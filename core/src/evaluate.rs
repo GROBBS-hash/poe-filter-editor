@@ -276,6 +276,9 @@ fn describe(b: &Block) -> (String, bool) {
         if ["Hide: ", "Highlight: ", "Louder: ", "Quieter: ", "Style: "].iter().any(|p| label.starts_with(p)) {
             return (label.to_string(), true);
         }
+        if let Some(rest) = label.strip_prefix("Preset: ") {
+            return (rest.to_string(), true);
+        }
         if label.starts_with("Price") {
             return (label.to_string(), false);
         }

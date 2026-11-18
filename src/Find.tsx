@@ -73,7 +73,11 @@ export default function Find({ onChange }: { onChange: () => void }) {
   const [levels, setLevels] = useState<LevelBuild[]>([]);
   const [allWeapons, setAllWeapons] = useState<string[]>([]);
   const [levelOn, setLevelOn] = useState<string | null>(null);
-  const [levelKeep, setLevelKeep] = useState<string[]>([]);
+  type LevelOpts = { keep: string[]; rares_from: number; hide_armour: boolean };
+  const [levelOpts, setLevelOpts] = useState<LevelOpts | null>(null);
+  const [raresFrom, setRaresFrom] = useState(16);
+  const [hideArmour, setHideArmour] = useState(false);
+  const levelKeep = levelOpts?.keep ?? [];
   const [editing, setEditing] = useState<{ build: LevelBuild; keep: string[] } | null>(null);
   const [levelColour, setLevelColour] = useState("Cyan");
   const [farmColour, setFarmColour] = useState<Record<string, string>>({});
@@ -83,8 +87,11 @@ export default function Find({ onChange }: { onChange: () => void }) {
   const [planned, setPlanned] = useState<{ plan: Plan | null; used_ai: boolean } | null>(null);
   const timer = useRef<number | undefined>(undefined);
 
-  const loadLevels = () => invoke<{ builds: LevelBuild[]; all: string[]; current: string | null; current_keep: string[] }>("list_level_presets")
-    .then((r) => { setLevels(r.builds); setAllWeapons(r.all); setLevelOn(r.current); setLevelKeep(r.current_keep); }).catch(() => {});
+  const loadLevels = () => invoke<{ builds: LevelBuild[]; all: string[]; current: string | null; options: LevelOpts | null }>("list_level_presets")
+    .then((r) => {
+      setLevels(r.builds); setAllWeapons(r.all); setLevelOn(r.current); setLevelOpts(r.options);
+      if (r.options) { setRaresFrom(r.options.rares_from); setHideArmour(r.options.hide_armour); }
+    }).catch(() => {});
   useEffect(() => { invoke<Preset[]>("list_farm_presets").then(setPresets).catch(() => {}); loadLevels(); }, []);
   useEffect(() => {
     window.clearTimeout(timer.current);
@@ -118,7 +125,7 @@ export default function Find({ onChange }: { onChange: () => void }) {
   };
   const applyLevel = async (id: string, title: string, keep: string[] = []) => {
     try {
-      await invoke("apply_level_preset", { id, keep, style: standOut(levelColour) });
+      await invoke("apply_level_preset", { id, options: { keep, rares_from: raresFrom, hide_armour: hideArmour && raresFrom > 0 }, style: standOut(levelColour) });
       setEditing(null);
       loadLevels();
       done(id === "off" ? "Levelling preset removed. Press F4 in game."
@@ -192,8 +199,25 @@ export default function Find({ onChange }: { onChange: () => void }) {
           {levelOn && <button className="link" onClick={() => applyLevel("off", "")}>Turn off ({levelOn})</button>}
         </div>
         <p className="muted small">Like FilterBlade's levelling presets. Until maps (area level 68), the weapons for your build stand out
-          and every other weapon type is hidden. Uniques and 4-links always show. One at a time; maps aren't affected.</p>
+          and every other weapon type is hidden. Uniques and 4-links always show, and 3-links until area level 28 (like NeverSink). One at a time; maps aren't affected.
+          Area level 16 is about the end of Act 2, 28 Act 4, 45 Act 8.</p>
         <div className="row"><span>Stand out in</span><Chips value={levelColour} onPick={setLevelColour} /></div>
+        <div className="row">
+          <span>White & blue weapons:</span>
+          <select value={raresFrom} onChange={(e) => setRaresFrom(+e.target.value)}>
+            <option value={0}>show the whole campaign</option>
+            {[8, 12, 16, 24, 28, 45].map((n) => <option key={n} value={n}>until area level {n}{n === 16 ? " (NeverSink’s choice)" : ""}, then rares only</option>)}
+          </select>
+        </div>
+        {raresFrom > 0 && (
+          <label className="tick">
+            <input type="checkbox" checked={hideArmour} onChange={(e) => setHideArmour(e.target.checked)} />
+            Also hide white & blue armour (body, helmet, gloves, boots) from area level {raresFrom}
+          </label>
+        )}
+        {levelOn && levelOpts && (levelOpts.rares_from !== raresFrom || levelOpts.hide_armour !== (hideArmour && raresFrom > 0)) && (
+          <div className="muted small">Press your build's button to apply these changes.</div>
+        )}
         <div className="farm-grid">
           {levels.map((p) => (
             <div key={p.id} className={`farm ${levelOn === p.title ? "on" : ""}`}>
@@ -204,7 +228,7 @@ export default function Find({ onChange }: { onChange: () => void }) {
               )}
               <div className="row">
                 <button className={levelOn === p.title ? "" : "primary"} onClick={() => applyLevel(p.id, p.title, levelOn === p.title ? levelKeep : p.keep)}>
-                  {levelOn === p.title ? "Using this ✓" : "Use this"}</button>
+                  {levelOn === p.title ? "Update ✓" : "Use this"}</button>
                 <button className="link" onClick={() => setEditing(editing?.build.id === p.id ? null
                   : { build: p, keep: levelOn === p.title ? levelKeep : p.keep })}>Edit weapons</button>
               </div>
