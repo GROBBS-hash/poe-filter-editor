@@ -1,3 +1,4 @@
+// The app (core logic lives in ../core; both are rebuilt by `tauri dev`).
 mod screen;
 
 use filter_core::{

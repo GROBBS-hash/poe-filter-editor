@@ -1,0 +1,5 @@
+# One Cargo workspace, so `tauri dev` also watches the core folder and
+# rebuilds the app when only core changes.
+[workspace]
+members = ["src-tauri", "core"]
+resolver = "2"
