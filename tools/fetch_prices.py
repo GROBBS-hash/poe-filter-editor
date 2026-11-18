@@ -33,6 +33,7 @@ POE2_EXCHANGE = ["Currency", "Fragments", "Abyss", "UncutGems", "LineageSupportG
 POE2_STASH = ["UniqueWeapons", "UniqueArmours", "UniqueAccessories", "UniqueFlasks", "UniqueCharms", "UniqueJewels"]
 
 debug = {}
+poe2_exalted_per_divine = 1.0  # set from the exchange data before uniques are read
 
 
 def get(path, **params):
@@ -76,16 +77,20 @@ def exchange(game, league, typ):
             "top_keys": list(data.keys()),
         }
     names = {}
-    for it in core.get("items") or data.get("items") or []:
+    for it in (data.get("items") or []) + (core.get("items") or []):
         if isinstance(it, dict) and it.get("id") is not None:
             names[str(it["id"])] = it.get("name") or it.get("text") or str(it["id"])
+    # PoE 2 prices come in Divine Orbs; convert to Exalted Orbs for finer steps.
+    factor = 1.0
+    if game == "poe2":
+        factor = num((core.get("rates") or {}).get("exalted")) or 1.0
     out = []
     for line in data.get("lines") or []:
         value = num(line.get("primaryValue"))
         name = names.get(str(line.get("id"))) or line.get("name")
         if value is None or not name:
             continue
-        out.append({"name": name, "base": name, "cat": typ, "value": value})
+        out.append({"name": name, "base": name, "cat": typ, "value": round(value * factor, 4)})
     return out, core
 
 
@@ -102,11 +107,15 @@ def stash_items(game, league, typ):
             continue
         if line.get("corrupted") and typ.startswith("Unique"):
             continue
+        if typ.startswith("Unique") and (line.get("listingCount") or 0) < 3:
+            continue  # too few listings to trust (price fixing, typos)
         value = num(line.get("chaosValue")) if game == "poe1" else num(line.get("primaryValue"))
+        if game == "poe2" and value is not None:
+            value *= poe2_exalted_per_divine
         name = line.get("name")
         if value is None or not name:
             continue
-        out.append({"name": name, "base": line.get("baseType") or name, "cat": typ, "value": value,
+        out.append({"name": name, "base": line.get("baseType") or name, "cat": typ, "value": round(value, 4),
                     "variant": line.get("variant"), "listings": line.get("listingCount")})
     return out
 
@@ -120,18 +129,21 @@ def run(game, exchange_types, stash_types):
     league_id = league.get("id") or league.get("name")
     print(f"{game}: league {league_id}")
     items, unit, core_seen = [], "chaos" if game == "poe1" else "exalted", None
+    global poe2_exalted_per_divine
     for t in exchange_types:
         res = exchange(game, league_id, t)
         if res:
             got, core = res
             core_seen = core_seen or core
+            if game == "poe2" and num((core.get("rates") or {}).get("exalted")):
+                poe2_exalted_per_divine = num(core["rates"]["exalted"])
             items += got
             print(f"  {t}: {len(got)}")
     for t in stash_types:
         got = stash_items(game, league_id, t)
         items += got
         print(f"  {t}: {len(got)}")
-    if core_seen and core_seen.get("primary"):
+    if game == "poe1" and core_seen and core_seen.get("primary"):
         unit = str(core_seen["primary"])
     return {
         "game": game,
