@@ -1310,8 +1310,36 @@ fn set_batch_mode(app: AppHandle, on: bool) {
 
 // ---------- startup ----------
 
+/// Everything the app keeps, loaded before any window opens (so a window can never
+/// ask for it too early). Same folder Tauri uses: <AppData>/com.grobbs.poefiltereditor.
+fn load_state() -> AppState {
+    let data = dirs::data_dir().unwrap_or_else(|| PathBuf::from(".")).join("com.grobbs.poefiltereditor");
+    let _ = std::fs::create_dir_all(&data);
+    let store_path = data.join("profiles.json");
+    // Start from the last downloaded prices, then keep them fresh.
+    let mut cached = std::collections::HashMap::new();
+    for g in [Game::Poe1, Game::Poe2] {
+        if let Some(f) = std::fs::read_to_string(data.join(format!("prices_{}.json", game_key(g)))).ok()
+            .and_then(|t| serde_json::from_str::<PriceFile>(&t).ok()) {
+            cached.insert(g, f);
+        }
+    }
+    let store = Store::load(&store_path);
+    let history_path = data.join("history.json");
+    let mut icons = std::collections::HashMap::new();
+    for g in [Game::Poe1, Game::Poe2] {
+        if let Some(m) = std::fs::read_to_string(data.join(format!("icons_{}.json", game_key(g)))).ok()
+            .and_then(|t| serde_json::from_str::<std::collections::HashMap<String, String>>(&t).ok()) {
+            icons.insert(g, m);
+        }
+    }
+    AppState { store: Mutex::new(store), store_path, history: Mutex::new(History::load(&history_path)), history_path,
+        icons: Mutex::new(icons), prices: Mutex::new(cached), data_dir: data, hotkeys: Mutex::new(Default::default()) }
+}
+
 pub fn run() {
     tauri::Builder::default()
+        .manage(load_state())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(
@@ -1349,30 +1377,7 @@ pub fn run() {
                 .build(),
         )
         .setup(move |app| {
-            let data = app.path().app_data_dir()?;
-            std::fs::create_dir_all(&data)?;
-            let store_path = data.join("profiles.json");
-            // Start from the last downloaded prices, then keep them fresh.
-            let mut cached = std::collections::HashMap::new();
-            for g in [Game::Poe1, Game::Poe2] {
-                if let Some(f) = std::fs::read_to_string(data.join(format!("prices_{}.json", game_key(g)))).ok()
-                    .and_then(|t| serde_json::from_str::<PriceFile>(&t).ok()) {
-                    cached.insert(g, f);
-                }
-            }
-            let store = Store::load(&store_path);
-            let settings = store.settings.clone();
-            let history_path = data.join("history.json");
-            let mut icons = std::collections::HashMap::new();
-            for g in [Game::Poe1, Game::Poe2] {
-                if let Some(m) = std::fs::read_to_string(data.join(format!("icons_{}.json", game_key(g)))).ok()
-                    .and_then(|t| serde_json::from_str::<std::collections::HashMap<String, String>>(&t).ok()) {
-                    icons.insert(g, m);
-                }
-            }
-            app.manage(AppState { store: Mutex::new(store), store_path,
-                history: Mutex::new(History::load(&history_path)), history_path, icons: Mutex::new(icons),
-                prices: Mutex::new(cached), data_dir: data.clone(), hotkeys: Mutex::new(Default::default()) });
+            let settings = app.state::<AppState>().store.lock().unwrap().settings.clone();
             start_price_updates(app.handle().clone());
             if register_hotkeys(app.handle(), &settings).is_err() {
                 // Fall back to the standard keys if saved ones can't be used.
