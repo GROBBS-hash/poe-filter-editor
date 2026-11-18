@@ -263,8 +263,11 @@ fn describe(b: &Block) -> (String, bool) {
     let content = b.header.trim_end();
     if let Some((_, label)) = content.split_once(" # ").filter(|_| b.type_path.is_empty()) {
         let label = label.trim();
-        if ["Hide: ", "Highlight: ", "Louder: ", "Quieter: "].iter().any(|p| label.starts_with(p)) {
+        if ["Hide: ", "Highlight: ", "Louder: ", "Quieter: ", "Style: "].iter().any(|p| label.starts_with(p)) {
             return (label.to_string(), true);
+        }
+        if label.starts_with("Price") {
+            return (label.to_string(), false);
         }
     }
     if b.type_path.is_empty() {

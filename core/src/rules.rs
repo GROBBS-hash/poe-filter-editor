@@ -300,6 +300,12 @@ pub const END: &str = "#=== LIVE-EDITOR END ===";
 /// so your latest choice always wins. Returns warnings for rules that no
 /// longer fit (e.g. after a NeverSink update renamed a tier).
 pub fn apply(segs: &mut Vec<Segment>, rules: &[Rule], nl: &str) -> Vec<String> {
+    apply_with_extra(segs, rules, "", nl)
+}
+
+/// Like `apply`, with extra generated blocks (price tiers) placed after your
+/// own edits and before the base filter.
+pub fn apply_with_extra(segs: &mut Vec<Segment>, rules: &[Rule], extra: &str, nl: &str) -> Vec<String> {
     let mut warnings = Vec::new();
     let mut top = format!("{START}{nl}# Edits made with the live editor. Rebuilt automatically; edit in the app.{nl}{nl}");
     for rule in rules.iter().rev() {
@@ -319,6 +325,7 @@ pub fn apply(segs: &mut Vec<Segment>, rules: &[Rule], nl: &str) -> Vec<String> {
             }
         }
     }
+    top.push_str(extra);
     top.push_str(&format!("{END}{nl}{nl}"));
     segs.insert(0, Segment::Raw(top));
     warnings

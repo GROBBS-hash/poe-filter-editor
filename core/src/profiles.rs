@@ -2,7 +2,8 @@
 //! "League Start", "Strict 1", "Strict 2"... each can build on a parent.
 
 use crate::filter::{parse_filter, render_filter};
-use crate::rules::{apply, Rule};
+use crate::prices::{price_blocks, PriceFile, PriceSettings};
+use crate::rules::{apply_with_extra, Rule};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fs, io, path::Path};
 
@@ -18,6 +19,9 @@ pub struct Profile {
     pub output_file: String,    // what the game loads, e.g. "League Start.filter"
     pub parent: Option<String>, // inherits this profile's edits first
     pub rules: Vec<Rule>,
+    /// Price tiering for this filter (off until you switch it on).
+    #[serde(default)]
+    pub prices: Option<PriceSettings>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -47,7 +51,7 @@ impl Store {
         let id = slug(name);
         self.profiles.insert(id.clone(), Profile {
             id: id.clone(), name: name.into(), game, base_file: base_file.into(),
-            output_file: format!("{name}.filter"), parent: None, rules: vec![],
+            output_file: format!("{name}.filter"), parent: None, rules: vec![], prices: None,
         });
         self.active.get_or_insert(id.clone());
         id
@@ -85,12 +89,21 @@ impl Store {
 /// Rebuilds a profile's filter from its base file plus all edits, backing up
 /// the previous output first. Returns warnings to show the user.
 pub fn build(store: &Store, id: &str, filter_dir: &Path) -> io::Result<Vec<String>> {
+    build_with_prices(store, id, filter_dir, None)
+}
+
+/// Rebuild including price tiers, when the profile has them switched on.
+pub fn build_with_prices(store: &Store, id: &str, filter_dir: &Path, prices: Option<&PriceFile>) -> io::Result<Vec<String>> {
     let p = store.profiles.get(id)
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "profile not found"))?;
     let base = fs::read_to_string(filter_dir.join(&p.base_file))?;
     let nl = if base.contains("\r\n") { "\r\n" } else { "\n" };
     let mut segs = parse_filter(&base);
-    let warnings = apply(&mut segs, &store.resolved_rules(id), nl);
+    let extra = match (&p.prices, prices) {
+        (Some(settings), Some(file)) => price_blocks(settings, file, nl),
+        _ => String::new(),
+    };
+    let warnings = apply_with_extra(&mut segs, &store.resolved_rules(id), &extra, nl);
 
     let out = filter_dir.join(&p.output_file);
     if out.exists() {
