@@ -41,6 +41,43 @@ pub struct Verdict {
     pub reason: String,
     /// Earlier blocks that might apply depending on things we can't see (mods etc).
     pub uncertain: Vec<String>,
+    /// Exactly which rule decided it, so the app can open it for editing.
+    pub source: Source,
+}
+
+/// Who decided an item's look, and where to change it.
+#[derive(Debug, Clone, Serialize, PartialEq, Default)]
+pub struct Source {
+    /// "edit" (your own), "preset" (levelling/farming presets), "price" (price tiers),
+    /// "neversink" (his filter), or "none".
+    pub kind: String,
+    /// Your edit's or preset's name, as listed in My edits.
+    pub label: String,
+    /// NeverSink's section and tier, e.g. ["currency", "stackedthree"] / "t5".
+    pub type_path: Vec<String>,
+    pub tier: Option<String>,
+    /// The same in the app's words, e.g. "Stacks of 3+" / "Tier 5", when it's in the Tiers tab.
+    pub section: Option<String>,
+    pub tier_name: Option<String>,
+}
+
+fn source_of(b: &Block) -> Source {
+    let label = b.header.trim_end().split_once(" # ").map(|(_, l)| l.trim().to_string()).unwrap_or_default();
+    if b.type_path.is_empty() {
+        let kind = if label.starts_with("Preset: ") { "preset" }
+            else if label.starts_with("Price") { "price" }
+            else if ["Hide: ", "Highlight: ", "Louder: ", "Quieter: ", "Style: "].iter().any(|p| label.starts_with(p)) { "edit" }
+            else { "none" };
+        return Source { kind: kind.into(), label, ..Default::default() };
+    }
+    Source {
+        kind: "neversink".into(),
+        section: crate::tiers::section_title(&b.type_path),
+        tier_name: b.tier.as_deref().map(|t| if b.type_path.first().map(String::as_str) == Some("gold") { crate::tiers::gold_name(t) } else { crate::tiers::tier_name(t) }),
+        type_path: b.type_path.clone(),
+        tier: b.tier.clone(),
+        label: String::new(),
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -334,13 +371,13 @@ pub fn evaluate(segs: &[Segment], c: &Ctx) -> Verdict {
                 if !cont {
                     let (decided_by, by_user_edit) = describe(b);
                     let reason = if by_user_edit || b.type_path.is_empty() { decided_by.clone() } else { crate::explain::explain(b) };
-                    return Verdict { visibility: b.visibility.clone(), style, decided_by, by_user_edit, reason, uncertain };
+                    return Verdict { visibility: b.visibility.clone(), style, decided_by, by_user_edit, reason, uncertain, source: source_of(b) };
                 }
             }
         }
     }
     Verdict { visibility: "None".into(), style, decided_by: "no rule matched".into(), by_user_edit: false,
-        reason: "Not covered by any rule (the game shows it normally)".into(), uncertain }
+        reason: "Not covered by any rule (the game shows it normally)".into(), uncertain, source: Source { kind: "none".into(), ..Default::default() } }
 }
 
 /// Full status, including whether stack size changes the outcome.

@@ -3,6 +3,7 @@ import Help from "./Help";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Overview } from "./types";
+import type { Source } from "./ItemPanel";
 import Setup from "./Setup";
 import Profiles from "./Profiles";
 import Edits from "./Edits";
@@ -67,6 +68,8 @@ export default function App() {
   });
   const setTab = (t: Tab) => { setTabRaw(t); try { localStorage.setItem("tab", t); } catch { /* not kept */ } };
   const [error, setError] = useState("");
+  /** "Modify rule" from the quick menu: which rule to show. */
+  const [focus, setFocus] = useState<Source | null>(null);
   const [adding, setAdding] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -78,9 +81,15 @@ export default function App() {
     const a = listen("batch-mode", (e) => { if (e.payload) setTab("batch"); refresh(); });
     const c = listen("active-changed", () => refresh());
     const d = listen("neversink-updated", () => refresh());
+    const g = listen<Source>("goto-rule", (e) => {
+      const src = e.payload;
+      setTab(src.kind === "neversink" ? "tiers" : src.kind === "edit" ? "edits" : src.kind === "preset" ? "presets" : src.kind === "price" ? "prices" : "find");
+      setFocus({ ...src });
+      refresh();
+    });
     const onFocus = () => refresh();
     window.addEventListener("focus", onFocus);
-    return () => { a.then((f) => f()); c.then((f) => f()); d.then((f) => f()); window.removeEventListener("focus", onFocus); };
+    return () => { a.then((f) => f()); c.then((f) => f()); d.then((f) => f()); g.then((f) => f()); window.removeEventListener("focus", onFocus); };
   }, [refresh]);
 
   if (!ov) return <div className="page">{error || "Loading…"}</div>;
@@ -123,7 +132,7 @@ export default function App() {
           <h1>{current?.name}</h1>
           <div className="muted small">{current?.hint}</div>
         </div>
-      {tab === "edits" && <Edits profile={active} onChange={refresh} />}
+      {tab === "edits" && <Edits profile={active} onChange={refresh} focus={focus?.kind === "edit" ? focus : null} />}
       {tab === "prices" && <Prices profile={active} />}
       {tab === "themes" && <Themes profile={active} onChange={refresh} />}
       {tab === "settings" && <SettingsPage />}
@@ -131,7 +140,7 @@ export default function App() {
       {tab === "help" && <Help go={(t) => setTab(t as Tab)} />}
       {tab === "gear" && <Gear />}
       {tab === "build" && <MyBuild />}
-      {tab === "tiers" && <Tiers profile={active} onChange={refresh} />}
+      {tab === "tiers" && <Tiers profile={active} onChange={refresh} focus={focus?.kind === "neversink" ? focus : null} />}
       {tab === "presets" && <Find key="presets" view="presets" onChange={refresh} />}
       {tab === "batch" && <Batch on={ov.batch_on} onChange={refresh} />}
       {tab === "profiles" && <Profiles ov={ov} active={active} onChange={refresh} onNew={() => setAdding(true)} />}

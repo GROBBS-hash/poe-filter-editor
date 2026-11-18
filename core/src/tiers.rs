@@ -86,7 +86,13 @@ pub fn tier_name(t: &str) -> String {
     c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default()
 }
 
-fn gold_name(t: &str) -> String {
+/// The Tiers tab's name for a NeverSink section, when it lists it.
+pub fn section_title(type_path: &[String]) -> Option<String> {
+    let key = type_path.join("->");
+    KNOWN.iter().find(|k| k.0 == key).map(|k| k.2.to_string())
+}
+
+pub fn gold_name(t: &str) -> String {
     match t {
         "stack3" => "Huge piles".into(), "stack2" => "Large piles".into(), "stack1" => "Medium piles".into(),
         "stacklvl1" => "Small piles (levelling only)".into(), "anyother" => "Any other gold".into(), _ => tier_name(t),
@@ -190,6 +196,17 @@ mod tests {
         assert!(stacks.tiers[0].note.contains("stacks of 3+"), "{:?}", stacks.tiers[0].note);
         assert!(s.iter().any(|x| x.title == "Divination cards" && x.tiers.len() >= 5));
         println!("{:?}", s.iter().map(|x| (&x.group, &x.title, x.tiers.len())).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn verdict_names_its_rule() {
+        let segs = parse_filter(&fixture());
+        let it = |n| crate::item::Item { item_class: "Stackable Currency".into(), rarity: "Currency".into(), base_type: "Jeweller's Orb".into(), stack_size: Some(n), ..Default::default() };
+        let v = crate::evaluate::status(&segs, &it(3), Some(70), false).verdict;
+        println!("{:?}", v.source);
+        assert_eq!(v.source.kind, "neversink");
+        assert!(v.source.section.as_deref().map(|s| s.starts_with("Stacks of")).unwrap_or(false), "{:?}", v.source);
+        assert!(v.source.tier_name.as_deref().unwrap_or("").starts_with("Tier"));
     }
 
     #[test]

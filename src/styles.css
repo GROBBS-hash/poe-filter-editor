@@ -458,3 +458,17 @@ code { background: #000; padding: 1px 5px; border-radius: 4px; color: var(--gold
 .tv-asc-svg circle.new { fill: #5ee06a; stroke: #d6ffd6; }
 .tv-asc-label { fill: #8f8572; font-size: 54px; font-family: inherit; }
 .tv-asc-label.on { fill: #e8be5a; } .tv-asc-label.new { fill: #5ee06a; }
+
+/* "Why" box in the quick menu */
+.qm-why { margin-top: 8px; padding: 7px 9px; border-radius: 7px; background: rgba(0,0,0,.28); border-left: 3px solid #8a7a55; }
+.why-top { display: flex; align-items: baseline; gap: 7px; }
+.why-badge { flex: none; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; padding: 1px 6px; border-radius: 4px; background: #3b2f1a; color: var(--gold); }
+.why-text { font-size: 13px; color: #f3e6c4; }
+.why-where { font-size: 12px; color: #cbbfa6; margin-top: 3px; }
+.why-more { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.why-actions { display: flex; gap: 10px; margin-top: 5px; align-items: center; }
+.qm-why.why-edit { border-left-color: #59d0ff; } .why-edit .why-badge { background: #12303c; color: #9fe3ff; }
+.qm-why.why-preset { border-left-color: #5ee06a; } .why-preset .why-badge { background: #173219; color: #b6f3bb; }
+.qm-why.why-price { border-left-color: #ffb347; } .why-price .why-badge { background: #3d2a10; color: #ffd59a; }
+.qm-why.why-none { border-left-color: #666; }
+.tier.focus { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(230,190,90,.45); animation: chipglow 1.2s ease-in-out 2; }

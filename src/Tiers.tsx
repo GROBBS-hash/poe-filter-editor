@@ -56,7 +56,8 @@ const SHOW_ITEMS = 24;
 
 /** Like FilterBlade: NeverSink's tier lists. Tick to show/hide a tier, click its label to restyle it,
  *  drag items between tiers to re-rank them. */
-export default function Tiers({ profile, onChange }: { profile: ProfileInfo; onChange: () => void }) {
+export default function Tiers({ profile, onChange, focus }: { profile: ProfileInfo; onChange: () => void;
+  focus?: { type_path: string[]; tier: string | null } | null }) {
   const [sections, setSections] = useState<Section[]>([]);
   const [sel, setSel] = useState<string>("");
   const [q, setQ] = useState("");
@@ -65,6 +66,17 @@ export default function Tiers({ profile, onChange }: { profile: ProfileInfo; onC
   const [drag, setDrag] = useState<{ base: string; from: string } | null>(null);
   const [over, setOver] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
+  const [focusTier, setFocusTier] = useState<string | null>(null);
+  // Opened from the quick menu's "Modify rule": show that section and make the tier glow.
+  useEffect(() => {
+    if (!focus || sections.length === 0) return;
+    const k = focus.type_path.join(">");
+    if (!sections.some((s) => s.type_path.join(">") === k)) return;
+    setSel(k); setQ(""); setEditing(null); setFocusTier(focus.tier);
+    const id = window.setTimeout(() => document.querySelector(`[data-tier="${CSS.escape(focus.tier ?? "")}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
+    const off = window.setTimeout(() => setFocusTier(null), 3000);
+    return () => { window.clearTimeout(id); window.clearTimeout(off); };
+  }, [focus, sections]);
   const [found, setFound] = useState<{ base: string; tier: string } | null>(null);
   const [copied, setCopied] = useState<{ style: CustomStyle; from: string } | null>(null);
 
@@ -160,7 +172,7 @@ export default function Tiers({ profile, onChange }: { profile: ProfileInfo; onC
               const open = expanded[key];
               const items = open ? t.bases : t.bases.slice(0, SHOW_ITEMS);
               return (
-                <div key={key} className={`tier ${over === key ? "over" : ""} ${shown ? "" : "off"}`}
+                <div key={key} data-tier={key} className={`tier ${over === key ? "over" : ""} ${shown ? "" : "off"} ${focusTier === key ? "focus" : ""}`}
                   onDragOver={(e) => { if (drag && drag.from !== key) { e.preventDefault(); setOver(key); } }}
                   onDragLeave={() => setOver((o) => (o === key ? null : o))}
                   onDrop={(e) => { e.preventDefault(); drop(t); }}>

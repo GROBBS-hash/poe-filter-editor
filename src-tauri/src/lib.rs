@@ -600,6 +600,18 @@ fn pob_set_stage(app: AppHandle, state: State<AppState>, stage: usize) -> Result
     Ok(())
 }
 
+/// "Modify rule" in the quick menu: bring the main app forward on the page for that rule.
+#[tauri::command]
+fn open_rule(app: AppHandle, source: serde_json::Value) {
+    if let Some(o) = app.get_webview_window("overlay") { let _ = o.hide(); }
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.unminimize();
+        let _ = w.show();
+        let _ = w.set_focus();
+        let _ = w.emit("goto-rule", source);
+    }
+}
+
 /// F6: show/hide the build window over the game.
 fn toggle_build_window(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("build") {
@@ -1460,6 +1472,7 @@ pub fn run() {
             pob_get,
             pob_set_stage,
             hide_build_window,
+            open_rule,
             gear_picks,
             open_url,
             set_stack_tier,

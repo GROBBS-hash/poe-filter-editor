@@ -99,7 +99,7 @@ function History({ profile, onChange }: { profile: ProfileInfo; onChange: () => 
   );
 }
 
-export default function Edits({ profile, onChange }: { profile: ProfileInfo; onChange: () => void }) {
+export default function Edits({ profile, onChange, focus }: { profile: ProfileInfo; onChange: () => void; focus?: { label: string } | null }) {
   const [msg, setMsg] = useState("");
   const [open, setOpen] = useState<{ index: number; detail: RuleDetail } | null>(null);
   const [q, setQ] = useState("");
@@ -122,6 +122,16 @@ export default function Edits({ profile, onChange }: { profile: ProfileInfo; onC
       setOpen({ index, detail });
     } catch (e) { setMsg(String(e)); }
   };
+
+  // Opened from the quick menu's "Modify rule": open that edit.
+  useEffect(() => {
+    if (!focus) return;
+    const r = [...profile.rules].reverse().find((x) => x.label === focus.label);
+    if (!r) return;
+    setQ("");
+    edit(r.index).then(() => window.setTimeout(() =>
+      document.querySelector(`[data-rule="${r.index}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 80));
+  }, [focus]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Group by item, newest first within each group; groups ordered by their newest edit.
   const needle = q.trim().toLowerCase();
@@ -165,7 +175,7 @@ export default function Edits({ profile, onChange }: { profile: ProfileInfo; onC
                 </div>
                 <ul className="rules">
                   {rules.map((r) => (
-                    <li key={r.index} className={`${open?.index === r.index ? "open" : ""} ${r.shadowed_by ? "unused" : ""}`}>
+                    <li key={r.index} data-rule={r.index} className={`${open?.index === r.index ? "open" : ""} ${r.shadowed_by ? "unused" : ""}`}>
                       <div className="rule-line">
                         <span className="rule-main">
                           <Look r={r} />

@@ -24,9 +24,38 @@ export function itemFromRule(d: RuleDetail): Item {
     corrupted: false, mirrored: false, unidentified: false,
   };
 }
+export type Source = { kind: string; label: string; type_path: string[]; tier: string | null; section: string | null; tier_name: string | null };
+const WHO: Record<string, string> = { neversink: "NeverSink", edit: "Your edit", preset: "Preset", price: "Price tier", none: "No rule" };
+
+/** A clear "why": who decided it, in plain words, which rule, and a button to open that rule in the app. */
+function Why({ v, onEditHere }: { v: Status["verdict"]; onEditHere?: () => void }) {
+  const src = v.source ?? { kind: v.by_user_edit ? "edit" : "neversink", label: v.decided_by, type_path: [], tier: null, section: null, tier_name: null };
+  const name = src.label.replace(/^(Preset|Hide|Highlight|Louder|Quieter|Style): /, "");
+  const headline = src.kind === "neversink" ? v.reason.split(", ")[0] : src.kind === "none" ? "No rule covers it, so the game shows it plainly" : name || v.decided_by;
+  const where = src.kind === "neversink"
+    ? (src.section ? `Tiers › ${src.section} › ${src.tier_name ?? src.tier}` : `NeverSink › ${src.type_path.join(" › ")}${src.tier ? ` › ${src.tier}` : ""}`)
+    : src.kind === "edit" ? "My edits" : src.kind === "preset" ? (src.label.startsWith("Preset: Levelling") ? "Presets › Levelling setup" : "Presets") : src.kind === "price" ? "Prices" : "";
+  const canOpen = src.kind !== "none" && (src.kind !== "neversink" || !!src.section);
+  return (
+    <div className={`qm-why why-${src.kind}`} title={v.reason}>
+      <div className="why-top">
+        <span className="why-badge">{WHO[src.kind] ?? src.kind}</span>
+        <span className="why-text">{headline}</span>
+      </div>
+      {where && <div className="why-where">{where}</div>}
+      {src.kind === "neversink" && v.reason.includes(", ") && <div className="why-more">{v.reason.split(", ").slice(1).join(", ")}</div>}
+      <div className="why-actions">
+        {onEditHere && <button className="qm-inline" onClick={onEditHere}>Edit here</button>}
+        {canOpen && <button className="qm-inline" onClick={() => invoke("open_rule", { source: src })}>Modify rule ↗</button>}
+        {!canOpen && src.kind === "neversink" && <span className="muted small">Change it from here with the buttons below.</span>}
+      </div>
+    </div>
+  );
+}
+
 type Style = CurrentStyle & { sound?: string | null; minimap?: string | null };
 type Status = {
-  verdict: { visibility: string; style: Style; decided_by: string; by_user_edit: boolean; reason: string; uncertain: string[] };
+  verdict: { visibility: string; style: Style; decided_by: string; by_user_edit: boolean; reason: string; uncertain: string[]; source: Source };
   by_stack: { from: number; visibility: string }[];
   assumptions: string[];
 };
@@ -360,12 +389,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
             </div>
           )}
           {status!.by_stack.length > 0 && <div className="qm-facts">Stacks: {stackLine(status!.by_stack)}</div>}
-          <div className="qm-by">
-            {v.by_user_edit ? <>Your edit: <b>{v.decided_by}</b>{" "}
-              {!replacing && <button className="qm-inline" onClick={() => openRule(v.decided_by)}>Edit this rule</button>}</>
-              : v.decided_by.startsWith("Price") ? <>Price tiers: {v.decided_by}</>
-              : <span title={`${v.reason}\nNeverSink rule: ${v.decided_by}`}>Why: {v.reason.split(", ")[0]}</span>}
-          </div>
+          <Why v={v} onEditHere={v.by_user_edit && !replacing ? () => openRule(v.decided_by) : undefined} />
           {(v.uncertain.length > 0 || status!.assumptions.length > 0 || extra?.area_level != null) && (
             <div className="qm-unsure" title={[
               extra?.area_level != null ? `Area level ${extra.area_level} (from your game)` : "",
