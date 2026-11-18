@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import ItemPanel from "./ItemPanel";
+import LevelSetup from "./LevelSetup";
 import { ItemIcon } from "./icons";
 import { CustomStyle, GAME_COLOURS } from "./StyleEditor";
 import { Item } from "./types";
@@ -69,17 +70,6 @@ export default function Find({ onChange, view = "find" }: { onChange: () => void
   const [weapon, setWeapon] = useState("Two Hand Maces");
   const [oldWeapon, setOldWeapon] = useState("");
   const [buildColour, setBuildColour] = useState("Cyan");
-  type LevelBuild = { id: string; title: string; hint: string; keep: string[] };
-  const [levels, setLevels] = useState<LevelBuild[]>([]);
-  const [allWeapons, setAllWeapons] = useState<string[]>([]);
-  const [levelOn, setLevelOn] = useState<string | null>(null);
-  type LevelOpts = { keep: string[]; rares_from: number; hide_armour: boolean };
-  const [levelOpts, setLevelOpts] = useState<LevelOpts | null>(null);
-  const [raresFrom, setRaresFrom] = useState(16);
-  const [hideArmour, setHideArmour] = useState(false);
-  const levelKeep = levelOpts?.keep ?? [];
-  const [editing, setEditing] = useState<{ build: LevelBuild; keep: string[] } | null>(null);
-  const [levelColour, setLevelColour] = useState("Cyan");
   const [farmColour, setFarmColour] = useState<Record<string, string>>({});
   const [msg, setMsg] = useState("");
   const [askText, setAskText] = useState("");
@@ -87,12 +77,7 @@ export default function Find({ onChange, view = "find" }: { onChange: () => void
   const [planned, setPlanned] = useState<{ plan: Plan | null; used_ai: boolean } | null>(null);
   const timer = useRef<number | undefined>(undefined);
 
-  const loadLevels = () => invoke<{ builds: LevelBuild[]; all: string[]; current: string | null; options: LevelOpts | null }>("list_level_presets")
-    .then((r) => {
-      setLevels(r.builds); setAllWeapons(r.all); setLevelOn(r.current); setLevelOpts(r.options);
-      if (r.options) { setRaresFrom(r.options.rares_from); setHideArmour(r.options.hide_armour); }
-    }).catch(() => {});
-  useEffect(() => { invoke<Preset[]>("list_farm_presets").then(setPresets).catch(() => {}); loadLevels(); }, []);
+  useEffect(() => { invoke<Preset[]>("list_farm_presets").then(setPresets).catch(() => {}); }, []);
   useEffect(() => {
     window.clearTimeout(timer.current);
     if (!q.trim()) { setResults([]); return; }
@@ -121,15 +106,6 @@ export default function Find({ onChange, view = "find" }: { onChange: () => void
         }
       }
       done(`Every ${weapon} now stands out in ${buildColour.toLowerCase()}${oldWeapon ? `, and normal/magic ${oldWeapon} are hidden` : ""}. Press F4 in game.`);
-    } catch (e) { setMsg(String(e)); }
-  };
-  const applyLevel = async (id: string, title: string, keep: string[] = []) => {
-    try {
-      await invoke("apply_level_preset", { id, options: { keep, rares_from: raresFrom, hide_armour: hideArmour && raresFrom > 0 }, style: standOut(levelColour) });
-      setEditing(null);
-      loadLevels();
-      done(id === "off" ? "Levelling preset removed. Press F4 in game."
-        : `${title}: while levelling, your weapons stand out in ${levelColour.toLowerCase()} and other weapons are hidden (uniques always show). Press F4 in game.`);
     } catch (e) { setMsg(String(e)); }
   };
   const applyFarm = async (p: Preset) => {
@@ -196,69 +172,7 @@ export default function Find({ onChange, view = "find" }: { onChange: () => void
 
       </>}
       {view === "presets" && <>
-      <div className="card">
-        <div className="row between">
-          <h2>Levelling build</h2>
-          {levelOn && <button className="link" onClick={() => applyLevel("off", "")}>Turn off ({levelOn})</button>}
-        </div>
-        <p className="muted small">Like FilterBlade's levelling presets. Until maps (area level 68), the weapons for your build stand out
-          and every other weapon type is hidden. Uniques and 4-links always show, and 3-links until area level 28 (like NeverSink). One at a time; maps aren't affected.
-          Area level 16 is about the end of Act 2, 28 Act 4, 45 Act 8.</p>
-        <div className="row"><span>Stand out in</span><Chips value={levelColour} onPick={setLevelColour} /></div>
-        <div className="row">
-          <span>White & blue weapons:</span>
-          <select value={raresFrom} onChange={(e) => setRaresFrom(+e.target.value)}>
-            <option value={0}>show the whole campaign</option>
-            {[8, 12, 16, 24, 28, 45].map((n) => <option key={n} value={n}>until area level {n}{n === 16 ? " (NeverSink’s choice)" : ""}, then rares only</option>)}
-          </select>
-        </div>
-        {raresFrom > 0 && (
-          <label className="tick">
-            <input type="checkbox" checked={hideArmour} onChange={(e) => setHideArmour(e.target.checked)} />
-            Also hide white & blue armour (body, helmet, gloves, boots) from area level {raresFrom}
-          </label>
-        )}
-        {levelOn && levelOpts && (levelOpts.rares_from !== raresFrom || levelOpts.hide_armour !== (hideArmour && raresFrom > 0)) && (
-          <div className="muted small">Press your build's button to apply these changes.</div>
-        )}
-        <div className="farm-grid">
-          {levels.map((p) => (
-            <div key={p.id} className={`farm ${levelOn === p.title ? "on" : ""}`}>
-              <b>{p.title}</b>
-              <span className="muted small">{p.hint}</span>
-              {levelOn === p.title && levelKeep.join() !== p.keep.join() && (
-                <span className="small">Your pick: {levelKeep.join(", ")}</span>
-              )}
-              <div className="row">
-                <button className={levelOn === p.title ? "" : "primary"} onClick={() => applyLevel(p.id, p.title, levelOn === p.title ? levelKeep : p.keep)}>
-                  {levelOn === p.title ? "Update ✓" : "Use this"}</button>
-                <button className="link" onClick={() => setEditing(editing?.build.id === p.id ? null
-                  : { build: p, keep: levelOn === p.title ? levelKeep : p.keep })}>Edit weapons</button>
-              </div>
-            </div>
-          ))}
-        </div>
-        {editing && (
-          <div className="plan">
-            <div><b>{editing.build.title}</b>: tick the weapon types you want while levelling. Unticked ones are hidden (uniques and 4-links still show).</div>
-            <div className="ticks">
-              {allWeapons.map((w) => (
-                <label key={w} className="tick">
-                  <input type="checkbox" checked={editing.keep.includes(w)}
-                    onChange={(e) => setEditing({ ...editing, keep: e.target.checked ? [...editing.keep, w] : editing.keep.filter((x) => x !== w) })} />
-                  {w}
-                </label>
-              ))}
-            </div>
-            <div className="row">
-              <button className="primary" disabled={editing.keep.length === 0}
-                onClick={() => applyLevel(editing.build.id, editing.build.title, editing.keep)}>Use with these</button>
-              <button className="link" onClick={() => setEditing({ ...editing, keep: editing.build.keep })}>Reset to default</button>
-              <button onClick={() => setEditing(null)}>Cancel</button>
-            </div>
-          </div>
-        )}
-      </div>
+      <LevelSetup onDone={done} />
 
       <div className="card">
         <h2>Switching build?</h2>

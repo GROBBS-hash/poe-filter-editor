@@ -270,3 +270,9 @@ code { background: #000; padding: 1px 5px; border-radius: 4px; color: var(--gold
 .farm.on { border-color: var(--gold); }
 .ticks { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 4px 12px; margin: 8px 0; }
 .tick { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
+.lvl-builds { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 6px; margin: 8px 0; }
+.lvl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; margin: 6px 0 10px; }
+.lvl-tile { padding: 10px 8px; border: 1px solid #3a3022; border-radius: 6px; background: #1d1812; color: var(--muted); font-size: 13px; text-align: center; cursor: pointer; }
+.lvl-tile:hover { border-color: #6b5838; color: var(--text); }
+.lvl-tile.on { background: #3b2f1a; border-color: var(--gold); color: #f3e6c4; }
+.lvl-builds .lvl-tile { font-size: 14px; font-weight: 600; }

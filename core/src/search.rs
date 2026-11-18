@@ -148,181 +148,187 @@ pub fn farm_rules(id: &str, style: &CustomStyle) -> Vec<Rule> {
     out
 }
 
-// ---------- levelling presets (like FilterBlade's build types) ----------
+// ---------- levelling (like FilterBlade's "Auto-Adjust: Campaign") ----------
+
+use crate::profiles::Game;
 
 /// Every weapon-ish item type, per game.
-pub fn weapon_classes(game: crate::profiles::Game) -> &'static [&'static str] {
+pub fn weapon_classes(game: Game) -> &'static [&'static str] {
     match game {
-        crate::profiles::Game::Poe1 => &["Bows", "Claws", "Daggers", "One Hand Axes", "One Hand Maces", "One Hand Swords", "Quivers",
-            "Rune Daggers", "Sceptres", "Shields", "Staves", "Thrusting One Hand Swords", "Two Hand Axes", "Two Hand Maces",
-            "Two Hand Swords", "Wands", "Warstaves"],
-        crate::profiles::Game::Poe2 => &["Bows", "Bucklers", "Crossbows", "Foci", "One Hand Maces", "Quarterstaves", "Quivers",
-            "Sceptres", "Shields", "Spears", "Staves", "Two Hand Maces", "Wands"],
+        Game::Poe1 => &["Warstaves", "Two Hand Maces", "Two Hand Axes", "One Hand Maces", "One Hand Axes", "Two Hand Swords",
+            "One Hand Swords", "Thrusting One Hand Swords", "Bows", "Quivers", "Claws", "Daggers", "Rune Daggers", "Wands",
+            "Sceptres", "Staves", "Shields"],
+        Game::Poe2 => &["Two Hand Maces", "One Hand Maces", "Quarterstaves", "Spears", "Bows", "Crossbows", "Quivers",
+            "Wands", "Sceptres", "Staves", "Foci", "Shields", "Bucklers"],
     }
 }
 
-/// (id, title, what it keeps) — the kept item types, per game.
-pub const LEVEL_BUILDS: [(&str, &str, &str); 6] = [
-    ("caster", "Caster", "Wands, staves, sceptres, rune daggers, shields / foci"),
-    ("minion", "Minions", "Wands, sceptres, shields / foci"),
-    ("melee2h", "Two-handed melee", "Two hand axes, maces, swords and staves"),
-    ("melee1h", "One-handed melee", "One hand weapons, claws, daggers and shields"),
-    ("ranged", "Bow / ranged", "Bows and quivers (crossbows and spears in PoE 2)"),
-    ("spear", "Spear (PoE 2)", "Spears and bucklers"),
+/// Build buttons: (id, title). "custom" keeps whatever you tick.
+pub const LEVEL_BUILDS: [(&str, &str); 8] = [
+    ("custom", "Custom"), ("claw", "Claw & Dagger"), ("bow", "Bow Ranger"), ("sword", "Sword & Shield"),
+    ("twohand", "2H Axe/Mace"), ("templar", "Fire Templar"), ("spells", "Spells & Minions"), ("spear", "Spear (PoE 2)"),
 ];
 
-pub fn level_keep(id: &str, game: crate::profiles::Game) -> Vec<&'static str> {
-    use crate::profiles::Game::*;
+/// Defence types, as on FilterBlade.
+pub const ARMOUR_TYPES: [(&str, &str); 6] = [
+    ("ar", "Armour"), ("ar_ev", "AR/EV"), ("ev", "Evasion"), ("ev_es", "EV/ES"), ("es", "Energy Shield"), ("ar_es", "AR/ES"),
+];
+
+/// Vendor-rares level ranges, as on FilterBlade: [from, below).
+pub const VENDOR_RANGES: [(u32, u32); 4] = [(1, 16), (16, 24), (24, 42), (42, 68)];
+
+/// What a build button ticks: (weapon types, armour types).
+pub fn build_defaults(id: &str, game: Game) -> (Vec<&'static str>, Vec<&'static str>) {
     match (id, game) {
-        ("caster", Poe1) => vec!["Wands", "Staves", "Sceptres", "Rune Daggers", "Shields"],
-        ("caster", Poe2) => vec!["Wands", "Staves", "Sceptres", "Foci"],
-        ("minion", Poe1) => vec!["Wands", "Sceptres", "Shields"],
-        ("minion", Poe2) => vec!["Wands", "Sceptres", "Foci"],
-        ("melee2h", Poe1) => vec!["Two Hand Axes", "Two Hand Maces", "Two Hand Swords", "Staves", "Warstaves"],
-        ("melee2h", Poe2) => vec!["Two Hand Maces", "Quarterstaves"],
-        ("melee1h", Poe1) => vec!["Claws", "Daggers", "One Hand Axes", "One Hand Maces", "One Hand Swords", "Thrusting One Hand Swords", "Shields"],
-        ("melee1h", Poe2) => vec!["One Hand Maces", "Shields"],
-        ("ranged", Poe1) => vec!["Bows", "Quivers"],
-        ("ranged", Poe2) => vec!["Bows", "Quivers", "Crossbows"],
-        ("spear", Poe2) => vec!["Spears", "Bucklers"],
-        _ => vec![],
+        ("claw", Game::Poe1) => (vec!["Claws", "Daggers", "Rune Daggers"], vec!["ev", "ev_es"]),
+        ("bow", Game::Poe1) => (vec!["Bows", "Quivers"], vec!["ev", "ev_es", "ar_ev"]),
+        ("bow", Game::Poe2) => (vec!["Bows", "Quivers", "Crossbows"], vec!["ev", "ev_es", "ar_ev"]),
+        ("sword", Game::Poe1) => (vec!["One Hand Swords", "Thrusting One Hand Swords", "One Hand Axes", "One Hand Maces", "Shields"], vec!["ar", "ar_ev"]),
+        ("sword", Game::Poe2) => (vec!["One Hand Maces", "Shields"], vec!["ar", "ar_ev"]),
+        ("twohand", Game::Poe1) => (vec!["Two Hand Axes", "Two Hand Maces", "Two Hand Swords", "Warstaves"], vec!["ar", "ar_ev"]),
+        ("twohand", Game::Poe2) => (vec!["Two Hand Maces", "Quarterstaves"], vec!["ar", "ar_ev"]),
+        ("templar", Game::Poe1) => (vec!["Sceptres", "Staves", "Shields"], vec!["ar_es", "es"]),
+        ("templar", Game::Poe2) => (vec!["Sceptres", "Staves", "Foci"], vec!["ar_es", "es"]),
+        ("spells", Game::Poe1) => (vec!["Wands", "Sceptres", "Rune Daggers", "Staves", "Shields"], vec!["es", "ev_es", "ar_es"]),
+        ("spells", Game::Poe2) => (vec!["Wands", "Sceptres", "Staves", "Foci"], vec!["es", "ev_es", "ar_es"]),
+        ("spear", Game::Poe2) => (vec!["Spears", "Bucklers"], vec!["ev", "ar_ev", "ev_es"]),
+        _ => (vec![], vec![]),
     }
 }
 
-pub fn level_presets(game: crate::profiles::Game) -> Vec<Preset> {
-    LEVEL_BUILDS.iter().filter(|(id, ..)| !level_keep(id, game).is_empty())
-        .map(|(id, title, hint)| Preset { id, title, hint, count: level_keep(id, game).len() }).collect()
+pub fn level_builds(game: Game) -> Vec<(&'static str, &'static str)> {
+    LEVEL_BUILDS.iter().copied().filter(|(id, _)| *id == "custom" || !build_defaults(id, game).0.is_empty()).collect()
 }
 
-pub const LEVEL_PREFIX: &str = "Preset: Levelling";
-
-/// While levelling (area level under 68): your weapon types stand out, every
-/// other weapon type is hidden. Uniques are never touched; in PoE 1, linked
-/// (4+ link) items still show, since they're worth wearing for anyone.
-pub fn level_rules(id: &str, game: crate::profiles::Game, style: &CustomStyle) -> Vec<Rule> {
-    let keep: Vec<String> = level_keep(id, game).iter().map(|c| c.to_string()).collect();
-    level_rules_with(id, game, &keep, style)
-}
-
-/// Your choices for a levelling build.
-#[derive(Debug, Clone, serde::Deserialize, Serialize, Default)]
+/// Your levelling choices (kept with the profile).
+#[derive(Debug, Clone, serde::Deserialize, Serialize, PartialEq)]
+#[serde(default)]
 pub struct LevelOptions {
-    /// Weapon types you want; the rest are hidden.
+    pub build: String,
+    /// Weapon types you want: they stand out. Others are hidden.
     pub keep: Vec<String>,
-    /// From this area level on, only rares of your weapons (0 = white and blue the whole campaign).
-    #[serde(default)]
+    /// Armour defence types you want. Others are hidden. Empty = all.
+    pub armour_types: Vec<String>,
+    /// Which VENDOR_RANGES still show rares of unpicked gear (to sell).
+    pub vendor_rares: Vec<usize>,
+    /// Also hide linked (3/4-link) unpicked gear.
+    pub aggressive: bool,
+    /// Minion bases (Convoking Wand, Bone Helmet...) always stand out.
+    pub minion: bool,
+    /// From this area level on, only rares of your weapons (0 = whole campaign).
     pub rares_from: u32,
     /// From that level on, hide white and blue armour too.
-    #[serde(default)]
     pub hide_armour: bool,
 }
 
-const ARMOUR: [&str; 4] = ["Body Armours", "Boots", "Gloves", "Helmets"];
-
-/// Same, with your own pick of weapon types to keep (e.g. caster without sceptres).
-pub fn level_rules_with(id: &str, game: crate::profiles::Game, keep: &[String], style: &CustomStyle) -> Vec<Rule> {
-    level_rules_opts(id, game, &LevelOptions { keep: keep.to_vec(), ..Default::default() }, style)
+impl Default for LevelOptions {
+    fn default() -> Self {
+        Self { build: "custom".into(), keep: vec![], armour_types: vec![], vendor_rares: vec![0, 1], aggressive: false,
+            minion: false, rares_from: 16, hide_armour: false }
+    }
 }
 
-/// Rules are listed oldest first; later ones win, so the "from area N" hides come last.
-pub fn level_rules_opts(id: &str, game: crate::profiles::Game, o: &LevelOptions, style: &CustomStyle) -> Vec<Rule> {
-    let Some((_, title, _)) = LEVEL_BUILDS.iter().find(|b| b.0 == id) else { return vec![] };
+pub const LEVEL_PREFIX: &str = "Preset: Levelling";
+const ARMOUR: [&str; 4] = ["Body Armours", "Boots", "Gloves", "Helmets"];
+const MINION_BASES: [&str; 6] = ["Bone Helmet", "Bone Spirit Shield", "Calling Wand", "Convoking Wand", "Necromancer Circlet", "Necromancer Silks"];
+
+/// The rules for your levelling choices. Later rules win (they go higher in the filter).
+/// Everything is limited to area level < 68, and uniques are never touched.
+pub fn level_rules_opts(game: Game, o: &LevelOptions, style: &CustomStyle) -> Vec<Rule> {
+    let title = LEVEL_BUILDS.iter().find(|b| b.0 == o.build).map(|b| b.1).unwrap_or("Custom");
+    let poe1 = game == Game::Poe1;
     let all = weapon_classes(game);
-    let keep: Vec<&str> = all.iter().copied().filter(|c| o.keep.iter().any(|k| k == c)).collect();
-    if keep.is_empty() { return vec![]; }
-    let poe1 = game == crate::profiles::Game::Poe1;
-    // Like NeverSink: linked items still show for anyone (3-links until area 28, 4-links always).
-    // A hide becomes two blocks in PoE 1: before 28 only unlinked (< 3), after it anything under 4 links.
-    let hide_rules = |out: &mut Vec<Rule>, label: String, c: Vec<String>| {
-        if !poe1 {
-            out.push(Rule::Override { label, show: false, conditions: c, actions: vec![] });
-            return;
+    let keep: Vec<String> = all.iter().filter(|c| o.keep.iter().any(|k| k == *c)).map(|c| c.to_string()).collect();
+    let other: Vec<String> = all.iter().filter(|c| !keep.contains(&c.to_string())).map(|c| c.to_string()).collect();
+    let lbl = |what: &str| format!("{LEVEL_PREFIX} ({title}): {what}");
+    let mut out = vec![];
+
+    // Hides of unpicked gear: white/blue always, rares outside the vendor ranges you picked.
+    // Linked items are spared like NeverSink (3-links until 28, 4-links always) unless aggressive.
+    let hide = |out: &mut Vec<Rule>, label: String, base: Vec<String>| {
+        let mut variants: Vec<Vec<String>> = vec![vec!["AreaLevel < 68".into(), "Rarity <= Magic".into()]];
+        for (i, (from, below)) in VENDOR_RANGES.iter().enumerate() {
+            if !o.vendor_rares.contains(&i) {
+                variants.push(vec![format!("AreaLevel >= {from}"), format!("AreaLevel < {below}"), "Rarity Rare".into()]);
+            }
         }
-        let mut early = c.clone();
-        early.extend(["AreaLevel <= 28".to_string(), "LinkedSockets < 3".to_string()]);
-        let mut late = c;
-        late.extend(["AreaLevel > 28".to_string(), "LinkedSockets < 4".to_string()]);
-        out.push(Rule::Override { label: label.clone(), show: false, conditions: early, actions: vec![] });
-        out.push(Rule::Override { label, show: false, conditions: late, actions: vec![] });
+        for v in variants {
+            let mut c = v;
+            c.extend(base.iter().cloned());
+            if !poe1 || o.aggressive {
+                out.push(Rule::Override { label: label.clone(), show: false, conditions: c, actions: vec![] });
+            } else {
+                let mut early = c.clone();
+                early.extend(["AreaLevel <= 28".to_string(), "LinkedSockets < 3".to_string()]);
+                c.extend(["AreaLevel > 28".to_string(), "LinkedSockets < 4".to_string()]);
+                out.push(Rule::Override { label: label.clone(), show: false, conditions: early, actions: vec![] });
+                out.push(Rule::Override { label: label.clone(), show: false, conditions: c, actions: vec![] });
+            }
+        }
     };
-    let hide: Vec<String> = all.iter().filter(|c| !keep.contains(c)).map(|c| c.to_string()).collect();
-    let keep: Vec<String> = keep.iter().map(|c| c.to_string()).collect();
-    let mut out = vec![Rule::Override {
-        label: format!("{LEVEL_PREFIX} ({title}): your weapons stand out"), show: true,
-        conditions: vec!["AreaLevel < 68".into(), "Rarity <= Rare".into(), format!("Class == {}", quote(&keep))],
-        actions: style_actions(style),
-    }];
-    if !hide.is_empty() {
-        hide_rules(&mut out, format!("{LEVEL_PREFIX} ({title}): other weapons hidden"),
-            vec!["AreaLevel < 68".into(), "Rarity <= Rare".into(), format!("Class == {}", quote(&hide))]);
+
+    if !keep.is_empty() {
+        out.push(Rule::Override { label: lbl("your weapons stand out"), show: true,
+            conditions: vec!["AreaLevel < 68".into(), "Rarity <= Rare".into(), format!("Class == {}", quote(&keep))],
+            actions: style_actions(style) });
+        if !other.is_empty() {
+            hide(&mut out, lbl("other weapons hidden"), vec![format!("Class == {}", quote(&other))]);
+        }
+    }
+    if !o.armour_types.is_empty() {
+        let mut classes: Vec<String> = ARMOUR.iter().map(|c| c.to_string()).collect();
+        classes.push("Shields".into());
+        for (t, _) in ARMOUR_TYPES.iter().filter(|(t, _)| !o.armour_types.iter().any(|k| k == t)) {
+            let mut c = vec![format!("Class == {}", quote(&classes))];
+            for (part, key) in [("ar", "BaseArmour"), ("ev", "BaseEvasion"), ("es", "BaseEnergyShield")] {
+                c.push(format!("{key} {}", if t.split('_').any(|x| x == part) { "> 0" } else { "== 0" }));
+            }
+            hide(&mut out, lbl(&format!("{} armour hidden", ARMOUR_TYPES.iter().find(|x| x.0 == *t).unwrap().1)), c);
+        }
     }
     let n = o.rares_from;
-    if n > 1 && n < 68 {
-        hide_rules(&mut out, format!("{LEVEL_PREFIX} ({title}): white & blue weapons hidden from area {n}"),
-            vec![format!("AreaLevel >= {n}"), "AreaLevel < 68".into(), "Rarity <= Magic".into(), format!("Class == {}", quote(&keep))]);
+    if n > 1 && n < 68 && !keep.is_empty() {
+        let mut c = vec![format!("AreaLevel >= {n}"), "AreaLevel < 68".into(), "Rarity <= Magic".into(), format!("Class == {}", quote(&keep))];
+        if poe1 && !o.aggressive { c.push("LinkedSockets < 3".into()); }
+        out.push(Rule::Override { label: lbl(&format!("white & blue weapons hidden from area {n}")), show: false, conditions: c, actions: vec![] });
         if o.hide_armour {
             let armour: Vec<String> = ARMOUR.iter().map(|c| c.to_string()).collect();
-            hide_rules(&mut out, format!("{LEVEL_PREFIX} ({title}): white & blue armour hidden from area {n}"),
-                vec![format!("AreaLevel >= {n}"), "AreaLevel < 68".into(), "Rarity <= Magic".into(), format!("Class == {}", quote(&armour))]);
+            let mut c = vec![format!("AreaLevel >= {n}"), "AreaLevel < 68".into(), "Rarity <= Magic".into(), format!("Class == {}", quote(&armour))];
+            if poe1 && !o.aggressive { c.push("LinkedSockets < 3".into()); }
+            out.push(Rule::Override { label: lbl(&format!("white & blue armour hidden from area {n}")), show: false, conditions: c, actions: vec![] });
         }
+    }
+    if o.minion && poe1 {
+        let bases: Vec<String> = MINION_BASES.iter().map(|b| b.to_string()).collect();
+        out.push(Rule::Override { label: lbl("minion bases stand out"), show: true,
+            conditions: vec!["AreaLevel < 68".into(), "Rarity <= Rare".into(), format!("BaseType == {}", quote(&bases))],
+            actions: style_actions(style) });
     }
     out
 }
 
-/// Reads a build's settings back from its rules: (title, options).
-pub fn level_options_of(rules: &[Rule], game: crate::profiles::Game) -> Option<(String, LevelOptions)> {
-    let mut title = None;
-    let mut o = LevelOptions::default();
-    for r in rules {
-        let Rule::Override { label, conditions, .. } = r else { continue };
-        let Some(rest) = label.strip_prefix(LEVEL_PREFIX) else { continue };
-        title = rest.split('(').nth(1).and_then(|x| x.split(')').next()).map(String::from);
-        let class = conditions.iter().find(|c| c.starts_with("Class")).cloned().unwrap_or_default();
-        if label.ends_with("your weapons stand out") {
-            o.keep = weapon_classes(game).iter().filter(|a| class.contains(&format!("\"{a}\""))).map(|a| a.to_string()).collect();
-        } else if label.contains("white & blue weapons hidden from area") {
-            o.rares_from = label.rsplit(' ').next().and_then(|n| n.parse().ok()).unwrap_or(0);
-        } else if label.contains("white & blue armour hidden") {
-            o.hide_armour = true;
-        }
-    }
-    title.map(|t| (t, o))
-}
-
 #[cfg(test)]
 mod tests {
+    use super::*;
     #[test]
     fn levelling_presets() {
-        use crate::profiles::Game;
         let style = CustomStyle { font_size: 40, text: [0, 255, 255, 255], border: None, background: [0, 0, 0, 220],
             beam: None, minimap: None, sound: crate::rules::Sound::Default, label_hidden: false };
-        let r = level_rules("caster", Game::Poe1, &style);
-        let Rule::Override { conditions, show, .. } = &r[1] else { panic!() };
-        assert!(!show);
-        assert!(conditions[2].contains("\"Two Hand Maces\"") && !conditions[2].contains("\"Wands\""), "{conditions:?}");
-        assert!(level_presets(Game::Poe1).iter().all(|p| p.id != "spear"));
-        // Caster without sceptres, plus two hand maces: sceptres get hidden, maces stand out.
-        let keep: Vec<String> = ["Wands", "Staves", "Two Hand Maces"].map(String::from).to_vec();
-        let r = level_rules_with("caster", Game::Poe1, &keep, &style);
-        let (Rule::Override { conditions: show, .. }, Rule::Override { conditions: hide, .. }) = (&r[0], &r[1]) else { panic!() };
-        assert!(hide.contains(&"LinkedSockets < 3".to_string()));
-        assert!(show[2].contains("\"Two Hand Maces\"") && !show[2].contains("Sceptres"));
-        assert!(hide[2].contains("\"Sceptres\"") && !hide[2].contains("\"Two Hand Maces\""));
-        let all: Vec<String> = weapon_classes(Game::Poe1).iter().map(|c| c.to_string()).collect();
-        assert_eq!(level_rules_with("caster", Game::Poe1, &all, &style).len(), 1);
-        // Rares only from area 15, armour too; settings read back.
-        let o = LevelOptions { keep: keep.clone(), rares_from: 15, hide_armour: true };
-        let r = level_rules_opts("caster", Game::Poe1, &o, &style);
-        assert_eq!(r.len(), 7);
-        let (t, back) = level_options_of(&r, Game::Poe1).unwrap();
-        assert_eq!((t.as_str(), back.rares_from, back.hide_armour, back.keep.len()), ("Caster", 15, true, 3));
-        assert!(level_presets(Game::Poe2).iter().any(|p| p.id == "spear"));
-        // Every PoE 1 type named is a real item type.
+        let (w, a) = build_defaults("spells", Game::Poe1);
+        let o = LevelOptions { build: "spells".into(), keep: w.iter().map(|s| s.to_string()).collect(),
+            armour_types: a.iter().map(|s| s.to_string()).collect(), ..Default::default() };
+        let r = level_rules_opts(Game::Poe1, &o, &style);
+        let Rule::Override { conditions, show, label, .. } = &r[1] else { panic!() };
+        assert!(!show && label.contains("Spells & Minions"));
+        assert!(conditions.iter().any(|c| c.contains("\"Two Hand Maces\"")) && !conditions.iter().any(|c| c.contains("\"Wands\"")));
+        assert!(level_builds(Game::Poe1).iter().all(|p| p.0 != "spear"));
+        assert!(level_builds(Game::Poe2).iter().any(|p| p.0 == "spear"));
         let real: BTreeSet<&String> = base_classes().values().collect();
         for c in weapon_classes(Game::Poe1) { assert!(real.contains(&c.to_string()), "{c}"); }
+        for b in MINION_BASES { assert!(base_classes().contains_key(b), "{b}"); }
+        assert_eq!(crate::item::defences().get("Vine Circlet").map(String::as_str), Some("es"));
     }
 
-    use super::*;
     #[test]
     fn nicknames_find_types() {
         let none = BTreeSet::new();

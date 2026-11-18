@@ -69,42 +69,54 @@ fn neversink_hides_plain_normal_boots_everywhere() {
 
 #[test]
 fn levelling_preset_on_real_filter() {
-    use filter_core::{evaluate::status, filter::{parse_filter, render_filter}, item::parse_item, profiles::Game, rules::*, search::level_rules};
+    use filter_core::{evaluate::status, filter::{parse_filter, render_filter}, item::parse_item, profiles::Game, rules::*, search::*};
     let t = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/poe1-semistrict.filter")).unwrap();
-    let mut segs = parse_filter(&t);
     let style = CustomStyle { font_size: 42, text: [0, 255, 255, 255], border: None, background: [0, 0, 0, 255],
         beam: None, minimap: None, sound: Sound::Default, label_hidden: false };
-    apply(&mut segs, &level_rules("caster", Game::Poe1, &style), "\r\n");
-    let segs = parse_filter(&render_filter(&segs));
-    let axe = parse_item("Item Class: Two Hand Axes\nRarity: Normal\nStone Axe\n--------\nItem Level: 10\n").unwrap();
-    let wand = parse_item("Item Class: Wands\nRarity: Magic\nDriftwood Wand\n--------\nItem Level: 10\n").unwrap();
-    let uniq = parse_item("Item Class: Two Hand Axes\nRarity: Unique\nLimbsplit\nWoodsplitter\n--------\nItem Level: 10\n").unwrap();
-    let v = |i, lvl| status(&segs, i, Some(lvl), false).verdict;
-    assert_eq!(v(&axe, 10).visibility, "Hide", "{:?}", v(&axe, 10));
-    assert_ne!(v(&wand, 10).visibility, "Hide");
-    assert_eq!(v(&wand, 10).style.font_size, Some(42));
-    assert_ne!(v(&uniq, 10).visibility, "Hide");
-    assert_ne!(v(&wand, 80).style.font_size, Some(42));
-    println!("axe in maps: {:?}", v(&axe, 80).reason);
-    assert_eq!(v(&wand, 10).reason, "Levelling (Caster): your weapons stand out");
-    // Read off the ground (no sockets visible): a rare warstave is still hidden for a caster.
-    let foul = parse_item("Item Class: Warstaves\nRarity: Rare\nFoul Staff\n").unwrap();
-    assert_eq!(status(&segs, &foul, Some(38), true).verdict.visibility, "Hide");
+    let build = |o: &LevelOptions| {
+        let mut segs = parse_filter(&t);
+        apply(&mut segs, &level_rules_opts(Game::Poe1, o, &style), "\r\n");
+        parse_filter(&render_filter(&segs))
+    };
+    let item = |s: &str| parse_item(s).unwrap();
+    let o = LevelOptions { build: "spells".into(), keep: vec!["Wands".into(), "Sceptres".into()],
+        armour_types: vec!["es".into(), "ev_es".into()], ..Default::default() };
+    let segs = build(&o);
+    let v = |i: &filter_core::item::Item, lvl| status(&segs, i, Some(lvl), false).verdict;
+    let axe = item("Item Class: Two Hand Axes\nRarity: Normal\nStone Axe\n--------\nItem Level: 10\n");
+    let wand = item("Item Class: Wands\nRarity: Magic\nDriftwood Wand\n--------\nItem Level: 10\n");
+    let rare_wand = item("Item Class: Wands\nRarity: Rare\nX\nDriftwood Wand\n--------\nItem Level: 20\n");
+    let rare_axe = item("Item Class: Two Hand Axes\nRarity: Rare\nX\nStone Axe\n--------\nItem Level: 10\n");
+    let uniq = item("Item Class: Two Hand Axes\nRarity: Unique\nLimbsplit\nWoodsplitter\n--------\nItem Level: 10\n");
+    let linked = item("Item Class: Two Hand Axes\nRarity: Normal\nStone Axe\n--------\nSockets: R-R-G \n--------\nItem Level: 10\n");
+    let es = item("Item Class: Helmets\nRarity: Rare\nX\nVine Circlet\n--------\nItem Level: 20\n");
+    let ar = item("Item Class: Helmets\nRarity: Rare\nX\nIron Hat\n--------\nItem Level: 20\n");
+    let ar_white = item("Item Class: Helmets\nRarity: Normal\nIron Hat\n--------\nItem Level: 20\n");
 
-    // Rares only from area 15, armour too.
-    let mut segs = parse_filter(&t);
-    let o = filter_core::search::LevelOptions { keep: vec!["Wands".into(), "Sceptres".into()], rares_from: 15, hide_armour: true };
-    apply(&mut segs, &filter_core::search::level_rules_opts("caster", Game::Poe1, &o, &style), "\r\n");
-    let segs = parse_filter(&render_filter(&segs));
-    let v = |i, lvl| status(&segs, i, Some(lvl), false).verdict;
-    let rare_wand = parse_item("Item Class: Wands\nRarity: Rare\nX\nDriftwood Wand\n--------\nItem Level: 20\n").unwrap();
-    let boots = parse_item("Item Class: Boots\nRarity: Normal\nIron Greaves\n--------\nItem Level: 20\n").unwrap();
-    assert_ne!(v(&wand, 10).visibility, "Hide");
+    assert_eq!(v(&axe, 10).visibility, "Hide");
+    assert_eq!(v(&wand, 10).style.font_size, Some(42));
+    assert_eq!(v(&wand, 10).reason, "Levelling (Spells & Minions): your weapons stand out");
+    assert_ne!(v(&uniq, 10).visibility, "Hide");
+    // Vendor rares on for 1-24 by default: rare axe shows at 10, hidden at 30.
+    assert!(!v(&rare_axe, 10).by_user_edit);
+    assert_eq!(v(&rare_axe, 30).visibility, "Hide");
+    // Rares only from 16 (default): white/blue wand hidden at 20, rare wand stands out.
     assert_eq!(v(&wand, 20).visibility, "Hide");
     assert_eq!(v(&rare_wand, 20).style.font_size, Some(42));
-    assert_eq!(v(&boots, 20).visibility, "Hide");
-    let linked = parse_item("Item Class: Two Hand Axes\nRarity: Normal\nStone Axe\n--------\nSockets: R-R-G \n--------\nItem Level: 10\n").unwrap();
-    assert!(!v(&linked, 20).by_user_edit, "3-links spared until 28: {:?}", v(&linked, 20));
+    // 3-links spared until 28.
+    assert!(!v(&linked, 20).by_user_edit);
     assert!(v(&linked, 35).by_user_edit);
-    assert!(!v(&wand, 80).by_user_edit && !v(&boots, 80).by_user_edit, "maps untouched");
+    // Armour types.
+    assert!(!v(&es, 30).by_user_edit);
+    assert!(!v(&ar, 20).by_user_edit, "vendor rares");
+    assert_eq!(v(&ar, 30).visibility, "Hide");
+    assert_eq!(v(&ar_white, 10).visibility, "Hide");
+    // Read off the ground (no sockets visible): still hidden.
+    assert_eq!(status(&segs, &item("Item Class: Warstaves\nRarity: Rare\nFoul Staff\n"), Some(38), true).verdict.visibility, "Hide");
+    // Maps untouched.
+    assert!(!v(&wand, 80).by_user_edit && !v(&ar, 80).by_user_edit && !v(&axe, 80).by_user_edit);
+
+    // Aggressive: linked gear hidden too.
+    let segs = build(&LevelOptions { aggressive: true, ..o.clone() });
+    assert_eq!(status(&segs, &linked, Some(20), false).verdict.visibility, "Hide");
 }

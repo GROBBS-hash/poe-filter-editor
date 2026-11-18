@@ -138,6 +138,15 @@ fn check(key: &str, op: &str, vals: &[String], c: &Ctx) -> Tri {
     match key {
         "Class" => if it.item_class.is_empty() { Tri::Unknown } else { cmp_text(&it.item_class, op, vals) },
         "BaseType" => cmp_text(&it.base_type, op, vals),
+        // We know which defences a base has (not the exact numbers): 1 if it has it, 0 if not.
+        "BaseArmour" | "BaseEvasion" | "BaseEnergyShield" | "BaseWard" => {
+            let part = match key { "BaseArmour" => "ar", "BaseEvasion" => "ev", "BaseEnergyShield" => "es", _ => "ward" };
+            match crate::item::defences().get(&it.base_type) {
+                Some(d) => cmp_num(Some(d.split('_').any(|x| x == part) as u32), op, vals),
+                None if ["Body Armours", "Boots", "Gloves", "Helmets", "Shields"].contains(&it.item_class.as_str()) => Tri::Unknown,
+                None => cmp_num(Some(0), op, vals),
+            }
+        }
         "Rarity" => {
             let Some(rank) = RARITIES.iter().position(|r| *r == it.rarity) else {
                 // Currency, gems etc. are "Normal" to the filter.

@@ -108,6 +108,12 @@ pub fn base_classes() -> &'static HashMap<String, String> {
     MAP.get_or_init(|| serde_json::from_str(include_str!("../data/poe1_bases.json")).unwrap_or_default())
 }
 
+/// Armour bases' defence type: "ar", "ev", "es", "ar_ev", "ar_es", "ev_es", "ward"...
+pub fn defences() -> &'static HashMap<String, String> {
+    static MAP: OnceLock<HashMap<String, String>> = OnceLock::new();
+    MAP.get_or_init(|| serde_json::from_str(include_str!("../data/poe1_defences.json")).unwrap_or_default())
+}
+
 /// Fills in the item class when we only know the base (items read off the ground).
 pub fn fill_class(item: &mut Item) {
     if item.item_class.trim().is_empty() {

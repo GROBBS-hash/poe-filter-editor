@@ -30,6 +30,9 @@ pub struct Profile {
     /// downloaded and kept up to date by the app. None = your own file.
     #[serde(default)]
     pub strictness: Option<u8>,
+    /// Levelling build choices (Presets tab); the rules themselves are in `rules`.
+    #[serde(default)]
+    pub levelling: Option<crate::search::LevelOptions>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -87,7 +90,7 @@ impl Store {
         let id = slug(name);
         self.profiles.insert(id.clone(), Profile {
             id: id.clone(), name: name.into(), game, base_file: base_file.into(),
-            output_file: format!("{name}.filter"), parent: None, rules: vec![], prices: None, theme: None, strictness: None,
+            output_file: format!("{name}.filter"), parent: None, rules: vec![], prices: None, theme: None, strictness: None, levelling: None,
         });
         self.active.get_or_insert(id.clone());
         id

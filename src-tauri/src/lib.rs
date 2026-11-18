@@ -9,7 +9,7 @@ use filter_core::{
     neversink,
     history::History,
     ask::{claude_tool, plan, read_offline, Plan, Request},
-    search::{farm_presets, farm_rules, level_keep, level_options_of, level_presets, level_rules_opts, search, weapon_classes, LevelOptions, Found, Preset, LEVEL_PREFIX},
+    search::{build_defaults, farm_presets, farm_rules, level_builds, level_rules_opts, search, weapon_classes, Found, LevelOptions, Preset, ARMOUR_TYPES, LEVEL_PREFIX, VENDOR_RANGES},
     item::{is_stackable, parse_item, resolve_magic_base, Item},
     preview::{preview, PreviewDrop},
     prices::{default_settings, price_of, PriceFile, PriceSettings},
@@ -1056,48 +1056,50 @@ fn apply_farm_preset(state: State<AppState>, id: String, style: CustomStyle) -> 
 }
 
 #[derive(serde::Serialize)]
-struct LevelBuild { id: String, title: String, hint: String, keep: Vec<String> }
+struct LevelBuild { id: String, title: String, keep: Vec<String>, armour: Vec<String> }
 
 #[derive(serde::Serialize)]
 struct LevelState {
     builds: Vec<LevelBuild>,
-    /// Every weapon type for this game, for the edit ticks.
-    all: Vec<String>,
-    /// The build in use (its title) and its settings.
-    current: Option<String>,
-    options: Option<LevelOptions>,
+    weapons: Vec<String>,
+    armour_types: Vec<(String, String)>,
+    vendor_ranges: Vec<(u32, u32)>,
+    /// Your current choices, if a levelling setup is on.
+    current: Option<LevelOptions>,
 }
 
-/// Build types for levelling, for the active profile's game.
+/// Levelling setup for the active profile's game (like FilterBlade's Auto-Adjust: Campaign).
 #[tauri::command]
 fn list_level_presets(state: State<AppState>) -> LevelState {
     let store = state.store.lock().unwrap();
     let p = store.active.as_ref().and_then(|id| store.profiles.get(id));
     let game = p.map(|p| p.game).unwrap_or(filter_core::profiles::Game::Poe1);
-    let all: Vec<String> = weapon_classes(game).iter().map(|c| c.to_string()).collect();
-    let (current, options) = match p.and_then(|p| level_options_of(&p.rules, game)) {
-        Some((t, o)) => (Some(t), Some(o)),
-        None => (None, None),
-    };
-    let builds = level_presets(game).into_iter().map(|b| LevelBuild {
-        id: b.id.into(), title: b.title.into(), hint: b.hint.into(),
-        keep: level_keep(b.id, game).iter().map(|c| c.to_string()).collect(),
-    }).collect();
-    LevelState { builds, all, current, options }
+    let on = p.map(|p| p.rules.iter().any(|r| rule_label(r).starts_with(LEVEL_PREFIX))).unwrap_or(false);
+    LevelState {
+        builds: level_builds(game).into_iter().map(|(id, title)| {
+            let (w, a) = build_defaults(id, game);
+            LevelBuild { id: id.into(), title: title.into(), keep: w.iter().map(|s| s.to_string()).collect(), armour: a.iter().map(|s| s.to_string()).collect() }
+        }).collect(),
+        weapons: weapon_classes(game).iter().map(|c| c.to_string()).collect(),
+        armour_types: ARMOUR_TYPES.iter().map(|(a, b)| (a.to_string(), b.to_string())).collect(),
+        vendor_ranges: VENDOR_RANGES.to_vec(),
+        current: if on { p.and_then(|p| p.levelling.clone()) } else { None },
+    }
 }
 
-/// Sets the levelling build ("off" removes it) with your choices. One at a time.
+/// Applies your levelling setup (None turns it off). Replaces any earlier one.
 #[tauri::command]
-fn apply_level_preset(state: State<AppState>, id: String, options: LevelOptions, style: CustomStyle) -> Result<Vec<String>, String> {
+fn apply_level_preset(state: State<AppState>, options: Option<LevelOptions>, style: CustomStyle) -> Result<Vec<String>, String> {
     let mut store = state.store.lock().unwrap();
     let pid = store.active.clone().ok_or("Set up a profile first")?;
     let game = store.profiles.get(&pid).ok_or("Profile not found")?.game;
-    let rules = if id == "off" { vec![] } else { level_rules_opts(&id, game, &options, &style) };
-    if id != "off" && rules.is_empty() { return Err("Pick at least one weapon type".into()); }
-    remember(&state, &store, &pid, &if id == "off" { "Levelling preset off".to_string() } else { format!("Levelling preset: {id}") });
+    let rules = match &options { Some(o) => level_rules_opts(game, o, &style), None => vec![] };
+    if options.is_some() && rules.is_empty() { return Err("Pick at least one weapon or armour type".into()); }
+    remember(&state, &store, &pid, if options.is_some() { "Levelling setup" } else { "Levelling setup off" });
     let p = store.profiles.get_mut(&pid).ok_or("Profile not found")?;
     p.rules.retain(|r| !rule_label(r).starts_with(LEVEL_PREFIX));
     p.rules.extend(rules);
+    p.levelling = options;
     save_and_build(&state, &store, &pid)
 }
 
