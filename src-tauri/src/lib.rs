@@ -1,13 +1,13 @@
 mod screen;
 
 use filter_core::{
-    evaluate::{status, Status},
+    evaluate::{status_with_fallback, Status},
     filter::{parse_filter, Segment},
     area::{find_log, read_area_level, selected_filter},
     ground::{ground_item, known_names, match_base, LabelColours},
     item::{is_stackable, parse_item, resolve_magic_base, Item},
     prices::{default_settings, price_of, PriceFile, PriceSettings},
-    profiles::{build_with_prices, Game, Store},
+    profiles::{build_with_prices, Game, Settings, Store},
     themes::{builtin_themes, Theme},
     rules::{add_rule, custom_rule, edited_rule, known_bases, locate, quick_rule, rule_detail, Action, CustomStyle, Location, MatchOpts, Rule, RuleDetail, RuleEdit},
 };
@@ -23,7 +23,7 @@ use std::{
 };
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, State};
 use tauri_plugin_clipboard_manager::ClipboardExt;
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 // ---------- state ----------
 
@@ -33,6 +33,54 @@ struct AppState {
     /// Latest prices per game, downloaded hourly from the app's own price cache.
     prices: Mutex<std::collections::HashMap<Game, PriceFile>>,
     data_dir: PathBuf,
+    /// Registered hotkeys: shortcut id -> what it does.
+    hotkeys: Mutex<std::collections::HashMap<u32, HotAction>>,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum HotAction { QuickEdit, Batch, Reload, Cycle }
+
+/// (Re)registers hotkeys from settings. Errors name the key that failed.
+fn register_hotkeys(app: &AppHandle, s: &Settings) -> Result<(), String> {
+    let mut wanted = vec![(s.key_quick_edit.as_str(), HotAction::QuickEdit), (s.key_batch.as_str(), HotAction::Batch),
+        (s.key_reload.as_str(), HotAction::Reload)];
+    if s.cycle_enabled { wanted.push((s.key_cycle.as_str(), HotAction::Cycle)); }
+    let mut parsed = Vec::new();
+    for (key, action) in wanted {
+        let sc: Shortcut = key.parse().map_err(|_| format!("“{key}” isn't a key the app understands"))?;
+        if parsed.iter().any(|(p, _): &(Shortcut, HotAction)| p.id() == sc.id()) {
+            return Err(format!("“{key}” is used for two things"));
+        }
+        parsed.push((sc, action));
+    }
+    let gs = app.global_shortcut();
+    let _ = gs.unregister_all();
+    let state = app.state::<AppState>();
+    let mut map = state.hotkeys.lock().unwrap();
+    map.clear();
+    for (sc, action) in parsed {
+        gs.register(sc).map_err(|e| format!("Couldn't use that key (another program may own it): {e}"))?;
+        map.insert(sc.id(), action);
+    }
+    Ok(())
+}
+
+/// Switches to the next filter for this game and loads it in game.
+fn cycle_filter(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let next = {
+        let mut store = state.store.lock().unwrap();
+        let Some(cur) = store.active.clone() else { return };
+        let Some(game) = store.profiles.get(&cur).map(|p| p.game) else { return };
+        let ids: Vec<String> = store.profiles.values().filter(|p| p.game == game).map(|p| p.id.clone()).collect();
+        let i = ids.iter().position(|x| *x == cur).unwrap_or(0);
+        let next = ids[(i + 1) % ids.len()].clone();
+        store.active = Some(next.clone());
+        let _ = store.save(&state.store_path);
+        next
+    };
+    let _ = app.emit("active-changed", next);
+    let _ = reload_in_game(app, 0); // the game's chat confirms which filter loaded
 }
 
 const PRICE_URL: &str = "https://raw.githubusercontent.com/GROBBS-hash/poe-filter-editor/prices";
@@ -120,6 +168,10 @@ fn area_level(app: &AppHandle) -> Option<u32> {
     read_area_level(&find_log(poe2, &[])?)
 }
 
+fn fallback_area_level(app: &AppHandle) -> u32 {
+    app.state::<AppState>().store.lock().unwrap().settings.fallback_area_level
+}
+
 /// The filter the game has selected, and whether it's this app's one.
 #[derive(Serialize, Clone)]
 struct GameFilter { selected: Option<String>, expected: String, matches: bool }
@@ -166,7 +218,7 @@ fn read_from_ground(app: &AppHandle) -> Result<Picked, String> {
     let m = match_base(&read.text, &names)
         .ok_or_else(|| format!("Read \"{}\" but couldn't match it to an item", read.text))?;
     let colours = read.colours.map(|(text, background)| LabelColours { text, background });
-    let item = ground_item(&live, &m, colours, area_level(app).unwrap_or(83));
+    let item = ground_item(&live, &m, colours, area_level(app).unwrap_or_else(|| fallback_area_level(app)));
     Ok(Picked { item, from_screen: true, screen_text: Some(read.text), confidence: m.confidence })
 }
 
@@ -558,7 +610,7 @@ fn locate_item(state: State<AppState>, item: Item) -> Vec<Location> {
 fn item_status(app: AppHandle, item: Item, from_screen: bool) -> Result<StatusReply, String> {
     let (live, _) = active_filters(&app).ok_or("Set up a filter first")?;
     let level = area_level(&app);
-    let st = status(&live, &item, level, from_screen);
+    let st = status_with_fallback(&live, &item, level, fallback_area_level(&app), from_screen);
     let stackable = is_stackable(&item) || !st.by_stack.is_empty();
     Ok(StatusReply { status: st, area_level: level, game_filter: game_filter(&app), stackable })
 }
@@ -669,6 +721,23 @@ fn delete_theme(state: State<AppState>, name: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn get_settings(state: State<AppState>) -> Settings {
+    state.store.lock().unwrap().settings.clone()
+}
+
+#[tauri::command]
+fn save_settings(app: AppHandle, state: State<AppState>, settings: Settings) -> Result<(), String> {
+    let old = state.store.lock().unwrap().settings.clone();
+    if let Err(e) = register_hotkeys(&app, &settings) {
+        let _ = register_hotkeys(&app, &old); // put the working keys back
+        return Err(e);
+    }
+    let mut store = state.store.lock().unwrap();
+    store.settings = Settings { fallback_area_level: settings.fallback_area_level.clamp(1, 86), ..settings };
+    store.save(&state.store_path).map_err(err)
+}
+
+#[tauri::command]
 fn set_batch_mode(app: AppHandle, on: bool) {
     if on {
         // Ignore whatever was already on the clipboard.
@@ -681,10 +750,6 @@ fn set_batch_mode(app: AppHandle, on: bool) {
 // ---------- startup ----------
 
 pub fn run() {
-    let f2 = Shortcut::new(None, Code::F2);
-    let f3 = Shortcut::new(None, Code::F3);
-    let f4 = Shortcut::new(None, Code::F4);
-
     tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
@@ -694,16 +759,21 @@ pub fn run() {
                     if ev.state() != ShortcutState::Pressed {
                         return;
                     }
-                    if sc == &f2 {
+                    let Some(state) = app.try_state::<AppState>() else { return };
+                    let action = state.hotkeys.lock().unwrap().get(&sc.id()).copied();
+                    if action == Some(HotAction::Cycle) {
+                        let app = app.clone();
+                        thread::spawn(move || cycle_filter(&app));
+                    } else if action == Some(HotAction::QuickEdit) {
                         quick_edit(app.clone());
-                    } else if sc == &f4 {
+                    } else if action == Some(HotAction::Reload) {
                         let app = app.clone();
                         thread::spawn(move || {
                             if let Err(e) = reload_in_game(&app, 0) {
                                 let _ = app.emit("reload-failed", e);
                             }
                         });
-                    } else if sc == &f3 {
+                    } else if action == Some(HotAction::Batch) {
                         let on = !BATCH_ON.load(Ordering::Relaxed);
                         set_batch_mode(app.clone(), on);
                         if on {
@@ -727,12 +797,15 @@ pub fn run() {
                     cached.insert(g, f);
                 }
             }
-            app.manage(AppState { store: Mutex::new(Store::load(&store_path)), store_path,
-                prices: Mutex::new(cached), data_dir: data.clone() });
+            let store = Store::load(&store_path);
+            let settings = store.settings.clone();
+            app.manage(AppState { store: Mutex::new(store), store_path,
+                prices: Mutex::new(cached), data_dir: data.clone(), hotkeys: Mutex::new(Default::default()) });
             start_price_updates(app.handle().clone());
-            app.global_shortcut().register(f2)?;
-            app.global_shortcut().register(f3)?;
-            app.global_shortcut().register(f4)?;
+            if register_hotkeys(app.handle(), &settings).is_err() {
+                // Fall back to the standard keys if saved ones can't be used.
+                let _ = register_hotkeys(app.handle(), &Settings::default());
+            }
             start_batch_watcher(app.handle().clone());
 
             // Tray icon: the app lives here so hotkeys work while you play.
@@ -743,7 +816,7 @@ pub fn run() {
             let menu = Menu::with_items(app, &[&open, &quit])?;
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
-                .tooltip("PoE Filter Editor (F2 quick edit, F3 batch, F4 reload filter)")
+                .tooltip("PoE Filter Editor")
                 .menu(&menu)
                 .on_menu_event(|app, e| match e.id.as_ref() {
                     "open" => {
@@ -793,8 +866,23 @@ pub fn run() {
             list_themes,
             set_profile_theme,
             save_theme,
-            delete_theme
+            delete_theme,
+            get_settings,
+            save_settings
         ])
         .run(tauri::generate_context!())
         .expect("error while running the app");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Shortcut;
+    #[test]
+    fn key_names_parse() {
+        for k in ["F2", "F5", "F12", "Ctrl+Shift+K", "Alt+Q", "Shift+F3"] {
+            assert!(k.parse::<Shortcut>().is_ok(), "{k}");
+        }
+        assert_ne!("F2".parse::<Shortcut>().unwrap().id(), "F3".parse::<Shortcut>().unwrap().id());
+        assert!("Banana".parse::<Shortcut>().is_err());
+    }
 }

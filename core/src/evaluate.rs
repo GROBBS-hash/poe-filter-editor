@@ -336,10 +336,15 @@ pub fn evaluate(segs: &[Segment], c: &Ctx) -> Verdict {
 
 /// Full status, including whether stack size changes the outcome.
 pub fn status(segs: &[Segment], item: &Item, known_area_level: Option<u32>, from_screen: bool) -> Status {
+    status_with_fallback(segs, item, known_area_level, 83, from_screen)
+}
+
+/// Like `status`, assuming `fallback` as the area level when it isn't known.
+pub fn status_with_fallback(segs: &[Segment], item: &Item, known_area_level: Option<u32>, fallback: u32, from_screen: bool) -> Status {
     let mut assumptions = Vec::new();
-    let area_level = known_area_level.unwrap_or(83);
+    let area_level = known_area_level.unwrap_or(fallback);
     if known_area_level.is_none() {
-        assumptions.push("you're in a level 83 map".into());
+        assumptions.push(if fallback >= 68 { format!("you're in a level {fallback} map") } else { format!("area level {fallback}") });
     }
     if item.item_level.is_none() && RARITIES.contains(&item.rarity.as_str()) {
         assumptions.push(format!("item level {area_level}"));

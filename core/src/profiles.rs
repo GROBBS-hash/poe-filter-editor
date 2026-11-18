@@ -35,6 +35,29 @@ pub struct Store {
     /// Themes you've made.
     #[serde(default)]
     pub themes: Vec<Theme>,
+    #[serde(default)]
+    pub settings: Settings,
+}
+
+/// App settings (Settings tab).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct Settings {
+    pub key_quick_edit: String,
+    pub key_batch: String,
+    pub key_reload: String,
+    pub key_cycle: String,
+    /// F5 cycling through your filters: off unless you switch it on.
+    pub cycle_enabled: bool,
+    /// Area level to assume when the game's log can't be found.
+    pub fallback_area_level: u32,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self { key_quick_edit: "F2".into(), key_batch: "F3".into(), key_reload: "F4".into(), key_cycle: "F5".into(),
+            cycle_enabled: false, fallback_area_level: 83 }
+    }
 }
 
 pub fn slug(name: &str) -> String {
