@@ -19,6 +19,26 @@ pub struct GroundMatch {
     pub superior: bool,
     /// 1.0 = the exact name was found in the text.
     pub confidence: f32,
+    /// An identified unique's name on the label, e.g. "Blood Price" (on a Reaver Helmet).
+    #[serde(default)]
+    pub unique: Option<String>,
+}
+
+/// An identified unique shows its name before the base ("BLOOD PRICE REAVER HELMET").
+/// Finds which unique on that base the label names, allowing a slightly garbled read.
+pub fn unique_on_label(text: &str, base: &str) -> Option<String> {
+    // Letters the reader often mixes up count as the same.
+    let fold = |s: &str| compact(s).chars().map(|c| match c { '0' => 'o', '1' | 'l' | '|' => 'i', '5' => 's', c => c }).collect::<String>();
+    let t = fold(text);
+    let b = fold(base);
+    let before = t.find(&b).map(|i| t[..i].to_string()).unwrap_or_else(|| t.clone());
+    if before.len() < 3 { return None; }
+    crate::gear::uniques().iter()
+        .filter(|u| u.base == base)
+        .map(|u| (fold(&u.name), &u.name))
+        .filter(|(c, _)| before.contains(c.as_str()) || strsim::jaro_winkler(&before, c) >= 0.9)
+        .max_by_key(|(c, _)| c.len())
+        .map(|(_, n)| n.clone())
 }
 
 fn norm(s: &str) -> String {
@@ -82,7 +102,7 @@ pub fn match_base(text: &str, known: &HashSet<String>) -> Option<GroundMatch> {
         c.len() >= 3 && t.contains(&c)
     }).max_by_key(|b| b.len());
     if let Some(b) = exact {
-        return Some(GroundMatch { base: b.clone(), stack, tier, superior, confidence: 1.0 });
+        return Some(GroundMatch { unique: unique_on_label(text, b), base: b.clone(), stack, tier, superior, confidence: 1.0 });
     }
     // Fuzzy: slide each name along the text and keep the closest fit.
     let chars: Vec<char> = t.chars().collect();
@@ -104,13 +124,13 @@ pub fn match_base(text: &str, known: &HashSet<String>) -> Option<GroundMatch> {
     }
     let _ = norm; // kept for future word-based matching
     if let Some((s, b)) = best.filter(|(s, _)| *s >= 0.9) {
-        return Some(GroundMatch { base: b.clone(), stack, tier, superior, confidence: s as f32 });
+        return Some(GroundMatch { unique: unique_on_label(text, b.clone().as_str()), base: b.clone(), stack, tier, superior, confidence: s as f32 });
     }
     // Start of the label cut off ("onic Spirit Shield"): accept it if exactly one name ends that way.
     if t.len() >= 8 {
         let ends: Vec<&String> = known.iter().filter(|b| compact(b).ends_with(&t)).collect();
         if ends.len() == 1 {
-            return Some(GroundMatch { base: ends[0].clone(), stack, tier, superior, confidence: 0.8 });
+            return Some(GroundMatch { unique: unique_on_label(text, ends[0].clone().as_str()), base: ends[0].clone(), stack, tier, superior, confidence: 0.8 });
         }
     }
     None
@@ -128,6 +148,12 @@ pub fn ground_item(segs: &[Segment], m: &GroundMatch, label: Option<LabelColours
         quality: m.superior.then_some(1), ..Default::default() };
     fill_class(&mut item);
     let class = item.item_class.as_str();
+    if let Some(name) = &m.unique {
+        item.rarity = "Unique".into();
+        item.name = Some(name.clone());
+        item.unidentified = false;
+        return item;
+    }
     item.rarity = match class {
         "Divination Cards" => "Divination Card".into(),
         "Skill Gems" | "Support Gems" => "Gem".into(),
@@ -190,6 +216,19 @@ mod tests {
     fn known() -> HashSet<String> {
         ["Coral Ring", "Ring", "Chaos Orb", "Orb of Alteration", "Leather Belt", "Divine Orb"]
             .iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn identified_unique_on_label() {
+        let mut k = known();
+        k.insert("Reaver Helmet".into());
+        let m = match_base("BLOOD PRICE REAVER HELMET •", &k).unwrap();
+        assert_eq!((m.base.as_str(), m.unique.as_deref()), ("Reaver Helmet", Some("Blood Price")));
+        // A slightly garbled read still finds it; a plain base has none.
+        assert_eq!(match_base("BL00D PRlCE REAVER HELMET", &k).unwrap().unique.as_deref(), Some("Blood Price"));
+        assert_eq!(match_base("REAVER HELMET", &k).unwrap().unique, None);
+        let it = ground_item(&[], &m, None, 40);
+        assert_eq!((it.rarity.as_str(), it.name.as_deref(), it.unidentified), ("Unique", Some("Blood Price"), false));
     }
 
     #[test]
@@ -261,7 +300,7 @@ mod tests {
     fn rarity_from_filter_colour() {
         let f = "Show\n    Rarity Rare\n    BaseType == \"Coral Ring\"\n    SetTextColor 10 200 10 255\n\nShow\n    Rarity Magic\n    BaseType == \"Coral Ring\"\n    SetTextColor 200 10 10 255\n";
         let segs = parse_filter(f);
-        let m = GroundMatch { base: "Coral Ring".into(), stack: None, tier: None, superior: false, confidence: 1.0 };
+        let m = GroundMatch { base: "Coral Ring".into(), stack: None, tier: None, superior: false, confidence: 1.0, unique: None };
         let lc = |t: [u8; 3]| Some(LabelColours { text: t, background: [10, 10, 10] });
         assert_eq!(ground_item(&segs, &m, lc([20, 190, 20]), 83).rarity, "Rare");
         assert_eq!(ground_item(&segs, &m, lc([190, 20, 20]), 83).rarity, "Magic");
@@ -272,7 +311,7 @@ mod tests {
     fn light_text_on_dark_is_not_an_orange_unique() {
         let f = "Show\n    Rarity Unique\n    BaseType == \"Opal Wand\"\n    SetTextColor 255 255 255 255\n    SetBackgroundColor 175 96 37 255\n\nHide\n    Rarity Normal Magic\n    BaseType == \"Opal Wand\"\n\nShow\n    Rarity Rare\n    BaseType == \"Opal Wand\"\n";
         let segs = parse_filter(f);
-        let m = GroundMatch { base: "Opal Wand".into(), stack: None, tier: None, superior: false, confidence: 1.0 };
+        let m = GroundMatch { base: "Opal Wand".into(), stack: None, tier: None, superior: false, confidence: 1.0, unique: None };
         let seen = Some(LabelColours { text: [235, 225, 200], background: [15, 12, 10] });
         assert_eq!(ground_item(&segs, &m, seen, 83).rarity, "Rare");
     }

@@ -36,7 +36,7 @@ fn why_unsure() {
 fn ground_currency_is_certain() {
     use filter_core::ground::{ground_item, GroundMatch};
     let segs = parse_filter(&std::fs::read_to_string(SRC).unwrap());
-    let m = GroundMatch { base: "Orb of Regret".into(), stack: None, tier: None, superior: false, confidence: 1.0 };
+    let m = GroundMatch { base: "Orb of Regret".into(), stack: None, tier: None, superior: false, confidence: 1.0, unique: None };
     let it = ground_item(&segs, &m, None, 83);
     let s = status(&segs, &it, Some(83), true);
     assert_eq!(s.verdict.visibility, "Show");
@@ -60,7 +60,7 @@ fn ground_superior_gem_is_shown() {
 fn neversink_hides_plain_normal_boots_everywhere() {
     use filter_core::ground::{ground_item, GroundMatch};
     let segs = parse_filter(&std::fs::read_to_string(SRC).unwrap());
-    let m = GroundMatch { base: "Conjurer Boots".into(), stack: None, tier: None, superior: false, confidence: 1.0 };
+    let m = GroundMatch { base: "Conjurer Boots".into(), stack: None, tier: None, superior: false, confidence: 1.0, unique: None };
     for lvl in [30, 60, 68, 83] {
         let it = filter_core::item::Item { rarity: "Normal".into(), ..ground_item(&segs, &m, None, lvl) };
         assert_eq!(status(&segs, &it, Some(lvl), true).verdict.visibility, "Hide");
@@ -127,7 +127,7 @@ fn levelling_preset_on_real_filter() {
     // (white text, dark background) is read as a white 4-link, not a unique.
     {
         use filter_core::ground::{ground_item, GroundMatch, LabelColours};
-        let m = GroundMatch { base: "Hussar Brigandine".into(), stack: None, tier: None, superior: false, confidence: 1.0 };
+        let m = GroundMatch { base: "Hussar Brigandine".into(), stack: None, tier: None, superior: false, confidence: 1.0, unique: None };
         let it = ground_item(&segs, &m, Some(LabelColours { text: [200, 200, 200], background: [20, 20, 0] }), 42);
         assert_eq!((it.rarity.as_str(), it.sockets.as_deref()), ("Normal", Some("R-R-R-R")), "{it:?}");
         let st = status(&segs, &it, Some(42), true);
