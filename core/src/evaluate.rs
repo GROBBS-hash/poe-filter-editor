@@ -160,6 +160,7 @@ fn check(key: &str, op: &str, vals: &[String], c: &Ctx) -> Tri {
         | "ElderMap" | "ShapedMap" | "BlightedMap" | "UberBlightedMap"
         | "TransfiguredGem" | "ZanaMemory" | "Imbued" =>
             if c.from_screen { Tri::Unknown } else { cmp_bool(Some(false), vals) },
+        "UnidentifiedItemTier" if it.item_tier.is_some() => cmp_num(it.item_tier, op, vals),
         "MemoryStrands" if !c.from_screen => cmp_num(Some(it.memory_strands.unwrap_or(0)), op, vals),
         // Things only gear can have: rule them out for currency, gems, cards...
         "HasExplicitMod" | "UnidentifiedItemTier" | "MemoryStrands" | "HasInfluence" | "HasEaterOfWorldsImplicit"
@@ -291,8 +292,12 @@ pub fn evaluate(segs: &[Segment], c: &Ctx) -> Verdict {
 }
 
 /// Full status, including whether stack size changes the outcome.
-pub fn status(segs: &[Segment], item: &Item, area_level: u32, from_screen: bool) -> Status {
+pub fn status(segs: &[Segment], item: &Item, known_area_level: Option<u32>, from_screen: bool) -> Status {
     let mut assumptions = Vec::new();
+    let area_level = known_area_level.unwrap_or(83);
+    if known_area_level.is_none() {
+        assumptions.push("you're in a level 83 map".into());
+    }
     if item.item_level.is_none() && RARITIES.contains(&item.rarity.as_str()) {
         assumptions.push(format!("item level {area_level}"));
     }
@@ -344,7 +349,7 @@ mod tests {
 
     #[test]
     fn shown_with_style() {
-        let s = status(&parse_filter(F), &item("Item Class: Stackable Currency\nRarity: Currency\nDivine Orb\n"), 83, false);
+        let s = status(&parse_filter(F), &item("Item Class: Stackable Currency\nRarity: Currency\nDivine Orb\n"), Some(83), false);
         assert_eq!(s.verdict.visibility, "Show");
         assert_eq!(s.verdict.style.font_size, Some(45));
         assert_eq!(s.verdict.style.text, Some([255, 0, 0, 255]));
@@ -354,7 +359,7 @@ mod tests {
 
     #[test]
     fn stack_size_changes_outcome() {
-        let s = status(&parse_filter(F), &item("Item Class: Stackable Currency\nRarity: Currency\nScroll of Wisdom\n--------\nStack Size: 2/40\n"), 83, false);
+        let s = status(&parse_filter(F), &item("Item Class: Stackable Currency\nRarity: Currency\nScroll of Wisdom\n--------\nStack Size: 2/40\n"), Some(83), false);
         assert_eq!(s.verdict.visibility, "Hide");
         let v: Vec<(u32, &str)> = s.by_stack.iter().map(|n| (n.from, n.visibility.as_str())).collect();
         assert_eq!(v, vec![(1, "Hide"), (6, "Show")]);
@@ -362,7 +367,7 @@ mod tests {
 
     #[test]
     fn unknown_mods_are_reported_not_guessed() {
-        let s = status(&parse_filter(F), &item("Item Class: Rings\nRarity: Rare\nDoom Loop\nCoral Ring\n"), 83, false);
+        let s = status(&parse_filter(F), &item("Item Class: Rings\nRarity: Rare\nDoom Loop\nCoral Ring\n"), Some(83), false);
         assert_eq!(s.verdict.visibility, "Hide");
         assert_eq!(s.verdict.uncertain.len(), 1);
         assert!(s.verdict.uncertain[0].contains("HasExplicitMod"));
@@ -371,7 +376,7 @@ mod tests {
     #[test]
     fn user_edit_label() {
         let f = format!("Hide # Hide: Divine Orb\n    BaseType == \"Divine Orb\"\n\n{F}");
-        let s = status(&parse_filter(&f), &item("Item Class: Stackable Currency\nRarity: Currency\nDivine Orb\n"), 83, false);
+        let s = status(&parse_filter(&f), &item("Item Class: Stackable Currency\nRarity: Currency\nDivine Orb\n"), Some(83), false);
         assert_eq!(s.verdict.visibility, "Hide");
         assert!(s.verdict.by_user_edit);
         assert_eq!(s.verdict.decided_by, "Hide: Divine Orb");

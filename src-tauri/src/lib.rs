@@ -3,7 +3,8 @@ mod screen;
 use filter_core::{
     evaluate::{status, Status},
     filter::{parse_filter, Segment},
-    ground::{ground_item, known_names, match_base},
+    area::{find_log, read_area_level, selected_filter},
+    ground::{ground_item, known_names, match_base, LabelColours},
     item::{parse_item, resolve_magic_base, Item},
     profiles::{build, Game, Store},
     rules::{known_bases, locate, quick_rule, Action, Location, MatchOpts, Rule},
@@ -57,8 +58,31 @@ fn read_item(app: &AppHandle, text: &str) -> Option<Item> {
     Some(item)
 }
 
-/// Area level used when we can't know the item level (items on the ground).
-const ASSUMED_AREA_LEVEL: u32 = 83;
+/// The real area level from the game's log, if we can find it.
+fn area_level(app: &AppHandle) -> Option<u32> {
+    let state = app.state::<AppState>();
+    let poe2 = {
+        let store = state.store.lock().unwrap();
+        store.active.as_ref().and_then(|id| store.profiles.get(id)).map(|p| p.game == Game::Poe2).unwrap_or(false)
+    };
+    read_area_level(&find_log(poe2, &[])?)
+}
+
+/// The filter the game has selected, and whether it's this app's one.
+#[derive(Serialize, Clone)]
+struct GameFilter { selected: Option<String>, expected: String, matches: bool }
+
+fn game_filter(app: &AppHandle) -> Option<GameFilter> {
+    let state = app.state::<AppState>();
+    let store = state.store.lock().unwrap();
+    let p = store.active.as_ref().and_then(|id| store.profiles.get(id))?;
+    let cfg = match p.game { Game::Poe1 => "production_Config.ini", Game::Poe2 => "poe2_production_Config.ini" };
+    let selected = std::fs::read_to_string(filter_dir(p.game).join(cfg)).ok().and_then(|t| selected_filter(&t));
+    let expected = p.output_file.clone();
+    let strip = |s: &str| s.trim_end_matches(".filter").to_lowercase();
+    let matches = selected.as_deref().map(|s| strip(s) == strip(&expected)).unwrap_or(true);
+    Some(GameFilter { selected, expected, matches })
+}
 
 /// The filter the game is actually using (with your edits), and the clean base.
 fn active_filters(app: &AppHandle) -> Option<(Vec<Segment>, Vec<Segment>)> {
@@ -89,7 +113,8 @@ fn read_from_ground(app: &AppHandle) -> Result<Picked, String> {
     let names = known_names(&known_bases(&base));
     let m = match_base(&read.text, &names)
         .ok_or_else(|| format!("Read \"{}\" but couldn't match it to an item", read.text))?;
-    let item = ground_item(&live, &m, read.rgb, ASSUMED_AREA_LEVEL);
+    let colours = read.colours.map(|(text, background)| LabelColours { text, background });
+    let item = ground_item(&live, &m, colours, area_level(app).unwrap_or(83));
     Ok(Picked { item, from_screen: true, screen_text: Some(read.text), confidence: m.confidence })
 }
 
@@ -352,10 +377,14 @@ fn locate_item(state: State<AppState>, item: Item) -> Vec<Location> {
 /// What the filter currently does to this item: shown or hidden, its look,
 /// its sound, and whether stack size changes that.
 #[tauri::command]
-fn item_status(app: AppHandle, item: Item, from_screen: bool) -> Result<Status, String> {
+fn item_status(app: AppHandle, item: Item, from_screen: bool) -> Result<StatusReply, String> {
     let (live, _) = active_filters(&app).ok_or("Set up a filter first")?;
-    Ok(status(&live, &item, ASSUMED_AREA_LEVEL, from_screen))
+    let level = area_level(&app);
+    Ok(StatusReply { status: status(&live, &item, level, from_screen), area_level: level, game_filter: game_filter(&app) })
 }
+
+#[derive(Serialize)]
+struct StatusReply { status: Status, area_level: Option<u32>, game_filter: Option<GameFilter> }
 
 #[tauri::command]
 fn set_batch_mode(app: AppHandle, on: bool) {

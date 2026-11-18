@@ -20,6 +20,9 @@ pub struct Item {
     pub unidentified: bool,
     #[serde(default)]
     pub memory_strands: Option<u32>,
+    /// 3.30 item tier (1-5), from the ground label or the copied text.
+    #[serde(default)]
+    pub item_tier: Option<u32>,
 }
 
 const SEP: &str = "--------";
@@ -67,6 +70,8 @@ pub fn parse_item(text: &str) -> Option<Item> {
             item.quality = v.split_whitespace().next().and_then(num);
         } else if let Some(v) = line.strip_prefix("Sockets: ") {
             item.sockets = Some(v.trim().to_string());
+        } else if let Some(v) = line.strip_prefix("Item Tier: ").or_else(|| line.strip_prefix("Tier: ")) {
+            item.item_tier = num(v);
         } else if let Some(v) = line.strip_prefix("Memory Strands: ") {
             item.memory_strands = num(v);
         } else if let Some(v) = line.strip_prefix("Map Tier: ") {

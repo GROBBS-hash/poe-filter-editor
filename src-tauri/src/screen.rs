@@ -4,8 +4,8 @@
 
 pub struct ScreenRead {
     pub text: String,
-    /// Main text colour of that label, used to tell the item's rarity.
-    pub rgb: Option<[u8; 3]>,
+    /// Text and background colour of that label, used to tell the item's rarity.
+    pub colours: Option<([u8; 3], [u8; 3])>,
 }
 
 #[cfg(not(windows))]
@@ -19,8 +19,9 @@ pub fn read_label_under_cursor() -> Result<ScreenRead, String> {
 }
 
 #[cfg_attr(not(windows), allow(dead_code))]
-/// Picks the most common colour that stands out from the background.
-fn text_colour(px: &[[u8; 3]]) -> Option<[u8; 3]> {
+/// (text colour, background colour): background is the most common colour,
+/// text the most common one that clearly stands out from it.
+fn text_colour(px: &[[u8; 3]]) -> Option<([u8; 3], [u8; 3])> {
     use std::collections::HashMap;
     let q = |c: [u8; 3]| [c[0] >> 4, c[1] >> 4, c[2] >> 4];
     let mut counts: HashMap<[u8; 3], (u32, [u32; 3])> = HashMap::new();
@@ -31,11 +32,13 @@ fn text_colour(px: &[[u8; 3]]) -> Option<[u8; 3]> {
     }
     let mut v: Vec<_> = counts.into_iter().collect();
     v.sort_by(|a, b| b.1 .0.cmp(&a.1 .0));
-    let bg = v.first()?.0;
+    let avg = |(n, sum): &(u32, [u32; 3])| [(sum[0] / n) as u8, (sum[1] / n) as u8, (sum[2] / n) as u8];
+    let (bg, bg_stats) = v.first()?;
+    let bg = *bg;
     let far = |c: [u8; 3]| -> i32 { (0..3).map(|i| (c[i] as i32 - bg[i] as i32).pow(2)).sum() };
     v.iter()
         .find(|(k, _)| far(*k) > 3 * 4 * 4)
-        .map(|(_, (n, sum))| [(sum[0] / n) as u8, (sum[1] / n) as u8, (sum[2] / n) as u8])
+        .map(|(_, stats)| (avg(stats), avg(bg_stats)))
 }
 
 #[cfg(windows)]
@@ -57,9 +60,9 @@ mod imp {
         },
     };
 
-    const W: i32 = 760;
-    const H: i32 = 140;
-    const SCALE: i32 = 2;
+    // Wide enough for the longest labels even with the mouse at one end.
+    const W: i32 = 1800;
+    const H: i32 = 120;
 
     /// Grabs a W x H strip centred on the mouse. Returns BGRA pixels.
     fn capture(cx: i32, cy: i32) -> windows::core::Result<(Vec<u8>, i32, i32)> {
@@ -99,13 +102,13 @@ mod imp {
         }
     }
 
-    /// Doubles the image size; the game's small label font reads better.
-    fn upscale(src: &[u8]) -> Vec<u8> {
-        let (w2, h2) = (W * SCALE, H * SCALE);
+    /// Enlarges the image; the game's small label font reads better.
+    fn upscale(src: &[u8], scale: i32) -> Vec<u8> {
+        let (w2, h2) = (W * scale, H * scale);
         let mut out = vec![0u8; (w2 * h2 * 4) as usize];
         for y in 0..h2 {
             for x in 0..w2 {
-                let s = (((y / SCALE) * W + x / SCALE) * 4) as usize;
+                let s = (((y / scale) * W + x / scale) * 4) as usize;
                 let d = ((y * w2 + x) * 4) as usize;
                 out[d..d + 3].copy_from_slice(&src[s..s + 3]);
                 out[d + 3] = 255;
@@ -124,50 +127,70 @@ mod imp {
         let mut p = POINT::default();
         unsafe { GetCursorPos(&mut p)? };
         let (raw, mx, my) = capture(p.x, p.y)?;
-        let big = upscale(&raw);
+        let max = OcrEngine::MaxImageDimension().unwrap_or(2600) as i32;
+        let scale = if W * 2 <= max { 2 } else { 1 };
+        let big = upscale(&raw, scale);
 
         let buffer = CryptographicBuffer::CreateFromByteArray(&big)?;
         let bitmap = SoftwareBitmap::CreateCopyWithAlphaFromBuffer(
-            &buffer, BitmapPixelFormat::Bgra8, W * SCALE, H * SCALE, BitmapAlphaMode::Ignore)?;
+            &buffer, BitmapPixelFormat::Bgra8, W * scale, H * scale, BitmapAlphaMode::Ignore)?;
         let engine = OcrEngine::TryCreateFromUserProfileLanguages()?;
         let result = engine.RecognizeAsync(&bitmap)?.get()?;
 
-        let (cx, cy) = ((mx * SCALE) as f32, (my * SCALE) as f32);
-        let mut best: Option<(f32, String, Rect)> = None;
+        let (cx, cy) = ((mx * scale) as f32, (my * scale) as f32);
+        let union = |a: Rect, r: Rect| {
+            let (x1, y1) = (a.X.min(r.X), a.Y.min(r.Y));
+            let (x2, y2) = ((a.X + a.Width).max(r.X + r.Width), (a.Y + a.Height).max(r.Y + r.Height));
+            Rect { X: x1, Y: y1, Width: x2 - x1, Height: y2 - y1 }
+        };
+        // Every recognised line with its box.
+        let mut lines: Vec<(String, Rect)> = Vec::new();
         for line in result.Lines()? {
             let mut rect: Option<Rect> = None;
             for word in line.Words()? {
                 let r = word.BoundingRect()?;
-                rect = Some(match rect {
-                    None => r,
-                    Some(a) => {
-                        let (x1, y1) = (a.X.min(r.X), a.Y.min(r.Y));
-                        let (x2, y2) = ((a.X + a.Width).max(r.X + r.Width), (a.Y + a.Height).max(r.Y + r.Height));
-                        Rect { X: x1, Y: y1, Width: x2 - x1, Height: y2 - y1 }
-                    }
-                });
+                rect = Some(match rect { None => r, Some(a) => union(a, r) });
             }
-            let Some(r) = rect else { continue };
-            let d = dist_to(&r, cx, cy);
-            if best.as_ref().map(|b| d < b.0).unwrap_or(true) {
-                best = Some((d, line.Text()?.to_string(), r));
+            if let Some(r) = rect {
+                lines.push((line.Text()?.to_string(), r));
             }
         }
+        // The text reader sometimes splits one label into pieces ("KARUI CH" + "OPPER"):
+        // join pieces on the same row that sit close together.
+        lines.sort_by(|a, b| a.1.X.partial_cmp(&b.1.X).unwrap_or(std::cmp::Ordering::Equal));
+        let mut merged: Vec<(String, Rect)> = Vec::new();
+        for (t, r) in lines {
+            let mid = r.Y + r.Height / 2.0;
+            let near = merged.iter().rposition(|e| {
+                let m = e.1;
+                mid > m.Y && mid < m.Y + m.Height && r.X - (m.X + m.Width) < r.Height * 1.5
+            });
+            match near {
+                Some(i) => {
+                    merged[i].0.push(' ');
+                    merged[i].0.push_str(&t);
+                    merged[i].1 = union(merged[i].1, r);
+                }
+                None => merged.push((t, r)),
+            }
+        }
+        let best = merged.into_iter().map(|(t, r)| (dist_to(&r, cx, cy), t, r))
+            .min_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
         let Some((_, text, r)) = best else {
-            return Ok(ScreenRead { text: String::new(), rgb: None });
+            return Ok(ScreenRead { text: String::new(), colours: None });
         };
 
         // Colour of the text inside that line, from the original pixels.
         let mut px = Vec::new();
-        let (x0, y0) = ((r.X as i32 / SCALE).max(0), (r.Y as i32 / SCALE).max(0));
-        let (x1, y1) = (((r.X + r.Width) as i32 / SCALE).min(W), ((r.Y + r.Height) as i32 / SCALE).min(H));
+        let (x0, y0) = ((r.X as i32 / scale).max(0), (r.Y as i32 / scale).max(0));
+        let (x1, y1) = (((r.X + r.Width) as i32 / scale).min(W), ((r.Y + r.Height) as i32 / scale).min(H));
         for y in y0..y1 {
             for x in x0..x1 {
                 let i = ((y * W + x) * 4) as usize;
                 px.push([raw[i + 2], raw[i + 1], raw[i]]); // BGRA -> RGB
             }
         }
-        Ok(ScreenRead { text, rgb: text_colour(&px) })
+        Ok(ScreenRead { text, colours: text_colour(&px) })
     }
 }
 
@@ -177,7 +200,8 @@ mod tests {
     fn picks_text_over_background() {
         let mut px = vec![[20u8, 20, 20]; 300];
         px.extend(vec![[255u8, 200, 40]; 80]);
-        let c = super::text_colour(&px).unwrap();
+        let (c, bg) = super::text_colour(&px).unwrap();
+        assert!(bg[0] < 30);
         assert!(c[0] > 240 && c[1] > 190 && c[2] < 60);
     }
 }

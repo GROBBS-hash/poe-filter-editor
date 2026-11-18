@@ -14,6 +14,8 @@ type Status = {
   by_stack: { from: number; visibility: string }[];
   assumptions: string[];
 };
+type GameFilter = { selected?: string | null; expected: string; matches: boolean };
+type Reply = { status: Status; area_level?: number | null; game_filter?: GameFilter | null };
 
 const GEAR = ["Normal", "Magic", "Rare", "Unique"];
 const rgba = (c?: number[] | null, fallback = "transparent") =>
@@ -33,6 +35,7 @@ function stackLine(by: Status["by_stack"]) {
 export default function QuickMenu() {
   const [picked, setPicked] = useState<Picked | null>(null);
   const [status, setStatus] = useState<Status | null>(null);
+  const [extra, setExtra] = useState<Omit<Reply, "status"> | null>(null);
   const [failed, setFailed] = useState("");
   const [toast, setToast] = useState("");
   const [anyRarity, setAnyRarity] = useState(false);
@@ -45,7 +48,9 @@ export default function QuickMenu() {
 
   const refresh = useCallback(async (p: Picked) => {
     try {
-      setStatus(await invoke<Status>("item_status", { item: p.item, fromScreen: p.from_screen }));
+      const r = await invoke<Reply>("item_status", { item: p.item, fromScreen: p.from_screen });
+      setStatus(r.status);
+      setExtra({ area_level: r.area_level, game_filter: r.game_filter });
     } catch {
       setStatus(null);
     }
@@ -111,8 +116,17 @@ export default function QuickMenu() {
   const st = v?.style;
   const isGear = GEAR.includes(item.rarity);
 
+  const gf = extra?.game_filter;
+  const nameOf = (f: string) => f.replace(/\.filter$/i, "");
+
   return (
     <div className="qm">
+      {gf && !gf.matches && (
+        <div className="qm-warn">
+          Your game is using <b>{nameOf(gf.selected ?? "")}</b>, not <b>{nameOf(gf.expected)}</b>.
+          Pick {nameOf(gf.expected)} in Options › Game › Item Filter, or this won't match what you see.
+        </div>
+      )}
       <div className="qm-head">
         <div className="qm-name" style={{ color: RARITY_COLOUR[item.rarity] ?? "#ddd" }}>{itemTitle(item)}</div>
         <div className="qm-sub">{itemSub(item)}</div>
@@ -160,6 +174,7 @@ export default function QuickMenu() {
             </div>
           )}
           {status!.assumptions.length > 0 && <div className="qm-unsure">Assuming {status!.assumptions.join(", ")}</div>}
+          {extra?.area_level != null && <div className="qm-unsure">Area level {extra.area_level} (from your game)</div>}
         </div>
       ) : (
         <div className="qm-status"><div className="qm-facts">Checking your filter…</div></div>
