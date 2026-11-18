@@ -1,0 +1,147 @@
+//! Parses the text Path of Exile puts on the clipboard when you Ctrl+C an item.
+
+use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct Item {
+    pub item_class: String,
+    pub rarity: String,
+    pub name: Option<String>,
+    pub base_type: String,
+    pub item_level: Option<u32>,
+    pub stack_size: Option<u32>,
+    pub quality: Option<u32>,
+    pub sockets: Option<String>,
+    pub map_tier: Option<u32>,
+    pub corrupted: bool,
+    pub mirrored: bool,
+    pub unidentified: bool,
+}
+
+const SEP: &str = "--------";
+
+pub fn parse_item(text: &str) -> Option<Item> {
+    let text = text.replace('\r', "");
+    let sections: Vec<Vec<&str>> = text
+        .split(SEP)
+        .map(|s| s.lines().map(str::trim).filter(|l| !l.is_empty()).collect())
+        .collect();
+
+    let header = sections.first()?;
+    let mut item = Item::default();
+    let mut names: Vec<&str> = Vec::new();
+    for line in header {
+        if let Some(v) = line.strip_prefix("Item Class: ") {
+            item.item_class = v.to_string();
+        } else if let Some(v) = line.strip_prefix("Rarity: ") {
+            item.rarity = v.to_string();
+        } else {
+            names.push(line);
+        }
+    }
+    if item.rarity.is_empty() || names.is_empty() {
+        return None;
+    }
+
+    match (item.rarity.as_str(), names.len()) {
+        ("Rare" | "Unique", n) if n >= 2 => {
+            item.name = Some(names[0].to_string());
+            item.base_type = names[1].to_string();
+        }
+        _ => item.base_type = names.last()?.to_string(),
+    }
+
+    for line in sections.iter().skip(1).flatten() {
+        let num = |s: &str| -> Option<u32> {
+            s.chars().filter(|c| c.is_ascii_digit()).collect::<String>().parse().ok()
+        };
+        if let Some(v) = line.strip_prefix("Item Level: ") {
+            item.item_level = num(v);
+        } else if let Some(v) = line.strip_prefix("Stack Size: ") {
+            item.stack_size = v.split('/').next().and_then(num);
+        } else if let Some(v) = line.strip_prefix("Quality: ") {
+            item.quality = v.split_whitespace().next().and_then(num);
+        } else if let Some(v) = line.strip_prefix("Sockets: ") {
+            item.sockets = Some(v.trim().to_string());
+        } else if let Some(v) = line.strip_prefix("Map Tier: ") {
+            item.map_tier = num(v);
+        } else if *line == "Corrupted" {
+            item.corrupted = true;
+        } else if *line == "Mirrored" {
+            item.mirrored = true;
+        } else if *line == "Unidentified" {
+            item.unidentified = true;
+        }
+    }
+    Some(item)
+}
+
+/// Magic items show "Prefix Base of Suffix" as one line. Given every base
+/// name we know (taken straight from the filter), keep the longest match.
+pub fn resolve_magic_base(item: &mut Item, known_bases: &HashSet<String>) {
+    if item.rarity != "Magic" || known_bases.contains(&item.base_type) {
+        return;
+    }
+    if let Some(best) = known_bases
+        .iter()
+        .filter(|b| item.base_type.contains(b.as_str()))
+        .max_by_key(|b| b.len())
+    {
+        item.base_type = best.clone();
+    }
+}
+
+/// How many links the biggest group has, e.g. "R-G-B G" -> 3.
+pub fn max_links(sockets: &str) -> u32 {
+    sockets
+        .split_whitespace()
+        .map(|g| g.split('-').count() as u32)
+        .max()
+        .unwrap_or(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unique() {
+        let t = "Item Class: Body Armours\r\nRarity: Unique\r\nKaom's Heart\r\nGlorious Plate\r\n--------\r\nQuality: +20% (augmented)\r\n--------\r\nSockets: R-R-R G\r\n--------\r\nItem Level: 84\r\n--------\r\nCorrupted\r\n";
+        let i = parse_item(t).unwrap();
+        assert_eq!(i.name.as_deref(), Some("Kaom's Heart"));
+        assert_eq!(i.base_type, "Glorious Plate");
+        assert_eq!(i.item_level, Some(84));
+        assert_eq!(i.quality, Some(20));
+        assert_eq!(max_links(i.sockets.as_deref().unwrap()), 3);
+        assert!(i.corrupted);
+    }
+
+    #[test]
+    fn currency_stack_with_commas() {
+        let t = "Item Class: Stackable Currency\nRarity: Currency\nChaos Orb\n--------\nStack Size: 1,234/5,000\n";
+        let i = parse_item(t).unwrap();
+        assert_eq!(i.base_type, "Chaos Orb");
+        assert_eq!(i.stack_size, Some(1234));
+    }
+
+    #[test]
+    fn magic_base_from_known_list() {
+        let t = "Item Class: Rings\nRarity: Magic\nCoral Ring of the Whelpling\n--------\nItem Level: 70\n";
+        let mut i = parse_item(t).unwrap();
+        let known: HashSet<String> = ["Ring", "Coral Ring", "Iron Ring"].iter().map(|s| s.to_string()).collect();
+        resolve_magic_base(&mut i, &known);
+        assert_eq!(i.base_type, "Coral Ring");
+    }
+
+    #[test]
+    fn map_tier() {
+        let t = "Item Class: Maps\nRarity: Normal\nStrand Map\n--------\nMap Tier: 16\n--------\nItem Level: 83\n";
+        assert_eq!(parse_item(t).unwrap().map_tier, Some(16));
+    }
+
+    #[test]
+    fn garbage_returns_none() {
+        assert!(parse_item("hello world").is_none());
+    }
+}

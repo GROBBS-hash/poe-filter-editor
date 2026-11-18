@@ -1,0 +1,173 @@
+//! Reads and writes NeverSink-style loot filters without losing anything.
+//! Every original line (including its \r\n ending and any extra tag tokens
+//! like `%H8` or `!uniques_a`) is kept verbatim unless we deliberately change it.
+
+use serde::Serialize;
+
+#[derive(Debug, Clone, Serialize)]
+pub struct Block {
+    pub visibility: String,     // Show | Hide | Minimal
+    pub type_path: Vec<String>, // e.g. ["uniques","replicas"]
+    pub tier: Option<String>,   // e.g. "t1"
+    pub header: String,         // original header line, ending included
+    pub lines: Vec<String>,     // original body lines, endings included
+    pub start_line: usize,
+    #[serde(skip)]
+    newline: String,
+}
+
+impl Block {
+    fn base_line_index(&self) -> Option<usize> {
+        self.lines.iter().position(|l| l.trim_start().starts_with("BaseType"))
+    }
+
+    pub fn base_types(&self) -> Vec<String> {
+        self.base_line_index()
+            .map(|i| quoted_values(&self.lines[i]))
+            .unwrap_or_default()
+    }
+
+    /// Replaces the BaseType list, keeping the original indentation,
+    /// operator and line ending. An emptied list comments the block out,
+    /// because the game rejects `BaseType ==` with no values.
+    pub fn set_base_types(&mut self, bases: &[String]) {
+        let Some(i) = self.base_line_index() else { return };
+        let line = &self.lines[i];
+        let indent: String = line.chars().take_while(|c| c.is_whitespace() && *c != '\r' && *c != '\n').collect();
+        let body = line.trim();
+        let op = if body.starts_with("BaseType ==") { "BaseType ==" } else { "BaseType" };
+        if bases.is_empty() {
+            self.lines[i] = format!("{indent}# {op} (emptied by editor){}", self.newline);
+        } else {
+            let list = bases.iter().map(|b| format!("\"{b}\"")).collect::<Vec<_>>().join(" ");
+            self.lines[i] = format!("{indent}{op} {list}{}", self.newline);
+        }
+    }
+
+    pub fn render(&self) -> String {
+        if self.disabled_empty() {
+            // Comment out the whole block so the game skips it.
+            let mut out = format!("# {}", self.header);
+            for l in &self.lines {
+                out.push_str("# ");
+                out.push_str(l);
+            }
+            return out;
+        }
+        let mut out = self.header.clone();
+        for l in &self.lines {
+            out.push_str(l);
+        }
+        out
+    }
+
+    fn disabled_empty(&self) -> bool {
+        self.lines.iter().any(|l| l.contains("(emptied by editor)"))
+    }
+}
+
+fn quoted_values(line: &str) -> Vec<String> {
+    line.split('"').skip(1).step_by(2).map(str::to_string).collect()
+}
+
+fn parse_tag(header: &str) -> (Vec<String>, Option<String>) {
+    let mut path = Vec::new();
+    let mut tier = None;
+    for word in header.split_whitespace() {
+        if let Some(p) = word.strip_prefix("$type->") {
+            path = p.split("->").map(str::to_string).collect();
+        } else if let Some(t) = word.strip_prefix("$tier->") {
+            tier = Some(t.to_string());
+        }
+    }
+    (path, tier)
+}
+
+pub enum Segment {
+    Raw(String),
+    Block(Block),
+}
+
+fn block_keyword(t: &str) -> Option<&'static str> {
+    ["Show", "Hide", "Minimal"].into_iter().find(|k| {
+        t.starts_with(k)
+            && t[k.len()..].chars().next().map_or(true, |c| c.is_whitespace() || c == '#')
+    })
+}
+
+pub fn parse_filter(text: &str) -> Vec<Segment> {
+    let newline = if text.contains("\r\n") { "\r\n" } else { "\n" }.to_string();
+    let mut segs = Vec::new();
+    let mut raw = String::new();
+    let mut cur: Option<Block> = None;
+
+    for (i, line) in text.split_inclusive('\n').enumerate() {
+        let t = line.trim_start();
+        let content = line.trim_end_matches(['\r', '\n']);
+
+        if let Some(kw) = block_keyword(t) {
+            if let Some(b) = cur.take() { segs.push(Segment::Block(b)); }
+            if !raw.is_empty() { segs.push(Segment::Raw(std::mem::take(&mut raw))); }
+            let (type_path, tier) = parse_tag(content);
+            cur = Some(Block {
+                visibility: kw.to_string(),
+                type_path,
+                tier,
+                header: line.to_string(),
+                lines: vec![],
+                start_line: i,
+                newline: newline.clone(),
+            });
+            continue;
+        }
+
+        let ends_block = content.trim().is_empty()
+            || (t.starts_with('#') && !line.starts_with([' ', '\t']));
+        match cur.as_mut() {
+            Some(b) if !ends_block => b.lines.push(line.to_string()),
+            Some(_) => {
+                segs.push(Segment::Block(cur.take().unwrap()));
+                raw.push_str(line);
+            }
+            None => raw.push_str(line),
+        }
+    }
+    if let Some(b) = cur { segs.push(Segment::Block(b)); }
+    if !raw.is_empty() { segs.push(Segment::Raw(raw)); }
+    segs
+}
+
+pub fn render_filter(segs: &[Segment]) -> String {
+    segs.iter()
+        .map(|s| match s {
+            Segment::Raw(r) => r.clone(),
+            Segment::Block(b) => b.render(),
+        })
+        .collect()
+}
+
+/// Moves a base type into `to_tier` within the section `type_path`,
+/// removing it from any other tier of that same section.
+/// Returns false if the target tier doesn't exist.
+pub fn move_base(segs: &mut [Segment], type_path: &[&str], base: &str, to_tier: &str) -> bool {
+    let same_path = |b: &Block| b.type_path.iter().map(String::as_str).eq(type_path.iter().copied());
+    let target_exists = segs.iter().any(|s| matches!(s, Segment::Block(b)
+        if same_path(b) && b.tier.as_deref() == Some(to_tier) && !b.base_types().is_empty()));
+    if !target_exists { return false; }
+
+    let mut placed = false;
+    for s in segs.iter_mut() {
+        let Segment::Block(b) = s else { continue };
+        if !same_path(b) { continue; }
+        let mut bases = b.base_types();
+        let has = bases.iter().any(|x| x == base);
+        if b.tier.as_deref() == Some(to_tier) {
+            if !placed && !has { bases.push(base.to_string()); b.set_base_types(&bases); }
+            placed = true;
+        } else if has {
+            bases.retain(|x| x != base);
+            b.set_base_types(&bases);
+        }
+    }
+    placed
+}

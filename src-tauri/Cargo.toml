@@ -1,0 +1,22 @@
+[package]
+name = "poe-filter-editor"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "poe_filter_editor_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+filter-core = { path = "../core" }
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-dialog = "2"
+enigo = "0.5"
+dirs = "6"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
