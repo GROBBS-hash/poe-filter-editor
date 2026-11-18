@@ -7,7 +7,7 @@ use filter_core::{
     ground::{ground_item, known_names, match_base, LabelColours},
     item::{is_stackable, parse_item, resolve_magic_base, Item},
     profiles::{build, Game, Store},
-    rules::{custom_rule, known_bases, locate, quick_rule, Action, CustomStyle, Location, MatchOpts, Rule},
+    rules::{custom_rule, edited_rule, known_bases, locate, quick_rule, rule_detail, Action, CustomStyle, Location, MatchOpts, Rule, RuleDetail, RuleEdit},
 };
 use serde::Serialize;
 use std::{
@@ -452,6 +452,35 @@ fn delete_rule(state: State<AppState>, id: String, index: usize) -> Result<(), S
     save_and_build(&state, &store, &id).map(|_| ())
 }
 
+/// Opens a saved edit for changing. With no index, finds the active
+/// profile's newest edit with this label (used by the in-game pop-up).
+#[tauri::command]
+fn get_rule(state: State<AppState>, id: Option<String>, index: Option<usize>, label: Option<String>) -> Result<(String, usize, RuleDetail), String> {
+    let store = state.store.lock().unwrap();
+    let id = id.or_else(|| store.active.clone()).ok_or("Set up a profile first")?;
+    let p = store.profiles.get(&id).ok_or("Profile not found")?;
+    let index = match (index, label) {
+        (Some(i), _) => i,
+        (None, Some(l)) => p.rules.iter().rposition(|r| rule_label(r) == l).ok_or("That edit lives in another profile")?,
+        _ => return Err("Which edit?".into()),
+    };
+    let detail = p.rules.get(index).and_then(rule_detail).ok_or("This edit can't be opened")?;
+    Ok((id, index, detail))
+}
+
+/// Saves changes to an edit, keeping its place in the list.
+#[tauri::command]
+fn update_rule(state: State<AppState>, id: String, index: usize, edit: RuleEdit) -> Result<ActionResult, String> {
+    let mut store = state.store.lock().unwrap();
+    let p = store.profiles.get_mut(&id).ok_or("Profile not found")?;
+    let old = p.rules.get(index).ok_or("That edit no longer exists")?;
+    let new = edited_rule(old, &edit).ok_or("This edit can't be changed")?;
+    let label = rule_label(&new);
+    p.rules[index] = new;
+    let warnings = save_and_build(&state, &store, &id)?;
+    Ok(ActionResult { label, warnings })
+}
+
 #[tauri::command]
 fn rebuild(state: State<AppState>, id: String) -> Result<Vec<String>, String> {
     let store = state.store.lock().unwrap();
@@ -585,6 +614,8 @@ pub fn run() {
             undo_last,
             delete_rule,
             rebuild,
+            get_rule,
+            update_rule,
             locate_item,
             item_status,
             set_batch_mode

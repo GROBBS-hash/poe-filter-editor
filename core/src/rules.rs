@@ -183,6 +183,75 @@ pub fn custom_rule(item: &Item, style: &CustomStyle, opts: &MatchOpts) -> Rule {
     Rule::Override { label: format!("Style: {who}"), show: true, conditions, actions: style_actions(style) }
 }
 
+// ---------- editing saved rules ----------
+
+/// A saved edit, opened for changing: what it matches and how it looks.
+#[derive(Debug, Clone, Serialize)]
+pub struct RuleDetail {
+    pub label: String,
+    pub show: bool,
+    pub item_class: String,
+    pub base_type: String,
+    /// None = applies to every rarity.
+    pub rarity: Option<String>,
+    pub min_stack: Option<u32>,
+    pub below_stack: Option<u32>,
+    pub style: crate::evaluate::Style,
+}
+
+/// Changes to apply to a saved edit.
+#[derive(Debug, Clone, Deserialize)]
+pub struct RuleEdit {
+    pub show: bool,
+    /// Required when shown.
+    pub style: Option<CustomStyle>,
+    pub every_rarity: bool,
+    pub min_stack: Option<u32>,
+    pub below_stack: Option<u32>,
+}
+
+fn first_quoted(line: &str) -> Option<String> {
+    line.split('"').nth(1).map(str::to_string)
+}
+
+pub fn rule_detail(rule: &Rule) -> Option<RuleDetail> {
+    let Rule::Override { label, show, conditions, actions } = rule else { return None };
+    let mut d = RuleDetail {
+        label: label.clone(), show: *show, item_class: String::new(), base_type: String::new(),
+        rarity: None, min_stack: None, below_stack: None, style: crate::evaluate::style_of(actions),
+    };
+    for c in conditions {
+        let c = c.trim();
+        if c.starts_with("Class") { d.item_class = first_quoted(c).unwrap_or_default(); }
+        else if c.starts_with("BaseType") { d.base_type = first_quoted(c).unwrap_or_default(); }
+        else if let Some(r) = c.strip_prefix("Rarity = ") { d.rarity = Some(r.trim().to_string()); }
+        else if let Some(n) = c.strip_prefix("StackSize >= ") { d.min_stack = n.trim().parse().ok(); }
+        else if let Some(n) = c.strip_prefix("StackSize < ") { d.below_stack = n.trim().parse().ok(); }
+    }
+    Some(d)
+}
+
+/// Rebuilds a saved edit with changes, keeping what it matches.
+pub fn edited_rule(rule: &Rule, edit: &RuleEdit) -> Option<Rule> {
+    let d = rule_detail(rule)?;
+    let item = Item {
+        item_class: d.item_class.clone(),
+        base_type: d.base_type.clone(),
+        rarity: d.rarity.clone().unwrap_or_else(|| "Currency".into()),
+        ..Default::default()
+    };
+    let opts = MatchOpts {
+        same_rarity: !edit.every_rarity && d.rarity.is_some(),
+        max_item_level: None,
+        min_stack: edit.min_stack,
+        below_stack: edit.below_stack,
+    };
+    Some(match (edit.show, &edit.style) {
+        (true, Some(style)) => custom_rule(&item, style, &opts),
+        _ => quick_rule(&item, Action::Hide, None, &opts),
+    })
+}
+
 /// Every base name NeverSink lists, used to work out magic item bases.
 pub fn known_bases(segs: &[Segment]) -> HashSet<String> {
     segs.iter()
@@ -308,6 +377,31 @@ mod tests {
         // The pop-up's stack summary sees the new cut-off too.
         let s = status(&segs, &crate::item::Item { stack_size: Some(40), ..gold }, Some(60), false);
         assert!(s.by_stack.iter().any(|b| b.from == 500 && b.visibility == "Show"), "{:?}", s.by_stack);
+    }
+
+    #[test]
+    fn edit_a_saved_rule() {
+        let gold = parse_item("Item Class: Gold\nRarity: Currency\nGold\n").unwrap();
+        let hide = quick_rule(&gold, Action::Hide, None, &MatchOpts { below_stack: Some(500), ..Default::default() });
+        let d = rule_detail(&hide).unwrap();
+        assert_eq!((d.base_type.as_str(), d.item_class.as_str(), d.below_stack, d.show), ("Gold", "Gold", Some(500), false));
+        // Raise the cut-off to 800.
+        let e = RuleEdit { show: false, style: None, every_rarity: false, min_stack: None, below_stack: Some(800) };
+        let Rule::Override { label, conditions, .. } = edited_rule(&hide, &e).unwrap() else { panic!() };
+        assert_eq!(label, "Hide: Gold (stacks under 800)");
+        assert!(conditions.contains(&"StackSize < 800".to_string()));
+
+        // A unique belt style: switch to every rarity and a new colour.
+        let belt = parse_item("Item Class: Belts\nRarity: Unique\nHeadhunter\nLeather Belt\n").unwrap();
+        let style = CustomStyle { font_size: 40, text: [1, 2, 3, 255], border: None, background: [0, 0, 0, 255],
+            beam: None, minimap: None, sound: Sound::Default };
+        let r = custom_rule(&belt, &style, &MatchOpts::default());
+        assert_eq!(rule_detail(&r).unwrap().rarity.as_deref(), Some("Unique"));
+        assert_eq!(rule_detail(&r).unwrap().style.font_size, Some(40));
+        let e = RuleEdit { show: true, style: Some(CustomStyle { text: [9, 9, 9, 255], ..style }), every_rarity: true, min_stack: None, below_stack: None };
+        let Rule::Override { conditions, actions, .. } = edited_rule(&r, &e).unwrap() else { panic!() };
+        assert!(!conditions.iter().any(|c| c.starts_with("Rarity")));
+        assert!(actions.contains(&"SetTextColor 9 9 9 255".to_string()));
     }
 
     #[test]

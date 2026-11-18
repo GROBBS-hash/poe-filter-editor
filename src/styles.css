@@ -116,3 +116,19 @@ code { background: #000; padding: 1px 5px; border-radius: 4px; color: var(--gold
 .qm-stack .qm-label b { color: var(--gold); font-weight: normal; }
 .qm-stack input[type=range] { width: 100%; accent-color: var(--gold); margin: 4px 0 0; }
 .qm-btn.small { padding: 6px 0; font-size: 13px; }
+
+/* editing saved rules */
+.rules li.open { flex-direction: column; align-items: stretch; background: #1a1510; border-radius: 8px; }
+.rule-line { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; }
+.rules li:not(.open) .rule-line { padding: 0; }
+.rule-edit { max-width: 340px; margin: 10px auto 4px; }
+.re-row { display: flex; align-items: center; gap: 6px; margin: 6px 0; flex-wrap: wrap; }
+.re-tog { flex: 1; padding: 6px 0; }
+.re-tog.on { border-color: #4caf6a; color: #9ff0ad; }
+.re-tog.on.hide { border-color: #a04040; color: #ffb0b0; }
+.re-check { display: flex; gap: 6px; align-items: flex-start; font-size: 12px; color: var(--muted); margin: 6px 0; }
+.re-stack span { font-size: 12px; color: var(--muted); }
+.re-stack input { width: 70px; font: inherit; font-size: 13px; color: var(--text); background: #120f0b;
+  border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
+.qm-inline { background: none; border: none; padding: 0 2px; font-size: 11px; color: #9fd0ff; text-decoration: underline; }
+.qm .re { font-size: 13px; }

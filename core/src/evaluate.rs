@@ -207,8 +207,19 @@ fn colour(vals: &[String]) -> Option<[u8; 4]> {
 }
 
 fn apply_actions(b: &Block, s: &mut Style) -> bool {
+    apply_action_lines(&b.lines, s)
+}
+
+/// The look a list of filter action lines gives (e.g. a saved edit).
+pub fn style_of(lines: &[String]) -> Style {
+    let mut s = Style::default();
+    apply_action_lines(lines, &mut s);
+    s
+}
+
+fn apply_action_lines(lines: &[String], s: &mut Style) -> bool {
     let mut cont = false;
-    for line in &b.lines {
+    for line in lines {
         let Some((key, _, v)) = split_condition(line) else { continue };
         match key {
             "SetFontSize" => s.font_size = v.first().and_then(|x| x.parse().ok()),

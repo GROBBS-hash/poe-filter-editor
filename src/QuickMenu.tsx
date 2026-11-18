@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { Item, RARITY_COLOUR, itemSub, itemTitle } from "./types";
 import StyleEditor, { CurrentStyle, CustomStyle, GAME_COLOURS, fromCurrent } from "./StyleEditor";
+import RuleEditor, { RuleDetail, RuleEdit } from "./RuleEditor";
 
 type Picked = { item: Item; from_screen: boolean; screen_text?: string | null; confidence: number };
 type Style = CurrentStyle & { sound?: string | null; minimap?: string | null };
@@ -44,6 +45,8 @@ export default function QuickMenu() {
   const [editing, setEditingRaw] = useState<false | { minStack: number }>(false);
   const setEditing = (v: boolean | { minStack: number }) => setEditingRaw(v === true ? { minStack: 1 } : v);
   const [stackPick, setStackPick] = useState(0); // index into the slider steps
+  /** One of your saved edits, opened for changing from in game. */
+  const [ruleEdit, setRuleEdit] = useState<{ id: string; index: number; detail: RuleDetail } | null>(null);
   const [autoReload, setAutoReload] = useState(() => {
     try { return localStorage.getItem("autoReload") !== "off"; } catch { return true; }
   });
@@ -52,13 +55,14 @@ export default function QuickMenu() {
     try { localStorage.setItem("autoReload", on ? "on" : "off"); } catch { /* not saved */ }
   };
   const editingRef = useRef(false);
-  editingRef.current = editing !== false;
+  editingRef.current = editing !== false || ruleEdit !== null;
   const box = useRef<HTMLDivElement | null>(null);
 
   const close = useCallback(async () => {
     setPicked(null);
     setFailed("");
     setEditingRaw(false);
+    setRuleEdit(null);
     await getCurrentWindow().hide();
   }, []);
 
@@ -91,6 +95,7 @@ export default function QuickMenu() {
       setStatus(null);
       setAnyRarity(false);
       setEditingRaw(false);
+      setRuleEdit(null);
       setStackPick(-1);
       refresh(e.payload);
     });
@@ -100,7 +105,9 @@ export default function QuickMenu() {
       setTimeout(close, 2500);
     });
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { if (editingRef.current) setEditingRaw(false); else close(); }
+      if (e.key === "Escape") {
+        if (editingRef.current) { setEditingRaw(false); setRuleEdit(null); } else close();
+      }
       if (e.key.toLowerCase() === "h" && !editingRef.current) document.getElementById("qm-hide")?.click();
     };
     // Clicking back into the game closes the menu, but not while editing
@@ -151,6 +158,19 @@ export default function QuickMenu() {
     setEditingRaw(false);
     saved(invoke("apply_custom_style", { item: picked.item, style, opts: opts(minStack > 1 ? { min_stack: minStack } : {}) }));
   };
+  const openRule = async (label: string) => {
+    try {
+      const [id, index, detail] = await invoke<[string, number, RuleDetail]>("get_rule", { id: null, index: null, label });
+      setRuleEdit({ id, index, detail });
+    } catch (e) { setToast(String(e)); }
+  };
+  const saveRule = (e: RuleEdit) => {
+    if (!ruleEdit) return;
+    const { id, index } = ruleEdit;
+    setRuleEdit(null);
+    saved(invoke("update_rule", { id, index, edit: e }));
+  };
+
   /** Current look, so quick buttons only change what they're about. */
   const current = () => fromCurrent(status?.verdict.visibility === "Hide" ? undefined : status?.verdict.style, picked?.item.rarity ?? "Normal");
   const louder = () => {
@@ -195,6 +215,18 @@ export default function QuickMenu() {
   })();
   const pickIndex = stackPick < 0 || stackPick >= steps.length ? defaultPick : stackPick;
   const stackN = steps[pickIndex];
+
+  if (ruleEdit) {
+    return (
+      <div className="qm" ref={box}>
+        <div className="qm-head">
+          <div className="qm-name" style={{ color: RARITY_COLOUR[item.rarity] ?? "#ddd" }}>{itemTitle(item)}</div>
+          <div className="qm-sub">Editing your rule: {ruleEdit.detail.label}</div>
+        </div>
+        <RuleEditor detail={ruleEdit.detail} onSave={saveRule} onCancel={() => setRuleEdit(null)} />
+      </div>
+    );
+  }
 
   if (editing) {
     return (
@@ -257,7 +289,9 @@ export default function QuickMenu() {
           )}
           {status!.by_stack.length > 0 && <div className="qm-facts">Stacks: {stackLine(status!.by_stack)}</div>}
           <div className="qm-by">
-            {v.by_user_edit ? <>Your edit: <b>{v.decided_by}</b></> : <>NeverSink: {v.decided_by}</>}
+            {v.by_user_edit ? <>Your edit: <b>{v.decided_by}</b>{" "}
+              <button className="qm-inline" onClick={() => openRule(v.decided_by)}>Edit this rule</button></>
+              : <>NeverSink: {v.decided_by}</>}
           </div>
           {v.uncertain.length > 0 && (
             <div className="qm-unsure" title={v.uncertain.join("\n")}>
