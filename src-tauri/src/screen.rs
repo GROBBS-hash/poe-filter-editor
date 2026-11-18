@@ -103,13 +103,13 @@ mod imp {
         }
     }
 
-    /// Enlarges the image; the game's small label font reads better.
-    fn upscale(src: &[u8], scale: i32) -> Vec<u8> {
-        let (w2, h2) = (W * scale, H * scale);
+    /// Cuts out columns x0..x0+w and enlarges them; the game's small label font reads better.
+    fn upscale(src: &[u8], x0: i32, w: i32, scale: i32) -> Vec<u8> {
+        let (w2, h2) = (w * scale, H * scale);
         let mut out = vec![0u8; (w2 * h2 * 4) as usize];
         for y in 0..h2 {
             for x in 0..w2 {
-                let s = (((y / scale) * W + x / scale) * 4) as usize;
+                let s = (((y / scale) * W + x0 + x / scale) * 4) as usize;
                 let d = ((y * w2 + x) * 4) as usize;
                 out[d..d + 3].copy_from_slice(&src[s..s + 3]);
                 out[d + 3] = 255;
@@ -129,36 +129,36 @@ mod imp {
         unsafe { GetCursorPos(&mut p)? };
         let (raw, mx, my) = capture(p.x, p.y)?;
         let max = OcrEngine::MaxImageDimension().unwrap_or(2600) as i32;
-        let scale = if W * 2 <= max { 2 } else { 1 };
         let engine = OcrEngine::TryCreateFromUserProfileLanguages()?;
-        let (cx, cy) = ((mx * scale) as f32, (my * scale) as f32);
+        // Everything below works in the captured strip's own pixels (not enlarged).
+        let (cx, cy) = (mx as f32, my as f32);
         let union = |a: Rect, r: Rect| {
             let (x1, y1) = (a.X.min(r.X), a.Y.min(r.Y));
             let (x2, y2) = ((a.X + a.Width).max(r.X + r.Width), (a.Y + a.Height).max(r.Y + r.Height));
             Rect { X: x1, Y: y1, Width: x2 - x1, Height: y2 - y1 }
         };
-        // Every recognised line with its box.
-        let recognise = |pixels: &[u8]| -> windows::core::Result<Vec<(String, Rect)>> {
-            let big = upscale(pixels, scale);
+        // Reads columns x0..x0+w at a given size; every line with its box, back in strip pixels.
+        let recognise = |pixels: &[u8], x0: i32, w: i32, scale: i32| -> windows::core::Result<Vec<(String, Rect)>> {
+            let big = upscale(pixels, x0, w, scale);
             let buffer = CryptographicBuffer::CreateFromByteArray(&big)?;
             let bitmap = SoftwareBitmap::CreateCopyWithAlphaFromBuffer(
-                &buffer, BitmapPixelFormat::Bgra8, W * scale, H * scale, BitmapAlphaMode::Ignore)?;
+                &buffer, BitmapPixelFormat::Bgra8, w * scale, H * scale, BitmapAlphaMode::Ignore)?;
             let result = engine.RecognizeAsync(&bitmap)?.get()?;
             let mut lines = Vec::new();
+            let sf = scale as f32;
             for line in result.Lines()? {
                 let mut rect: Option<Rect> = None;
                 for word in line.Words()? {
                     let r = word.BoundingRect()?;
+                    let r = Rect { X: r.X / sf + x0 as f32, Y: r.Y / sf, Width: r.Width / sf, Height: r.Height / sf };
                     rect = Some(match rect { None => r, Some(a) => union(a, r) });
                 }
                 if let Some(r) = rect { lines.push((line.Text()?.to_string(), r)); }
             }
             Ok(lines)
         };
-        // Some filter colours give the reader too little contrast (white text on bright orange):
-        // if nothing is found near the mouse, try again with the darkest colour channel as grey,
-        // then the same inverted.
-        let near_mouse = |lines: &Vec<(String, Rect)>| lines.iter().any(|(_, r)| dist_to(r, cx, cy) < (220.0 * scale as f32).powi(2));
+        let near_mouse = |lines: &Vec<(String, Rect)>| lines.iter().any(|(_, r)| dist_to(r, cx, cy) < 220.0 * 220.0);
+        // The darkest colour channel as grey (optionally inverted): rescues low-contrast colours.
         let grey = |invert: bool| -> Vec<u8> {
             let mut out = raw.clone();
             for px in out.chunks_exact_mut(4) {
@@ -168,10 +168,16 @@ mod imp {
             }
             out
         };
-        let mut lines = recognise(&raw)?;
+        // 1. The whole strip (enlarged if the reader allows it).
+        let mut lines = recognise(&raw, 0, W, if W * 2 <= max { 2 } else { 1 })?;
+        // 2. Still nothing near the mouse: a closer look around it at double size,
+        //    then the same with the contrast boosted both ways.
         if !near_mouse(&lines) {
-            for invert in [false, true] {
-                let more = recognise(&grey(invert))?;
+            let w = (max / 2).min(1200).min(W);
+            let x0 = (mx - w / 2).clamp(0, W - w);
+            let (g1, g2) = (grey(false), grey(true));
+            for pixels in [&raw, &g1, &g2] {
+                let more = recognise(pixels, x0, w, 2)?;
                 if near_mouse(&more) { lines = more; break; }
             }
         }
@@ -218,8 +224,8 @@ mod imp {
 
         // Colour of the text inside that line, from the original pixels.
         let mut px = Vec::new();
-        let (x0, y0) = ((r.X as i32 / scale).max(0), (r.Y as i32 / scale).max(0));
-        let (x1, y1) = (((r.X + r.Width) as i32 / scale).min(W), ((r.Y + r.Height) as i32 / scale).min(H));
+        let (x0, y0) = ((r.X as i32).max(0), (r.Y as i32).max(0));
+        let (x1, y1) = (((r.X + r.Width) as i32).min(W), ((r.Y + r.Height) as i32).min(H));
         for y in y0..y1 {
             for x in x0..x1 {
                 let i = ((y * W + x) * 4) as usize;
