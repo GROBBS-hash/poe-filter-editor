@@ -30,9 +30,32 @@ pub struct MatchOpts {
     /// Only stacks smaller than this (e.g. hide Gold under 500).
     #[serde(default)]
     pub below_stack: Option<u32>,
+    /// Only while levelling (areas below 68) or only in maps (68+).
+    #[serde(default)]
+    pub when: When,
 }
 impl Default for MatchOpts {
-    fn default() -> Self { Self { same_rarity: true, max_item_level: None, min_stack: None, below_stack: None } }
+    fn default() -> Self { Self { same_rarity: true, max_item_level: None, min_stack: None, below_stack: None, when: When::Always } }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum When {
+    #[default]
+    Always,
+    /// The campaign: areas below level 68.
+    Levelling,
+    /// Endgame: areas level 68 and up.
+    Maps,
+}
+
+impl When {
+    fn condition(self) -> Option<&'static str> {
+        match self { When::Always => None, When::Levelling => Some("AreaLevel < 68"), When::Maps => Some("AreaLevel >= 68") }
+    }
+    fn words(self) -> &'static str {
+        match self { When::Always => "", When::Levelling => " while levelling", When::Maps => " in maps" }
+    }
 }
 
 const RARITIES: [&str; 4] = ["Normal", "Magic", "Rare", "Unique"];
@@ -69,6 +92,9 @@ pub fn quick_rule(item: &Item, action: Action, colour_name: Option<&str>, opts: 
     if let Some(n) = opts.below_stack.filter(|n| *n > 1) {
         conditions.push(format!("StackSize < {n}"));
     }
+    if let Some(c) = opts.when.condition() {
+        conditions.push(c.to_string());
+    }
     let what = if item.base_type.is_empty() { format!("every {}", item.item_class) } else { item.base_type.clone() };
     let mut who = match RARITIES.contains(&item.rarity.as_str()) && opts.same_rarity {
         true => format!("{} {what}", item.rarity),
@@ -80,6 +106,7 @@ pub fn quick_rule(item: &Item, action: Action, colour_name: Option<&str>, opts: 
         (None, Some(b)) => who.push_str(&format!(" (stacks under {b})")),
         _ => {}
     }
+    who.push_str(opts.when.words());
 
     let (show, actions, verb) = match action {
         Action::Hide => (false, vec!["DisableDropSound".into()], "Hide"),
@@ -212,6 +239,8 @@ pub struct RuleDetail {
     pub rarity: Option<String>,
     pub min_stack: Option<u32>,
     pub below_stack: Option<u32>,
+    #[serde(default)]
+    pub when: When,
     pub style: crate::evaluate::Style,
 }
 
@@ -224,6 +253,8 @@ pub struct RuleEdit {
     pub every_rarity: bool,
     pub min_stack: Option<u32>,
     pub below_stack: Option<u32>,
+    #[serde(default)]
+    pub when: When,
 }
 
 fn first_quoted(line: &str) -> Option<String> {
@@ -237,7 +268,7 @@ pub fn rule_detail(rule: &Rule) -> Option<RuleDetail> {
     }
     let mut d = RuleDetail {
         label: label.clone(), show: *show, item_class: String::new(), base_type: String::new(),
-        rarity: None, min_stack: None, below_stack: None, style: crate::evaluate::style_of(actions),
+        rarity: None, min_stack: None, below_stack: None, when: When::Always, style: crate::evaluate::style_of(actions),
     };
     for c in conditions {
         let c = c.trim();
@@ -246,6 +277,8 @@ pub fn rule_detail(rule: &Rule) -> Option<RuleDetail> {
         else if let Some(r) = c.strip_prefix("Rarity = ") { d.rarity = Some(r.trim().to_string()); }
         else if let Some(n) = c.strip_prefix("StackSize >= ") { d.min_stack = n.trim().parse().ok(); }
         else if let Some(n) = c.strip_prefix("StackSize < ") { d.below_stack = n.trim().parse().ok(); }
+        else if c == "AreaLevel < 68" { d.when = When::Levelling; }
+        else if c == "AreaLevel >= 68" { d.when = When::Maps; }
     }
     Some(d)
 }
@@ -258,6 +291,7 @@ pub fn same_slot(a: &Rule, b: &Rule) -> bool {
     x.item_class == y.item_class && x.base_type == y.base_type && x.rarity == y.rarity
         && x.min_stack.is_some() == y.min_stack.is_some()
         && x.below_stack.is_some() == y.below_stack.is_some()
+        && x.when == y.when
 }
 
 /// For each edit, the newer edit that always wins over it (so it never
@@ -272,7 +306,8 @@ pub fn shadowed_by(rules: &[Rule]) -> Vec<Option<usize>> {
                 && (new.base_type == old.base_type || new.base_type.is_empty());
             let covers_rarity = new.rarity.is_none() || new.rarity == old.rarity;
             let covers_stacks = new.min_stack.is_none() && new.below_stack.is_none();
-            same_item && covers_rarity && covers_stacks
+            let covers_when = new.when == When::Always || new.when == old.when;
+            same_item && covers_rarity && covers_stacks && covers_when
         })
     }).collect()
 }
@@ -297,6 +332,7 @@ pub fn edited_rule(rule: &Rule, edit: &RuleEdit) -> Option<Rule> {
         max_item_level: None,
         min_stack: edit.min_stack,
         below_stack: edit.below_stack,
+        when: edit.when,
     };
     Some(match (edit.show, &edit.style) {
         (true, Some(style)) => custom_rule(&item, style, &opts),
@@ -446,7 +482,7 @@ mod tests {
         let d = rule_detail(&hide).unwrap();
         assert_eq!((d.base_type.as_str(), d.item_class.as_str(), d.below_stack, d.show), ("Gold", "Gold", Some(500), false));
         // Raise the cut-off to 800.
-        let e = RuleEdit { show: false, style: None, every_rarity: false, min_stack: None, below_stack: Some(800) };
+        let e = RuleEdit { show: false, style: None, every_rarity: false, min_stack: None, below_stack: Some(800), when: When::Always };
         let Rule::Override { label, conditions, .. } = edited_rule(&hide, &e).unwrap() else { panic!() };
         assert_eq!(label, "Hide: Gold (stacks under 800)");
         assert!(conditions.contains(&"StackSize < 800".to_string()));
@@ -458,7 +494,7 @@ mod tests {
         let r = custom_rule(&belt, &style, &MatchOpts::default());
         assert_eq!(rule_detail(&r).unwrap().rarity.as_deref(), Some("Unique"));
         assert_eq!(rule_detail(&r).unwrap().style.font_size, Some(40));
-        let e = RuleEdit { show: true, style: Some(CustomStyle { text: [9, 9, 9, 255], ..style }), every_rarity: true, min_stack: None, below_stack: None };
+        let e = RuleEdit { show: true, style: Some(CustomStyle { text: [9, 9, 9, 255], ..style }), every_rarity: true, min_stack: None, below_stack: None, when: When::Always };
         let Rule::Override { conditions, actions, .. } = edited_rule(&r, &e).unwrap() else { panic!() };
         assert!(!conditions.iter().any(|c| c.starts_with("Rarity")));
         assert!(actions.contains(&"SetTextColor 9 9 9 255".to_string()));
@@ -516,6 +552,23 @@ mod tests {
             quick_rule(&gold, Action::Hide, None, &MatchOpts { below_stack: Some(100), ..Default::default() }), // 3: fine (newest)
         ];
         assert_eq!(shadowed_by(&rules), vec![Some(2), None, None, None]);
+    }
+
+    #[test]
+    fn wands_only_while_levelling() {
+        let wands = parse_item("Item Class: Wands\nRarity: Rare\nX\nOpal Wand\n").unwrap();
+        let wands = crate::item::Item { base_type: String::new(), ..wands };
+        let style = CustomStyle { font_size: 42, text: [0, 255, 255, 255], border: None, background: [0, 0, 0, 255],
+            beam: None, minimap: None, sound: Sound::Default, label_hidden: false };
+        let r = custom_rule(&wands, &style, &MatchOpts { same_rarity: false, when: When::Levelling, ..Default::default() });
+        let d = rule_detail(&r).unwrap();
+        assert_eq!((d.label.as_str(), d.when), ("Style: every Wands while levelling", When::Levelling));
+        let mut segs = parse_filter("Show\n    Class == \"Wands\"\n    SetFontSize 30\n");
+        apply(&mut segs, &[r], "\n");
+        let segs = parse_filter(&crate::filter::render_filter(&segs));
+        let item = crate::item::Item { base_type: "Opal Wand".into(), ..wands };
+        assert_eq!(status(&segs, &item, Some(30), false).verdict.style.font_size, Some(42));
+        assert_eq!(status(&segs, &item, Some(75), false).verdict.style.font_size, Some(30));
     }
 
     #[test]

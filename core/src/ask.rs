@@ -21,6 +21,8 @@ pub struct Request {
     pub rarity: Option<String>,
     pub min_stack: Option<u32>,
     pub below_stack: Option<u32>,
+    #[serde(default)]
+    pub when: Option<crate::rules::When>,
 }
 
 /// A request matched to a real item, ready to show and apply.
@@ -32,6 +34,7 @@ pub struct Plan {
     pub rarity: Option<String>,
     pub min_stack: Option<u32>,
     pub below_stack: Option<u32>,
+    pub when: crate::rules::When,
     /// "Highlight every Gold in purple (stacks of 500+)".
     pub summary: String,
     /// Other things the words could have meant.
@@ -66,6 +69,11 @@ pub fn read_offline(text: &str) -> Request {
         Intent::Highlight
     });
 
+    if has(" levelling") || has(" leveling") || has(" campaign") || has(" while i level") {
+        r.when = Some(crate::rules::When::Levelling);
+    } else if has(" in maps") || has(" endgame") || has(" end game") || has(" mapping") {
+        r.when = Some(crate::rules::When::Maps);
+    }
     let words: Vec<&str> = lower.split_whitespace().collect();
     let num = |w: &str| w.trim_end_matches('+').replace(['k', 'K'], "000").parse::<u32>().ok();
     let mut skip: BTreeSet<usize> = BTreeSet::new();
@@ -96,10 +104,11 @@ pub fn read_offline(text: &str) -> Request {
         }
     }
     // Item words: what's left after dropping instructions and filler.
-    const FILLER: [&str; 58] = ["show", "make", "highlight", "hide", "remove", "don't", "dont", "stop", "showing", "get", "rid", "of",
+    const FILLER: [&str; 65] = ["show", "make", "highlight", "hide", "remove", "don't", "dont", "stop", "showing", "get", "rid", "of",
         "in", "a", "an", "the", "with", "as", "on", "my", "filter", "please", "can", "you", "i", "want", "to", "stand", "out",
         "colour", "color", "highlighted", "bright", "light", "dark", "icon", "only", "just", "beam", "no", "label", "louder", "loud",
-        "quieter", "silent", "mute", "bigger", "smaller", "stacks", "stack", "over", "above", "under", "below", "than", "more", "less", "or"];
+        "quieter", "silent", "mute", "bigger", "smaller", "stacks", "stack", "over", "above", "under", "below", "than", "more", "less", "or",
+        "while", "levelling", "leveling", "campaign", "maps", "endgame", "mapping"];
     r.target = words.iter().enumerate()
         .filter(|(i, w)| !skip.contains(i) && !FILLER.contains(w) && num(w).is_none() && !MORE_FILLER.contains(w))
         .map(|(_, w)| *w).collect::<Vec<_>>().join(" ");
@@ -150,8 +159,14 @@ pub fn plan(req: &Request, extra_bases: &BTreeSet<String>) -> Option<Plan> {
         (None, Some(b)) => summary.push_str(&format!(", stacks under {b}")),
         _ => {}
     }
+    let when = req.when.unwrap_or_default();
+    match when {
+        crate::rules::When::Levelling => summary.push_str(", only while levelling"),
+        crate::rules::When::Maps => summary.push_str(", only in maps"),
+        _ => {}
+    }
     Some(Plan {
-        intent, target, colour, rarity: req.rarity.clone(), min_stack: req.min_stack, below_stack: req.below_stack,
+        intent, target, colour, rarity: req.rarity.clone(), min_stack: req.min_stack, below_stack: req.below_stack, when,
         summary, alternatives: found.into_iter().skip(1).collect(),
     })
 }
@@ -170,7 +185,8 @@ pub fn claude_tool() -> serde_json::Value {
                 "colour": {"type": "string", "enum": COLOURS},
                 "rarity": {"type": "string", "enum": ["Normal", "Magic", "Rare", "Unique"]},
                 "min_stack": {"type": "integer", "description": "Only stacks of at least this many"},
-                "below_stack": {"type": "integer", "description": "Only stacks smaller than this"}
+                "below_stack": {"type": "integer", "description": "Only stacks smaller than this"},
+                "when": {"type": "string", "enum": ["always", "levelling", "maps"], "description": "levelling = campaign areas below level 68; maps = endgame"}
             },
             "required": ["intent", "target"]
         }
@@ -199,6 +215,9 @@ mod tests {
 
         let e = p("icon only for scrolls of wisdom");
         assert_eq!((e.intent, e.target.base_type.as_str()), (Intent::Icon, "Scroll of Wisdom"));
+
+        let w = p("highlight wands while levelling in cyan");
+        assert_eq!((w.target.item_class.as_str(), w.when, w.colour.as_str()), ("Wands", crate::rules::When::Levelling, "Cyan"));
 
         let f = p("highlight rare amulets in gold");
         assert_eq!((f.target.item_class.as_str(), f.rarity.as_deref(), f.colour.as_str()), ("Amulets", Some("Rare"), "Yellow"));

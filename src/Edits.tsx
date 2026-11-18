@@ -29,6 +29,8 @@ function scope(r: RuleInfo) {
   if (d.min_stack && d.below_stack) parts.push(`stacks ${d.min_stack}–${d.below_stack - 1}`);
   else if (d.min_stack) parts.push(`stacks of ${d.min_stack}+`);
   else if (d.below_stack) parts.push(`stacks under ${d.below_stack}`);
+  const w = (d as { when?: string }).when;
+  if (w === "levelling") parts.push("while levelling"); else if (w === "maps") parts.push("in maps");
   const st = d.style;
   if (d.show && !st.label_hidden) {
     if (st.beam) parts.push(`${st.beam} beam`);

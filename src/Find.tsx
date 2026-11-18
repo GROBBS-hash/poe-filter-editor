@@ -8,14 +8,14 @@ type Found = { base_type: string; item_class: string };
 type Preset = { id: string; title: string; hint: string; count: number };
 type Plan = {
   intent: "highlight" | "hide" | "icon" | "louder" | "quieter";
-  target: Found; colour: string; rarity?: string | null; min_stack?: number | null; below_stack?: number | null;
+  target: Found; colour: string; rarity?: string | null; min_stack?: number | null; below_stack?: number | null; when?: string;
   summary: string; alternatives: Found[];
 };
 
 /** Does what an ask-box plan says, using the same building blocks as the buttons. */
 async function carryOut(p: Plan) {
   const item = { ...toItem(p.target), ...(p.rarity ? { rarity: p.rarity } : {}) };
-  const opts = { same_rarity: !!p.rarity, max_item_level: null, min_stack: p.min_stack ?? undefined, below_stack: p.below_stack ?? undefined };
+  const opts = { same_rarity: !!p.rarity, max_item_level: null, min_stack: p.min_stack ?? undefined, below_stack: p.below_stack ?? undefined, when: p.when ?? "always" };
   const base = standOut(p.colour);
   if (p.intent === "hide") return invoke("apply_quick_action", { item, action: "hide", colour: null, opts });
   const style: CustomStyle =
