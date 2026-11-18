@@ -61,7 +61,7 @@ function Chips({ value, onPick }: { value: string; onPick: (c: string) => void }
   );
 }
 
-export default function Find({ onChange }: { onChange: () => void }) {
+export default function Find({ onChange, view = "find" }: { onChange: () => void; view?: "find" | "presets" }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Found[]>([]);
   const [chosen, setChosen] = useState<Found | null>(null);
@@ -142,6 +142,7 @@ export default function Find({ onChange }: { onChange: () => void }) {
 
   return (
     <>
+      {view === "find" && <>
       <div className="card">
         <h2>Just say what you want</h2>
         <div className="row">
@@ -193,6 +194,8 @@ export default function Find({ onChange }: { onChange: () => void }) {
         )}
       </div>
 
+      </>}
+      {view === "presets" && <>
       <div className="card">
         <div className="row between">
           <h2>Levelling build</h2>
@@ -289,6 +292,7 @@ export default function Find({ onChange }: { onChange: () => void }) {
           ))}
         </div>
       </div>
+      </>}
       {msg && <div className="save-bar"><span className="note">{msg}</span></div>}
     </>
   );

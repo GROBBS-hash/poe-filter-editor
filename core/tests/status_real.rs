@@ -87,6 +87,9 @@ fn levelling_preset_on_real_filter() {
     assert_ne!(v(&wand, 80).style.font_size, Some(42));
     println!("axe in maps: {:?}", v(&axe, 80).reason);
     assert_eq!(v(&wand, 10).reason, "Levelling (Caster): your weapons stand out");
+    // Read off the ground (no sockets visible): a rare warstave is still hidden for a caster.
+    let foul = parse_item("Item Class: Warstaves\nRarity: Rare\nFoul Staff\n").unwrap();
+    assert_eq!(status(&segs, &foul, Some(38), true).verdict.visibility, "Hide");
 
     // Rares only from area 15, armour too.
     let mut segs = parse_filter(&t);

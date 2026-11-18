@@ -323,15 +323,17 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
             {v.by_user_edit ? <>Your edit: <b>{v.decided_by}</b>{" "}
               {!replacing && <button className="qm-inline" onClick={() => openRule(v.decided_by)}>Edit this rule</button>}</>
               : v.decided_by.startsWith("Price") ? <>Price tiers: {v.decided_by}</>
-              : <span title={`NeverSink rule: ${v.decided_by}`}>Why: {v.reason}</span>}
+              : <span title={`${v.reason}\nNeverSink rule: ${v.decided_by}`}>Why: {v.reason.split(", ")[0]}</span>}
           </div>
-          {v.uncertain.length > 0 && (
-            <div className="qm-unsure" title={v.uncertain.join("\n")}>
-              Could differ depending on its mods ({v.uncertain.length} rule{v.uncertain.length > 1 ? "s" : ""})
+          {(v.uncertain.length > 0 || status!.assumptions.length > 0 || extra?.area_level != null) && (
+            <div className="qm-unsure" title={[
+              extra?.area_level != null ? `Area level ${extra.area_level} (from your game)` : "",
+              status!.assumptions.length ? `Assuming ${status!.assumptions.join(", ")}` : "",
+              ...v.uncertain.map((u) => `Could differ: ${u}`),
+            ].filter(Boolean).join("\n")}>
+              {extra?.area_level != null ? `Area ${extra.area_level}` : ""}{v.uncertain.length > 0 ? `${extra?.area_level != null ? " · " : ""}could differ with its mods` : ""} ⓘ
             </div>
           )}
-          {status!.assumptions.length > 0 && <div className="qm-unsure">Assuming {status!.assumptions.join(", ")}</div>}
-          {extra?.area_level != null && <div className="qm-unsure">Area level {extra.area_level} (from your game)</div>}
         </div>
       ) : (
         <div className="qm-status"><div className="qm-facts">Checking your filter…</div></div>
@@ -356,7 +358,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
 
       <div className="qm-row">
         <button id="qm-hide" className="qm-btn hide" onClick={hide}>Hide</button>
-        <button className="qm-btn" onClick={iconOnly} disabled={!status && !wholeType} title="No label: just the beam and minimap icon">Icon only</button>
+        <button className="qm-btn" onClick={iconOnly} disabled={!status && !wholeType} title="No label: just the minimap icon (and beam, if set)">Minimap icon only</button>
 
       </div>
 
