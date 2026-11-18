@@ -255,6 +255,23 @@ pub fn same_slot(a: &Rule, b: &Rule) -> bool {
         && x.below_stack.is_some() == y.below_stack.is_some()
 }
 
+/// For each edit, the newer edit that always wins over it (so it never
+/// applies), if any. Newer edits sit higher in the filter.
+pub fn shadowed_by(rules: &[Rule]) -> Vec<Option<usize>> {
+    let details: Vec<Option<RuleDetail>> = rules.iter().map(rule_detail).collect();
+    (0..rules.len()).map(|i| {
+        let old = details[i].as_ref()?;
+        (i + 1..rules.len()).rev().find(|&j| {
+            let Some(new) = details[j].as_ref() else { return false };
+            let same_item = new.item_class == old.item_class
+                && (new.base_type == old.base_type || new.base_type.is_empty());
+            let covers_rarity = new.rarity.is_none() || new.rarity == old.rarity;
+            let covers_stacks = new.min_stack.is_none() && new.below_stack.is_none();
+            same_item && covers_rarity && covers_stacks
+        })
+    }).collect()
+}
+
 /// Adds an edit, replacing any older edit in the same slot.
 pub fn add_rule(rules: &mut Vec<Rule>, rule: Rule) {
     rules.retain(|r| !same_slot(r, &rule));
@@ -479,6 +496,21 @@ mod tests {
         assert!(a.contains(&"MinimapIcon 0 Red Star".to_string()));
         let st = crate::evaluate::style_of(&a);
         assert!(st.label_hidden);
+    }
+
+    #[test]
+    fn spots_edits_that_never_apply() {
+        let gold = parse_item("Item Class: Gold\nRarity: Currency\nGold\n").unwrap();
+        let belt = parse_item("Item Class: Belts\nRarity: Unique\nHeadhunter\nLeather Belt\n").unwrap();
+        let style = CustomStyle { font_size: 40, text: [1, 2, 3, 255], border: None, background: [0, 0, 0, 255],
+            beam: None, minimap: None, sound: Sound::Default, label_hidden: false };
+        let rules = vec![
+            custom_rule(&gold, &style, &MatchOpts { min_stack: Some(500), ..Default::default() }), // 0: covered by 2
+            quick_rule(&belt, Action::Hide, None, &MatchOpts::default()),                          // 1: fine
+            quick_rule(&gold, Action::Hide, None, &MatchOpts::default()),                          // 2: hides all gold
+            quick_rule(&gold, Action::Hide, None, &MatchOpts { below_stack: Some(100), ..Default::default() }), // 3: fine (newest)
+        ];
+        assert_eq!(shadowed_by(&rules), vec![Some(2), None, None, None]);
     }
 
     #[test]

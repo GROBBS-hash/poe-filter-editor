@@ -10,7 +10,7 @@ use filter_core::{
     prices::{default_settings, price_of, PriceFile, PriceSettings},
     profiles::{build_with_prices, Game, Settings, Store},
     themes::{builtin_themes, Theme},
-    rules::{add_rule, custom_rule, edited_rule, known_bases, locate, quick_rule, rule_detail, Action, CustomStyle, Location, MatchOpts, Rule, RuleDetail, RuleEdit},
+    rules::{add_rule, shadowed_by, custom_rule, edited_rule, known_bases, locate, quick_rule, rule_detail, Action, CustomStyle, Location, MatchOpts, Rule, RuleDetail, RuleEdit},
 };
 use serde::Serialize;
 use std::{
@@ -426,6 +426,10 @@ struct ProfileInfo {
 struct RuleInfo {
     index: usize,
     label: String,
+    /// What it matches and how it looks (for grouping and previews).
+    detail: Option<RuleDetail>,
+    /// A newer edit always wins over this one, so it never applies.
+    shadowed_by: Option<String>,
 }
 
 fn rule_label(r: &Rule) -> String {
@@ -460,12 +464,15 @@ fn overview(state: State<AppState>) -> Overview {
                         .and_then(|f| f.take(4096).read_to_string(&mut head).ok());
                     neversink::version_of(&head)
                 },
-                rules: p
-                    .rules
-                    .iter()
-                    .enumerate()
-                    .map(|(index, r)| RuleInfo { index, label: rule_label(r) })
-                    .collect(),
+                rules: {
+                    let sh = shadowed_by(&p.rules);
+                    p.rules.iter().enumerate().map(|(index, r)| RuleInfo {
+                        index,
+                        label: rule_label(r),
+                        detail: rule_detail(r),
+                        shadowed_by: sh[index].map(|j| rule_label(&p.rules[j])),
+                    }).collect()
+                },
             })
             .collect(),
         active: store.active.clone(),

@@ -23,7 +23,7 @@ export type ProfileInfo = {
   base_file: string;
   output_file: string;
   parent?: string | null;
-  rules: { index: number; label: string }[];
+  rules: RuleInfo[];
   theme?: string | null;
   strictness?: number | null;
   base_version?: string | null;
@@ -62,3 +62,15 @@ export const itemSub = (i: Item) =>
     .filter(Boolean).join(" · ");
 
 export const STRICTNESS_NAMES = ["Soft", "Regular", "Semi-Strict", "Strict", "Very Strict", "Uber Strict", "Uber Plus Strict"];
+
+export type RuleInfo = {
+  index: number;
+  label: string;
+  detail?: {
+    label: string; show: boolean; item_class: string; base_type: string; rarity?: string | null;
+    min_stack?: number | null; below_stack?: number | null;
+    style: { font_size?: number | null; text?: number[] | null; border?: number[] | null; background?: number[] | null;
+      beam?: string | null; muted: boolean; sound?: string | null; minimap_parts?: [number, string, string] | null; label_hidden?: boolean };
+  } | null;
+  shadowed_by?: string | null;
+};
