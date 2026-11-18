@@ -426,6 +426,15 @@ pub fn apply_with_extra(segs: &mut Vec<Segment>, rules: &[Rule], extra: &str, nl
                     warnings.push(format!("Couldn't change {} {tier}: that tier is gone in this version", type_path.join(" > ")));
                 }
             }
+            Rule::MoveBase { type_path, base, to_tier } if to_tier.is_empty() => {
+                // Take the item out of every tier of this section.
+                for seg in segs.iter_mut() {
+                    let Segment::Block(b) = seg else { continue };
+                    if b.type_path != *type_path { continue; }
+                    let mut bases = b.base_types();
+                    if bases.iter().any(|x| x == base) { bases.retain(|x| x != base); b.set_base_types(&bases); }
+                }
+            }
             Rule::MoveBase { type_path, base, to_tier } => {
                 let tp: Vec<&str> = type_path.iter().map(String::as_str).collect();
                 if !move_base(segs, &tp, base, to_tier) {

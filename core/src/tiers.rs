@@ -144,6 +144,28 @@ pub fn sections(segs: &[Segment]) -> Vec<Section> {
     found
 }
 
+/// One stack section as offered in the in-game panel.
+#[derive(Debug, Clone, Serialize)]
+pub struct StackChoice {
+    pub type_path: Vec<String>,
+    pub title: String,
+    pub tiers: Vec<TierRow>,
+    /// The tier this item is in now, if any.
+    pub current: Option<String>,
+}
+
+/// Stack sections for a currency: the general ones (3+, 6+) and any that already list it.
+pub fn stack_choices(segs: &[Segment], base: &str) -> Vec<StackChoice> {
+    sections(segs).into_iter()
+        .filter(|s| s.group == "Currency" && s.title != "Gold" && s.tiers.iter().all(|t| t.min_stack.is_some()))
+        .filter_map(|s| {
+            let current = s.tiers.iter().find(|t| t.bases.iter().any(|b| b == base)).map(|t| t.tier.clone());
+            let general = matches!(s.type_path.last().map(String::as_str), Some("stackedthree" | "stackedsix"));
+            (general || current.is_some()).then(|| StackChoice { type_path: s.type_path, title: s.title, tiers: s.tiers, current })
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -200,6 +222,15 @@ mod tests {
         let v1 = status(&segs, &it(1), Some(70), false).verdict;
         assert!(v6.decided_by.contains("stackedsix") && v6.decided_by.contains("t7"), "{base}: {}", v6.decided_by);
         assert!(!v1.decided_by.contains("stackedsix"), "single drops keep their normal tier");
+        let ch = stack_choices(&segs, &base);
+        assert!(ch.iter().any(|c| c.title == "Stacks of 6+" && c.current.as_deref() == Some("t7")));
+        // Taking it out again.
+        let mut segs2 = parse_filter(&render_filter(&segs));
+        apply(&mut segs2, &[Rule::MoveBase { type_path: vec!["currency".into(), "stackedsix".into()], base: base.clone(), to_tier: String::new() }], "\r\n");
+        let segs2 = parse_filter(&render_filter(&segs2));
+        assert!(stack_choices(&segs2, &base).iter().all(|c| c.current.is_none()));
+        let w = stack_choices(&segs2, "Scroll of Wisdom");
+        assert!(w.iter().any(|c| c.title == "Wisdom scroll stacks" && c.current.is_some()), "{:?}", w.iter().map(|c| &c.title).collect::<Vec<_>>());
     }
 
     #[test]

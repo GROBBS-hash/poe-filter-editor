@@ -56,6 +56,47 @@ function stackLine(by: Status["by_stack"]) {
  * Used by the in-game pop-up and by "Edit" in the editor window. With `replacing`,
  * every button changes that saved edit instead of adding a new one.
  */
+
+type StackTier = { tier: string; name: string; min_stack: number | null; style: { text?: number[] | null; background?: number[] | null; border?: number[] | null } };
+type StackChoice = { type_path: string[]; title: string; tiers: StackTier[]; current: string | null };
+const rgb = (c?: number[] | null) => (c ? `rgba(${c[0]},${c[1]},${c[2]},${(c[3] ?? 255) / 255})` : "transparent");
+
+/** NeverSink's stack tiers for a currency (3+, 6+, its own supply stacks): see and change them in game. */
+function StackTiers({ base, onDone }: { base: string; onDone: (msg: string) => void }) {
+  const [list, setList] = useState<StackChoice[]>([]);
+  const load = useCallback(() => {
+    invoke<StackChoice[]>("stack_choices", { base }).then(setList).catch(() => setList([]));
+  }, [base]);
+  useEffect(() => { load(); }, [load]);
+  if (list.length === 0) return null;
+  const pick = async (c: StackChoice, tier: string) => {
+    try {
+      await invoke("set_stack_tier", { typePath: c.type_path, base, tier });
+      const t = c.tiers.find((x) => x.tier === tier);
+      onDone(tier ? `${base} stacks now use ${c.title} › ${t?.name} (${t?.min_stack}+).` : `${base} taken out of ${c.title}.`);
+      load();
+    } catch (e) { onDone(String(e)); }
+  };
+  return (
+    <div className="qm-stacktiers">
+      <div className="qm-label">Stack tiers <span className="muted small">(NeverSink's: how stacks of it look)</span></div>
+      {list.map((c) => {
+        const cur = c.tiers.find((t) => t.tier === c.current);
+        return (
+          <div key={c.type_path.join(">")} className="qm-st-row">
+            <span className="qm-st-title">{c.title}</span>
+            {cur && <span className="qm-st-swatch" style={{ color: rgb(cur.style.text), background: rgb(cur.style.background), borderColor: rgb(cur.style.border) }}>Aa</span>}
+            <select value={c.current ?? ""} onChange={(e) => pick(c, e.target.value)}>
+              <option value="">Not in it</option>
+              {c.tiers.map((t) => <option key={t.tier} value={t.tier}>{t.name} · {t.min_stack}+</option>)}
+            </select>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function ItemPanel({ start, inGame, replacing: replacingProp, onClose, onChanged, onEditingChange }: {
   start: Picked;
   inGame: boolean;
@@ -353,6 +394,9 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
               Style {stackN.toLocaleString()}+…
             </button>
           </div>
+          {item.item_class === "Stackable Currency" && item.base_type && (
+            <StackTiers base={item.base_type} onDone={(m) => afterChange(m)} />
+          )}
         </div>
       )}
 

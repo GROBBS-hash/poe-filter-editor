@@ -464,6 +464,9 @@ struct RuleInfo {
 fn rule_label(r: &Rule) -> String {
     match r {
         Rule::Override { label, .. } => label.clone(),
+        Rule::MoveBase { type_path, base, to_tier } if to_tier.is_empty() => {
+            format!("Tier: {base} taken out of {}", type_path.join(" > "))
+        }
         Rule::MoveBase { type_path, base, to_tier } => {
             format!("Tier: {base} moved to {} {}", type_path.join(" > "), filter_core::tiers::tier_name(to_tier))
         }
@@ -488,6 +491,20 @@ fn get_tiers(state: State<AppState>, id: String) -> Result<Vec<filter_core::tier
     let prices = state.prices.lock().unwrap();
     let (text, _) = render_profile(&store, &id, &filter_dir(game), prices.get(&game), None).map_err(err)?;
     Ok(filter_core::tiers::sections(&parse_filter(&text)))
+}
+
+/// In-game panel: the stack tiers a currency can go in, and where it is now.
+#[tauri::command]
+fn stack_choices(app: AppHandle, base: String) -> Result<Vec<filter_core::tiers::StackChoice>, String> {
+    let (live, _) = active_filters(&app).ok_or("Set up a filter first")?;
+    Ok(filter_core::tiers::stack_choices(&live, &base))
+}
+
+/// Puts a currency's stacks into a tier of a stack section ("" = take it out), for the active filter.
+#[tauri::command]
+fn set_stack_tier(state: State<AppState>, type_path: Vec<String>, base: String, tier: String) -> Result<Vec<String>, String> {
+    let id = state.store.lock().unwrap().active.clone().ok_or("Set up a filter first")?;
+    move_tier_item(state, id, type_path, base, tier)
 }
 
 /// Drag & drop: move an item into another tier of the same section.
@@ -1305,6 +1322,8 @@ pub fn run() {
             list_level_presets,
             get_tiers,
             move_tier_item,
+            stack_choices,
+            set_stack_tier,
             set_tier,
             apply_level_preset,
             ask,
