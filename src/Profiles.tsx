@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { Tip } from "./Help";
 import { Overview, ProfileInfo, STRICTNESS_NAMES } from "./types";
 
 /** "Built on": NeverSink at a strictness (kept up to date), or your own file. */
@@ -73,7 +74,9 @@ export default function Profiles({ ov, active, onChange, onNew }: { ov: Overview
 
       <div className="card">
         <div className="row between">
-          <h2>Your filters</h2>
+          <h2>Your filters <Tip><b>Going stricter?</b> Change <b>Built on</b> to e.g. Uber Strict: your edits, tier changes, levelling setup,
+            price tiers and theme all carry over. <b>Want both?</b> Save as new first, then change the copy, and switch between them in
+            game with F4. <b>FilterBlade file?</b> Choose it under “Your own file”; your edits go on top of it.</Tip></h2>
           <button onClick={onNew}>New filter (e.g. for PoE 2)…</button>
         </div>
         <p className="muted small">Change how strict a filter is any time. Your edits, price tiers and theme carry over.

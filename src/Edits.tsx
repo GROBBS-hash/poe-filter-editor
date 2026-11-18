@@ -1,3 +1,4 @@
+import { Tip } from "./Help";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 import { ProfileInfo, RuleInfo, RARITY_COLOUR } from "./types";
@@ -136,7 +137,9 @@ export default function Edits({ profile, onChange }: { profile: ProfileInfo; onC
     <>
     <div className="card">
       <div className="row between">
-        <h2>Edits in “{profile.name}”</h2>
+        <h2>Edits in “{profile.name}” <Tip>Every change you've made to this filter. Newer edits win over older ones.
+          Edit or Remove any of them; History lets you go back to before a change. Rebuild re-applies everything
+          (you rarely need it: NeverSink updates do this automatically).</Tip></h2>
         <button onClick={rebuild} title="Use after downloading a new filter file">Rebuild</button>
       </div>
       <p className="muted">In game, press <b>F4</b> to switch to and load “{profile.output_file.replace(".filter", "")}”. Newer edits win over older ones.</p>

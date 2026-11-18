@@ -301,3 +301,16 @@ code { background: #000; padding: 1px 5px; border-radius: 4px; color: var(--gold
 .stackbox input { width: 64px; margin: 0 3px; padding: 2px 4px; background: #120e09; border: 1px solid #3a3022; color: var(--text); border-radius: 4px; }
 .tier-tools { display: flex; gap: 6px; }
 .lvl-tile:disabled { opacity: .35; cursor: default; }
+
+/* Help */
+.tip-btn { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; margin-left: 6px; padding: 0;
+  border-radius: 50%; border: 1px solid #6b5838; background: none; color: var(--gold); font-size: 11px; font-weight: 700; cursor: pointer; vertical-align: middle; }
+.tip-btn.on, .tip-btn:hover { background: #3b2f1a; }
+.tip-body { font-size: 13px; font-weight: normal; line-height: 1.5; color: var(--text); background: #221b13; border: 1px solid #3a3022;
+  border-left: 3px solid var(--gold); border-radius: 6px; padding: 8px 12px; margin: 8px 0; text-transform: none; letter-spacing: 0; }
+.faq { list-style: none; padding: 0; margin: 0; }
+.faq li { border-bottom: 1px solid #2c241a; }
+.faq-q { width: 100%; text-align: left; background: none; border: 0; padding: 10px 4px; color: var(--text); font-size: 14px; cursor: pointer; }
+.faq-q::before { content: "▸ "; color: var(--gold); }
+.faq li.open .faq-q::before { content: "▾ "; }
+.faq-a { padding: 0 4px 12px 18px; font-size: 13px; line-height: 1.55; }

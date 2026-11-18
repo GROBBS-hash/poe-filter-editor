@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { Tip } from "./Help";
 import { useEffect, useMemo, useState } from "react";
 import { ProfileInfo } from "./types";
 import StyleEditor, { CurrentStyle, CustomStyle, Preview, fromCurrent } from "./StyleEditor";
@@ -97,9 +98,10 @@ export default function Tiers({ profile, onChange }: { profile: ProfileInfo; onC
       <div className="tiers-main">
         {!section ? <div className="empty">No tier lists found in this filter.</div> : (
           <div className="card">
-            <h2>{section.title}</h2>
-            <p className="muted small">Untick a tier to hide it. Click a tier's label to change its look.
-              Drag an item onto another tier to move it there.</p>
+            <h2>{section.title} <Tip>NeverSink sorts items into tiers, best at the top. <b>Untick</b> a tier to hide everything in it.
+              <b> Click the label</b> to change how the whole tier looks. <b>Drag</b> an item onto another tier to move it there
+              (e.g. drag Chaos Orb up a tier). <b>Copy/Paste</b> gives one tier another tier's look. <b>Reset</b> puts a tier back
+              to NeverSink's. Your changes survive NeverSink updates and strictness changes.</Tip></h2>
             {section.tiers.map((t) => {
               const key = t.tier;
               const shown = t.visibility !== "Hide";

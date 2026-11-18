@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Tip } from "./Help";
 import { invoke } from "@tauri-apps/api/core";
 import { GAME_COLOURS } from "./StyleEditor";
 import { standOut } from "./Find";
@@ -56,7 +57,11 @@ export default function LevelSetup({ onDone }: { onDone: (msg: string) => void }
   return (
     <div className="card lvl">
       <div className="row between">
-        <h2>Levelling setup</h2>
+        <h2>Levelling setup <Tip>For a new character. <b>Build buttons</b> tick the usual weapons and armour for that build;
+          change any tick to make it your own. Picked weapons stand out; other weapons and armour types are hidden.
+          <b> Vendor rares</b> keeps rares you didn't pick showing in those level ranges, so you can sell them.
+          <b> Item progression</b> highlights the newest white base of a weapon type as you level.
+          Nothing here applies in maps (area level 68+). Press Apply, then F4 in game.</Tip></h2>
         {st.current && <button className="link" onClick={() => apply(true)}>Turn off</button>}
       </div>
       <p className="muted small">Like FilterBlade's “Auto-Adjust: Campaign”. Only until maps (area level 68); uniques always show,

@@ -1,3 +1,4 @@
+import { Tip } from "./Help";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -89,7 +90,9 @@ export default function Prices({ profile }: { profile: ProfileInfo }) {
     <>
       <div className="card">
         <div className="row between">
-          <h2>Price tiers for “{profile.name}”</h2>
+          <h2>Price tiers for “{profile.name}” <Tip>Uses live poe.ninja prices (updated hourly) to give items a look by what
+            they're worth, on top of NeverSink's tiers. Set the value for each tier; anything above tier 1 gets the Divine-style
+            drop sound. “Hide below” hides cheap items of that kind. Your own F2 edits still win.</Tip></h2>
           <button onClick={refresh}>Check for new prices</button>
         </div>
         <p className="muted">
