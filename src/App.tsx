@@ -16,6 +16,7 @@ export default function App() {
   const [ov, setOv] = useState<Overview | null>(null);
   const [tab, setTab] = useState<Tab>("edits");
   const [error, setError] = useState("");
+  const [adding, setAdding] = useState(false);
 
   const refresh = useCallback(async () => {
     try { setOv(await invoke<Overview>("overview")); } catch (e) { setError(String(e)); }
@@ -32,7 +33,9 @@ export default function App() {
   }, [refresh]);
 
   if (!ov) return <div className="page">{error || "Loading…"}</div>;
-  if (ov.profiles.length === 0) return <Setup ov={ov} onDone={refresh} />;
+  if (ov.profiles.length === 0 || adding) {
+    return <Setup ov={ov} onDone={() => { setAdding(false); refresh(); }} onCancel={ov.profiles.length ? () => setAdding(false) : undefined} />;
+  }
 
   const active = ov.profiles.find((p) => p.id === ov.active) ?? ov.profiles[0];
 
@@ -64,7 +67,7 @@ export default function App() {
       {tab === "themes" && <Themes profile={active} onChange={refresh} />}
       {tab === "settings" && <SettingsPage />}
       {tab === "batch" && <Batch on={ov.batch_on} onChange={refresh} />}
-      {tab === "profiles" && <Profiles ov={ov} active={active} onChange={refresh} />}
+      {tab === "profiles" && <Profiles ov={ov} active={active} onChange={refresh} onNew={() => setAdding(true)} />}
     </div>
   );
 }

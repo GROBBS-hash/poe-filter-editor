@@ -483,21 +483,57 @@ fn save_and_build(state: &AppState, store: &Store, id: &str) -> Result<Vec<Strin
     build_with_prices(store, id, &filter_dir(game), prices.get(&game)).map_err(err)
 }
 
+/// A filter file found in the game's folder (for first-time setup).
+#[derive(Serialize)]
+struct FoundFilter { name: String, path: String, modified: u64, neversink: bool, version: Option<String> }
+
 #[tauri::command]
-fn create_profile(state: State<AppState>, name: String, game: Game, base_path: String) -> Result<String, String> {
+fn list_filters(state: State<AppState>, game: Game) -> Vec<FoundFilter> {
+    let ours: Vec<String> = state.store.lock().unwrap().profiles.values().map(|p| p.output_file.to_lowercase()).collect();
+    let mut v: Vec<FoundFilter> = std::fs::read_dir(filter_dir(game)).into_iter().flatten().filter_map(Result::ok)
+        .filter(|e| e.file_name().to_string_lossy().to_lowercase().ends_with(".filter"))
+        .filter(|e| !ours.contains(&e.file_name().to_string_lossy().to_lowercase()))
+        .map(|e| {
+            use std::io::Read;
+            let mut head = String::new();
+            std::fs::File::open(e.path()).ok().and_then(|f| f.take(4096).read_to_string(&mut head).ok());
+            FoundFilter {
+                name: e.file_name().to_string_lossy().to_string(),
+                path: e.path().display().to_string(),
+                modified: e.metadata().and_then(|m| m.modified()).ok()
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_secs()).unwrap_or(0),
+                neversink: head.contains("NeverSink"),
+                version: neversink::version_of(&head),
+            }
+        })
+        .collect();
+    v.sort_by(|a, b| (b.neversink, b.modified).cmp(&(a.neversink, a.modified)));
+    v
+}
+
+#[tauri::command]
+fn create_profile(state: State<AppState>, name: String, game: Game, base_path: Option<String>, strictness: Option<u8>) -> Result<String, String> {
     let dir = filter_dir(game);
-    let src = Path::new(&base_path);
-    let file_name = src.file_name().ok_or("That isn't a file")?.to_string_lossy().to_string();
-    // Keep the base next to the game's filters so rebuilds always find it.
-    if src.parent() != Some(dir.as_path()) {
-        std::fs::create_dir_all(&dir).map_err(err)?;
-        std::fs::copy(src, dir.join(&file_name)).map_err(err)?;
-    }
+    let file_name = match (strictness, base_path) {
+        (Some(level), _) => download_neversink(&state, game, level.min(6))?.0.display().to_string(),
+        (None, Some(base_path)) => {
+            let src = Path::new(&base_path);
+            let file_name = src.file_name().ok_or("That isn't a file")?.to_string_lossy().to_string();
+            // Keep the base next to the game's filters so rebuilds always find it.
+            if src.parent() != Some(dir.as_path()) {
+                std::fs::create_dir_all(&dir).map_err(err)?;
+                std::fs::copy(src, dir.join(&file_name)).map_err(err)?;
+            }
+            file_name
+        }
+        _ => return Err("Pick a filter to start from".into()),
+    };
     let mut store = state.store.lock().unwrap();
     if store.profiles.values().any(|p| p.name.eq_ignore_ascii_case(&name)) {
         return Err(format!("You already have a profile called {name}"));
     }
     let id = store.create(&name, game, &file_name);
+    if let Some(p) = store.profiles.get_mut(&id) { p.strictness = strictness.map(|l| l.min(6)); }
     store.active = Some(id.clone());
     save_and_build(&state, &store, &id)?;
     Ok(id)
@@ -933,6 +969,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             overview,
             create_profile,
+            list_filters,
             set_active,
             fork_profile,
             delete_profile,

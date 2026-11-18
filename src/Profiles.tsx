@@ -37,7 +37,7 @@ function BaseChooser({ p, dir, onChange, onMsg }: { p: ProfileInfo; dir: string;
   );
 }
 
-export default function Profiles({ ov, active, onChange }: { ov: Overview; active: ProfileInfo; onChange: () => void }) {
+export default function Profiles({ ov, active, onChange, onNew }: { ov: Overview; active: ProfileInfo; onChange: () => void; onNew: () => void }) {
   const [name, setName] = useState("");
   const [inherit, setInherit] = useState(true);
   const [msg, setMsg] = useState("");
@@ -72,7 +72,10 @@ export default function Profiles({ ov, active, onChange }: { ov: Overview; activ
       </div>
 
       <div className="card">
-        <h2>Your filters</h2>
+        <div className="row between">
+          <h2>Your filters</h2>
+          <button onClick={onNew}>New filter (e.g. for PoE 2)…</button>
+        </div>
         <p className="muted small">Change how strict a filter is any time. Your edits, price tiers and theme carry over.
           Picking NeverSink here downloads his latest version and keeps it updated; picking a FilterBlade file keeps your FilterBlade choices instead.</p>
         <ul className="rules profiles-list">
