@@ -289,13 +289,22 @@ struct Picked {
 /// No item text on the clipboard: read the ground label under the mouse instead.
 fn read_from_ground(app: &AppHandle) -> Result<Picked, String> {
     let read = screen::read_label_under_cursor()?;
+    // Failed reads are saved next to your filters (ReaderSnapshots) so they can be looked at and fixed.
+    let keep = |why: &str| {
+        let game = active_game(&app.state::<AppState>());
+        screen::save_snapshot(&filter_dir(game).join("ReaderSnapshots"), &read, why)
+            .map(|p| format!(" (saved what it saw: {})", p.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default()))
+            .unwrap_or_default()
+    };
     if read.text.trim().is_empty() {
-        return Err("Couldn't see an item label under your mouse".into());
+        return Err(format!("Couldn't see an item label under your mouse{}", keep("No label found near the mouse")));
     }
     let (live, base) = active_filters(app).ok_or("Set up a filter first")?;
     let names = known_names(&known_bases(&base));
-    let m = match_base(&read.text, &names)
-        .ok_or_else(|| format!("Read \"{}\" but couldn't match it to an item", read.text))?;
+    let m = match match_base(&read.text, &names) {
+        Some(m) => m,
+        None => return Err(format!("Read \"{}\" but couldn't match it to an item{}", read.text, keep("Read text but no item matched"))),
+    };
     let colours = read.colours.map(|(text, background)| LabelColours { text, background });
     let item = ground_item(&live, &m, colours, area_level(app).unwrap_or_else(|| fallback_area_level(app)));
     Ok(Picked { item, from_screen: true, screen_text: Some(read.text), confidence: m.confidence })

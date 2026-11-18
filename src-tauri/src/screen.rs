@@ -1,11 +1,53 @@
 //! Reads the item label under the mouse using Windows' built-in text
 //! recognition (no extra installs). Only looks at a small strip of the
-//! screen around the cursor, only when you press F2, and keeps nothing.
+//! screen around the cursor, only when you press F2. The strip is kept
+//! only when reading fails (see `save_snapshot`), so it can be fixed.
 
 pub struct ScreenRead {
     pub text: String,
     /// Text and background colour of that label, used to tell the item's rarity.
     pub colours: Option<([u8; 3], [u8; 3])>,
+    /// What was looked at: BGRA pixels, width, height, mouse x/y in it, and every line read.
+    pub snapshot: Option<(Vec<u8>, i32, i32, i32, i32, Vec<String>)>,
+}
+
+/// Saves a failed read as a picture (+ a note) in `dir`, keeping the newest 15.
+/// Returns the picture's path.
+pub fn save_snapshot(dir: &std::path::Path, read: &ScreenRead, why: &str) -> Option<std::path::PathBuf> {
+    let (px, w, h, mx, my, lines) = read.snapshot.as_ref()?;
+    std::fs::create_dir_all(dir).ok()?;
+    let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).ok()?.as_secs();
+    let path = dir.join(format!("read-{stamp}.bmp"));
+    // A plain 32-bit BMP (bottom-up rows), no extra libraries needed.
+    let (w, h) = (*w as u32, *h as u32);
+    let size = 54 + w * h * 4;
+    let mut out = Vec::with_capacity(size as usize);
+    out.extend_from_slice(b"BM");
+    for v in [size, 0, 54, 40] { out.extend_from_slice(&v.to_le_bytes()); }
+    out.extend_from_slice(&(w as i32).to_le_bytes());
+    out.extend_from_slice(&(h as i32).to_le_bytes());
+    out.extend_from_slice(&1u16.to_le_bytes());
+    out.extend_from_slice(&32u16.to_le_bytes());
+    for v in [0u32, w * h * 4, 2835, 2835, 0, 0] { out.extend_from_slice(&v.to_le_bytes()); }
+    for y in (0..h).rev() {
+        let row = &px[(y * w * 4) as usize..((y + 1) * w * 4) as usize];
+        out.extend_from_slice(row);
+    }
+    std::fs::write(&path, out).ok()?;
+    let note = format!("{why}\nMouse at {mx},{my} in the picture.\nRead: {}\nLines found:\n{}\n",
+        read.text, lines.join("\n"));
+    let _ = std::fs::write(path.with_extension("txt"), note);
+    // Keep the newest 15.
+    if let Ok(rd) = std::fs::read_dir(dir) {
+        let mut files: Vec<_> = rd.flatten().map(|e| e.path()).filter(|p| p.extension().map(|x| x == "bmp").unwrap_or(false)).collect();
+        files.sort();
+        while files.len() > 15 {
+            let old = files.remove(0);
+            let _ = std::fs::remove_file(old.with_extension("txt"));
+            let _ = std::fs::remove_file(old);
+        }
+    }
+    Some(path)
 }
 
 #[cfg(not(windows))]
@@ -203,7 +245,7 @@ mod imp {
         let best = merged.iter().enumerate().map(|(i, (_, r))| (dist_to(r, cx, cy), i))
             .min_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
         let Some((_, bi)) = best else {
-            return Ok(ScreenRead { text: String::new(), colours: None });
+            return Ok(ScreenRead { text: String::new(), colours: None, snapshot: Some((raw, W, H, mx, my, vec![])) });
         };
         // Big labels wrap ("BLOOD PRICE" over "REAVER HELMET"): join lines stacked right above/below,
         // lined up with this one, top to bottom.
@@ -232,7 +274,8 @@ mod imp {
                 px.push([raw[i + 2], raw[i + 1], raw[i]]); // BGRA -> RGB
             }
         }
-        Ok(ScreenRead { text, colours: text_colour(&px) })
+        let found: Vec<String> = merged.iter().map(|(t, r)| format!("{t}  @ {:.0},{:.0} {:.0}x{:.0}", r.X, r.Y, r.Width, r.Height)).collect();
+        Ok(ScreenRead { text, colours: text_colour(&px), snapshot: Some((raw, W, H, mx, my, found)) })
     }
 }
 
