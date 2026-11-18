@@ -191,7 +191,7 @@ export default function QuickMenu() {
       {gf && !gf.matches && (
         <div className="qm-warn">
           Your game is using <b>{nameOf(gf.selected ?? "")}</b>, not <b>{nameOf(gf.expected)}</b>.
-          Pick {nameOf(gf.expected)} in Options › Game › Item Filter, or this won't match what you see.
+          Press <b>F4</b> in game to switch to {nameOf(gf.expected)}.
         </div>
       )}
       <div className="qm-head">
@@ -273,7 +273,7 @@ export default function QuickMenu() {
 
       <label className="qm-check">
         <input type="checkbox" checked={autoReload} onChange={(e) => toggleAuto(e.target.checked)} />
-        Reload the filter in game after each change (F4 does it by hand)
+        Reload {gf ? <b>{nameOf(gf.expected)}</b> : "the filter"} in game after each change (F4 does it by hand)
       </label>
 
       <div className="qm-foot">
