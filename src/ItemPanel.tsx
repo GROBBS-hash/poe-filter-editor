@@ -186,20 +186,23 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
     if (replacing && replacing.detail.show) return fromCurrent(replacing.detail.style, picked.item.rarity);
     return fromCurrent(status?.verdict.visibility === "Hide" ? undefined : status?.verdict.style, picked.item.rarity);
   };
-  const louder = () => {
-    const c = current();
-    const sound = c.sound.kind === "Builtin" || c.sound.kind === "Custom" ? { ...c.sound, volume: 300 } : { kind: "Builtin" as const, id: "2", volume: 300 };
-    saveStyle({ ...c, font_size: 45, sound });
-  };
   const iconOnly = () => {
     const c = current();
     saveStyle({ ...c, label_hidden: true, sound: { kind: "Off" },
       beam: c.beam ?? { colour: "White", temp: false },
       minimap: c.minimap ?? { size: 1, colour: "White", shape: "Circle" } });
   };
-  const quieter = () => {
+  /** Sound on/off and volume, keeping the rest of the look as it is. */
+  const setSound = (sound: CustomStyle["sound"]) => saveStyle({ ...current(), sound });
+  const soundOff = () => setSound({ kind: "Off" });
+  const soundOn = () => {
     const c = current();
-    saveStyle({ ...c, font_size: Math.max(18, c.font_size - 10), sound: { kind: "Off" }, beam: null });
+    // Coming back from silent: the game's normal drop sound.
+    setSound(c.sound.kind === "Off" ? { kind: "Default" } : c.sound);
+  };
+  const setVolume = (v: number) => {
+    const c = current();
+    if (c.sound.kind === "Builtin" || c.sound.kind === "Custom") setSound({ ...c.sound, volume: v });
   };
   const highlight = (name: string) => {
     const c = current();
@@ -350,9 +353,34 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
       <div className="qm-row">
         <button id="qm-hide" className="qm-btn hide" onClick={hide}>Hide</button>
         <button className="qm-btn" onClick={iconOnly} disabled={!status && !wholeType} title="No label: just the beam and minimap icon">Icon only</button>
-        <button className="qm-btn" onClick={louder} disabled={!status && !wholeType}>Louder</button>
-        <button className="qm-btn" onClick={quieter} disabled={!status && !wholeType}>Quieter</button>
+
       </div>
+
+      {(status || wholeType) && (() => {
+        const snd = current().sound;
+        const off = snd.kind === "Off";
+        const alert = snd.kind === "Builtin" || snd.kind === "Custom";
+        return (
+          <div className="qm-sound">
+            <span className="qm-label">Sound</span>
+            <button className={!off ? "on" : ""} onClick={soundOn}>On</button>
+            <button className={off ? "on off" : ""} onClick={soundOff}>Off</button>
+            {!off && alert && (
+              <>
+                <input type="range" min={0} max={300} step={10} key={`${snd.kind}-${(snd as { volume: number }).volume}`}
+                  defaultValue={(snd as { volume: number }).volume}
+                  title="Volume (saved when you let go)"
+                  onMouseUp={(e) => setVolume(+(e.target as HTMLInputElement).value)}
+                  onKeyUp={(e) => setVolume(+(e.target as HTMLInputElement).value)} />
+                <span className="qm-vol">{Math.round(((snd as { volume: number }).volume / 300) * 100)}%</span>
+              </>
+            )}
+            {!off && !alert && (
+              <button className="qm-inline" onClick={() => setEditing(true)} title="Opens Customise">Pick a sound…</button>
+            )}
+          </div>
+        );
+      })()}
 
       <div className="qm-label">Quick highlight</div>
       <div className="qm-row">
