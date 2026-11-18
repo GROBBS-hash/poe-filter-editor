@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { ProfileInfo, RuleInfo, RARITY_COLOUR } from "./types";
 import ItemPanel, { RuleDetail, itemFromRule } from "./ItemPanel";
 import { ItemIcon } from "./icons";
+import DropPreview from "./DropPreview";
 
 const css = (c?: number[] | null) => (c ? `rgba(${c[0]},${c[1]},${c[2]},${(c[3] ?? 255) / 255})` : "transparent");
 
@@ -38,6 +39,19 @@ function scope(r: RuleInfo) {
     if (st.muted) parts.push("silent"); else if (st.sound) parts.push(st.sound);
   }
   return parts.join(" · ");
+}
+
+function PreviewCard({ profile }: { profile: ProfileInfo }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="card">
+      <div className="row between">
+        <h2>Preview drops</h2>
+        <button className="link" onClick={() => setOpen(!open)}>{open ? "Hide" : "Show how drops look"}</button>
+      </div>
+      {open && <DropPreview profile={profile} />}
+    </div>
+  );
 }
 
 type Change = { index: number; at: number; what: string };
@@ -178,6 +192,7 @@ export default function Edits({ profile, onChange }: { profile: ProfileInfo; onC
       )}
       {msg && <div className="note">{msg}</div>}
     </div>
+    <PreviewCard profile={profile} />
     <History profile={profile} onChange={onChange} />
     </>
   );

@@ -7,6 +7,7 @@ pub mod history;
 pub mod ground;
 pub mod item;
 pub mod neversink;
+pub mod preview;
 pub mod prices;
 pub mod profiles;
 pub mod rules;

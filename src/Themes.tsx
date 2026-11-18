@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ProfileInfo } from "./types";
+import DropPreview from "./DropPreview";
 
 type LevelLook = { text: number[]; border: number[] | null; background: number[] };
 type Theme = { name: string; levels: LevelLook[]; classic?: Record<string, number[]> | null; neversink_style?: string | null; game?: string | null };
@@ -146,6 +147,8 @@ export default function Themes({ profile, onChange }: { profile: ProfileInfo; on
   const [list, setList] = useState<{ builtin: Theme[]; custom: Theme[] } | null>(null);
   const [editing, setEditing] = useState<{ theme: Theme; oldName: string | null } | null>(null);
   const [msg, setMsg] = useState("");
+  /** Theme being previewed ("" = NeverSink's own colours). */
+  const [previewing, setPreviewing] = useState<string | null>(null);
 
   const load = () => invoke<{ builtin: Theme[]; custom: Theme[] }>("list_themes").then(setList).catch((e) => setMsg(String(e)));
   useEffect(() => { load(); }, []);
@@ -201,6 +204,10 @@ export default function Themes({ profile, onChange }: { profile: ProfileInfo; on
           </span>
         </div>
         <Samples t={t} />
+        <button className="link" onClick={() => setPreviewing(previewing === (name ?? "") ? null : (name ?? ""))}>
+          {previewing === (name ?? "") ? "Close preview" : "Preview with real drops"}
+        </button>
+        {previewing === (name ?? "") && <DropPreview profile={profile} theme={name ?? ""} />}
         <button className={inUse ? "primary wide" : "wide"} disabled={inUse} onClick={() => use(name)}>
           {inUse ? `Used by “${profile.name}”` : `Use for “${profile.name}”`}
         </button>

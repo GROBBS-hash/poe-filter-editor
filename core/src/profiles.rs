@@ -132,17 +132,7 @@ pub fn build(store: &Store, id: &str, filter_dir: &Path) -> io::Result<Vec<Strin
 pub fn build_with_prices(store: &Store, id: &str, filter_dir: &Path, prices: Option<&PriceFile>) -> io::Result<Vec<String>> {
     let p = store.profiles.get(id)
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "profile not found"))?;
-    let base = fs::read_to_string(filter_dir.join(&p.base_file))?;
-    let nl = if base.contains("\r\n") { "\r\n" } else { "\n" };
-    let mut segs = parse_filter(&base);
-    if let Some(theme) = p.theme.as_deref().and_then(|n| find_theme(n, &store.themes, &builtin_themes()).cloned()) {
-        apply_theme(&mut segs, &theme);
-    }
-    let extra = match (&p.prices, prices) {
-        (Some(settings), Some(file)) => price_blocks(settings, file, nl),
-        _ => String::new(),
-    };
-    let warnings = apply_with_extra(&mut segs, &store.resolved_rules(id), &extra, nl);
+    let (text, warnings) = render_profile(store, id, filter_dir, prices, None)?;
 
     let out = filter_dir.join(&p.output_file);
     if out.exists() {
@@ -153,9 +143,31 @@ pub fn build_with_prices(store: &Store, id: &str, filter_dir: &Path, prices: Opt
         prune_backups(&backups, &p.id, 30)?;
     }
     let tmp = out.with_extension("tmp");
-    fs::write(&tmp, render_filter(&segs))?;
+    fs::write(&tmp, text)?;
     fs::rename(tmp, out)?;
     Ok(warnings)
+}
+
+/// The finished filter text for a profile, without saving it. `theme`
+/// overrides the profile's theme (Some(None) = NeverSink's own colours),
+/// which is how a theme is previewed before switching to it.
+pub fn render_profile(store: &Store, id: &str, filter_dir: &Path, prices: Option<&PriceFile>,
+    theme: Option<Option<&str>>) -> io::Result<(String, Vec<String>)> {
+    let p = store.profiles.get(id)
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "profile not found"))?;
+    let base = fs::read_to_string(filter_dir.join(&p.base_file))?;
+    let nl = if base.contains("\r\n") { "\r\n" } else { "\n" };
+    let mut segs = parse_filter(&base);
+    let theme_name = match theme { Some(t) => t, None => p.theme.as_deref() };
+    if let Some(theme) = theme_name.and_then(|n| find_theme(n, &store.themes, &builtin_themes()).cloned()) {
+        apply_theme(&mut segs, &theme);
+    }
+    let extra = match (&p.prices, prices) {
+        (Some(settings), Some(file)) => price_blocks(settings, file, nl),
+        _ => String::new(),
+    };
+    let warnings = apply_with_extra(&mut segs, &store.resolved_rules(id), &extra, nl);
+    Ok((render_filter(&segs), warnings))
 }
 
 fn prune_backups(dir: &Path, id: &str, keep: usize) -> io::Result<()> {

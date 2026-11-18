@@ -11,8 +11,9 @@ use filter_core::{
     ask::{claude_tool, plan, read_offline, Plan, Request},
     search::{farm_presets, farm_rules, search, Found, Preset},
     item::{is_stackable, parse_item, resolve_magic_base, Item},
+    preview::{preview, PreviewDrop},
     prices::{default_settings, price_of, PriceFile, PriceSettings},
-    profiles::{build_with_prices, Game, Settings, Store},
+    profiles::{build_with_prices, render_profile, Game, Settings, Store},
     themes::{builtin_themes, Theme},
     rules::{add_rule, shadowed_by, custom_rule, edited_rule, known_bases, locate, quick_rule, rule_detail, Action, CustomStyle, Location, MatchOpts, Rule, RuleDetail, RuleEdit},
 };
@@ -698,6 +699,31 @@ fn undo_last(state: State<AppState>) -> Result<Option<String>, String> {
 struct HistoryItem { index: usize, at: u64, what: String }
 
 /// Recent changes to a filter, newest first.
+#[derive(Serialize)]
+struct Preview { drops: Vec<PreviewDrop>, area_level: u32 }
+
+/// How sample drops (and items you've edited) look with this filter. With
+/// `theme` set, previews that theme without switching to it ("" = NeverSink's own colours).
+#[tauri::command]
+fn preview_drops(app: AppHandle, state: State<AppState>, id: String, theme: Option<String>, area_level: Option<u32>) -> Result<Preview, String> {
+    let level = area_level.or_else(|| crate::area_level(&app)).unwrap_or_else(|| fallback_area_level(&app));
+    let store = state.store.lock().unwrap();
+    let p = store.profiles.get(&id).ok_or("Profile not found")?;
+    let game = p.game;
+    let prices = state.prices.lock().unwrap();
+    let theme_override = theme.as_deref().map(|t| if t.is_empty() { None } else { Some(t) });
+    let (text, _) = render_profile(&store, &id, &filter_dir(game), prices.get(&game), theme_override).map_err(err)?;
+    // Your edited items first, so you can see your own changes.
+    let extra: Vec<Item> = p.rules.iter().filter_map(rule_detail).filter(|d| !d.base_type.is_empty()).map(|d| {
+        let mut it = Item { item_class: d.item_class.clone(), base_type: d.base_type.clone(),
+            rarity: d.rarity.clone().unwrap_or_else(|| "Currency".into()),
+            stack_size: d.min_stack.or(d.below_stack.map(|b| b.saturating_sub(1).max(1))), ..Default::default() };
+        it.unidentified = matches!(it.rarity.as_str(), "Magic" | "Rare" | "Unique");
+        it
+    }).collect();
+    Ok(Preview { drops: preview(&parse_filter(&text), &extra, game, level), area_level: level })
+}
+
 /// Item pictures for the active filter's game: name -> picture URL.
 #[tauri::command]
 fn get_icons(state: State<AppState>) -> std::collections::HashMap<String, String> {
@@ -1178,6 +1204,7 @@ pub fn run() {
             ask,
             get_history,
             get_icons,
+            preview_drops,
             go_back
         ])
         .run(tauri::generate_context!())
