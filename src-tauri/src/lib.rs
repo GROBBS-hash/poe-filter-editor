@@ -49,12 +49,12 @@ struct AppState {
 }
 
 #[derive(Clone, Copy, PartialEq)]
-enum HotAction { QuickEdit, Batch, Reload, Cycle }
+enum HotAction { QuickEdit, Batch, Reload, Cycle, Build }
 
 /// (Re)registers hotkeys from settings. Errors name the key that failed.
 fn register_hotkeys(app: &AppHandle, s: &Settings) -> Result<(), String> {
     let mut wanted = vec![(s.key_quick_edit.as_str(), HotAction::QuickEdit), (s.key_batch.as_str(), HotAction::Batch),
-        (s.key_reload.as_str(), HotAction::Reload)];
+        (s.key_reload.as_str(), HotAction::Reload), (s.key_build.as_str(), HotAction::Build)];
     if s.cycle_enabled { wanted.push((s.key_cycle.as_str(), HotAction::Cycle)); }
     let mut parsed = Vec::new();
     for (key, action) in wanted {
@@ -546,6 +546,76 @@ fn open_url(url: String) -> Result<(), String> {
     #[cfg(not(windows))]
     let r = std::process::Command::new("xdg-open").arg(&url).spawn();
     r.map(|_| ()).map_err(err)
+}
+
+// ---------- Path of Building ----------
+
+fn pob_file(state: &AppState) -> PathBuf {
+    state.store_path.with_file_name("pob.txt")
+}
+
+#[derive(serde::Serialize)]
+struct PobState { build: filter_core::pob::Build, stage: usize, link: String }
+
+fn pob_load(state: &AppState) -> Option<PobState> {
+    let code = std::fs::read_to_string(pob_file(state)).ok()?;
+    let build = filter_core::pob::parse(&filter_core::pob::decode(&code).ok()?).ok()?;
+    let s = state.store.lock().unwrap();
+    let stage = s.settings.pob_stage.unwrap_or(build.active).min(build.stages.len().saturating_sub(1));
+    Some(PobState { build, stage, link: s.settings.pob_link.clone() })
+}
+
+/// Imports a PoB link (pobb.in, pastebin, poe.ninja) or a pasted code, and remembers it.
+#[tauri::command]
+fn pob_import(app: AppHandle, state: State<AppState>, link: String) -> Result<PobState, String> {
+    let code = match filter_core::pob::raw_url(&link) {
+        Some(url) => ureq::get(&url).set("User-Agent", "poe-filter-editor").timeout(Duration::from_secs(20)).call()
+            .map_err(|e| format!("Couldn't download that build: {e}"))?
+            .into_string().map_err(err)?,
+        None => link.trim().to_string(),
+    };
+    let build = filter_core::pob::parse(&filter_core::pob::decode(&code)?)?;
+    std::fs::write(pob_file(&state), code.trim()).map_err(err)?;
+    {
+        let mut s = state.store.lock().unwrap();
+        s.settings.pob_link = if filter_core::pob::raw_url(&link).is_some() { link.trim().to_string() } else { "(pasted code)".into() };
+        s.settings.pob_stage = Some(build.active);
+        s.save(&state.store_path).map_err(err)?;
+    }
+    let _ = app.emit("pob-imported", ());
+    pob_load(&state).ok_or_else(|| "Couldn't read the build back".into())
+}
+
+#[tauri::command]
+fn pob_get(state: State<AppState>) -> Option<PobState> {
+    pob_load(&state)
+}
+
+#[tauri::command]
+fn pob_set_stage(app: AppHandle, state: State<AppState>, stage: usize) -> Result<(), String> {
+    let mut s = state.store.lock().unwrap();
+    s.settings.pob_stage = Some(stage);
+    s.save(&state.store_path).map_err(err)?;
+    let _ = app.emit("pob-stage", stage);
+    Ok(())
+}
+
+/// F6: show/hide the build window over the game.
+fn toggle_build_window(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window("build") {
+        if w.is_visible().unwrap_or(false) {
+            let _ = w.hide();
+        } else {
+            let _ = w.emit("build-shown", ());
+            let _ = w.show();
+            let _ = w.set_focus();
+        }
+    }
+}
+
+#[tauri::command]
+fn hide_build_window(app: AppHandle) {
+    if let Some(w) = app.get_webview_window("build") { let _ = w.hide(); }
 }
 
 /// In-game panel: the stack tiers a currency can go in, and where it is now.
@@ -1264,6 +1334,8 @@ pub fn run() {
                                 let _ = app.emit("reload-failed", e);
                             }
                         });
+                    } else if action == Some(HotAction::Build) {
+                        toggle_build_window(app);
                     } else if action == Some(HotAction::Batch) {
                         let on = !BATCH_ON.load(Ordering::Relaxed);
                         set_batch_mode(app.clone(), on);
@@ -1379,6 +1451,10 @@ pub fn run() {
             move_tier_item,
             stack_choices,
             gear_setup,
+            pob_import,
+            pob_get,
+            pob_set_stage,
+            hide_build_window,
             gear_picks,
             open_url,
             set_stack_tier,

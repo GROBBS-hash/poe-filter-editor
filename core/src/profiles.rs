@@ -60,12 +60,18 @@ pub struct Settings {
     pub fallback_area_level: u32,
     /// Optional Claude API key for the "ask" box (kept only on this PC).
     pub claude_api_key: String,
+    /// Hotkey for the build overlay (PoB gems, gear, tree).
+    pub key_build: String,
+    /// Your Path of Building link or code, and the stage you're on.
+    pub pob_link: String,
+    pub pob_stage: Option<usize>,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self { key_quick_edit: "F2".into(), key_batch: "F3".into(), key_reload: "F4".into(), key_cycle: "F5".into(),
-            cycle_enabled: false, fallback_area_level: 83, claude_api_key: String::new() }
+            cycle_enabled: false, fallback_area_level: 83, claude_api_key: String::new(),
+            key_build: "F6".into(), pob_link: String::new(), pob_stage: None }
     }
 }
 

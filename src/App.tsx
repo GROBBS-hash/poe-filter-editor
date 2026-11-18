@@ -13,8 +13,9 @@ import SettingsPage from "./Settings";
 import Find from "./Find";
 import Tiers from "./Tiers";
 import Gear from "./Gear";
+import MyBuild from "./MyBuild";
 
-type Tab = "help" | "find" | "presets" | "tiers" | "gear" | "edits" | "prices" | "themes" | "batch" | "profiles" | "settings";
+type Tab = "help" | "find" | "presets" | "tiers" | "gear" | "build" | "edits" | "prices" | "themes" | "batch" | "profiles" | "settings";
 
 /** Small line icons for the side menu. */
 const ICONS: Record<Tab, string> = {
@@ -26,6 +27,7 @@ const ICONS: Record<Tab, string> = {
   edits: "M4 6h12M4 12h16M4 18h9M18 16l3 3M17 3l4 4-9 9H8v-4z",
   batch: "M4 7h13v13H4zM8 3h12v12",
   gear: "M14 3l7 7-9 9-3-3-4 4-2-2 4-4-3-3 9-9zM14 3l-2 6 3 3 6-2",
+  build: "M12 3v4M12 17v4M3 12h4M17 12h4M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8",
   profiles: "M3 7h6l2 2h10v10H3zM3 7v12",
   settings: "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM19.4 15l1.6 1-2 3.4-1.8-.7a7 7 0 0 1-2 1.2L15 22h-4l-.3-2.1a7 7 0 0 1-2-1.2l-1.8.7-2-3.4 1.6-1a7 7 0 0 1 0-2.4l-1.6-1 2-3.4 1.8.7a7 7 0 0 1 2-1.2L11 2h4l.3 2.1a7 7 0 0 1 2 1.2l1.8-.7 2 3.4-1.6 1a7 7 0 0 1 0 2.4z",
   help: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17h.01",
@@ -44,6 +46,7 @@ const MENU: { group: string; items: { id: Tab; name: string; hint: string }[] }[
     { id: "batch", name: "Batch mode", hint: "Edit lots of items in a row" },
   ] },
   { group: "Levelling", items: [
+    { id: "build", name: "My build", hint: "Your Path of Building gems, gear and tree, in game with F6" },
     { id: "gear", name: "Levelling gear", hint: "Uniques for your level and skill, with trade links" },
   ] },
   { group: "App", items: [
@@ -112,7 +115,7 @@ export default function App() {
             </div>
           ))}
         </nav>
-        <div className="side-foot muted small">In game: <b>F2</b> edit item · <b>F4</b> reload</div>
+        <div className="side-foot muted small">In game: <b>F2</b> edit item · <b>F4</b> reload · <b>F6</b> build</div>
       </aside>
 
       <main className="content">
@@ -127,6 +130,7 @@ export default function App() {
       {tab === "find" && <Find onChange={refresh} />}
       {tab === "help" && <Help go={(t) => setTab(t as Tab)} />}
       {tab === "gear" && <Gear />}
+      {tab === "build" && <MyBuild />}
       {tab === "tiers" && <Tiers profile={active} onChange={refresh} />}
       {tab === "presets" && <Find key="presets" view="presets" onChange={refresh} />}
       {tab === "batch" && <Batch on={ov.batch_on} onChange={refresh} />}

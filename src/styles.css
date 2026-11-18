@@ -378,3 +378,42 @@ code { background: #000; padding: 1px 5px; border-radius: 4px; color: var(--gold
   .menu-gname, .side-foot { display: none; }
   .menu-item { width: auto; }
 }
+
+/* Build (PoB) view */
+.buildview { display: flex; flex-direction: column; gap: 10px; }
+.bv-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.bv-who { font-size: 16px; color: #f3e6c4; }
+.bv-stage { display: flex; align-items: center; gap: 2px; }
+.bv-stage select { max-width: 240px; }
+.bv-stage .link { font-size: 20px; padding: 0 8px; }
+.bv-tabs { display: flex; gap: 4px; border-bottom: 1px solid #2c241a; }
+.bv-tabs button { background: none; border: none; border-bottom: 2px solid transparent; border-radius: 0; padding: 6px 14px; color: var(--muted); }
+.bv-tabs button.on { color: var(--gold); border-bottom-color: var(--gold); }
+.bv-groups { display: flex; flex-direction: column; gap: 8px; }
+.bv-group { background: #17130e; border: 1px solid #2c241a; border-radius: 8px; padding: 8px 10px; }
+.bv-group.off { opacity: .5; }
+.bv-glabel { font-size: 12px; color: #cbbfa6; margin-bottom: 6px; }
+.bv-gems { display: flex; flex-wrap: wrap; gap: 5px; }
+.gem { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px 3px 6px; border-radius: 12px; font-size: 13px;
+  background: #221b13; border: 1px solid #3a3022; }
+.gem.main { font-weight: 600; border-color: #6b5838; }
+.gem.sup { font-size: 12px; }
+.gem.off { opacity: .45; text-decoration: line-through; }
+.gem-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.gem-r .gem-dot { background: #d8423a; } .gem-g .gem-dot { background: #4cbf4c; } .gem-b .gem-dot { background: #4a7ef0; } .gem-w .gem-dot { background: #ddd; }
+.gem-r { color: #ffb4ad; } .gem-g { color: #bff2bf; } .gem-b { color: #b8cdff; }
+.gem-lvl { font-size: 10px; color: var(--muted); }
+.bv-gear { list-style: none; margin: 0; padding: 0; }
+.bv-gear > li { border-bottom: 1px solid #2c241a; cursor: pointer; }
+.bv-item { display: flex; align-items: center; gap: 10px; padding: 6px 2px; }
+.bv-slot { width: 64px; flex: none; }
+.bv-iname { min-width: 0; }
+.bv-lines { list-style: none; margin: 0 0 8px 74px; padding: 8px 10px; background: #0d0b08; border-radius: 6px; font-size: 12.5px; color: #9db8ff; line-height: 1.55; }
+.bv-tree p { margin: 6px 0 10px; }
+/* F6 window over the game */
+.bo { height: 100vh; display: flex; flex-direction: column; background: rgba(16, 13, 10, .94); border: 1px solid #5c4a2c; border-radius: 10px; overflow: hidden; color: var(--text); }
+.bo-bar { display: flex; align-items: center; gap: 10px; padding: 6px 10px; background: #1f1a13; cursor: move; user-select: none; }
+.bo-bar > span:first-child { color: var(--gold); }
+.bo-bar .link { margin-left: auto; }
+.bo-body { flex: 1; overflow-y: auto; padding: 10px 12px; }
+.buildview.compact .bv-stage select { max-width: 200px; }

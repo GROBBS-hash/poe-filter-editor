@@ -158,6 +158,16 @@ def main(pob, base_items_path, out_dir):
                     stats.append(s)
         gems.setdefault(name, {"tags": [t for t in tags if t not in ("grants_active_skill", "intelligence", "strength", "dexterity")], "stats": stats})
 
+    # Gem colours (supports too), keyed by the game's gem id and by name: r / g / b / w.
+    colours = {}
+    for m in re.finditer(r'name = "([^"]+)",.*?gameId = "([^"]+)",.*?tags = \{(.*?)\},', gtext, re.S):
+        name, gid, tags = m.group(1), m.group(2), re.findall(r"(\w+) = true", m.group(3))
+        c = "r" if "strength" in tags else "g" if "dexterity" in tags else "b" if "intelligence" in tags else "w"
+        colours.setdefault(gid, c)
+        colours.setdefault(name, c)
+        colours.setdefault(name.replace(" Support", ""), c)
+    json.dump(colours, open(os.path.join(out_dir, "gem_colours.json"), "w"), separators=(",", ":"))
+
     json.dump(uniques, open(os.path.join(out_dir, "poe1_uniques.json"), "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
     json.dump(gems, open(os.path.join(out_dir, "poe1_gems.json"), "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
     json.dump([{"id": s, "name": n} for s, n, _ in STATS], open(os.path.join(out_dir, "levelling_stats.json"), "w"), separators=(",", ":"))

@@ -32,6 +32,20 @@
         "resizable": false,
         "visible": false,
         "shadow": false
+      },
+      {
+        "label": "build",
+        "title": "Build",
+        "width": 560,
+        "height": 720,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": true,
+        "visible": false,
+        "transparent": true,
+        "shadow": false,
+        "dragDropEnabled": false
       }
     ],
     "security": { "csp": null }
