@@ -12,8 +12,9 @@ import Themes from "./Themes";
 import SettingsPage from "./Settings";
 import Find from "./Find";
 import Tiers from "./Tiers";
+import Gear from "./Gear";
 
-type Tab = "help" | "find" | "presets" | "tiers" | "edits" | "prices" | "themes" | "batch" | "profiles" | "settings";
+type Tab = "help" | "find" | "presets" | "tiers" | "gear" | "edits" | "prices" | "themes" | "batch" | "profiles" | "settings";
 
 export default function App() {
   const [ov, setOv] = useState<Overview | null>(null);
@@ -58,9 +59,9 @@ export default function App() {
       </header>
 
       <nav className="tabs">
-        {(["find", "presets", "tiers", "edits", "prices", "themes", "batch", "profiles", "settings", "help"] as Tab[]).map((t) => (
+        {(["find", "presets", "tiers", "edits", "gear", "prices", "themes", "batch", "profiles", "settings", "help"] as Tab[]).map((t) => (
           <button key={t} className={tab === t ? "tab on" : "tab"} onClick={() => setTab(t)}>
-            {{ find: "Find", presets: "Presets", tiers: "Tiers", edits: "My edits", prices: "Prices", themes: "Themes", batch: "Batch mode", profiles: "Profiles", settings: "Settings", help: "Help" }[t]}
+            {{ find: "Find", presets: "Presets", tiers: "Tiers", gear: "Levelling gear", edits: "My edits", prices: "Prices", themes: "Themes", batch: "Batch mode", profiles: "Profiles", settings: "Settings", help: "Help" }[t]}
           </button>
         ))}
       </nav>
@@ -71,6 +72,7 @@ export default function App() {
       {tab === "settings" && <SettingsPage />}
       {tab === "find" && <Find onChange={refresh} />}
       {tab === "help" && <Help go={(t) => setTab(t as Tab)} />}
+      {tab === "gear" && <Gear />}
       {tab === "tiers" && <Tiers profile={active} onChange={refresh} />}
       {tab === "presets" && <Find key="presets" view="presets" onChange={refresh} />}
       {tab === "batch" && <Batch on={ov.batch_on} onChange={refresh} />}

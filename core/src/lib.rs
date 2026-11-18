@@ -3,6 +3,7 @@ pub mod ask;
 pub mod evaluate;
 pub mod explain;
 pub mod filter;
+pub mod gear;
 pub mod history;
 pub mod ground;
 pub mod item;

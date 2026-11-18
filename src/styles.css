@@ -331,3 +331,20 @@ code { background: #000; padding: 1px 5px; border-radius: 4px; color: var(--gold
 .qm-st-title { flex: 1; font-size: 12px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .qm-st-swatch { font-size: 11px; padding: 0 5px; border: 1px solid transparent; border-radius: 3px; }
 .qm-st-row select { font-size: 12px; padding: 2px 4px; max-width: 150px; }
+
+/* Levelling gear */
+.gear-top { flex-wrap: wrap; gap: 14px; }
+.gear-top input[type=number] { width: 64px; margin-left: 6px; }
+.gear-stats, .gear-slots { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; align-items: center; }
+.lvl-tile.small { padding: 5px 10px; font-size: 12px; }
+.chip.on { border-color: var(--gold); background: #3b2f1a; color: #f3e6c4; }
+.gear-list { list-style: none; padding: 0; margin: 0; }
+.gear-list > li { border-bottom: 1px solid #2c241a; }
+.gear-list > li.later { opacity: .6; }
+.gear-row { display: flex; align-items: center; gap: 10px; padding: 8px 2px; cursor: pointer; }
+.gear-name { display: flex; flex-direction: column; min-width: 150px; }
+.gear-name b { color: #c87a2e; font-weight: 600; }
+.gear-matched { flex: 1; display: flex; flex-wrap: wrap; gap: 4px; }
+.tag { font-size: 11px; padding: 1px 7px; border-radius: 10px; background: #2a3a22; color: #cfe8b8; }
+.gear-price { min-width: 44px; text-align: right; color: var(--gold); font-size: 13px; }
+.gear-mods { margin: 0 0 10px 44px; padding: 8px 12px; background: #120e09; border-radius: 6px; list-style: none; font-size: 12.5px; color: #9db8ff; line-height: 1.6; }

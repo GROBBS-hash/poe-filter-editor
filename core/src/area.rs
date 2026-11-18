@@ -12,6 +12,30 @@ pub fn last_area_level(log: &str) -> Option<u32> {
     })
 }
 
+/// Your character from the newest level-up line: ": Name (Class) is now level 23".
+pub fn last_character(log: &str) -> Option<(String, String, u32)> {
+    log.lines().rev().find_map(|l| {
+        let i = l.find(" is now level ")?;
+        let level: u32 = l[i + " is now level ".len()..].trim().parse().ok()?;
+        let head = &l[..i];
+        let start = head.rfind(" : ")? + 3;
+        let who = &head[start..];
+        let open = who.rfind(" (")?;
+        let class = who[open + 2..].trim_end_matches(')').to_string();
+        Some((who[..open].to_string(), class, level))
+    })
+}
+
+/// Reads the last ~8 MB of the log for your newest level-up (they're rarer than area changes).
+pub fn read_character(log_path: &Path) -> Option<(String, String, u32)> {
+    let mut f = std::fs::File::open(log_path).ok()?;
+    let len = f.metadata().ok()?.len();
+    f.seek(SeekFrom::Start(len.saturating_sub(8 * 1024 * 1024))).ok()?;
+    let mut buf = Vec::new();
+    f.read_to_end(&mut buf).ok()?;
+    last_character(&String::from_utf8_lossy(&buf))
+}
+
 /// Reads just the end of the log (it can be hundreds of MB).
 pub fn read_area_level(log_path: &Path) -> Option<u32> {
     let mut f = std::fs::File::open(log_path).ok()?;
@@ -105,5 +129,16 @@ mod tests {
     fn reads_selected_filter() {
         let cfg = "[UI]\nitem_filter_loaded_successfully=Giga juice.filter\nitem_filter=Giga juice.filter\n";
         assert_eq!(selected_filter(cfg).as_deref(), Some("Giga juice.filter"));
+    }
+}
+
+#[cfg(test)]
+mod character_tests {
+    #[test]
+    fn reads_level_up_line() {
+        let log = "2026/11/18 12:00:00 123 abc [INFO Client 1] : Grobbs_Witch (Witch) is now level 22\n\
+                   2026/11/18 12:05:00 124 abc [INFO Client 1] : Grobbs_Witch (Witch) is now level 23\n\
+                   2026/11/18 12:06:00 125 abc [DEBUG Client 1] Generating level 24 area \"1_2_3\"\n";
+        assert_eq!(super::last_character(log), Some(("Grobbs_Witch".into(), "Witch".into(), 23)));
     }
 }

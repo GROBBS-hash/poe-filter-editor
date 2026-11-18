@@ -493,6 +493,61 @@ fn get_tiers(state: State<AppState>, id: String) -> Result<Vec<filter_core::tier
     Ok(filter_core::tiers::sections(&parse_filter(&text)))
 }
 
+#[derive(serde::Serialize)]
+struct GearSetup {
+    /// From the game's log: (name, class, level).
+    character: Option<(String, String, u32)>,
+    stats: Vec<filter_core::gear::StatInfo>,
+    /// Gem name -> the stats it likes.
+    gems: std::collections::BTreeMap<String, Vec<String>>,
+    league: String,
+}
+
+/// Levelling gear helper: your character (from the log), the stat list and gems.
+#[tauri::command]
+fn gear_setup(state: State<AppState>) -> GearSetup {
+    let character = find_log(false, &[]).and_then(|p| filter_core::area::read_character(&p));
+    let league = state.prices.lock().unwrap().get(&Game::Poe1).map(|f| f.league.clone()).unwrap_or_else(|| "Standard".into());
+    GearSetup {
+        character,
+        stats: filter_core::gear::stat_list().clone(),
+        gems: filter_core::gear::gems().iter().map(|(k, v)| (k.clone(), v.stats.clone())).collect(),
+        league,
+    }
+}
+
+#[derive(serde::Serialize)]
+struct GearPick {
+    #[serde(flatten)]
+    pick: filter_core::gear::Pick,
+    trade: String,
+    /// poe.ninja price in chaos, when known.
+    price: Option<f64>,
+}
+
+#[tauri::command]
+fn gear_picks(state: State<AppState>, level: u32, ahead: u32, wanted: Vec<String>, skill: Vec<String>, classes: Vec<String>) -> Vec<GearPick> {
+    let prices = state.prices.lock().unwrap();
+    let file = prices.get(&Game::Poe1);
+    let league = file.map(|f| f.league.clone()).unwrap_or_else(|| "Standard".into());
+    filter_core::gear::picks(level, ahead, &wanted, &skill, &classes).into_iter().map(|p| {
+        let price = file.and_then(|f| f.items.iter().filter(|i| i.name == p.unique.name && i.base == p.unique.base)
+            .map(|i| i.value).reduce(f64::min));
+        GearPick { trade: filter_core::gear::trade_url(&league, &p.unique.name, &p.unique.base), price, pick: p }
+    }).collect()
+}
+
+/// Opens a web page (trade links) in your normal browser.
+#[tauri::command]
+fn open_url(url: String) -> Result<(), String> {
+    if !url.starts_with("https://") { return Err("Only web links".into()); }
+    #[cfg(windows)]
+    let r = std::process::Command::new("rundll32").args(["url.dll,FileProtocolHandler", &url]).spawn();
+    #[cfg(not(windows))]
+    let r = std::process::Command::new("xdg-open").arg(&url).spawn();
+    r.map(|_| ()).map_err(err)
+}
+
 /// In-game panel: the stack tiers a currency can go in, and where it is now.
 #[tauri::command]
 fn stack_choices(app: AppHandle, base: String) -> Result<Vec<filter_core::tiers::StackChoice>, String> {
@@ -1323,6 +1378,9 @@ pub fn run() {
             get_tiers,
             move_tier_item,
             stack_choices,
+            gear_setup,
+            gear_picks,
+            open_url,
             set_stack_tier,
             set_tier,
             apply_level_preset,
