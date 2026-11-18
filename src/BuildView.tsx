@@ -117,7 +117,9 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
                 {stage > 0 && <> · <b className="c-new">{change.added}</b> new{change.removed ? <>, <b className="c-gone">{change.removed}</b> to take back</> : ""} since “{build.stages[stage - 1].title}”</>}
                 <button className="link small" onClick={() => invoke("open_url", { url: s.tree!.url })}>Open on pathofexile.com</button>
               </div>
-              <TreeView nodes={s.tree.nodes} previous={stage > 0 ? build.stages[stage - 1].tree?.nodes : undefined} height={compact ? 470 : 560} ascendancy={build.ascendancy || undefined} />
+              <TreeView nodes={s.tree.nodes} previous={stage > 0 ? build.stages[stage - 1].tree?.nodes : undefined} height={compact ? 470 : 560} ascendancy={build.ascendancy || undefined}
+                masteries={(s.tree as { masteries?: [number, number][] }).masteries ?? []}
+                prevMasteries={stage > 0 ? (build.stages[stage - 1].tree as { masteries?: [number, number][] } | null)?.masteries : undefined} />
             </>
           ) : <div className="empty">No tree saved for this stage.</div>}
         </div>

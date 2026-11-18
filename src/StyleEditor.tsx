@@ -33,6 +33,17 @@ const RARITY_TEXT: Record<string, number[]> = {
   Gem: [27, 162, 155, 255], Currency: [170, 158, 130, 255],
 };
 
+/** The game only has 11 beam/icon colours: the one closest to an RGB colour. */
+export function nearestGameColour(c: number[]): string {
+  let best = "White", d0 = Infinity;
+  for (const [name, h] of Object.entries(GAME_COLOURS)) {
+    const r = parseInt(h.slice(1, 3), 16), g = parseInt(h.slice(3, 5), 16), b = parseInt(h.slice(5, 7), 16);
+    const d = (r - c[0]) ** 2 * 2 + (g - c[1]) ** 2 * 4 + (b - c[2]) ** 2 * 3;
+    if (d < d0) { d0 = d; best = name; }
+  }
+  return best;
+}
+
 /** Start the editor from exactly what the filter shows today. */
 export function fromCurrent(st: CurrentStyle | undefined, rarity: string): CustomStyle {
   const p = st?.minimap_parts;
@@ -154,6 +165,14 @@ export default function StyleEditor({ start, label, onSave, onCancel }: {
         <input type="color" value={hex(s.background)}
           onChange={(e) => set({ background: fromHex(e.target.value, s.background[3]) })} />
       </div>
+
+      <button className="se-match" title="Border the same colour as the text, and the beam and map icon in the nearest game colour"
+        onClick={() => {
+          const name = nearestGameColour(s.text);
+          set({ border: [s.text[0], s.text[1], s.text[2], s.border?.[3] ?? 255],
+            beam: { colour: name, temp: s.beam?.temp ?? false },
+            minimap: { size: s.minimap?.size ?? 1, shape: s.minimap?.shape ?? "Circle", colour: name } });
+        }}>Match border, beam &amp; map icon to the text colour</button>
 
       <div className="se-label">Opacity <span className="muted small">(lower = see-through)</span></div>
       <div className="se-row se-alpha">

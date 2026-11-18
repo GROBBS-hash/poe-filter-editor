@@ -45,6 +45,9 @@ pub struct Tree {
     pub nodes: Vec<u32>,
     /// Official tree link for this stage (opens on pathofexile.com).
     pub url: String,
+    /// Mastery choices: (mastery node, effect picked).
+    #[serde(default)]
+    pub masteries: Vec<(u32, u32)>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -148,6 +151,10 @@ pub fn parse(xml: &str) -> Result<Build, String> {
                 class_id: attr(&s, "classId").parse().unwrap_or(0),
                 ascend_id: attr(&s, "ascendClassId").parse().unwrap_or(0),
                 nodes: attr(&s, "nodes").split(',').filter_map(|n| n.trim().parse().ok()).collect(),
+                masteries: attr(&s, "masteryEffects").split('}').filter_map(|p| {
+                    let (a, b) = p.trim_start_matches([',', '{']).split_once(',')?;
+                    Some((a.trim().parse().ok()?, b.trim().parse().ok()?))
+                }).collect(),
                 url,
             }));
         }
@@ -231,7 +238,7 @@ mod tests {
 		<Spec title="Act 1" treeVersion="3_29" classId="3" ascendClassId="0" nodes="739,1031,1957">
 			<URL>https://www.pathofexile.com/passive-skill-tree/AAAABgMADwLjBAc</URL>
 		</Spec>
-		<Spec title="Act 3" treeVersion="3_29" classId="3" ascendClassId="2" nodes="739,885,1031,1957,4184">
+		<Spec title="Act 3" treeVersion="3_29" classId="3" ascendClassId="2" nodes="739,885,1031,1957,4184" masteryEffects="{12125,34242},{63268,55308}">
 			<URL>https://www.pathofexile.com/passive-skill-tree/AAAABgMAIgLjA3U</URL>
 		</Spec>
 	</Tree>
@@ -311,6 +318,7 @@ Leather Cap
         assert!(!staff.lines.iter().any(|l| l.starts_with("Unique ID") || l.contains('{') || l.starts_with("Prefix") || l.starts_with("Crafted") || l.contains("Percentile")), "{:?}", staff.lines);
         assert!(staff.lines.contains(&"Quality: 20".to_string()));
         assert_eq!(s.gear.len(), 2, "swap and empty slots skipped");
+        assert_eq!(b.stages[1].tree.as_ref().unwrap().masteries, vec![(12125, 34242), (63268, 55308)]);
         // Second stage: its own gems, gear falls back to nothing (only one item set).
         assert_eq!(b.stages[1].groups[0].slot, "Helmet");
         // Codes may arrive with line breaks or padding.

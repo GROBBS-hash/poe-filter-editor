@@ -36,6 +36,7 @@ def main(src, out):
     per = d["constants"]["skillsPerOrbit"]
     groups = d["groups"]
     nodes, pos, info = {}, {}, {}
+    effects = {}  # mastery effect id -> its text (what you picked on a mastery)
     for nid, n in d["nodes"].items():
         if nid == "root" or "group" not in n or n.get("isProxy") or n.get("expansionJewel", {}).get("parent"):
             continue
@@ -48,7 +49,9 @@ def main(src, out):
         name = n.get("name", "")
         stats = n.get("stats", [])
         if n.get("isMastery"):
-            stats = [e.get("stats", [""])[0] for e in n.get("masteryEffects", [])][:6]
+            for e in n.get("masteryEffects", []):
+                effects[str(e["effect"])] = " / ".join(e.get("stats", []))
+            stats = [" / ".join(e.get("stats", [])) for e in n.get("masteryEffects", [])]
         nodes[nid] = [round(x, 1), round(y, 1), kind, name, stats, n.get("ascendancyName", "")]
         pos[nid] = (x, y)
         info[nid] = (n["group"], n["orbit"], n.get("ascendancyName", ""), kind)
@@ -74,7 +77,7 @@ def main(src, out):
     xs = [v[0] for v in nodes.values() if not v[5]]
     ys = [v[1] for v in nodes.values() if not v[5]]
     data = {"bounds": [min(xs), min(ys), max(xs), max(ys)], "nodes": nodes, "edges": edges,
-            "classes": [c["name"] for c in d["classes"]]}
+            "classes": [c["name"] for c in d["classes"]], "effects": effects}
     json.dump(data, open(out, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
     print(len(nodes), "nodes,", len(edges), "edges")
 

@@ -472,3 +472,14 @@ code { background: #000; padding: 1px 5px; border-radius: 4px; color: var(--gold
 .qm-why.why-price { border-left-color: #ffb347; } .why-price .why-badge { background: #3d2a10; color: #ffd59a; }
 .qm-why.why-none { border-left-color: #666; }
 .tier.focus { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(230,190,90,.45); animation: chipglow 1.2s ease-in-out 2; }
+.se-match { width: 100%; margin: 4px 0 8px; font-size: 12.5px; padding: 6px; }
+.tv-nodes circle.hit { fill: transparent; stroke: none; cursor: pointer; }
+.tv-nodes circle.k3.on, .tv-nodes circle.k3.new { stroke-dasharray: none; stroke-width: 14; }
+.tv-pick { color: #5ee06a; font-weight: 600; margin: 2px 0; }
+.tv-masteries { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+.tv-mastery { display: flex; flex-direction: column; align-items: flex-start; text-align: left; gap: 1px; padding: 6px 9px;
+  background: #15110c; border: 1px solid #2c241a; border-radius: 6px; cursor: pointer; }
+.tv-mastery:hover { border-color: #6b5838; }
+.tv-mastery.new { border-color: #2f6b36; }
+.tv-m-name { color: #f3e6c4; font-size: 12.5px; }
+.tv-m-eff { color: #9db8ff; font-size: 12px; }

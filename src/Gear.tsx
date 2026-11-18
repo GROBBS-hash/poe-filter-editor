@@ -23,6 +23,8 @@ export default function Gear() {
   const [gem, setGem] = useState<string>(() => load("gear.gem", ""));
   const [wanted, setWanted] = useState<string[]>(() => load("gear.wanted", ALWAYS));
   const [slots, setSlots] = useState<string[]>([]);
+  const [types, setTypes] = useState<string[]>(() => load("gear.types", []));
+  useEffect(() => { save("gear.types", types); }, [types]);
   const [results, setResults] = useState<Result[]>([]);
   const [open, setOpen] = useState<string | null>(null);
 
@@ -47,7 +49,10 @@ export default function Gear() {
   const toggle = (id: string) => setWanted(wanted.includes(id) ? wanted.filter((x) => x !== id) : [...wanted, id]);
   const statName = (id: string) => setup?.stats.find((s) => s.id === id)?.name ?? id;
 
-  const shown = results.filter((r) => slots.length === 0 || slots.includes(r.slot));
+  // Weapon types in the results (Wands, Staves, Sceptres…), for the type filter.
+  const weaponTypes = [...new Set(results.filter((r) => r.slot === "Weapon" || r.slot === "Off hand").map((r) => r.unique.class))].sort();
+  const shown = results.filter((r) => (slots.length === 0 || slots.includes(r.slot))
+    && (types.length === 0 || !(r.slot === "Weapon" || r.slot === "Off hand") || types.includes(r.unique.class)));
   const groups = SLOTS.map((s) => [s, shown.filter((r) => r.slot === s)] as const).filter(([, l]) => l.length > 0);
 
   return (
@@ -91,6 +96,16 @@ export default function Gear() {
           ))}
           {slots.length > 0 && <button className="link small" onClick={() => setSlots([])}>All slots</button>}
         </div>
+        {weaponTypes.length > 1 && (
+          <div className="gear-slots">
+            <span className="muted small">Weapon types:</span>
+            {weaponTypes.map((t) => (
+              <button key={t} className={`chip ${types.includes(t) ? "on" : ""}`}
+                onClick={() => setTypes(types.includes(t) ? types.filter((x) => x !== t) : [...types, t])}>{t}</button>
+            ))}
+            {types.length > 0 && <button className="link small" onClick={() => setTypes([])}>All types</button>}
+          </div>
+        )}
       </div>
 
       {groups.length === 0 && <div className="card empty">Nothing matches at level {level}. Untick a few stats or look further ahead.</div>}

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 type NodeData = [number, number, number, string, string[], string]; // x, y, kind, name, stats, ascendancy
-type TreeData = { bounds: [number, number, number, number]; nodes: Record<string, NodeData>; edges: number[][] };
+type TreeData = { bounds: [number, number, number, number]; nodes: Record<string, NodeData>; edges: number[][]; effects?: Record<string, string> };
 
 let cache: Promise<TreeData> | null = null;
 const loadTree = () => (cache ??= fetch("/tree_poe1.json").then((r) => r.json()));
@@ -64,7 +64,11 @@ function Ascendancy({ tree, name, have, added }: { tree: TreeData; name: string;
   );
 }
 
-export default function TreeView({ nodes, previous, height = 520, ascendancy }: { nodes: number[]; previous?: number[]; height?: number; ascendancy?: string }) {
+export default function TreeView({ nodes, previous, height = 520, ascendancy, masteries = [], prevMasteries }: {
+  nodes: number[]; previous?: number[]; height?: number; ascendancy?: string;
+  /** (mastery node, effect picked) for this stage and the one before. */
+  masteries?: [number, number][]; prevMasteries?: [number, number][];
+}) {
   const [tree, setTree] = useState<TreeData | null>(null);
   const [box, setBox] = useState<Box | null>(null);
   const [hover, setHover] = useState<{ id: string; x: number; y: number } | null>(null);
@@ -78,6 +82,8 @@ export default function TreeView({ nodes, previous, height = 520, ascendancy }: 
   const before = useMemo(() => new Set((previous ?? []).map(String)), [previous]);
   const added = useMemo(() => new Set([...have].filter((n) => previous && !before.has(n))), [have, before, previous]);
   const removed = useMemo(() => new Set([...before].filter((n) => !have.has(n))), [have, before]);
+  const picked = useMemo(() => new Map(masteries.map(([n, e]) => [String(n), String(e)])), [masteries]);
+  const pickedBefore = useMemo(() => new Map((prevMasteries ?? []).map(([n, e]) => [String(n), String(e)])), [prevMasteries]);
   const needle = q.trim().toLowerCase();
   const found = useMemo(() => {
     if (!tree || needle.length < 3) return new Set<string>();
@@ -115,6 +121,13 @@ export default function TreeView({ nodes, previous, height = 520, ascendancy }: 
   };
 
   const on = (id: string) => have.has(id);
+  const effectText = (e?: string) => (e && tree.effects?.[e]) || "";
+  /** Centre the view on one node (from the masteries list). */
+  const focusNode = (id: string) => {
+    const n = tree.nodes[id];
+    if (n) setBox({ x: n[0] - 1600, y: n[1] - 1000, w: 3200, h: 2000 });
+    setHover(null);
+  };
   const edgeClass = (a: string, b: string) => (on(a) && on(b) ? (added.has(a) || added.has(b) ? "e-new" : "e-on") : "e-off");
   const hovered = hover && tree.nodes[hover.id];
   const asc = [...have].map((id) => tree.nodes[id]).filter((n) => n && n[5] && n[2] !== 6);
@@ -166,17 +179,44 @@ export default function TreeView({ nodes, previous, height = 520, ascendancy }: 
           {Object.entries(tree.nodes).map(([id, n]) => {
             if (n[5]) return null;
             const cls = `k${n[2]} ${on(id) ? (added.has(id) ? "new" : "on") : removed.has(id) ? "gone" : ""} ${found.has(id) ? "found" : ""}`;
-            return <circle key={id} cx={n[0]} cy={n[1]} r={RADIUS[n[2]] ?? 26} className={cls}
-              onMouseEnter={(e) => setHover({ id, x: e.clientX, y: e.clientY })} onMouseLeave={() => setHover(null)} />;
+            const enter = (e: React.MouseEvent) => setHover({ id, x: e.clientX, y: e.clientY });
+            return (
+              <g key={id}>
+                <circle cx={n[0]} cy={n[1]} r={RADIUS[n[2]] ?? 26} className={cls} />
+                {/* Masteries are hard to hit: a big invisible target around them. */}
+                <circle cx={n[0]} cy={n[1]} r={n[2] === 3 ? 110 : Math.max(RADIUS[n[2]] ?? 26, 45)} className="hit"
+                  onMouseEnter={enter} onMouseLeave={() => setHover(null)} />
+              </g>
+            );
           })}
         </g>
       </svg>
       {hovered && hover && (
         <div className="tv-tip" style={{ left: hover.x + 14, top: hover.y + 14 }}>
           <b>{hovered[3] || "Passive"}</b>
-          {hovered[4].map((s, i) => <div key={i}>{s}</div>)}
+          {hovered[2] === 3 && picked.has(hover.id) ? (
+            <>
+              <div className="tv-pick">Take: {effectText(picked.get(hover.id))}</div>
+              <div className="muted small">{hovered[4].length - 1} other choices</div>
+            </>
+          ) : hovered[4].map((s, i) => <div key={i}>{s}</div>)}
           {added.has(hover.id) && <div className="tv-tag new">New this stage</div>}
           {removed.has(hover.id) && <div className="tv-tag gone">Take this back this stage</div>}
+        </div>
+      )}
+      {picked.size > 0 && (
+        <div className="tv-masteries">
+          <div className="tv-asc-head">Masteries <span className="muted small">(click one to find it on the tree)</span></div>
+          {[...picked.entries()].map(([node, eff]) => {
+            const n = tree.nodes[node];
+            const isNew = previous && pickedBefore.get(node) !== eff;
+            return (
+              <button key={node} className={`tv-mastery ${isNew ? "new" : ""}`} onClick={() => focusNode(node)}>
+                <span className="tv-m-name">{n?.[3] ?? "Mastery"}{isNew && <span className="tv-tag new"> new</span>}</span>
+                <span className="tv-m-eff">{effectText(eff)}</span>
+              </button>
+            );
+          })}
         </div>
       )}
       {ascendancy ? <Ascendancy tree={tree} name={ascendancy} have={have} added={added} />

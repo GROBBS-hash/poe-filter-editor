@@ -103,6 +103,10 @@ fn levelling_preset_on_real_filter() {
     // Rares only from 16 (default): white/blue wand hidden at 20, rare wand stands out.
     assert_eq!(v(&wand, 20).visibility, "Hide");
     assert_eq!(v(&rare_wand, 20).style.font_size, Some(42));
+    // A white 3-linked wand: kept until area 28, hidden after (wands can't be 4-linked).
+    let wand3 = item("Item Class: Wands\nRarity: Normal\nDriftwood Wand\n--------\nSockets: B-B-B \n--------\nItem Level: 20\n");
+    assert!(!v(&wand3, 20).by_user_edit || v(&wand3, 20).visibility != "Hide");
+    assert_eq!(v(&wand3, 48).visibility, "Hide", "{:?}", v(&wand3, 48));
     // 3-links spared until 28.
     assert!(!v(&linked, 20).by_user_edit);
     assert!(v(&linked, 35).by_user_edit);

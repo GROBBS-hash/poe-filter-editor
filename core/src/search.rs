@@ -316,14 +316,24 @@ pub fn level_rules_opts(game: Game, o: &LevelOptions, style: &CustomStyle) -> Ve
     }
     let n = o.rares_from;
     if n > 1 && n < 68 && !keep.is_empty() {
-        let mut c = vec![format!("AreaLevel >= {n}"), "AreaLevel < 68".into(), "Rarity <= Magic".into(), format!("Class == {}", quote(&keep))];
-        if poe1 && !o.aggressive { c.push("LinkedSockets < 3".into()); }
-        out.push(Rule::Override { label: lbl(&format!("white & blue weapons hidden from area {n}")), show: false, conditions: c, actions: vec![] });
+        // Like NeverSink, 3-links are kept until area 28, then only 4-links (unless aggressive).
+        let push = |out: &mut Vec<Rule>, what: &str, classes: Vec<String>| {
+            let base = vec![format!("AreaLevel >= {n}"), "AreaLevel < 68".into(), "Rarity <= Magic".into(), format!("Class == {}", quote(&classes))];
+            let label = lbl(&format!("white & blue {what} hidden from area {n}"));
+            if !poe1 || o.aggressive {
+                out.push(Rule::Override { label, show: false, conditions: base, actions: vec![] });
+                return;
+            }
+            let mut early = base.clone();
+            early.extend(["AreaLevel <= 28".to_string(), "LinkedSockets < 3".to_string()]);
+            let mut late = base;
+            late.extend(["AreaLevel > 28".to_string(), "LinkedSockets < 4".to_string()]);
+            out.push(Rule::Override { label: label.clone(), show: false, conditions: early, actions: vec![] });
+            out.push(Rule::Override { label, show: false, conditions: late, actions: vec![] });
+        };
+        push(&mut out, "weapons", keep.clone());
         if o.hide_armour {
-            let armour: Vec<String> = ARMOUR.iter().map(|c| c.to_string()).collect();
-            let mut c = vec![format!("AreaLevel >= {n}"), "AreaLevel < 68".into(), "Rarity <= Magic".into(), format!("Class == {}", quote(&armour))];
-            if poe1 && !o.aggressive { c.push("LinkedSockets < 3".into()); }
-            out.push(Rule::Override { label: lbl(&format!("white & blue armour hidden from area {n}")), show: false, conditions: c, actions: vec![] });
+            push(&mut out, "armour", ARMOUR.iter().map(|c| c.to_string()).collect());
         }
     }
     // Item progression: white/blue copies of the newest base, on top of the hides above.

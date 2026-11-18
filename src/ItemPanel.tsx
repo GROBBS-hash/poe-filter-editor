@@ -389,7 +389,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
             </div>
           )}
           {status!.by_stack.length > 0 && <div className="qm-facts">Stacks: {stackLine(status!.by_stack)}</div>}
-          <Why v={v} onEditHere={v.by_user_edit && !replacing ? () => openRule(v.decided_by) : undefined} />
+          <Why v={v} onEditHere={v.by_user_edit && !replacing && v.source?.kind === "edit" ? () => openRule(v.decided_by) : undefined} />
           {(v.uncertain.length > 0 || status!.assumptions.length > 0 || extra?.area_level != null) && (
             <div className="qm-unsure" title={[
               extra?.area_level != null ? `Area level ${extra.area_level} (from your game)` : "",
