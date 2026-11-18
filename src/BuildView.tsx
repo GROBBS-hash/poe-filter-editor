@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
 import { ItemIcon } from "./icons";
+import TreeView from "./TreeView";
 
 export type PobGem = { name: string; level: number; quality: number; enabled: boolean; support: boolean; colour: string };
 export type PobGroup = { label: string; slot: string; enabled: boolean; gems: PobGem[] };
@@ -112,10 +113,11 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
         <div className="bv-tree">
           {s.tree ? (
             <>
-              <p><b>{change.total}</b> points in this stage
-                {stage > 0 && <> · <b>{change.added}</b> new{change.removed ? <>, <b>{change.removed}</b> respecced away</> : ""} since “{build.stages[stage - 1].title}”</>}.</p>
-              <button className="primary" onClick={() => invoke("open_url", { url: s.tree!.url })}>Open this tree on pathofexile.com</button>
-              <p className="muted small">The tree drawn right here, with this stage's new points highlighted, is coming next.</p>
+              <div className="bv-tree-sum small"><b>{change.total}</b> points
+                {stage > 0 && <> · <b className="c-new">{change.added}</b> new{change.removed ? <>, <b className="c-gone">{change.removed}</b> to take back</> : ""} since “{build.stages[stage - 1].title}”</>}
+                <button className="link small" onClick={() => invoke("open_url", { url: s.tree!.url })}>Open on pathofexile.com</button>
+              </div>
+              <TreeView nodes={s.tree.nodes} previous={stage > 0 ? build.stages[stage - 1].tree?.nodes : undefined} height={compact ? 470 : 560} />
             </>
           ) : <div className="empty">No tree saved for this stage.</div>}
         </div>

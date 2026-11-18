@@ -47,3 +47,8 @@ Plan and roadmap: see the "PoE Live Filter Editor" doc.
 
 `core/data/poe1_uniques.json`, `poe1_gems.json` and `levelling_stats.json` are built from Path of Building Community's
 open item/gem data and RePoE's base items with `tools/build_levelling_data.py` (see the top of that file).
+
+## Passive tree data
+
+`public/tree_poe1.json` is built from GGG's official export (https://github.com/grindinggear/skilltree-export) with
+`tools/build_tree_data.py`. Re-run it when a new league's tree comes out.

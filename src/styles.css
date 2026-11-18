@@ -417,3 +417,34 @@ code { background: #000; padding: 1px 5px; border-radius: 4px; color: var(--gold
 .bo-bar .link { margin-left: auto; }
 .bo-body { flex: 1; overflow-y: auto; padding: 10px 12px; }
 .buildview.compact .bv-stage select { max-width: 200px; }
+
+/* Passive tree */
+.treeview { position: relative; }
+.tv-tools { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.tv-tools input { flex: 0 1 260px; padding: 4px 8px; background: #120e09; border: 1px solid var(--line); color: var(--text); border-radius: 6px; font-size: 12px; }
+.tv-tools .grow { flex: 1; }
+.tv-legend { display: flex; gap: 12px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
+.tv-legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+.dot.on { background: #e8be5a; } .dot.new { background: #5ee06a; } .dot.gone { background: #ff6a5a; }
+.tv-svg { width: 100%; display: block; background: radial-gradient(ellipse at center, #15110c 0%, #0a0806 100%); border: 1px solid #2c241a; border-radius: 8px; cursor: grab; user-select: none; }
+.tv-svg:active { cursor: grabbing; }
+.tv-edges line, .tv-edges path { fill: none; stroke-width: 9; stroke-linecap: round; }
+.e-off { stroke: #2e2a24; } .e-on { stroke: #b8913f; stroke-width: 14 !important; } .e-new { stroke: #4fc95b; stroke-width: 16 !important; }
+.tv-nodes circle { fill: #1c1915; stroke: #4a4337; stroke-width: 6; }
+.tv-nodes circle.k1 { stroke: #8a7a55; stroke-width: 9; }
+.tv-nodes circle.k2 { stroke: #b49a62; stroke-width: 12; }
+.tv-nodes circle.k3 { fill: none; stroke: #3a352c; stroke-dasharray: 10 8; }
+.tv-nodes circle.k4 { stroke: #6a7aa0; }
+.tv-nodes circle.k5 { fill: #2a2418; stroke: #8a7a55; }
+.tv-nodes circle.on { fill: #e8be5a; stroke: #fff1c4; }
+.tv-nodes circle.new { fill: #5ee06a; stroke: #d6ffd6; filter: drop-shadow(0 0 30px #5ee06a); }
+.tv-nodes circle.gone { fill: #2a1210; stroke: #ff6a5a; stroke-width: 12; }
+.tv-nodes circle.found { stroke: #59d0ff; stroke-width: 16; }
+.tv-nodes circle:hover { stroke: #ffffff; stroke-width: 14; }
+.tv-tip { position: fixed; z-index: 50; max-width: 280px; background: rgba(10, 8, 6, .96); border: 1px solid #6b5838; border-radius: 6px;
+  padding: 8px 10px; font-size: 12.5px; line-height: 1.5; color: #9db8ff; pointer-events: none; }
+.tv-tip b { color: #f3e6c4; display: block; margin-bottom: 2px; }
+.tv-tag { margin-top: 4px; font-size: 11px; } .tv-tag.new { color: #5ee06a; } .tv-tag.gone { color: #ff6a5a; }
+.tv-asc { margin-top: 6px; }
+.bv-tree-sum { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+.c-new { color: #5ee06a; } .c-gone { color: #ff6a5a; }
