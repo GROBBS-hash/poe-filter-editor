@@ -51,11 +51,18 @@ pub fn text_fits(part: &str, whole: &str) -> bool {
 
 /// Rarity from the colour of the item's name in the hover box.
 pub fn rarity_from_colour(c: [u8; 3]) -> &'static str {
-    let (r, g, b) = (c[0] as i32, c[1] as i32, c[2] as i32);
-    if b > r + 30 && b > g { "Magic" }
-    else if r > 170 && g > 160 && b < g - 40 { "Rare" }
-    else if r > g + 40 && g > b { "Unique" }
-    else { "Normal" }
+    rarity_from_colour_sure(c).unwrap_or("Normal")
+}
+
+/// Rarity only when the colour is clearly one of the game's four name colours.
+pub fn rarity_from_colour_sure(c: [u8; 3]) -> Option<&'static str> {
+    let names = [("Normal", [200, 200, 200]), ("Magic", [136, 136, 255]), ("Rare", [255, 255, 119]), ("Unique", [175, 96, 37])];
+    let d = |a: [i32; 3]| (0..3).map(|i| (c[i] as i32 - a[i]).pow(2)).sum::<i32>();
+    let (name, best) = names.iter().map(|(n, a)| (*n, d(*a))).min_by_key(|x| x.1)?;
+    // White-ish text of any brightness is a normal item.
+    let grey = (c[0] as i32 - c[1] as i32).abs() < 25 && (c[1] as i32 - c[2] as i32).abs() < 25 && c[0] > 150;
+    if grey { return Some("Normal"); }
+    (best < 35 * 35 * 3).then_some(name)
 }
 
 /// The hover box's "Item Level: 61" line (the number may be read as a separate piece,
@@ -80,7 +87,7 @@ pub fn from_tooltip(lines: &[(String, Option<[u8; 3]>)], known: &HashSet<String>
         // Close reads and cut-off names count; a bare word that's merely part of
         // one name ("Sceptre", the item type under the name) doesn't.
         if m.confidence < 0.7 || (m.confidence - 0.75).abs() < 1e-6 { continue; }
-        let rarity = lines[i].1.map(|c| rarity_from_colour(c).to_string());
+        let rarity = lines[i].1.and_then(rarity_from_colour_sure).map(String::from);
         // Most of the line should be the name, not a stat that happens to contain one
         // (magic names are long: "Glimmering Opal Sceptre of Embers", so blue lines may be).
         if compact(&m.base).len() * 10 < compact(&lines[i].0).len() * 5 && rarity.as_deref() != Some("Magic") { continue; }
@@ -299,29 +306,50 @@ pub fn guess_rarity(segs: &[Segment], item: &Item, label: Option<LabelColours>, 
 /// rarity and, when a linked look matched best, the sockets assumed.
 pub fn guess_rarity_links(segs: &[Segment], item: &Item, label: Option<LabelColours>, area_level: u32) -> (String, Option<String>) {
     let Some(seen) = label else { return ("Normal".into(), None) };
+    // Plain first; a small nudge so links only win when they explain the label better.
+    let socket_options: [(Option<&str>, i32); 3] = [(None, 0), (Some("R-R-R"), 2_000), (Some("R-R-R-R"), 2_000)];
+    let mut best: Option<(i32, &str, Option<&str>)> = None;
+    for r in ["Normal", "Magic", "Rare", "Unique"] {
+        for (sockets, nudge) in socket_options {
+            if sockets.is_some() && !matches!(r, "Normal" | "Magic") { continue; }
+            let d = label_distance(segs, item, seen, area_level, r, sockets) + nudge;
+            if best.map(|b| d < b.0).unwrap_or(true) { best = Some((d, r, sockets)); }
+        }
+    }
+    best.map(|(_, r, s)| (r.to_string(), s.map(String::from))).unwrap_or_else(|| ("Normal".into(), None))
+}
+
+/// How far the label seen on screen is from how your filter would draw this
+/// item at a given rarity (0 = identical; hidden looks count as very far).
+pub fn label_distance(segs: &[Segment], item: &Item, seen: LabelColours, area_level: u32, rarity: &str, sockets: Option<&str>) -> i32 {
     // The game's default colours, used when the filter doesn't set one.
-    let defaults = [("Normal", [200, 200, 200]), ("Magic", [136, 136, 255]), ("Rare", [255, 255, 119]), ("Unique", [175, 96, 37])];
+    let def = match rarity { "Magic" => [136, 136, 255], "Rare" => [255, 255, 119], "Unique" => [175, 96, 37], _ => [200, 200, 200] };
     let dist = |a: [u8; 3], b: [u8; 3]| -> i32 { a.iter().zip(b).map(|(x, y)| (*x as i32 - y as i32).pow(2)).sum() };
     // Backgrounds are drawn semi-transparent over the game, so a dark one reads as near-black.
     let bg_of = |c: Option<[u8; 4]>| -> [u8; 3] {
         c.map(|c| { let a = c[3] as u32; [(c[0] as u32 * a / 255) as u8, (c[1] as u32 * a / 255) as u8, (c[2] as u32 * a / 255) as u8] })
             .unwrap_or([0, 0, 0])
     };
-    // Plain first; a small nudge so links only win when they explain the label better.
-    let socket_options: [(Option<&str>, i32); 3] = [(None, 0), (Some("R-R-R"), 2_000), (Some("R-R-R-R"), 2_000)];
-    let mut best: Option<(i32, &str, Option<&str>)> = None;
-    for (r, def) in defaults.iter() {
-        for (sockets, nudge) in socket_options {
-            if sockets.is_some() && !matches!(*r, "Normal" | "Magic") { continue; }
-            let it = Item { rarity: (*r).into(), sockets: sockets.map(String::from), ..item.clone() };
-            let v = evaluate(segs, &Ctx { item: &it, area_level: Some(area_level), stack: None, from_screen: true });
-            let text = v.style.text.map(|t| [t[0], t[1], t[2]]).unwrap_or(*def);
-            let hidden_penalty = if v.visibility == "Hide" { 200_000 } else { 0 };
-            let d = dist(text, seen.text) + dist(bg_of(v.style.background), seen.background) + hidden_penalty + nudge;
-            if best.map(|b| d < b.0).unwrap_or(true) { best = Some((d, r, sockets)); }
+    let it = Item { rarity: rarity.into(), sockets: sockets.map(String::from), ..item.clone() };
+    let v = evaluate(segs, &Ctx { item: &it, area_level: Some(area_level), stack: None, from_screen: true });
+    let text = v.style.text.map(|t| [t[0], t[1], t[2]]).unwrap_or(def);
+    let hidden_penalty = if v.visibility == "Hide" { 200_000 } else { 0 };
+    dist(text, seen.text) + dist(bg_of(v.style.background), seen.background) + hidden_penalty
+}
+
+/// Uses the hover box, but not its rarity when the label on screen clearly
+/// doesn't look like your filter's style for that rarity (the box's colour
+/// reading can be fooled by its frame; a white item's label isn't a unique's).
+pub fn apply_tooltip_checked(segs: &[Segment], item: &mut Item, t: &TooltipRead, label: Option<LabelColours>, area_level: u32) {
+    let mut t = t.clone();
+    if let (Some(r), Some(seen)) = (t.rarity.clone(), label) {
+        if t.found.unique.is_none() && r != item.rarity {
+            let theirs = label_distance(segs, item, seen, area_level, &r, None);
+            let ours = label_distance(segs, item, seen, area_level, &item.rarity, item.sockets.as_deref());
+            if theirs > ours + 25_000 { t.rarity = None; }
         }
     }
-    best.map(|(_, r, s)| (r.to_string(), s.map(String::from))).unwrap_or_else(|| ("Normal".into(), None))
+    apply_tooltip(item, &t);
 }
 
 #[cfg(test)]
@@ -332,6 +360,21 @@ mod tests {
     fn known() -> HashSet<String> {
         ["Coral Ring", "Ring", "Chaos Orb", "Orb of Alteration", "Leather Belt", "Divine Orb"]
             .iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn hover_box_rarity_must_fit_the_label() {
+        let f = "Show\n\tRarity Unique\n\tSetTextColor 255 0 0 255\n\tSetBackgroundColor 255 255 255 255\n\nShow\n\tRarity Normal\n\tSetTextColor 200 200 200 255\n\tSetBackgroundColor 0 0 0 255\n";
+        let segs = parse_filter(f);
+        let mut it = Item { base_type: "Piledriver".into(), rarity: "Normal".into(), ..Default::default() };
+        let seen = LabelColours { text: [210, 210, 210], background: [10, 10, 10] };
+        let found = GroundMatch { base: "Piledriver".into(), stack: None, tier: None, superior: false, confidence: 1.0, unique: None };
+        let t = TooltipRead { found, item_level: Some(70), unidentified: false, rarity: Some("Unique".into()), header: "PILEDRIVER".into() };
+        apply_tooltip_checked(&segs, &mut it, &t, Some(seen), 70);
+        assert_eq!((it.rarity.as_str(), it.item_level), ("Normal", Some(70)));
+        // The frame's brown isn't a unique's name colour; plain white is normal.
+        assert_eq!(rarity_from_colour_sure([200, 140, 80]), None);
+        assert_eq!(rarity_from_colour_sure([250, 250, 245]), Some("Normal"));
     }
 
     #[test]

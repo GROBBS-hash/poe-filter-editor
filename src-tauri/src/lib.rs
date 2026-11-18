@@ -322,7 +322,8 @@ fn read_from_ground(app: &AppHandle) -> Result<Picked, String> {
     };
     let colours = read.colours.map(|(text, background)| LabelColours { text, background });
     let mut item = ground_item(&live, &m, colours, area_level(app).unwrap_or_else(|| fallback_area_level(app)));
-    if let Some(t) = &tip { filter_core::ground::apply_tooltip(&mut item, t); }
+    let area = area_level(app).unwrap_or_else(|| fallback_area_level(app));
+    if let Some(t) = &tip { filter_core::ground::apply_tooltip_checked(&live, &mut item, t, colours, area); }
     let text = if read.text.trim().is_empty() { m.base.clone() } else { read.text.clone() };
     Ok(Picked { item, from_screen: true, screen_text: Some(text), confidence: m.confidence })
 }
