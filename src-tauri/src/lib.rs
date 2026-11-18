@@ -5,7 +5,7 @@ use filter_core::{
     filter::{parse_filter, Segment},
     area::{find_log, read_area_level, selected_filter},
     ground::{ground_item, known_names, match_base, LabelColours},
-    item::{parse_item, resolve_magic_base, Item},
+    item::{is_stackable, parse_item, resolve_magic_base, Item},
     profiles::{build, Game, Store},
     rules::{custom_rule, known_bases, locate, quick_rule, Action, CustomStyle, Location, MatchOpts, Rule},
 };
@@ -474,11 +474,13 @@ fn locate_item(state: State<AppState>, item: Item) -> Vec<Location> {
 fn item_status(app: AppHandle, item: Item, from_screen: bool) -> Result<StatusReply, String> {
     let (live, _) = active_filters(&app).ok_or("Set up a filter first")?;
     let level = area_level(&app);
-    Ok(StatusReply { status: status(&live, &item, level, from_screen), area_level: level, game_filter: game_filter(&app) })
+    let st = status(&live, &item, level, from_screen);
+    let stackable = is_stackable(&item) || !st.by_stack.is_empty();
+    Ok(StatusReply { status: st, area_level: level, game_filter: game_filter(&app), stackable })
 }
 
 #[derive(Serialize)]
-struct StatusReply { status: Status, area_level: Option<u32>, game_filter: Option<GameFilter> }
+struct StatusReply { status: Status, area_level: Option<u32>, game_filter: Option<GameFilter>, stackable: bool }
 
 #[tauri::command]
 fn set_batch_mode(app: AppHandle, on: bool) {

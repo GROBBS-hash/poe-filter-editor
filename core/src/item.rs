@@ -119,9 +119,27 @@ pub fn fill_class(item: &mut Item) {
 
 /// Gear can roll mods; currency, gems, cards etc. can't.
 pub fn is_gear(item: &Item) -> bool {
-    matches!(item.rarity.as_str(), "Normal" | "Magic" | "Rare" | "Unique")
-        && !matches!(item.item_class.as_str(), "Stackable Currency" | "Divination Cards" | "Map Fragments"
-            | "Skill Gems" | "Support Gems" | "Quest Items" | "Incubators" | "Delve Stackable Socketable Currency")
+    if item.item_class.trim().is_empty() {
+        return matches!(item.rarity.as_str(), "Normal" | "Magic" | "Rare" | "Unique");
+    }
+    GEAR_CLASSES.contains(&item.item_class.as_str())
+}
+
+/// Item classes that come in Normal/Magic/Rare/Unique and can roll mods.
+pub const GEAR_CLASSES: [&str; 45] = [
+    "Abyss Jewels", "Amulets", "Belts", "Body Armours", "Boots", "Bows", "Claws", "Daggers", "Gloves",
+    "Heist Brooches", "Heist Cloaks", "Heist Gear", "Heist Tools", "Helmets", "Hybrid Flasks", "Idols",
+    "Jewels", "Life Flasks", "Mana Flasks", "One Hand Axes", "One Hand Maces", "One Hand Swords", "Quivers",
+    "Rings", "Rune Daggers", "Sceptres", "Shields", "Staves", "Thrusting One Hand Swords", "Tinctures",
+    "Two Hand Axes", "Two Hand Maces", "Two Hand Swords", "Utility Flasks", "Wands", "Warstaves", "Maps",
+    "Contracts", "Blueprints", "Expedition Logbooks", "Trinkets", "Fishing Rods", "Relics", "Sanctified Relics", "Charms",
+];
+
+/// Things that drop in stacks (where stack size can matter to the filter).
+pub fn is_stackable(item: &Item) -> bool {
+    item.stack_size.is_some()
+        || matches!(item.item_class.as_str(), "Stackable Currency" | "Gold" | "Divination Cards" | "Map Fragments"
+            | "Incubators" | "Delve Stackable Socketable Currency" | "Delve Socketable Currency" | "Corpses" | "Cursed Ducat")
 }
 
 /// How many links the biggest group has, e.g. "R-G-B G" -> 3.

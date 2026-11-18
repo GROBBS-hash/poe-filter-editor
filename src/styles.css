@@ -107,3 +107,12 @@ code { background: #000; padding: 1px 5px; border-radius: 4px; color: var(--gold
 .se-off.on { border-color: var(--gold); color: var(--gold); }
 .se-hint { font-size: 11px; color: #7f745f; font-style: italic; }
 .se-actions { display: flex; justify-content: space-between; margin-top: 10px; }
+
+.qm-check { align-items: flex-start; line-height: 1.35; }
+.qm-check input { margin-top: 2px; flex: none; }
+.qm-check b { color: var(--gold); font-weight: normal; }
+.qm-stack { border: 1px solid #3a3022; border-radius: 8px; padding: 6px 8px 2px; margin: 4px 0 8px; }
+.qm-stack .qm-label { margin-top: 0; }
+.qm-stack .qm-label b { color: var(--gold); font-weight: normal; }
+.qm-stack input[type=range] { width: 100%; accent-color: var(--gold); margin: 4px 0 0; }
+.qm-btn.small { padding: 6px 0; font-size: 13px; }

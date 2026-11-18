@@ -24,9 +24,15 @@ pub enum Action { Hide, Highlight, Louder, Quieter }
 pub struct MatchOpts {
     pub same_rarity: bool,
     pub max_item_level: Option<u32>, // only items at or below this ilvl
+    /// Only stacks of at least this many (e.g. 3+ Chaos Orbs).
+    #[serde(default)]
+    pub min_stack: Option<u32>,
+    /// Only stacks smaller than this (e.g. hide Gold under 500).
+    #[serde(default)]
+    pub below_stack: Option<u32>,
 }
 impl Default for MatchOpts {
-    fn default() -> Self { Self { same_rarity: true, max_item_level: None } }
+    fn default() -> Self { Self { same_rarity: true, max_item_level: None, min_stack: None, below_stack: None } }
 }
 
 const RARITIES: [&str; 4] = ["Normal", "Magic", "Rare", "Unique"];
@@ -56,10 +62,22 @@ pub fn quick_rule(item: &Item, action: Action, colour_name: Option<&str>, opts: 
     if let Some(lvl) = opts.max_item_level {
         conditions.push(format!("ItemLevel <= {lvl}"));
     }
-    let who = match RARITIES.contains(&item.rarity.as_str()) {
+    if let Some(n) = opts.min_stack.filter(|n| *n > 1) {
+        conditions.push(format!("StackSize >= {n}"));
+    }
+    if let Some(n) = opts.below_stack.filter(|n| *n > 1) {
+        conditions.push(format!("StackSize < {n}"));
+    }
+    let mut who = match RARITIES.contains(&item.rarity.as_str()) {
         true => format!("{} {}", item.rarity, item.base_type),
         false => item.base_type.clone(),
     };
+    match (opts.min_stack.filter(|n| *n > 1), opts.below_stack.filter(|n| *n > 1)) {
+        (Some(a), Some(b)) => who.push_str(&format!(" (stacks {a}–{})", b - 1)),
+        (Some(a), None) => who.push_str(&format!(" (stacks of {a}+)")),
+        (None, Some(b)) => who.push_str(&format!(" (stacks under {b})")),
+        _ => {}
+    }
 
     let (show, actions, verb) = match action {
         Action::Hide => (false, vec!["DisableDropSound".into()], "Hide"),
@@ -262,6 +280,34 @@ mod tests {
         assert!(v.style.beam_temp);
         assert_eq!(v.style.minimap_parts, Some((1, "Pink".into(), "Moon".into())));
         assert_eq!((v.style.sound_id.as_deref(), v.style.volume), (Some("ShDivine"), Some(250)));
+    }
+
+    #[test]
+    fn hide_small_gold_style_big_chaos() {
+        let gold = parse_item("Item Class: Gold\nRarity: Currency\nGold\n--------\nStack Size: 40\n").unwrap();
+        let chaos = parse_item("Item Class: Stackable Currency\nRarity: Currency\nChaos Orb\n").unwrap();
+        let hide_small = quick_rule(&gold, Action::Hide, None, &MatchOpts { below_stack: Some(500), ..Default::default() });
+        let style = CustomStyle { font_size: 45, text: [255, 0, 0, 255], border: None, background: [0, 0, 0, 255],
+            beam: Some(Beam { colour: "Red".into(), temp: false }), minimap: None, sound: Sound::Default };
+        let big_chaos = custom_rule(&chaos, &style, &MatchOpts { min_stack: Some(3), ..Default::default() });
+        let mut segs = parse_filter("Show\n    BaseType == \"Gold\" \"Chaos Orb\"\n    SetFontSize 30\n");
+        apply(&mut segs, &[hide_small.clone(), big_chaos.clone()], "\n");
+        let segs = parse_filter(&crate::filter::render_filter(&segs));
+        let at = |it: &crate::item::Item, n: u32| {
+            let it = crate::item::Item { stack_size: Some(n), ..it.clone() };
+            status(&segs, &it, Some(60), false).verdict
+        };
+        assert_eq!(at(&gold, 40).visibility, "Hide");
+        assert_eq!(at(&gold, 800).visibility, "Show");
+        assert_eq!(at(&chaos, 1).style.font_size, Some(30));
+        assert_eq!(at(&chaos, 3).style.font_size, Some(45));
+        let Rule::Override { label, .. } = big_chaos else { panic!() };
+        assert_eq!(label, "Style: Chaos Orb (stacks of 3+)");
+        let Rule::Override { label, .. } = hide_small else { panic!() };
+        assert_eq!(label, "Hide: Gold (stacks under 500)");
+        // The pop-up's stack summary sees the new cut-off too.
+        let s = status(&segs, &crate::item::Item { stack_size: Some(40), ..gold }, Some(60), false);
+        assert!(s.by_stack.iter().any(|b| b.from == 500 && b.visibility == "Show"), "{:?}", s.by_stack);
     }
 
     #[test]

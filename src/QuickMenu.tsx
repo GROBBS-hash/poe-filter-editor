@@ -13,7 +13,10 @@ type Status = {
   assumptions: string[];
 };
 type GameFilter = { selected?: string | null; expected: string; matches: boolean };
-type Reply = { status: Status; area_level?: number | null; game_filter?: GameFilter | null };
+type Reply = { status: Status; area_level?: number | null; game_filter?: GameFilter | null; stackable: boolean };
+
+/** Stack amounts the slider snaps to, plus any cut-offs the filter already uses. */
+const STEPS = [1, 2, 3, 4, 5, 6, 8, 10, 15, 20, 30, 50, 100, 200, 300, 500, 750, 1000, 1500, 2000, 3000, 5000, 10000];
 
 const GEAR = ["Normal", "Magic", "Rare", "Unique"];
 const rgba = (c?: number[] | null, fallback = "transparent") =>
@@ -37,7 +40,10 @@ export default function QuickMenu() {
   const [failed, setFailed] = useState("");
   const [toast, setToast] = useState("");
   const [anyRarity, setAnyRarity] = useState(false);
-  const [editing, setEditing] = useState(false);
+  /** false = not editing; otherwise the stack size the look applies from (1 = all). */
+  const [editing, setEditingRaw] = useState<false | { minStack: number }>(false);
+  const setEditing = (v: boolean | { minStack: number }) => setEditingRaw(v === true ? { minStack: 1 } : v);
+  const [stackPick, setStackPick] = useState(0); // index into the slider steps
   const [autoReload, setAutoReload] = useState(() => {
     try { return localStorage.getItem("autoReload") !== "off"; } catch { return true; }
   });
@@ -46,13 +52,13 @@ export default function QuickMenu() {
     try { localStorage.setItem("autoReload", on ? "on" : "off"); } catch { /* not saved */ }
   };
   const editingRef = useRef(false);
-  editingRef.current = editing;
+  editingRef.current = editing !== false;
   const box = useRef<HTMLDivElement | null>(null);
 
   const close = useCallback(async () => {
     setPicked(null);
     setFailed("");
-    setEditing(false);
+    setEditingRaw(false);
     await getCurrentWindow().hide();
   }, []);
 
@@ -71,7 +77,7 @@ export default function QuickMenu() {
     try {
       const r = await invoke<Reply>("item_status", { item: p.item, fromScreen: p.from_screen });
       setStatus(r.status);
-      setExtra({ area_level: r.area_level, game_filter: r.game_filter });
+      setExtra({ area_level: r.area_level, game_filter: r.game_filter, stackable: r.stackable });
     } catch {
       setStatus(null);
     }
@@ -84,7 +90,8 @@ export default function QuickMenu() {
       setToast("");
       setStatus(null);
       setAnyRarity(false);
-      setEditing(false);
+      setEditingRaw(false);
+      setStackPick(-1);
       refresh(e.payload);
     });
     const b = listen<string>("pick-failed", (e) => {
@@ -93,7 +100,7 @@ export default function QuickMenu() {
       setTimeout(close, 2500);
     });
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { if (editingRef.current) setEditing(false); else close(); }
+      if (e.key === "Escape") { if (editingRef.current) setEditingRaw(false); else close(); }
       if (e.key.toLowerCase() === "h" && !editingRef.current) document.getElementById("qm-hide")?.click();
     };
     // Clicking back into the game closes the menu, but not while editing
@@ -133,12 +140,16 @@ export default function QuickMenu() {
       setToast(String(e));
     }
   };
-  const opts = () => ({ same_rarity: !anyRarity, max_item_level: null });
+  const opts = (extraOpts: { min_stack?: number; below_stack?: number } = {}) =>
+    ({ same_rarity: !anyRarity, max_item_level: null, ...extraOpts });
   const hide = () => picked && saved(invoke("apply_quick_action", { item: picked.item, action: "hide", colour: null, opts: opts() }));
+  const hideBelow = (n: number) =>
+    picked && saved(invoke("apply_quick_action", { item: picked.item, action: "hide", colour: null, opts: opts({ below_stack: n }) }));
   const saveStyle = (style: CustomStyle) => {
     if (!picked) return;
-    setEditing(false);
-    saved(invoke("apply_custom_style", { item: picked.item, style, opts: opts() }));
+    const minStack = editing ? editing.minStack : 1;
+    setEditingRaw(false);
+    saved(invoke("apply_custom_style", { item: picked.item, style, opts: opts(minStack > 1 ? { min_stack: minStack } : {}) }));
   };
   /** Current look, so quick buttons only change what they're about. */
   const current = () => fromCurrent(status?.verdict.visibility === "Hide" ? undefined : status?.verdict.style, picked?.item.rarity ?? "Normal");
@@ -174,12 +185,25 @@ export default function QuickMenu() {
   const gf = extra?.game_filter;
   const nameOf = (f: string) => f.replace(/\.filter$/i, "");
 
+  // Slider steps: the usual amounts plus any cut-offs the filter already uses.
+  const steps = Array.from(new Set([...STEPS, ...(status?.by_stack.map((b) => b.from) ?? [])])).sort((a, b) => a - b);
+  const defaultPick = (() => {
+    const cut = status?.by_stack.find((b) => b.from > 1)?.from;
+    const want = cut ?? (item.stack_size && item.stack_size > 1 ? item.stack_size : 3);
+    const i = steps.findIndex((n) => n >= want);
+    return i < 0 ? steps.length - 1 : i;
+  })();
+  const pickIndex = stackPick < 0 || stackPick >= steps.length ? defaultPick : stackPick;
+  const stackN = steps[pickIndex];
+
   if (editing) {
     return (
       <div className="qm" ref={box}>
         <div className="qm-head">
           <div className="qm-name" style={{ color: RARITY_COLOUR[item.rarity] ?? "#ddd" }}>{itemTitle(item)}</div>
-          <div className="qm-sub">Customise how it looks in game</div>
+          <div className="qm-sub">
+            {editing.minStack > 1 ? `Customise stacks of ${editing.minStack} or more` : "Customise how it looks in game"}
+          </div>
         </div>
         <StyleEditor start={current()} label={item.base_type} onSave={saveStyle} onCancel={() => setEditing(false)} />
       </div>
@@ -247,6 +271,22 @@ export default function QuickMenu() {
         <div className="qm-status"><div className="qm-facts">Checking your filter…</div></div>
       )}
 
+      {extra?.stackable && status && (
+        <div className="qm-stack">
+          <div className="qm-label">Stack size: <b>{stackN.toLocaleString()}</b>{item.stack_size ? ` (this one: ${item.stack_size.toLocaleString()})` : ""}</div>
+          <input type="range" min={0} max={steps.length - 1} value={pickIndex}
+            onChange={(e) => setStackPick(+e.target.value)} />
+          <div className="qm-row">
+            <button className="qm-btn small hide" onClick={() => hideBelow(stackN)} disabled={stackN <= 1}>
+              Hide under {stackN.toLocaleString()}
+            </button>
+            <button className="qm-btn small" onClick={() => setEditing({ minStack: stackN })}>
+              Style {stackN.toLocaleString()}+…
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="qm-row">
         <button id="qm-hide" className="qm-btn hide" onClick={hide}>Hide</button>
         <button className="qm-btn" onClick={louder} disabled={!status}>Louder</button>
@@ -267,13 +307,13 @@ export default function QuickMenu() {
       {isGear && (
         <label className="qm-check">
           <input type="checkbox" checked={anyRarity} onChange={(e) => setAnyRarity(e.target.checked)} />
-          Apply to every rarity, not just {item.rarity}
+          <span>Apply to every rarity, not just {item.rarity}</span>
         </label>
       )}
 
       <label className="qm-check">
         <input type="checkbox" checked={autoReload} onChange={(e) => toggleAuto(e.target.checked)} />
-        Reload {gf ? <b>{nameOf(gf.expected)}</b> : "the filter"} in game after each change (F4 does it by hand)
+        <span>Reload {gf ? <b>{nameOf(gf.expected)}</b> : "the filter"} in game after each change (F4 does it by hand)</span>
       </label>
 
       <div className="qm-foot">

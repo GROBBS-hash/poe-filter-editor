@@ -38,6 +38,12 @@ fn compact(s: &str) -> String {
 /// "3x Chaos Orb" -> (Some(3), "Chaos Orb")
 fn split_stack(text: &str) -> (Option<u32>, &str) {
     let t = text.trim();
+    // "3 GOLD" / "1,250 Gold": a plain number in front.
+    if let Some((n, rest)) = t.split_once(' ') {
+        if let Ok(v) = n.replace(',', "").parse::<u32>() {
+            return (Some(v), rest.trim());
+        }
+    }
     if let Some((n, rest)) = t.split_once(['x', 'X', '×']) {
         if let Ok(v) = n.trim().replace(',', "").parse::<u32>() {
             return (Some(v), rest.trim());
@@ -123,10 +129,11 @@ pub fn ground_item(segs: &[Segment], m: &GroundMatch, label: Option<LabelColours
     fill_class(&mut item);
     let class = item.item_class.as_str();
     item.rarity = match class {
-        "Stackable Currency" | "Delve Stackable Socketable Currency" | "Map Fragments" | "Incubators" => "Currency".into(),
         "Divination Cards" => "Divination Card".into(),
         "Skill Gems" | "Support Gems" => "Gem".into(),
-        _ => guess_rarity(segs, &item, label, area_level),
+        _ if crate::item::is_gear(&Item { rarity: "Normal".into(), ..item.clone() }) || class.is_empty() =>
+            guess_rarity(segs, &item, label, area_level),
+        _ => "Currency".into(),
     };
     item.unidentified = matches!(item.rarity.as_str(), "Magic" | "Rare" | "Unique");
     item
@@ -220,6 +227,16 @@ mod tests {
         let m = match_base("JPERIOR LIGHTNING TENDRILS", &k).unwrap();
         assert_eq!(m.base, "Lightning Tendrils");
         assert!(m.superior);
+    }
+
+    #[test]
+    fn gold_stack_without_x() {
+        let mut k = known();
+        k.insert("Gold".into());
+        let m = match_base("3 GOLD", &k).unwrap();
+        assert_eq!((m.base.as_str(), m.stack), ("Gold", Some(3)));
+        let m = match_base("1,250 Gold", &k).unwrap();
+        assert_eq!(m.stack, Some(1250));
     }
 
     #[test]
