@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import ItemPanel from "./ItemPanel";
+import { ItemIcon } from "./icons";
 import { CustomStyle, GAME_COLOURS } from "./StyleEditor";
 import { Item } from "./types";
 
@@ -151,7 +152,7 @@ export default function Find({ onChange }: { onChange: () => void }) {
           <ul className="results">
             {results.map((r) => (
               <li key={r.item_class + r.base_type} onClick={() => setChosen(r)}>
-                {r.base_type ? <><span>{r.base_type}</span><span className="muted small">{r.item_class}</span></>
+                {r.base_type ? <><span className="with-icon"><ItemIcon base={r.base_type} size={24} />{r.base_type}</span><span className="muted small">{r.item_class}</span></>
                   : <><span><b>Every {r.item_class}</b></span><span className="muted small">whole item type</span></>}
               </li>
             ))}

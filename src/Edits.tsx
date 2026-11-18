@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 import { ProfileInfo, RuleInfo, RARITY_COLOUR } from "./types";
 import ItemPanel, { RuleDetail, itemFromRule } from "./ItemPanel";
+import { ItemIcon } from "./icons";
 
 const css = (c?: number[] | null) => (c ? `rgba(${c[0]},${c[1]},${c[2]},${(c[3] ?? 255) / 255})` : "transparent");
 
@@ -141,6 +142,7 @@ export default function Edits({ profile, onChange }: { profile: ProfileInfo; onC
             return (
               <div key={key} className="egroup">
                 <div className="egroup-head">
+                  {d?.base_type && <ItemIcon base={d.base_type} size={26} />}
                   <span style={{ color: d?.rarity ? RARITY_COLOUR[d.rarity] : undefined }}>{title}</span>
                   {d?.base_type && <span className="muted small">{d.item_class}</span>}
                 </div>

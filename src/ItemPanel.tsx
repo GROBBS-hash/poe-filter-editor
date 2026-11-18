@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Item, RARITY_COLOUR, itemSub, itemTitle } from "./types";
 import StyleEditor, { CurrentStyle, CustomStyle, GAME_COLOURS, fromCurrent } from "./StyleEditor";
+import { ItemIcon } from "./icons";
 
 export type Picked = { item: Item; from_screen: boolean; screen_text?: string | null; confidence: number };
 
@@ -267,7 +268,9 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
           Press <b>F4</b> in game to switch to {nameOf(gf.expected)}.
         </div>
       )}
-      <div className="qm-head">
+      <div className="qm-head with-icon">
+        <ItemIcon name={item.rarity === "Unique" ? item.name : null} base={item.base_type || null} size={40} />
+        <div className="qm-head-text">
         <div className="qm-name" style={{ color: RARITY_COLOUR[item.rarity] ?? "#ddd" }}>{itemTitle(item)}</div>
         <div className="qm-sub">{itemSub(item)}</div>
         {price && (
@@ -280,6 +283,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
         {picked.from_screen && (
           <div className="qm-where">Read from the ground: “{picked.screen_text}”{picked.confidence < 1 ? " (best guess)" : ""}</div>
         )}
+        </div>
       </div>
 
       {(picked.from_screen || replacing || !inGame) && isGear && (

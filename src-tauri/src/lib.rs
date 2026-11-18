@@ -38,6 +38,8 @@ struct AppState {
     /// Latest prices per game, downloaded hourly from the app's own price cache.
     prices: Mutex<std::collections::HashMap<Game, PriceFile>>,
     data_dir: PathBuf,
+    /// Item name -> picture URL, per game (from the price job).
+    icons: Mutex<std::collections::HashMap<Game, std::collections::HashMap<String, String>>>,
     /// Every filter's recent changes, for going back.
     history: Mutex<History>,
     history_path: PathBuf,
@@ -105,10 +107,20 @@ fn fetch_prices(app: &AppHandle) -> Vec<Game> {
         let Ok(body) = resp.into_string() else { continue };
         let Ok(file) = serde_json::from_str::<PriceFile>(&body) else { continue };
         let mut prices = state.prices.lock().unwrap();
-        if prices.get(&g).map(|p| p.updated != file.updated).unwrap_or(true) {
+        let no_icons = state.icons.lock().unwrap().get(&g).is_none();
+        let new_prices = prices.get(&g).map(|p| p.updated != file.updated).unwrap_or(true);
+        if new_prices || no_icons {
             let _ = std::fs::write(state.data_dir.join(format!("prices_{}.json", game_key(g))), &body);
             prices.insert(g, file);
-            changed.push(g);
+            if new_prices { changed.push(g); }
+            // Item pictures come with each price update.
+            let icon_url = format!("{PRICE_URL}/{}_icons.json", game_key(g));
+            if let Some(text) = ureq::get(&icon_url).timeout(Duration::from_secs(20)).call().ok().and_then(|r| r.into_string().ok()) {
+                if let Ok(map) = serde_json::from_str::<std::collections::HashMap<String, String>>(&text) {
+                    let _ = std::fs::write(state.data_dir.join(format!("icons_{}.json", game_key(g))), &text);
+                    state.icons.lock().unwrap().insert(g, map);
+                }
+            }
         }
     }
     changed
@@ -686,6 +698,13 @@ fn undo_last(state: State<AppState>) -> Result<Option<String>, String> {
 struct HistoryItem { index: usize, at: u64, what: String }
 
 /// Recent changes to a filter, newest first.
+/// Item pictures for the active filter's game: name -> picture URL.
+#[tauri::command]
+fn get_icons(state: State<AppState>) -> std::collections::HashMap<String, String> {
+    let game = active_game(&state);
+    state.icons.lock().unwrap().get(&game).cloned().unwrap_or_default()
+}
+
 #[tauri::command]
 fn get_history(state: State<AppState>, id: String) -> Vec<HistoryItem> {
     let h = state.history.lock().unwrap();
@@ -1073,8 +1092,15 @@ pub fn run() {
             let store = Store::load(&store_path);
             let settings = store.settings.clone();
             let history_path = data.join("history.json");
+            let mut icons = std::collections::HashMap::new();
+            for g in [Game::Poe1, Game::Poe2] {
+                if let Some(m) = std::fs::read_to_string(data.join(format!("icons_{}.json", game_key(g)))).ok()
+                    .and_then(|t| serde_json::from_str::<std::collections::HashMap<String, String>>(&t).ok()) {
+                    icons.insert(g, m);
+                }
+            }
             app.manage(AppState { store: Mutex::new(store), store_path,
-                history: Mutex::new(History::load(&history_path)), history_path,
+                history: Mutex::new(History::load(&history_path)), history_path, icons: Mutex::new(icons),
                 prices: Mutex::new(cached), data_dir: data.clone(), hotkeys: Mutex::new(Default::default()) });
             start_price_updates(app.handle().clone());
             if register_hotkeys(app.handle(), &settings).is_err() {
@@ -1151,6 +1177,7 @@ pub fn run() {
             apply_farm_preset,
             ask,
             get_history,
+            get_icons,
             go_back
         ])
         .run(tauri::generate_context!())
