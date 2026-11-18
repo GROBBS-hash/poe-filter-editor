@@ -45,7 +45,11 @@ fn limiter() -> &'static Mutex<Limiter> {
 
 fn default_rules(kind: &str) -> Vec<(u32, u64)> {
     // Careful guesses until the site tells us its real numbers.
-    if kind == "search" { vec![(4, 10), (12, 60), (40, 300)] } else { vec![(8, 4), (12, 10)] }
+    match kind {
+        "search" | "exchange" => vec![(4, 10), (12, 60), (40, 300)],
+        "poeprices" => vec![(3, 10), (20, 300)],
+        _ => vec![(8, 4), (12, 10)],
+    }
 }
 
 /// "8:10:60,15:60:300" -> [(8, 10), (15, 60)]
@@ -146,26 +150,60 @@ pub fn fetch(poe2: bool, ids: &[String], search_id: &str) -> Result<Value, Strin
     call("fetch", ureq::get(&url), None)
 }
 
-/// The trade site's stat list, kept on disk for a day.
-pub fn stats(data_dir: &Path, poe2: bool) -> Result<StatIndex, String> {
-    static CACHE: OnceLock<Mutex<HashMap<bool, std::sync::Arc<Value>>>> = OnceLock::new();
+/// One of the trade site's data lists ("stats", "static"), kept on disk for a day.
+fn data(data_dir: &Path, poe2: bool, kind: &str) -> Result<std::sync::Arc<Value>, String> {
+    static CACHE: OnceLock<Mutex<HashMap<(bool, String), std::sync::Arc<Value>>>> = OnceLock::new();
     let cache = CACHE.get_or_init(Default::default);
-    if let Some(v) = cache.lock().unwrap().get(&poe2) { return Ok(StatIndex::from_json(v)); }
-    let path = data_dir.join(if poe2 { "trade_stats_poe2.json" } else { "trade_stats_poe1.json" });
+    if let Some(v) = cache.lock().unwrap().get(&(poe2, kind.to_string())) { return Ok(v.clone()); }
+    let path = data_dir.join(format!("trade_{kind}_{}.json", if poe2 { "poe2" } else { "poe1" }));
     let fresh = std::fs::metadata(&path).and_then(|m| m.modified()).ok()
         .and_then(|t| SystemTime::now().duration_since(t).ok()).map(|age| age < Duration::from_secs(86_400)).unwrap_or(false);
     let v: Value = if fresh {
         serde_json::from_str(&std::fs::read_to_string(&path).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?
     } else {
-        match call("data", ureq::get(&format!("{}/data/stats", api_base(poe2))), None) {
+        match call("data", ureq::get(&format!("{}/data/{kind}", api_base(poe2))), None) {
             Ok(v) => { let _ = std::fs::write(&path, v.to_string()); v }
             // Offline: an old copy is better than none.
             Err(e) => serde_json::from_str(&std::fs::read_to_string(&path).map_err(|_| e)?).map_err(|e| e.to_string())?,
         }
     };
-    let idx = StatIndex::from_json(&v);
-    cache.lock().unwrap().insert(poe2, std::sync::Arc::new(v));
-    Ok(idx)
+    let v = std::sync::Arc::new(v);
+    cache.lock().unwrap().insert((poe2, kind.to_string()), v.clone());
+    Ok(v)
+}
+
+/// The trade site's stat list.
+pub fn stats(data_dir: &Path, poe2: bool) -> Result<StatIndex, String> {
+    Ok(StatIndex::from_json(&*data(data_dir, poe2, "stats")?))
+}
+
+/// The trade site's bulk-exchange item ids.
+pub fn statics(data_dir: &Path, poe2: bool) -> Result<filter_core::trade::StaticIndex, String> {
+    Ok(filter_core::trade::StaticIndex::from_json(&*data(data_dir, poe2, "static")?))
+}
+
+/// Bulk exchange search; returns (search id, answer).
+pub fn exchange(poe2: bool, league: &str, query: &Value) -> Result<(String, Value), String> {
+    let url = format!("{}/exchange/{}", api_base(poe2), enc(league));
+    let v = call("exchange", ureq::post(&url), Some(query))?;
+    Ok((v["id"].as_str().unwrap_or("").to_string(), v))
+}
+
+pub fn exchange_url(poe2: bool, league: &str, id: &str) -> String {
+    let league = enc(league);
+    if poe2 { format!("https://www.pathofexile.com/trade2/exchange/poe2/{league}/{id}") }
+    else { format!("https://www.pathofexile.com/trade/exchange/{league}/{id}") }
+}
+
+/// poeprices.info's rough price for a rare, from its copied text.
+pub fn poeprices(league: &str, item_text: &str) -> Result<Value, String> {
+    use base64::Engine;
+    let b64 = base64::engine::general_purpose::STANDARD.encode(item_text.replace('\r', ""));
+    let url = format!("https://www.poeprices.info/api?l={}&i={}&s=poe-filter-editor", enc(league), enc(&b64));
+    wait_turn("poeprices")?;
+    ureq::get(&url).set("User-Agent", UA).timeout(Duration::from_secs(15)).call()
+        .map_err(|e| format!("poeprices.info didn't answer: {e}"))?
+        .into_json::<Value>().map_err(|e| e.to_string())
 }
 
 #[cfg(test)]

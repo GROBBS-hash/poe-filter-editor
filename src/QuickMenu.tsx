@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
@@ -23,7 +24,7 @@ export default function QuickMenu() {
     if (!box.current) return;
     const ro = new ResizeObserver(() => {
       const h = Math.ceil(box.current?.getBoundingClientRect().height ?? 300) + 4;
-      getCurrentWindow().setSize(new LogicalSize(300, Math.max(120, h))).catch(() => {});
+      getCurrentWindow().setSize(new LogicalSize(300, Math.max(120, h))).then(() => invoke("keep_on_screen")).catch(() => {});
     });
     ro.observe(box.current);
     return () => ro.disconnect();

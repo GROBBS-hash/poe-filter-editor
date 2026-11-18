@@ -31,6 +31,19 @@ pub struct StatFilter {
     /// "pseudo", "explicit", "implicit"...
     pub kind: String,
     pub tier: Option<u32>,
+    /// Rarely affects the price (accuracy, thorns, light radius…): never ticked for you.
+    #[serde(default)]
+    pub junk: bool,
+}
+
+/// Mods that almost never change what an item sells for.
+const JUNK: &[&str] = &["Accuracy Rating", "Light Radius", "Stun and Block Recovery", "Reflects # Physical Damage",
+    "reduced Attribute Requirements", "Stun Duration", "Stun Threshold", "gained for each Enemy hit", "gained on Kill",
+    "increased Rarity of Items found", "Knockback", "reduced Enemy Stun", "increased Flask Charges gained",
+    "Life gained when you Block", "Mana gained when you Block", "Thorns"];
+
+pub fn is_junk(template_text: &str) -> bool {
+    JUNK.iter().any(|j| template_text.contains(j))
 }
 
 /// Everything the price check window needs to start a search.
@@ -47,6 +60,9 @@ pub struct TradeSetup {
     pub unknown: Vec<String>,
     /// Trade site category for the item class ("armour.helmet").
     pub category: Option<String>,
+    /// The copied item text (for poeprices.info).
+    #[serde(default)]
+    pub raw: String,
 }
 
 /// The trade site's stat list (api/trade/data/stats), indexed by text.
@@ -239,28 +255,33 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
     for (id, label, v, _) in &ps {
         let worth = match *id { "pseudo.pseudo_total_life" => *v >= 40.0, "pseudo.pseudo_total_elemental_resistance" => *v >= 36.0, _ => *v >= 15.0 };
         filters.push(StatFilter { id: id.to_string(), label: label.replace('#', &format!("{v}")), value: *v, min: Some(min_for(*v)),
-            enabled: worth && !unique, kind: "pseudo".into(), tier: None });
+            enabled: worth && !unique, kind: "pseudo".into(), tier: None, junk: false });
     }
     let has_tiers = lines.iter().any(|m| m.tier.is_some());
     for (i, m) in lines.iter().enumerate() {
         let Some((id, value)) = index.find(m) else { unknown.push(m.text.clone()); continue };
         let (t, _) = template(&m.text);
         let good = if has_tiers { m.tier.map(|t| t <= 2).unwrap_or(false) } else { VALUABLE.iter().any(|k| t.contains(k)) };
-        let enabled = !unique && m.kind != "enchant" && !covered.contains(&i) && good;
-        filters.push(StatFilter { id, label: m.text.clone(), value, min: Some(min_for(value)), enabled, kind: m.kind.clone(), tier: m.tier });
+        let junk = is_junk(&t);
+        let enabled = !unique && m.kind != "enchant" && !covered.contains(&i) && good && !junk;
+        filters.push(StatFilter { id, label: m.text.clone(), value, min: Some(min_for(value)), enabled, kind: m.kind.clone(), tier: m.tier, junk });
     }
     let links = item.sockets.as_deref().map(crate::item::max_links).unwrap_or(0);
     let gem_level = text.replace('\r', "").split("--------").nth(1)
         .and_then(|s| s.lines().find_map(|l| l.trim().strip_prefix("Level: ")))
         .and_then(|v| v.split_whitespace().next()?.parse().ok())
         .filter(|_| item.item_class.contains("Gem"));
+    // Nothing worth searching on (white/unidentified items, or only weak mods): it's
+    // the base that's for sale, so search that base at this item level or better.
+    let nothing_picked = !filters.iter().any(|f| f.enabled);
+    let gear = category(&item.item_class).is_some();
     Some(TradeSetup {
         category: category(&item.item_class).map(String::from),
-        base_only: !matches!(item.rarity.as_str(), "Rare" | "Magic") || category(&item.item_class).is_none(),
-        ilvl_min: None,
+        base_only: !matches!(item.rarity.as_str(), "Rare" | "Magic") || !gear || nothing_picked,
+        ilvl_min: (gear && nothing_picked && item.rarity != "Unique").then_some(item.item_level).flatten(),
         links_min: (links >= 5).then_some(links),
         gem_level,
-        filters, unknown, item,
+        filters, unknown, item, raw: text.to_string(),
     })
 }
 
@@ -283,6 +304,7 @@ pub fn query(s: &TradeSetup) -> Value {
     if type_f.as_object().map(|o| !o.is_empty()).unwrap_or(false) { filters["type_filters"] = json!({ "filters": type_f }); }
     let mut misc = json!({});
     if let Some(n) = s.ilvl_min { misc["ilvl"] = json!({ "min": n }); }
+    if it.unidentified && it.rarity != "Unique" { misc["identified"] = json!({ "option": "false" }); }
     if let Some(n) = s.gem_level { misc["gem_level"] = json!({ "min": n }); }
     if it.item_class.contains("Gem") {
         if let Some(qual) = it.quality { misc["quality"] = json!({ "min": qual }); }
@@ -354,6 +376,109 @@ pub fn rates(price_of: impl Fn(&str) -> Option<f64>) -> HashMap<String, f64> {
     let mut m: HashMap<String, f64> = CURRENCY_NAMES.iter().filter_map(|(id, name)| price_of(name).map(|v| (id.to_string(), v))).collect();
     m.insert("chaos".into(), 1.0);
     m
+}
+
+// ---------- bulk exchange (currency, fragments, scarabs…) ----------
+
+/// The trade site's item ids for bulk exchange ("divine", "chaos"…), from
+/// api/trade/data/static, by name.
+#[derive(Debug, Default)]
+pub struct StaticIndex { by_name: HashMap<String, String> }
+
+impl StaticIndex {
+    pub fn from_json(v: &Value) -> StaticIndex {
+        let mut by_name = HashMap::new();
+        for group in v["result"].as_array().into_iter().flatten() {
+            for e in group["entries"].as_array().into_iter().flatten() {
+                if let (Some(id), Some(text)) = (e["id"].as_str(), e["text"].as_str()) {
+                    by_name.entry(text.to_lowercase()).or_insert_with(|| id.to_string());
+                }
+            }
+        }
+        StaticIndex { by_name }
+    }
+    pub fn id(&self, name: &str) -> Option<String> { self.by_name.get(&name.to_lowercase()).cloned() }
+}
+
+/// A bulk exchange search: people selling `want` for `have`.
+pub fn exchange_query(have: &str, want: &str, minimum: Option<u32>) -> Value {
+    let mut q = json!({ "status": { "option": "online" }, "have": [have], "want": [want] });
+    if let Some(m) = minimum { q["minimum"] = json!(m); }
+    json!({ "query": q, "sort": { "have": "asc" }, "engine": "new" })
+}
+
+/// One bulk offer: they give `get` of the item for `pay` of your currency.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct Offer {
+    pub pay: f64,
+    pub pay_currency: String,
+    pub get: f64,
+    pub get_currency: String,
+    /// Your currency per one item.
+    pub each: f64,
+    pub stock: u32,
+    pub account: String,
+    pub whisper: String,
+}
+
+/// Reads a bulk exchange answer (cheapest first).
+pub fn offers(v: &Value) -> Vec<Offer> {
+    let mut out: Vec<Offer> = v["result"].as_object().into_iter().flat_map(|m| m.values()).filter_map(|r| {
+        let l = &r["listing"];
+        let o = l["offers"].as_array()?.first()?;
+        let (ex, it) = (&o["exchange"], &o["item"]);
+        let pay = ex["amount"].as_f64()?;
+        let get = it["amount"].as_f64()?;
+        if get <= 0.0 { return None; }
+        let fill = |w: &str, n: f64| w.replace("{0}", &format!("{}", n));
+        // The site gives a whisper with gaps for the amounts: one lot of the offer.
+        let whisper = l["whisper"].as_str().map(|w| w
+            .replace("{0}", &fill(it["whisper"].as_str().unwrap_or("{0}"), get))
+            .replace("{1}", &fill(ex["whisper"].as_str().unwrap_or("{0}"), pay))).unwrap_or_default();
+        Some(Offer {
+            pay, pay_currency: ex["currency"].as_str().unwrap_or("").into(),
+            get, get_currency: it["currency"].as_str().unwrap_or("").into(),
+            each: pay / get, stock: it["stock"].as_u64().unwrap_or(0) as u32,
+            account: l["account"]["lastCharacterName"].as_str().or(l["account"]["name"].as_str()).unwrap_or("").into(),
+            whisper,
+        })
+    }).collect();
+    out.sort_by(|a, b| a.each.partial_cmp(&b.each).unwrap_or(std::cmp::Ordering::Equal));
+    out
+}
+
+// ---------- map check ----------
+
+/// Map mods that are a problem for many builds, with a short reason.
+pub const MAP_DANGER: &[(&str, &str)] = &[
+    ("reflect #% of Elemental Damage", "Elemental reflect"), ("reflect #% of Physical Damage", "Physical reflect"),
+    ("cannot Regenerate", "No regen"), ("Cannot Leech", "No leech"), ("maximum Resistances", "Less max res"),
+    ("reduced Recovery Rate of Life and Energy Shield", "Less recovery"), ("Avoid Elemental Ailments", "Monsters avoid ailments"),
+    ("less effect of Curses", "Less curse effect"), ("cannot be Stunned", "Monsters can't be stunned"),
+    ("Temporal Chains", "Temp chains"), ("Elemental Weakness", "Elemental weakness"), ("Enfeeble", "Enfeeble"),
+    ("Vulnerability", "Vulnerability"), ("are Hexproof", "Hexproof"), ("Life as Extra Maximum Energy Shield", "Monster ES"),
+    ("Burning Ground", "Burning ground"), ("Shocked Ground", "Shocked ground"), ("Chilled Ground", "Chilled ground"),
+    ("Consecrated Ground", "Monster consecrated ground"), ("Poison on Hit", "Monsters poison"), ("Bleeding on Hit", "Monsters bleed"),
+    ("Damage as Extra", "Extra monster damage"), ("Critical Strike Chance", "Monster crits"), ("Flasks gain", "Fewer flask charges"),
+];
+
+/// Each of a map's mods with a warning when it's one you said you can't run
+/// (`avoid` holds the short names; empty = warn about all known dangers).
+pub fn map_check(mods: &[ModLine], avoid: &[String]) -> Vec<(String, Option<String>)> {
+    mods.iter().map(|m| {
+        let (t, _) = template(&m.text);
+        let hit = MAP_DANGER.iter().find(|(k, name)| t.contains(k) && (avoid.is_empty() || avoid.iter().any(|a| a == name)));
+        (m.text.clone(), hit.map(|(_, n)| n.to_string()))
+    }).collect()
+}
+
+// ---------- poeprices.info (rough price for rares) ----------
+
+/// poeprices.info's estimate: (min, max, currency, confidence %).
+pub fn poeprices(v: &Value) -> Option<(f64, f64, String, f64)> {
+    if v["error"].as_i64().unwrap_or(0) != 0 { return None; }
+    Some((v["min"].as_f64()?, v["max"].as_f64()?, v["currency"].as_str().unwrap_or("chaos").to_string(),
+        v["pred_confidence_score"].as_f64().unwrap_or(0.0)))
 }
 
 #[cfg(test)]
@@ -436,6 +561,25 @@ Item Level: 75
         assert!(s.filters.iter().all(|f| !f.enabled), "uniques search by name");
         let q = query(&s);
         assert_eq!((q["query"]["name"].as_str(), q["query"]["type"].as_str()), (Some("Goldrim"), Some("Leather Cap")));
+    }
+
+    #[test]
+    fn junk_bulk_and_maps() {
+        assert!(is_junk("+# to Accuracy Rating") && !is_junk("+# to maximum Life"));
+        let st = StaticIndex::from_json(&json!({ "result": [ { "entries": [ { "id": "divine", "text": "Divine Orb" } ] } ] }));
+        assert_eq!(st.id("divine orb").as_deref(), Some("divine"));
+        let v = json!({ "result": { "a": { "listing": { "whisper": "@Bob Hi, I'd like to buy your {0} for my {1} in Keepers.",
+            "account": { "name": "Bob" }, "offers": [ { "exchange": { "currency": "chaos", "amount": 360, "whisper": "{0} Chaos Orb" },
+            "item": { "currency": "divine", "amount": 2, "stock": 10, "whisper": "{0} Divine Orb" } } ] } } } });
+        let o = offers(&v);
+        assert_eq!((o[0].each, o[0].stock), (180.0, 10));
+        assert_eq!(o[0].whisper, "@Bob Hi, I'd like to buy your 2 Divine Orb for my 360 Chaos Orb in Keepers.");
+        let mods = vec![ModLine { text: "Monsters reflect 18% of Elemental Damage".into(), kind: "explicit".into(), tier: None, values: vec![18.0] },
+            ModLine { text: "+20% Monster pack size".into(), kind: "explicit".into(), tier: None, values: vec![20.0] }];
+        let c = map_check(&mods, &[]);
+        assert_eq!(c[0].1.as_deref(), Some("Elemental reflect"));
+        assert_eq!(c[1].1, None);
+        assert_eq!(map_check(&mods, &["No regen".into()])[0].1, None);
     }
 
     #[test]

@@ -336,11 +336,42 @@ fn read_from_ground(app: &AppHandle) -> Result<Picked, String> {
     Ok(Picked { item, from_screen: true, screen_text: Some(text), confidence: m.confidence })
 }
 
+/// The screen (x, y, width, height) the point is on, or the first screen.
+fn monitor_at(w: &tauri::WebviewWindow, x: f64, y: f64) -> Option<(i32, i32, i32, i32)> {
+    let mons = w.available_monitors().ok()?;
+    let rect = |m: &tauri::Monitor| (m.position().x, m.position().y, m.size().width as i32, m.size().height as i32);
+    mons.iter().map(rect).find(|(mx, my, mw, mh)| x >= *mx as f64 && x < (*mx + *mw) as f64 && y >= *my as f64 && y < (*my + *mh) as f64)
+        .or_else(|| mons.first().map(rect))
+}
+
+/// Puts a pop-up next to the mouse on the side with more room (left of the mouse
+/// on the right half of the screen), kept fully on that screen.
+fn place_near_cursor(w: &tauri::WebviewWindow, gap: i32) {
+    let Ok(pos) = w.cursor_position() else { return };
+    let Some((mx, my, mw, mh)) = monitor_at(w, pos.x, pos.y) else { return };
+    let size = w.outer_size().map(|s| (s.width as i32, s.height as i32)).unwrap_or((380, 500));
+    let (cx, cy) = (pos.x as i32, pos.y as i32);
+    let x = if cx > mx + mw / 2 { cx - size.0 - gap } else { cx + gap };
+    let y = cy - size.1 / 3;
+    let x = x.clamp(mx, (mx + mw - size.0).max(mx));
+    let y = y.clamp(my, (my + mh - size.1).max(my));
+    let _ = w.set_position(PhysicalPosition::new(x, y));
+}
+
+/// Called by a pop-up after it changes size: pulls it back fully onto its screen.
+#[tauri::command]
+fn keep_on_screen(window: tauri::WebviewWindow) {
+    let (Ok(p), Ok(s)) = (window.outer_position(), window.outer_size()) else { return };
+    let Some((mx, my, mw, mh)) = monitor_at(&window, p.x as f64 + 1.0, p.y as f64 + 1.0) else { return };
+    let (w, h) = (s.width as i32, s.height as i32);
+    let x = p.x.clamp(mx, (mx + mw - w).max(mx));
+    let y = p.y.clamp(my, (my + mh - h).max(my));
+    if (x, y) != (p.x, p.y) { let _ = window.set_position(PhysicalPosition::new(x, y)); }
+}
+
 fn show_overlay(app: &AppHandle, event: &str, payload: impl Serialize + Clone) {
     if let Some(w) = app.get_webview_window("overlay") {
-        if let Ok(pos) = w.cursor_position() {
-            let _ = w.set_position(PhysicalPosition::new(pos.x as i32 + 12, pos.y as i32 + 12));
-        }
+        place_near_cursor(&w, 12);
         let _ = w.emit(event, payload);
         let _ = w.show();
         let _ = w.set_focus();
@@ -407,6 +438,8 @@ struct PriceCheck {
     /// Read off the ground (name only, no stats).
     from_ground: bool,
     error: Option<String>,
+    /// The trade site's bulk id when this sells in bulk (currency, scarabs, cards…).
+    bulk: Option<String>,
 }
 
 fn trade_league(app: &AppHandle) -> (bool, String) {
@@ -443,13 +476,13 @@ fn price_check(app: AppHandle) {
         let payload = if !text.is_empty() {
             match trade_api::stats(&state.data_dir, poe2) {
                 Ok(index) => match filter_core::trade::setup(&text, &index) {
-                    Some(s) => PriceCheck { ninja: ninja_price(&app, &s.item), setup: Some(s), league, from_ground: false, error: None },
-                    None => PriceCheck { setup: None, ninja: None, league, from_ground: false, error: Some("That doesn't look like an item".into()) },
+                    Some(s) => PriceCheck { ninja: ninja_price(&app, &s.item), setup: Some(s), league, from_ground: false, error: None, bulk: None },
+                    None => PriceCheck { setup: None, ninja: None, league, from_ground: false, error: Some("That doesn't look like an item".into()), bulk: None },
                 },
                 Err(e) => match filter_core::trade::setup(&text, &Default::default()) {
                     Some(s) => PriceCheck { ninja: ninja_price(&app, &s.item), setup: Some(s), league, from_ground: false,
-                        error: Some(format!("Stat list unavailable, searching by name only ({e})")) },
-                    None => PriceCheck { setup: None, ninja: None, league, from_ground: false, error: Some(e) },
+                        error: Some(format!("Stat list unavailable, searching by name only ({e})")), bulk: None },
+                    None => PriceCheck { setup: None, ninja: None, league, from_ground: false, error: Some(e), bulk: None },
                 },
             }
         } else {
@@ -459,16 +492,20 @@ fn price_check(app: AppHandle) {
                     let item = p.item;
                     let category = filter_core::trade::category(&item.item_class).map(String::from);
                     let s = filter_core::trade::TradeSetup { item: item.clone(), filters: vec![], base_only: true, ilvl_min: None,
-                        links_min: None, gem_level: None, unknown: vec![], category };
-                    PriceCheck { ninja: ninja_price(&app, &item), setup: Some(s), league, from_ground: true, error: None }
+                        links_min: None, gem_level: None, unknown: vec![], category, raw: String::new() };
+                    PriceCheck { ninja: ninja_price(&app, &item), setup: Some(s), league, from_ground: true, error: None, bulk: None }
                 }
-                Err(e) => PriceCheck { setup: None, ninja: None, league, from_ground: true, error: Some(e) },
+                Err(e) => PriceCheck { setup: None, ninja: None, league, from_ground: true, error: Some(e), bulk: None },
             }
         };
-        if let Some(w) = app.get_webview_window("trade") {
-            if let Ok(pos) = w.cursor_position() {
-                let _ = w.set_position(PhysicalPosition::new(pos.x as i32 + 16, (pos.y as i32 - 200).max(0)));
+        let mut payload = payload;
+        if let Some(it) = payload.setup.as_ref().map(|s| s.item.clone()) {
+            if !matches!(it.rarity.as_str(), "Rare" | "Magic" | "Unique") && filter_core::trade::category(&it.item_class).is_none() {
+                payload.bulk = trade_api::statics(&state.data_dir, poe2).ok().and_then(|st| st.id(&it.base_type));
             }
+        }
+        if let Some(w) = app.get_webview_window("trade") {
+            place_near_cursor(&w, 24);
             let _ = w.emit("price-check", payload);
             let _ = w.show();
             let _ = w.set_focus();
@@ -504,6 +541,27 @@ fn trade_search(app: AppHandle, setup: filter_core::trade::TradeSetup) -> Result
     let listings = filter_core::trade::listings(&fetched, &rates);
     Ok(TradeResult { summary: filter_core::trade::summary(&listings), total, url: trade_api::site_url(poe2, &league, &id),
         divine: rates.get("divine").copied(), listings })
+}
+
+#[derive(Serialize)]
+struct BulkResult { offers: Vec<filter_core::trade::Offer>, url: String, divine: Option<f64> }
+
+/// Bulk rates: people selling `want` (a trade id like "divine") for `pay` ("chaos"/"divine").
+#[tauri::command]
+fn trade_bulk(app: AppHandle, want: String, pay: String) -> Result<BulkResult, String> {
+    let (poe2, league) = trade_league(&app);
+    let (id, v) = trade_api::exchange(poe2, &league, &filter_core::trade::exchange_query(&pay, &want, None))?;
+    let state = app.state::<AppState>();
+    let game = active_game(&state);
+    let divine = state.prices.lock().unwrap().get(&game).and_then(|f| price_of(f, None, "Divine Orb", "Currency"));
+    Ok(BulkResult { offers: filter_core::trade::offers(&v).into_iter().take(20).collect(), url: trade_api::exchange_url(poe2, &league, &id), divine })
+}
+
+/// poeprices.info's rough price for a rare: (min, max, currency, confidence %).
+#[tauri::command]
+fn rare_estimate(app: AppHandle, text: String) -> Result<Option<(f64, f64, String, f64)>, String> {
+    let (_, league) = trade_league(&app);
+    Ok(filter_core::trade::poeprices(&trade_api::poeprices(&league, &text)?))
 }
 
 #[tauri::command]
@@ -1673,7 +1731,7 @@ pub fn run() {
             list_farm_presets,
             apply_farm_preset,
             list_level_presets,
-            get_tiers, get_rule_section, trade_search, copy_text, hide_trade_window,
+            get_tiers, get_rule_section, trade_search, trade_bulk, rare_estimate, copy_text, hide_trade_window, keep_on_screen,
             move_tier_item,
             stack_choices,
             gear_setup,

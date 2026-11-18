@@ -1,14 +1,16 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ItemIcon } from "./icons";
 import { Item, RARITY_COLOUR, itemTitle } from "./types";
 
-type StatFilter = { id: string; label: string; value: number; min: number | null; enabled: boolean; kind: string; tier: number | null };
+type StatFilter = { id: string; label: string; value: number; min: number | null; enabled: boolean; kind: string; tier: number | null; junk?: boolean };
 type Setup = { item: Item; filters: StatFilter[]; base_only: boolean; ilvl_min: number | null; links_min: number | null;
-  gem_level: number | null; unknown: string[]; category: string | null };
-type Check = { setup: Setup | null; ninja: [number, string] | null; league: string; from_ground: boolean; error: string | null };
+  gem_level: number | null; unknown: string[]; category: string | null; raw?: string };
+type Check = { setup: Setup | null; ninja: [number, string] | null; league: string; from_ground: boolean; error: string | null; bulk?: string | null };
+type Offer = { pay: number; pay_currency: string; get: number; get_currency: string; each: number; stock: number; account: string; whisper: string };
+type Bulk = { offers: Offer[]; url: string; divine: number | null };
 type Listing = { amount: number; currency: string; chaos: number | null; account: string; indexed: string; whisper: string; ilvl: number | null };
 type Result = { listings: Listing[]; summary: [number, number] | null; total: number; url: string; divine: number | null };
 
@@ -26,11 +28,11 @@ function ago(iso: string) {
 /** Chaos, or divines when it's worth more than one. */
 function money(c: number, divine: number | null) {
   if (divine && c >= divine) return `${(c / divine).toFixed(c / divine < 10 ? 1 : 0)} div`;
-  return `${c < 10 ? +c.toFixed(1) : Math.round(c)}c`;
+  return `${c < 1 ? +c.toFixed(2) : c < 10 ? +c.toFixed(1) : Math.round(c)}c`;
 }
 
 /** Whether the trade site is worth asking: poe.ninja already prices currency, cards, etc. */
-const needsTrade = (c: Check) => !!c.setup && (!c.ninja || ["Rare", "Magic", "Normal", "Gem"].includes(c.setup.item.rarity)
+const needsTrade = (c: Check) => !!c.setup && !c.bulk && (!c.ninja || ["Rare", "Magic", "Normal", "Gem"].includes(c.setup.item.rarity)
   || (c.setup.item.rarity === "Unique" && !c.setup.item.name));
 
 /** The Ctrl+D price window. */
@@ -40,10 +42,19 @@ export default function TradeWindow() {
   const [res, setRes] = useState<Result | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  const [copied, setCopied] = useState<number | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+  const [bulk, setBulk] = useState<Bulk | null>(null);
+  const [pay, setPay] = useState<"chaos" | "divine">("chaos");
+  const [ai, setAi] = useState<[number, number, string, number] | null>(null);
   const box = useRef<HTMLDivElement | null>(null);
 
-  const close = useCallback(() => { setCheck(null); setRes(null); setErr(""); invoke("hide_trade_window"); }, []);
+  const close = useCallback(() => { setCheck(null); setRes(null); setBulk(null); setAi(null); setErr(""); invoke("hide_trade_window"); }, []);
+
+  const runBulk = useCallback(async (want: string, p: "chaos" | "divine") => {
+    setBusy(true); setErr(""); setBulk(null);
+    try { setBulk(await invoke<Bulk>("trade_bulk", { want, pay: p })); } catch (e) { setErr(String(e)); }
+    setBusy(false);
+  }, []);
 
   const run = useCallback(async (s: Setup) => {
     setBusy(true); setErr(""); setRes(null);
@@ -53,22 +64,27 @@ export default function TradeWindow() {
 
   useEffect(() => {
     const a = listen<Check>("price-check", (e) => {
-      setCheck(e.payload); setSetup(e.payload.setup); setRes(null); setErr(e.payload.error ?? ""); setCopied(null);
-      if (e.payload.setup && needsTrade(e.payload)) run(e.payload.setup);
+      const c = e.payload;
+      setCheck(c); setSetup(c.setup); setRes(null); setBulk(null); setAi(null); setErr(c.error ?? ""); setCopied(null); setPay("chaos");
+      if (c.bulk) runBulk(c.bulk, "chaos");
+      else if (c.setup && needsTrade(c)) run(c.setup);
+      // A rough second opinion on rares from poeprices.info.
+      if (c.setup?.item.rarity === "Rare" && c.setup.raw && !c.setup.item.unidentified)
+        invoke<[number, number, string, number] | null>("rare_estimate", { text: c.setup.raw }).then(setAi).catch(() => {});
     });
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
     const onBlur = () => close();
     window.addEventListener("keydown", onKey);
     window.addEventListener("blur", onBlur);
     return () => { a.then((f) => f()); window.removeEventListener("keydown", onKey); window.removeEventListener("blur", onBlur); };
-  }, [close, run]);
+  }, [close, run, runBulk]);
 
   // Fit the window to what's shown.
   useEffect(() => {
     if (!box.current) return;
     const ro = new ResizeObserver(() => {
       const h = Math.ceil(box.current?.getBoundingClientRect().height ?? 300) + 4;
-      getCurrentWindow().setSize(new LogicalSize(380, Math.max(100, Math.min(900, h)))).catch(() => {});
+      getCurrentWindow().setSize(new LogicalSize(380, Math.max(100, Math.min(900, h)))).then(() => invoke("keep_on_screen")).catch(() => {});
     });
     ro.observe(box.current);
     return () => ro.disconnect();
@@ -79,7 +95,13 @@ export default function TradeWindow() {
 
   const it = setup.item;
   const patch = (i: number, p: Partial<StatFilter>) => setSetup({ ...setup, filters: setup.filters.map((f, j) => (j === i ? { ...f, ...p } : f)) });
-  const divine = res?.divine ?? null;
+  const divine = res?.divine ?? bulk?.divine ?? null;
+  const copy = (text: string, key: string) => { invoke("copy_text", { text }); setCopied(key); };
+  // Mouse wheel on a minimum: 1 at a time (Shift: 10).
+  const wheel = (i: number, f: StatFilter, e: React.WheelEvent) => {
+    const step = (e.shiftKey ? 10 : 1) * (e.deltaY < 0 ? 1 : -1);
+    patch(i, { min: Math.max(0, (f.min ?? f.value) + step), enabled: true });
+  };
 
   return (
     <div className="qm tw" ref={box}>
@@ -99,11 +121,11 @@ export default function TradeWindow() {
       {setup.filters.length > 0 && (
         <div className="tw-stats">
           {setup.filters.map((f, i) => (
-            <label key={f.id + i} className={`tw-stat ${f.enabled ? "on" : ""}`}>
+            <label key={f.id + i} className={`tw-stat ${f.enabled ? "on" : ""} ${f.junk ? "junk" : ""}`} title={f.junk ? "Rarely changes the price" : undefined}>
               <input type="checkbox" checked={f.enabled} onChange={(e) => patch(i, { enabled: e.target.checked })} />
               <span className="tw-label">{f.label}{KIND[f.kind] && <span className="tw-kind">{KIND[f.kind]}</span>}
                 {f.tier != null && <span className={`tw-tier ${f.tier <= 2 ? "good" : ""}`}>T{f.tier}</span>}</span>
-              <input className="tw-min" type="number" value={f.min ?? ""} placeholder="min"
+              <input className="tw-min" type="number" value={f.min ?? ""} placeholder="min" onWheel={(e) => wheel(i, f, e)}
                 onChange={(e) => patch(i, { min: e.target.value === "" ? null : +e.target.value, enabled: true })} />
             </label>
           ))}
@@ -111,7 +133,7 @@ export default function TradeWindow() {
       )}
       {setup.unknown.length > 0 && <div className="muted small tw-unknown" title={setup.unknown.join("\n")}>{setup.unknown.length} mod{setup.unknown.length > 1 ? "s" : ""} not searchable</div>}
 
-      <div className="tw-opts">
+      {!check.bulk && <div className="tw-opts">
         {setup.category && it.rarity !== "Unique" && (
           <label><input type="checkbox" checked={setup.base_only} onChange={(e) => setSetup({ ...setup, base_only: e.target.checked })} /> {it.base_type} only</label>
         )}
@@ -119,10 +141,38 @@ export default function TradeWindow() {
           <label><input type="checkbox" checked={setup.ilvl_min != null} onChange={(e) => setSetup({ ...setup, ilvl_min: e.target.checked ? it.item_level ?? null : null })} /> ilvl {it.item_level}+</label>
         )}
         <button className="tw-search" disabled={busy} onClick={() => run(setup)}>{busy ? "Searching…" : res ? "Search again" : "Search trade"}</button>
-      </div>
+      </div>}
 
       {check.from_ground && it.rarity !== "Unique" && setup.filters.length === 0 && ["Rare", "Magic"].includes(it.rarity) && (
         <div className="muted small">Read off the ground, so no stats: pick it up and press Ctrl+D in your inventory for a proper price.</div>
+      )}
+      {ai && (
+        <div className="tw-ai" title="poeprices.info's machine-learning estimate from the item's mods">
+          AI estimate <b>{+ai[0].toFixed(1)}–{+ai[1].toFixed(1)} {UNIT[ai[2]] ?? ai[2]}</b>
+          <span className="muted small"> · {Math.round(ai[3])}% sure · poeprices.info</span></div>
+      )}
+      {check.bulk && (
+        <div className="tw-res">
+          <div className="tw-sum tw-bulkhead">
+            <span>Bulk: {bulk?.offers[0] ? <>from <b>{money(bulk.offers[0].pay_currency === "divine" && bulk.divine ? bulk.offers[0].each * bulk.divine : bulk.offers[0].each, bulk.divine)}</b> each</> : busy ? "checking…" : "no offers"}</span>
+            <span className="tw-pay">
+              {(["chaos", "divine"] as const).map((p) => (
+                <button key={p} className={pay === p ? "on" : ""} onClick={() => { setPay(p); runBulk(check.bulk!, p); }}>{p === "chaos" ? "for chaos" : "for divines"}</button>
+              ))}
+            </span>
+          </div>
+          <ul className="tw-list">
+            {bulk?.offers.map((o, i) => (
+              <li key={i}>
+                <span className="tw-price">{+o.each.toFixed(o.each < 1 ? 3 : 2)} {o.pay_currency}</span>
+                <span className="muted small">{o.get > 1 ? `${o.pay} for ${o.get}` : ""}</span>
+                <span className="tw-seller muted small">{o.stock} in stock · {o.account}</span>
+                {o.whisper && <button className="link small" onClick={() => copy(o.whisper, "b" + i)}>{copied === "b" + i ? "Copied" : "Whisper"}</button>}
+              </li>
+            ))}
+          </ul>
+          {bulk && <button className="link small" onClick={() => invoke("open_url", { url: bulk.url })}>Open on the trade site</button>}
+        </div>
       )}
       {err && <div className="qm-warn">{err}</div>}
 
@@ -135,11 +185,11 @@ export default function TradeWindow() {
           <ul className="tw-list">
             {res.listings.map((l, i) => (
               <li key={i}>
-                <span className="tw-price">{+l.amount.toFixed(2)} {l.currency}</span>
+                <span className="tw-price" title={l.chaos != null && l.currency !== "chaos" ? `≈ ${money(l.chaos, divine)}` : undefined}>{+l.amount.toFixed(2)} {l.currency}</span>
                 <span className="muted small">{l.ilvl ? `ilvl ${l.ilvl} · ` : ""}{ago(l.indexed)}</span>
                 <span className="tw-seller muted small">{l.account}</span>
-                {l.whisper && <button className="link small" onClick={() => { invoke("copy_text", { text: l.whisper }); setCopied(i); }}>
-                  {copied === i ? "Copied" : "Whisper"}</button>}
+                {l.whisper && <button className="link small" onClick={() => copy(l.whisper, "l" + i)}>
+                  {copied === "l" + i ? "Copied" : "Whisper"}</button>}
               </li>
             ))}
           </ul>
