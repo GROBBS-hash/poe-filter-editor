@@ -448,3 +448,13 @@ code { background: #000; padding: 1px 5px; border-radius: 4px; color: var(--gold
 .tv-asc { margin-top: 6px; }
 .bv-tree-sum { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
 .c-new { color: #5ee06a; } .c-gone { color: #ff6a5a; }
+.tv-ascbox { margin-top: 10px; border: 1px solid #2c241a; border-radius: 8px; padding: 8px; background: #0f0c09; }
+.tv-asc-head { color: #f3e6c4; margin-bottom: 4px; }
+.tv-asc-svg { width: 100%; max-height: 300px; display: block; }
+.tv-asc-svg .e-off, .tv-asc-svg .e-on { fill: none; stroke-width: 10; }
+.tv-asc-svg circle { fill: #1c1915; stroke: #4a4337; stroke-width: 7; }
+.tv-asc-svg circle.k1 { stroke: #8a7a55; stroke-width: 10; }
+.tv-asc-svg circle.on { fill: #e8be5a; stroke: #fff1c4; }
+.tv-asc-svg circle.new { fill: #5ee06a; stroke: #d6ffd6; }
+.tv-asc-label { fill: #8f8572; font-size: 54px; font-family: inherit; }
+.tv-asc-label.on { fill: #e8be5a; } .tv-asc-label.new { fill: #5ee06a; }

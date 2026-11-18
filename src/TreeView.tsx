@@ -10,7 +10,61 @@ const RADIUS = [26, 40, 58, 30, 38, 60, 40]; // by kind: small, notable, keyston
 type Box = { x: number; y: number; w: number; h: number };
 
 /** The passive tree for one stage: your points gold, new ones this stage green, respecced-away ones red. */
-export default function TreeView({ nodes, previous, height = 520 }: { nodes: number[]; previous?: number[]; height?: number }) {
+/** Your ascendancy on its own: notables named, taken ones gold (new this stage green). Small passives are just dots. */
+function Ascendancy({ tree, name, have, added }: { tree: TreeData; name: string; have: Set<string>; added: Set<string> }) {
+  const [tip, setTip] = useState<{ id: string; x: number; y: number } | null>(null);
+  const list = Object.entries(tree.nodes).filter(([, n]) => n[5] === name);
+  if (list.length === 0) return null;
+  const ids = new Set(list.map(([id]) => id));
+  const xs = list.map(([, n]) => n[0]), ys = list.map(([, n]) => n[1]);
+  const pad = 260;
+  const vb = `${Math.min(...xs) - pad} ${Math.min(...ys) - pad} ${Math.max(...xs) - Math.min(...xs) + pad * 2} ${Math.max(...ys) - Math.min(...ys) + pad * 2}`;
+  const majors = list.filter(([id, n]) => n[2] === 1 && have.has(id));
+  const centre = list.find(([, n]) => n[2] === 6)?.[1];
+  const t = tip && tree.nodes[tip.id];
+  return (
+    <div className="tv-ascbox">
+      <div className="tv-asc-head">{name}{majors.length > 0 && <span className="muted small"> · {majors.map(([, n]) => n[3]).join(" · ")}</span>}</div>
+      <svg className="tv-asc-svg" viewBox={vb}>
+        {tree.edges.filter((e) => ids.has(String(e[0])) && ids.has(String(e[1]))).map((e, i) => {
+          const a = tree.nodes[String(e[0])], b = tree.nodes[String(e[1])];
+          const on = have.has(String(e[0])) && have.has(String(e[1]));
+          if (e.length === 5) {
+            const [, , cx, cy, r] = e;
+            const a1 = Math.atan2(a[1] - cy, a[0] - cx), a2 = Math.atan2(b[1] - cy, b[0] - cx);
+            let d = a2 - a1; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+            return <path key={i} className={on ? "e-on" : "e-off"} d={`M${a[0]} ${a[1]} A${r} ${r} 0 0 ${d > 0 ? 1 : 0} ${b[0]} ${b[1]}`} />;
+          }
+          return <line key={i} className={on ? "e-on" : "e-off"} x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} />;
+        })}
+        {list.map(([id, n]) => {
+          const major = n[2] === 1, start = n[2] === 6;
+          const state = have.has(id) ? (added.has(id) ? "new" : "on") : "";
+          return (
+            <g key={id} onMouseEnter={(e) => setTip({ id, x: e.clientX, y: e.clientY })} onMouseLeave={() => setTip(null)}>
+              <circle cx={n[0]} cy={n[1]} r={start ? 50 : major ? 54 : 22} className={`${major ? "k1" : start ? "k5" : "k0"} ${state}`} />
+              {major && state && (() => {
+                // Beside the node, pointing away from the ascendancy's centre, so neighbours don't overlap.
+                const dx = centre ? n[0] - centre[0] : 0;
+                const anchor = dx < -40 ? "end" : dx > 40 ? "start" : "middle";
+                const x = n[0] + (anchor === "end" ? -80 : anchor === "start" ? 80 : 0);
+                const y = n[1] + (anchor === "middle" ? 120 : 18);
+                return <text x={x} y={y} textAnchor={anchor} className={`tv-asc-label ${state}`}>{n[3]}</text>;
+              })()}
+            </g>
+          );
+        })}
+      </svg>
+      {t && tip && (
+        <div className="tv-tip" style={{ left: tip.x + 14, top: tip.y + 14 }}>
+          <b>{t[3]}</b>{t[4].map((x, i) => <div key={i}>{x}</div>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function TreeView({ nodes, previous, height = 520, ascendancy }: { nodes: number[]; previous?: number[]; height?: number; ascendancy?: string }) {
   const [tree, setTree] = useState<TreeData | null>(null);
   const [box, setBox] = useState<Box | null>(null);
   const [hover, setHover] = useState<{ id: string; x: number; y: number } | null>(null);
@@ -125,9 +179,8 @@ export default function TreeView({ nodes, previous, height = 520 }: { nodes: num
           {removed.has(hover.id) && <div className="tv-tag gone">Take this back this stage</div>}
         </div>
       )}
-      {asc.length > 0 && (
-        <div className="tv-asc small"><span className="muted">Ascendancy:</span> {asc.map((n) => n[3]).filter((x, i, a) => x && a.indexOf(x) === i).join(" · ")}</div>
-      )}
+      {ascendancy ? <Ascendancy tree={tree} name={ascendancy} have={have} added={added} />
+        : asc.length > 0 && <div className="tv-asc small"><span className="muted">Ascendancy:</span> {asc.filter((n) => n[2] === 1).map((n) => n[3]).join(" · ")}</div>}
     </div>
   );
 }
