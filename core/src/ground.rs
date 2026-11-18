@@ -164,9 +164,12 @@ pub fn match_base(text: &str, known: &HashSet<String>) -> Option<GroundMatch> {
     if t.len() < 3 {
         return None;
     }
+    // A name found inside the text must be whole words ("hope" sits inside
+    // "c-HOPE-r": that's not the Hope card) or most of what was read.
+    let spaced = format!(" {} ", norm(rest));
     let exact = known.iter().filter(|b| {
         let c = compact(b);
-        c.len() >= 3 && t.contains(&c)
+        c.len() >= 3 && t.contains(&c) && (spaced.contains(&format!(" {} ", norm(b))) || c.len() * 10 >= t.len() * 6)
     }).max_by_key(|b| b.len());
     if let Some(b) = exact {
         return Some(GroundMatch { unique: unique_on_label(text, b), base: b.clone(), stack, tier, superior, confidence: 1.0 });
@@ -178,6 +181,8 @@ pub fn match_base(text: &str, known: &HashSet<String>) -> Option<GroundMatch> {
         let c = compact(b);
         let n = c.chars().count();
         if n < 4 { continue; }
+        // Short names fit by chance inside longer words: only when they're most of the text.
+        if n < 7 && n * 10 < t.len() * 6 { continue; }
         let lo = n.saturating_sub(2).max(1);
         for len in lo..=(n + 2).min(chars.len()) {
             for w in chars.windows(len) {
@@ -189,7 +194,6 @@ pub fn match_base(text: &str, known: &HashSet<String>) -> Option<GroundMatch> {
             }
         }
     }
-    let _ = norm; // kept for future word-based matching
     if let Some((s, b)) = best.filter(|(s, _)| *s >= 0.9) {
         return Some(GroundMatch { unique: unique_on_label(text, b.clone().as_str()), base: b.clone(), stack, tier, superior, confidence: s as f32 });
     }
@@ -283,6 +287,20 @@ mod tests {
     fn known() -> HashSet<String> {
         ["Coral Ring", "Ring", "Chaos Orb", "Orb of Alteration", "Leather Belt", "Divine Orb"]
             .iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn short_names_inside_words_dont_count() {
+        let mut k = known();
+        k.insert("Hope".into());
+        k.insert("Karui Chopper".into());
+        assert_ne!(match_base("IRV-CHOPPER-", &k).map(|m| m.base), Some("Hope".to_string()));
+        assert_eq!(match_base("KARUI CHOPPER", &k).unwrap().base, "Karui Chopper");
+        assert_eq!(match_base("KARUICHOPPER", &k).unwrap().base, "Karui Chopper");
+        assert_eq!(match_base("Hope", &k).unwrap().base, "Hope");
+        assert_eq!(match_base("3x Hope", &k).unwrap().base, "Hope");
+        // Letters lost in the middle: still the chopper.
+        assert_eq!(match_base("KARUI OPPER-", &k).unwrap().base, "Karui Chopper");
     }
 
     #[test]

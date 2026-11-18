@@ -431,7 +431,7 @@ code { background: #000; padding: 1px 5px; border-radius: 4px; color: var(--gold
 .tv-legend { display: flex; gap: 12px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
 .tv-legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
 .dot.on { background: var(--gold); } .dot.new { background: #5ee06a; } .dot.gone { background: #ff6a5a; }
-.tv-svg { width: 100%; display: block; background: radial-gradient(ellipse at center, var(--raised) 0%, #0a0806 100%); border: 1px solid var(--line); border-radius: 8px; cursor: grab; user-select: none; }
+.tv-svg { width: 100%; display: block; background: #050506; border: 1px solid var(--line); border-radius: 8px; cursor: grab; user-select: none; }
 .tv-svg:active { cursor: grabbing; }
 .tv-edges line, .tv-edges path { fill: none; stroke-width: 9; stroke-linecap: round; }
 .e-off { stroke: #2e2a24; } .e-on { stroke: #b8913f; stroke-width: 14 !important; } .e-new { stroke: #4fc95b; stroke-width: 16 !important; }

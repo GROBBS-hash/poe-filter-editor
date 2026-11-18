@@ -185,12 +185,24 @@ fn pieces(lines: Vec<Vec<(String, Bx)>>, colour: &dyn Fn(Bx) -> Option<([u8; 3],
     merged
 }
 
+/// The piece of text nearest the mouse, but only if the mouse is actually on its
+/// label (labels have some padding round the text). A neighbouring label is never
+/// picked just because the one under the mouse couldn't be read.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn nearest_under(merged: &[Piece], cx: f32, cy: f32) -> Option<usize> {
+    let (_, bi) = merged.iter().enumerate().map(|(i, p)| (dist_to(&p.1, cx, cy), i))
+        .min_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal))?;
+    let r = merged[bi].1;
+    let dx = (r[0] - cx).max(0.0).max(cx - (r[0] + r[2]));
+    let dy = (r[1] - cy).max(0.0).max(cy - (r[1] + r[3]));
+    (dx <= r[3] * 2.5 && dy <= r[3] * 0.9).then_some(bi)
+}
+
 /// The label nearest the mouse, with lines stacked right above/below it joined
 /// ("BLOOD PRICE" over "REAVER HELMET"). Returns its text, box and colours.
 #[cfg_attr(not(windows), allow(dead_code))]
 fn pick_label(merged: &[Piece], cx: f32, cy: f32) -> Option<Piece> {
-    let (_, bi) = merged.iter().enumerate().map(|(i, p)| (dist_to(&p.1, cx, cy), i))
-        .min_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal))?;
+    let bi = nearest_under(merged, cx, cy)?;
     let r0 = merged[bi].1;
     let stacked = |r: &Bx| {
         let overlap = (r[0] + r[2]).min(r0[0] + r0[2]) - r[0].max(r0[0]);
@@ -205,6 +217,29 @@ fn pick_label(merged: &[Piece], cx: f32, cy: f32) -> Option<Piece> {
     block.sort_by(|a, b| a.1[1].partial_cmp(&b.1[1]).unwrap_or(std::cmp::Ordering::Equal));
     let text = block.iter().map(|x| x.0.as_str()).collect::<Vec<_>>().join(" ");
     Some((text, r0, merged[bi].2))
+}
+
+/// Every piece on the mouse's row that belongs to the same label (close together,
+/// same colour), joined left to right: for when the reader loses letters mid-label.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn row_label(merged: &[Piece], cx: f32, cy: f32) -> Option<Piece> {
+    let bi = nearest_under(merged, cx, cy)?;
+    let r0 = merged[bi].1;
+    let mid = r0[1] + r0[3] / 2.0;
+    let mut row: Vec<&Piece> = merged.iter()
+        .filter(|p| mid > p.1[1] - p.1[3] * 0.3 && mid < p.1[1] + p.1[3] * 1.3 && !far_apart(p.2, merged[bi].2))
+        .collect();
+    row.sort_by(|a, b| a.1[0].partial_cmp(&b.1[0]).unwrap_or(std::cmp::Ordering::Equal));
+    // Grow outwards from the nearest piece while the gaps stay small.
+    let pos = row.iter().position(|p| std::ptr::eq(*p, &merged[bi]))?;
+    let (mut lo, mut hi) = (pos, pos);
+    let gap_ok = |a: &Piece, b: &Piece| b.1[0] - (a.1[0] + a.1[2]) < r0[3] * 4.0;
+    while lo > 0 && gap_ok(row[lo - 1], row[lo]) { lo -= 1; }
+    while hi + 1 < row.len() && gap_ok(row[hi], row[hi + 1]) { hi += 1; }
+    if lo == hi { return None; }
+    let text = row[lo..=hi].iter().map(|p| p.0.as_str()).collect::<Vec<_>>().join(" ");
+    let bx = row[lo..=hi].iter().fold(row[lo].1, |a, p| union(a, p.1));
+    Some((text, bx, merged[bi].2))
 }
 
 /// The hover box's lines: everything in the column of the "Item Level" line nearest
@@ -250,7 +285,7 @@ fn boost(raw: &[u8]) -> Vec<u8> {
 
 #[cfg(windows)]
 mod imp {
-    use super::{boost, colour_in, dist_to, grey, pick_label, pieces, tooltip_lines, Bx, ScreenRead, TooltipLines};
+    use super::{boost, colour_in, dist_to, grey, pick_label, pieces, row_label, tooltip_lines, Bx, ScreenRead, TooltipLines};
     use windows::{
         Graphics::Imaging::{BitmapAlphaMode, BitmapPixelFormat, SoftwareBitmap},
         Media::Ocr::OcrEngine,
@@ -383,11 +418,14 @@ mod imp {
             let ps = pieces(recognise(pic, x0, w, scale)?, &colour_raw);
             if !near_mouse(&ps) { return Ok(false); }
             let label = pick_label(&ps, cx, cy);
+            let row = row_label(&ps, cx, cy);
             seen = ps;
-            if let Some(l) = label {
+            // The nearest piece, or the whole row it sits in (the reader can drop letters
+            // mid-label: "KARUI" … "OPPER").
+            for l in [label, row].into_iter().flatten() {
                 let ok = accept(&l.0);
                 if first.is_none() || ok { first = Some(l); }
-                return Ok(ok);
+                if ok { return Ok(true); }
             }
             Ok(false)
         };
@@ -404,7 +442,15 @@ mod imp {
                 if attempt(use_pic, x0, w, 2)? { done = true; break; }
             }
         }
-        let _ = done;
+        // 3. Bigger still, strongly boosted: the small-caps label font at 3x.
+        if !done {
+            let w = (max / 3).min(900).min(raw.w);
+            let x0 = (mx - w / 2).clamp(0, raw.w - w);
+            for px in [boost(&raw.px), grey(&raw.px, false)] {
+                let pic = Pic { px, w: raw.w, h: raw.h };
+                if attempt(&pic, x0, w, 3)? { break; }
+            }
+        }
 
         // The hover box: read the big picture at its own size.
         let tip = {
@@ -462,12 +508,21 @@ mod tests {
         assert_eq!(texts, ["OPAL SCEPTRE", "TYRANT'S SEKHEM"]);
         // Mouse over the sceptre: that's the one picked.
         assert_eq!(super::pick_label(&ps, 150.0, 105.0).unwrap().0, "OPAL SCEPTRE");
+        // Mouse on a label the reader couldn't read (a row below): don't grab a neighbour.
+        assert!(super::pick_label(&ps, 150.0, 140.0).is_none());
         // Same colour but a wide gap: still two labels.
         let ps = super::pieces(vec![vec![w("OPAL", 100.0, 40.0), w("SCEPTRE", 146.0, 70.0), w("WAND", 236.0, 50.0)]], &|_| white);
         assert_eq!(ps.len(), 2);
         // A word the reader split in two is joined back.
         let ps = super::pieces(vec![vec![w("KARUI", 100.0, 50.0), w("CH", 155.0, 20.0)], vec![w("OPPER", 176.0, 50.0)]], &|_| white);
         assert_eq!(ps[0].0, "KARUI CHOPPER");
+    }
+
+    #[test]
+    fn whole_row_when_letters_go_missing() {
+        let ps = vec![("KARUI".to_string(), [732.0, 112.0, 112.0, 33.0], None), ("OPPER-".to_string(), [925.0, 119.0, 149.0, 25.0], None),
+            ("PORTAL".to_string(), [1500.0, 110.0, 100.0, 30.0], None)];
+        assert_eq!(super::row_label(&ps, 900.0, 120.0).unwrap().0, "KARUI OPPER-");
     }
 
     #[test]
