@@ -23,35 +23,57 @@ pub fn read_area_level(log_path: &Path) -> Option<u32> {
     last_area_level(&String::from_utf8_lossy(&buf))
 }
 
-/// Likely places for the game's log: Steam libraries and the standalone install.
-pub fn find_log(poe2: bool, extra_steam_libraries: &[PathBuf]) -> Option<PathBuf> {
+/// Where Steam is installed, as Windows records it (handles custom spots like C:\\STEAM).
+#[cfg(windows)]
+fn steam_from_registry() -> Option<PathBuf> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    for (key, value) in [(r"HKCU\Software\Valve\Steam", "SteamPath"), (r"HKLM\SOFTWARE\WOW6432Node\Valve\Steam", "InstallPath")] {
+        let out = std::process::Command::new("reg")
+            .args(["query", key, "/v", value])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+            .ok()?;
+        let text = String::from_utf8_lossy(&out.stdout);
+        if let Some(path) = text.lines().find_map(|l| l.split_once("REG_SZ").map(|(_, p)| p.trim().to_string())) {
+            return Some(PathBuf::from(path.replace('/', "\\")));
+        }
+    }
+    None
+}
+#[cfg(not(windows))]
+fn steam_from_registry() -> Option<PathBuf> { None }
+
+/// Likely places for the game's log: every Steam library (wherever Steam is
+/// installed) and the standalone install, on any drive.
+pub fn find_log(poe2: bool, extra_roots: &[PathBuf]) -> Option<PathBuf> {
     let game = if poe2 { "Path of Exile 2" } else { "Path of Exile" };
-    let mut roots: Vec<PathBuf> = vec![
-        PathBuf::from(r"C:\Program Files (x86)\Steam"),
-        PathBuf::from(r"C:\Program Files\Steam"),
-    ];
-    // Other Steam library folders (e.g. D:\SteamLibrary) are listed here.
-    for s in roots.clone() {
+    let mut steam_roots: Vec<PathBuf> = steam_from_registry().into_iter().collect();
+    let mut ggg_roots: Vec<PathBuf> = Vec::new();
+    for d in b'C'..=b'Z' {
+        let drive = PathBuf::from(format!("{}:\\", d as char));
+        if !drive.exists() { continue; }
+        for sub in ["Program Files (x86)\\Steam", "Program Files\\Steam", "Steam", "SteamLibrary", "Games\\Steam", "Games\\SteamLibrary"] {
+            steam_roots.push(drive.join(sub));
+        }
+        for sub in ["Program Files (x86)\\Grinding Gear Games", "Program Files\\Grinding Gear Games", "Grinding Gear Games", "Games\\Grinding Gear Games"] {
+            ggg_roots.push(drive.join(sub));
+        }
+    }
+    // Every Steam install lists its other library folders (e.g. D:\\SteamLibrary).
+    for s in steam_roots.clone() {
         if let Ok(vdf) = std::fs::read_to_string(s.join("steamapps").join("libraryfolders.vdf")) {
             for line in vdf.lines() {
-                let t = line.trim();
-                if let Some(rest) = t.strip_prefix("\"path\"") {
-                    let p = rest.trim().trim_matches('"').replace("\\\\", "\\");
-                    roots.push(PathBuf::from(p));
+                if let Some(rest) = line.trim().strip_prefix("\"path\"") {
+                    steam_roots.push(PathBuf::from(rest.trim().trim_matches('"').replace("\\\\", "\\")));
                 }
             }
         }
     }
-    roots.extend(extra_steam_libraries.iter().cloned());
-    let mut candidates: Vec<PathBuf> = roots
-        .iter()
-        .map(|r| r.join("steamapps").join("common").join(game).join("logs"))
-        .collect();
-    for pf in [r"C:\Program Files (x86)\Grinding Gear Games", r"C:\Program Files\Grinding Gear Games"] {
-        candidates.push(Path::new(pf).join(game).join("logs"));
-    }
-    candidates
-        .into_iter()
+    let mut dirs: Vec<PathBuf> = steam_roots.iter().map(|r| r.join("steamapps").join("common").join(game).join("logs")).collect();
+    dirs.extend(ggg_roots.iter().map(|r| r.join(game).join("logs")));
+    dirs.extend(extra_roots.iter().cloned());
+    dirs.into_iter()
         .flat_map(|d| [d.join("LatestClient.txt"), d.join("Client.txt")])
         .filter(|p| p.is_file())
         .max_by_key(|p| p.metadata().and_then(|m| m.modified()).ok())
