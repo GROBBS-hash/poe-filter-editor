@@ -18,6 +18,9 @@ pub struct TierRow {
     pub note: String,
     /// "StackSize >= N" tiers (stacks, gold): N, so the app can offer a slider.
     pub min_stack: Option<u32>,
+    /// "UnidentifiedItemTier >= N" (3.30 item tiers on rare gear).
+    #[serde(default)]
+    pub min_item_tier: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -27,6 +30,10 @@ pub struct Section {
     pub title: String,
     pub group: String,
     pub tiers: Vec<TierRow>,
+    /// The same base sits in several tiers (a grid, like rare gear by item tier):
+    /// dragging would pull it out of the others, so the app doesn't offer it.
+    #[serde(default)]
+    pub shared_bases: bool,
 }
 
 /// Known sections: (type path, group, title). Order here is the order shown.
@@ -60,6 +67,7 @@ const KNOWN: &[(&str, &str, &str)] = &[
     ("corpses", "League currency", "Corpses"),
     ("viscera", "League currency", "Viscera"),
     ("gold", "Currency", "Gold"),
+    ("gear->tiered", "Gear", "Rare gear by item tier"),
     ("exotic->fractured", "Gear", "Fractured bases"),
     ("rare->exotic->veiled", "Gear", "Veiled items"),
     ("exoticbases", "Gear", "Exotic bases"),
@@ -67,7 +75,18 @@ const KNOWN: &[(&str, &str, &str)] = &[
 
 /// "t2divine" -> "Tier 2 (divine)", "exhide" -> "Hidden extras".
 pub fn tier_name(t: &str) -> String {
+    // "t5r1": item tier 5 and up, on the best (rank 1) bases.
+    if let Some(rest) = t.strip_prefix('t') {
+        if let Some((a, b)) = rest.split_once('r') {
+            if let (Ok(tier), Ok(rank)) = (a.parse::<u32>(), b.parse::<u32>()) {
+                let r = match rank { 1 => "top bases", 2 => "good bases", 3 => "decent bases", _ => "other bases" };
+                return format!("Item tier {tier}+ · {r}");
+            }
+        }
+    }
     match t {
+        "strandedfractured" => return "Fractured, memory-stranded".into(),
+        "strandedveiled" => return "Veiled, memory-stranded".into(),
         "exhide" => return "Hidden extras".into(),
         "tportal" => return "Portal scrolls".into(),
         "twisdom" => return "Wisdom scrolls".into(),
@@ -108,6 +127,9 @@ fn note_of(lines: &[String]) -> String {
             if let Some(n) = v.strip_prefix(">=") { out.push(format!("stacks of {}+", n.trim())); }
             else if let Some(n) = v.strip_prefix('>') { out.push(format!("stacks over {}", n.trim())); }
             else if let Some(n) = v.strip_prefix('<') { out.push(format!("stacks under {}", n.trim_start_matches('=').trim())); }
+        } else if let Some(v) = t.strip_prefix("ItemLevel") {
+            let v = v.trim();
+            out.push(match v.strip_prefix(">=") { Some(n) => format!("item level {}+", n.trim()), None => format!("item level {v}") });
         } else if let Some(v) = t.strip_prefix("AreaLevel") {
             out.push(format!("area level {}", v.trim()));
         }
@@ -130,7 +152,7 @@ pub fn sections(segs: &[Segment]) -> Vec<Section> {
             None => {
                 let (group, title) = KNOWN.iter().find(|k| k.0 == key).map(|k| (k.1.to_string(), k.2.to_string()))
                     .unwrap_or_else(|| ("Other".into(), b.type_path.iter().map(|p| tier_name(p)).collect::<Vec<_>>().join(" › ")));
-                found.push(Section { type_path: b.type_path.clone(), title, group, tiers: vec![] });
+                found.push(Section { type_path: b.type_path.clone(), title, group, tiers: vec![], shared_bases: false });
                 found.len() - 1
             }
         };
@@ -140,7 +162,12 @@ pub fn sections(segs: &[Segment]) -> Vec<Section> {
             name: if key == "gold" { gold_name(&tier) } else { tier_name(&tier) },
             tier, visibility: b.visibility.clone(), style: style_of(&b.lines), bases, note: note_of(&b.lines),
             min_stack: b.lines.iter().find_map(|l| l.trim().strip_prefix("StackSize >=").and_then(|n| n.trim().parse().ok())),
+            min_item_tier: b.lines.iter().find_map(|l| l.trim().strip_prefix("UnidentifiedItemTier >=").and_then(|n| n.trim().parse().ok())),
         });
+    }
+    for s in found.iter_mut() {
+        let mut seen = std::collections::HashSet::new();
+        s.shared_bases = s.tiers.iter().flat_map(|t| t.bases.iter()).any(|b| !seen.insert(b.clone()));
     }
     let rank = |s: &Section| KNOWN.iter().position(|k| k.0 == s.type_path.join("->")).unwrap_or(usize::MAX);
     // Unknown sections only when none are known (e.g. PoE 2's different names).
@@ -254,10 +281,10 @@ mod tests {
     fn tier_rule_hides_and_restyles() {
         let mut segs = parse_filter(&fixture());
         let rules = vec![
-            Rule::Tier { type_path: vec!["currency".into()], tier: "t5alchemy".into(), show: Some(false), actions: None, min_stack: None },
-            Rule::Tier { type_path: vec!["gold".into()], tier: "stack2".into(), show: None, actions: None, min_stack: Some(800) },
+            Rule::Tier { type_path: vec!["currency".into()], tier: "t5alchemy".into(), show: Some(false), actions: None, min_stack: None, min_item_tier: None },
+            Rule::Tier { type_path: vec!["gold".into()], tier: "stack2".into(), show: None, actions: None, min_stack: Some(800), min_item_tier: None },
             Rule::Tier { type_path: vec!["divination".into()], tier: "t1".into(), show: None,
-                actions: Some(vec!["SetFontSize 45".into(), "SetTextColor 1 2 3 255".into()]), min_stack: None },
+                actions: Some(vec!["SetFontSize 45".into(), "SetTextColor 1 2 3 255".into()]), min_stack: None, min_item_tier: None },
         ];
         let w = apply(&mut segs, &rules, "\r\n");
         assert!(w.is_empty(), "{w:?}");

@@ -470,11 +470,12 @@ fn rule_label(r: &Rule) -> String {
         Rule::MoveBase { type_path, base, to_tier } => {
             format!("Tier: {base} moved to {} {}", type_path.join(" > "), filter_core::tiers::tier_name(to_tier))
         }
-        Rule::Tier { type_path, tier, show, actions, min_stack } => {
+        Rule::Tier { type_path, tier, show, actions, min_stack, min_item_tier } => {
             let what = match (show, actions, min_stack) {
                 (Some(false), ..) => "hidden".to_string(),
                 (_, Some(_), _) => "restyled".to_string(),
                 (_, _, Some(n)) => format!("set to stacks of {n}+"),
+                _ if min_item_tier.is_some() => format!("set to item tier {}+", min_item_tier.unwrap_or(0)),
                 (Some(true), ..) => "shown".to_string(),
                 _ => "changed".to_string(),
             };
@@ -658,7 +659,7 @@ fn move_tier_item(state: State<AppState>, id: String, type_path: Vec<String>, ba
 /// Show/hide a whole tier, give it a new look, or put it back (reset).
 #[tauri::command]
 fn set_tier(state: State<AppState>, id: String, type_path: Vec<String>, tier: String, show: Option<bool>,
-            style: Option<CustomStyle>, min_stack: Option<u32>, reset: bool) -> Result<Vec<String>, String> {
+            style: Option<CustomStyle>, min_stack: Option<u32>, min_item_tier: Option<u32>, reset: bool) -> Result<Vec<String>, String> {
     let mut store = state.store.lock().unwrap();
     remember(&state, &store, &id, &format!("Tier {}", filter_core::tiers::tier_name(&tier)));
     let p = store.profiles.get_mut(&id).ok_or("Profile not found")?;
@@ -669,10 +670,11 @@ fn set_tier(state: State<AppState>, id: String, type_path: Vec<String>, tier: St
         // Also undo items dragged into this tier.
         p.rules.retain(|r| !matches!(r, Rule::MoveBase { type_path: tp, to_tier, .. } if *tp == type_path && *to_tier == tier));
     } else {
-        let (old_show, old_actions, old_stack) = match old {
-            Some(Rule::Tier { show, actions, min_stack, .. }) => (show, actions, min_stack), _ => (None, None, None) };
+        let (old_show, old_actions, old_stack, old_it) = match old {
+            Some(Rule::Tier { show, actions, min_stack, min_item_tier, .. }) => (show, actions, min_stack, min_item_tier), _ => (None, None, None, None) };
         p.rules.push(Rule::Tier { type_path, tier, show: show.or(old_show),
-            actions: style.map(|s| filter_core::rules::style_actions(&s)).or(old_actions), min_stack: min_stack.or(old_stack) });
+            actions: style.map(|s| filter_core::rules::style_actions(&s)).or(old_actions), min_stack: min_stack.or(old_stack),
+            min_item_tier: min_item_tier.or(old_it) });
     }
     save_and_build(&state, &store, &id)
 }

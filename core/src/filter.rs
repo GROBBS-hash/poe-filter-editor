@@ -73,9 +73,14 @@ impl Block {
 
     /// Sets "StackSize >= n" (replacing any StackSize line, or adding one).
     pub fn set_min_stack(&mut self, n: u32) {
+        self.set_min("StackSize", n);
+    }
+
+    /// Sets "<key> >= n", e.g. "UnidentifiedItemTier >= 4" (replacing that line, or adding one).
+    pub fn set_min(&mut self, key: &str, n: u32) {
         let indent: String = self.lines.first().map(|l| l.chars().take_while(|c| *c == ' ' || *c == '\t').collect()).unwrap_or_else(|| "\t".into());
-        let line = format!("{indent}StackSize >= {n}{}", self.newline);
-        match self.lines.iter().position(|l| l.trim_start().starts_with("StackSize")) {
+        let line = format!("{indent}{key} >= {n}{}", self.newline);
+        match self.lines.iter().position(|l| l.trim_start().split_whitespace().next() == Some(key)) {
             Some(i) => self.lines[i] = line,
             None => self.lines.insert(0, line),
         }

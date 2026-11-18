@@ -5,7 +5,7 @@ import { ProfileInfo } from "./types";
 import StyleEditor, { CurrentStyle, CustomStyle, Preview, fromCurrent } from "./StyleEditor";
 import { ItemIcon } from "./icons";
 
-type TierRow = { tier: string; name: string; visibility: string; style: CurrentStyle; bases: string[]; note: string; min_stack: number | null };
+type TierRow = { tier: string; name: string; visibility: string; style: CurrentStyle; bases: string[]; note: string; min_stack: number | null; min_item_tier?: number | null };
 
 /** "+ Add item": search any item and put it in this tier. */
 function AddItem({ onAdd }: { onAdd: (base: string) => void }) {
@@ -39,18 +39,18 @@ function AddItem({ onAdd }: { onAdd: (base: string) => void }) {
 }
 
 /** "Stacks of N+": saves when you leave the box or press Enter. */
-function StackBox({ value, onSave }: { value: number; onSave: (n: number) => void }) {
+function StackBox({ value, onSave, label = "stacks of", title = "Smallest stack this tier applies to" }: { value: number; onSave: (n: number) => void; label?: string; title?: string }) {
   const [v, setV] = useState(String(value));
   useEffect(() => setV(String(value)), [value]);
   const save = () => { const n = parseInt(v, 10); if (n > 0 && n !== value) onSave(n); else setV(String(value)); };
   return (
-    <span className="stackbox" title="Smallest stack this tier applies to">
-      stacks of <input type="number" min={1} value={v} onChange={(e) => setV(e.target.value)} onBlur={save}
+    <span className="stackbox" title={title}>
+      {label} <input type="number" min={1} value={v} onChange={(e) => setV(e.target.value)} onBlur={save}
         onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()} />+
     </span>
   );
 }
-type Section = { type_path: string[]; title: string; group: string; tiers: TierRow[] };
+type Section = { type_path: string[]; title: string; group: string; tiers: TierRow[]; shared_bases?: boolean };
 
 const SHOW_ITEMS = 24;
 
@@ -111,9 +111,9 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
   const done = async (p: Promise<unknown>, m: string) => {
     try { await p; setMsg(`${m} Press F4 in game.`); onChange(); await load(); } catch (e) { setMsg(String(e)); }
   };
-  const setTier = (t: TierRow, patch: { show?: boolean; style?: CustomStyle; reset?: boolean; minStack?: number }) =>
+  const setTier = (t: TierRow, patch: { show?: boolean; style?: CustomStyle; reset?: boolean; minStack?: number; minItemTier?: number }) =>
     done(invoke("set_tier", { id: profile.id, typePath: section!.type_path, tier: t.tier, show: patch.show ?? null,
-      style: patch.style ?? null, minStack: patch.minStack ?? null, reset: !!patch.reset }),
+      style: patch.style ?? null, minStack: patch.minStack ?? null, minItemTier: patch.minItemTier ?? null, reset: !!patch.reset }),
       patch.reset ? `${t.name} is back to NeverSink's.` : patch.style ? `${t.name} restyled.`
         : patch.minStack ? `${t.name} now applies to stacks of ${patch.minStack}+.` : `${t.name} ${patch.show ? "shown" : "hidden"}.`);
   const addTo = (t: TierRow, base: string) => {
@@ -162,6 +162,10 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
       <div className="tiers-main">
         {!section ? <div className="empty">No tier lists found in this filter.</div> : (
           <div className="card">
+            {section.shared_bases && (
+              <div className="note">Each base sits in several rows here (one per item tier), so dragging is off: use the
+                item tier boxes, ticks and looks instead. Top bases are the most valuable to pick up.</div>
+            )}
             <h2>{section.title} <Tip>NeverSink sorts items into tiers, best at the top. <b>Untick</b> a tier to hide everything in it.
               <b> Click the label</b> to change how the whole tier looks. <b>Drag</b> an item onto another tier to move it there
               (e.g. drag Chaos Orb up a tier). <b>+ Add item</b> puts any item in a tier, e.g. add a currency to “Stacks of 6+” to give its stacks that look while single drops keep their normal one. <b>Copy/Paste</b> gives one tier another tier's look. <b>Reset</b> puts a tier back
@@ -173,7 +177,7 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
               const items = open ? t.bases : t.bases.slice(0, SHOW_ITEMS);
               return (
                 <div key={key} data-tier={key} className={`tier ${over === key ? "over" : ""} ${shown ? "" : "off"} ${focusTier === key ? "focus" : ""}`}
-                  onDragOver={(e) => { if (drag && drag.from !== key) { e.preventDefault(); setOver(key); } }}
+                  onDragOver={(e) => { if (drag && drag.from !== key && !section.shared_bases) { e.preventDefault(); setOver(key); } }}
                   onDragLeave={() => setOver((o) => (o === key ? null : o))}
                   onDrop={(e) => { e.preventDefault(); drop(t); }}>
                   <div className="tier-head">
@@ -183,6 +187,8 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
                       {t.note && t.min_stack == null && <span className="muted small">{t.note}</span>}
                     </label>
                     {t.min_stack != null && <StackBox value={t.min_stack} onSave={(n) => setTier(t, { minStack: n })} />}
+                    {t.min_item_tier != null && <StackBox label="item tier" title="Lowest item tier (shown on the label in 3.30) this row applies to"
+                      value={t.min_item_tier} onSave={(n) => setTier(t, { minItemTier: n })} />}
                     <button className="tier-look" title="Change this tier's look" onClick={() => setEditing(editing === key ? null : key)}>
                       <Preview s={fromCurrent(t.style, "Currency")} text={t.bases[0] ?? t.name} />
                     </button>
@@ -205,7 +211,7 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
                   <div className="tier-items">
                     {items.map((b) => (
                       <span key={b} data-chip={`${key}|${b}`}
-                        className={`chip ${drag?.base === b ? "dragging" : ""} ${found?.base === b && found.tier === key ? "found" : ""}`} draggable
+                        className={`chip ${drag?.base === b ? "dragging" : ""} ${found?.base === b && found.tier === key ? "found" : ""}`} draggable={!section.shared_bases}
                         onDragStart={(e) => { e.dataTransfer.setData("text/plain", b); e.dataTransfer.effectAllowed = "move"; setDrag({ base: b, from: key }); }}
                         onDragEnd={() => { setDrag(null); setOver(null); }}
                         title={`Drag to another tier`}>
@@ -217,7 +223,7 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
                         {open ? "Show fewer" : `+${t.bases.length - SHOW_ITEMS} more`}
                       </button>
                     )}
-                    <AddItem onAdd={(b) => addTo(t, b)} />
+                    {!section.shared_bases && <AddItem onAdd={(b) => addTo(t, b)} />}
                   </div>
                 </div>
               );

@@ -18,6 +18,9 @@ pub enum Rule {
         /// New "StackSize >= N" for stack and gold tiers.
         #[serde(default)]
         min_stack: Option<u32>,
+        /// New "UnidentifiedItemTier >= N" for rare gear tiers (3.30 item tiers).
+        #[serde(default)]
+        min_item_tier: Option<u32>,
     },
 }
 
@@ -412,7 +415,7 @@ pub fn apply_with_extra(segs: &mut Vec<Segment>, rules: &[Rule], extra: &str, nl
                 }
                 top.push_str(nl);
             }
-            Rule::Tier { type_path, tier, show, actions, min_stack } => {
+            Rule::Tier { type_path, tier, show, actions, min_stack, min_item_tier } => {
                 let mut found = false;
                 for seg in segs.iter_mut() {
                     let Segment::Block(b) = seg else { continue };
@@ -421,6 +424,7 @@ pub fn apply_with_extra(segs: &mut Vec<Segment>, rules: &[Rule], extra: &str, nl
                     if let Some(sh) = show { b.set_visibility(*sh); }
                     if let Some(a) = actions { b.replace_style(a); }
                     if let Some(n) = min_stack { b.set_min_stack(*n); }
+                    if let Some(n) = min_item_tier { b.set_min("UnidentifiedItemTier", *n); }
                 }
                 if !found {
                     warnings.push(format!("Couldn't change {} {tier}: that tier is gone in this version", type_path.join(" > ")));
