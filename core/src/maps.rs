@@ -11,6 +11,7 @@ pub const MAP_DANGER: &[(&[&str], &str)] = &[
     (&["reflect", "physical damage"], "Physical reflect"),
     (&["cannot regenerate"], "No regen"),
     (&["cannot leech"], "No leech"),
+    (&["leeched from"], "No leech"),
     (&["maximum resistances"], "Less max res"),
     (&["recovery rate of life and energy shield"], "Less recovery"),
     (&["avoid elemental ailments"], "Monsters avoid ailments"),
@@ -113,8 +114,8 @@ pub fn map_info(text: &str, avoid: Option<&[String]>) -> MapInfo {
             if let Some(t) = l.strip_prefix("Map Tier: ").or_else(|| l.strip_prefix("Waystone Tier: ")) {
                 info.tier = t.trim().parse().ok();
             }
-            if ["Item Quantity:", "Item Rarity:", "Monster Pack Size:", "More Maps:", "More Scarabs:", "More Currency:", "More Divination Cards:"]
-                .iter().any(|p| l.starts_with(p)) {
+            // Quantity, pack size, more maps… sit above the item level ("Item Quantity: +80%").
+            if ilvl_at.map(|a| i < a).unwrap_or(false) && l.contains(": ") && l.contains('%') && !l.starts_with("Map Tier") {
                 info.stats.push(tidy(l));
             }
         }

@@ -8,6 +8,7 @@ pub mod history;
 pub mod ground;
 pub mod item;
 pub mod maps;
+pub mod mapregex;
 pub mod neversink;
 pub mod pob;
 pub mod preview;

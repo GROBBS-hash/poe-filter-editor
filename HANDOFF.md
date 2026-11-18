@@ -50,6 +50,17 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   manual price check; new listings pop up in the `trades` window with a Whisper button (types the whisper in game).
   Official websocket live search needs a POESESSID login, so this polls instead.
 
+- Price window shows chaos AND divine for every price (orb icons via `CurrencyIcon`, falls back to "c"/"div" text);
+  bulk shows "1 div ≈ N items" ratios.
+- Maps page (main app, Endgame → Maps; `src/Maps.tsx`, `core/src/mapregex.rs`): tick mods you can't run + minimums
+  (quantity, pack size, rarity, more maps/currency/scarabs/cards) → stash regex (`"!tok|tok" "as d.*([8-9]\d|\d{3})%"`,
+  250-char limit shown) and "Find maps like this on trade" (stats `not` with the mods' trade ids, map_filters
+  map_tier/map_bonus/map_packsize/map_iir, pseudo more-drops, conqueror/elder/shaper/originator implicits).
+  Ctrl+D map window has "Copy map regex". Mod list + search codes + trade ids are poe.re's generated data
+  (data.poe.re, downloaded daily with UA `poe-filter-editor/0.1 (local app)`, fallback copy in core/data/poere).
+  Their data terms: fine for own/small free tools with credit (shown on the page); ask them before selling or a big release.
+  Not verified in game yet: the stat-line fragments (from poe.re's English settings) and the trade map filter names.
+
 ## Left to do (agreed order)
 1. **GROBBS to test in game**: trade helper buttons (focus switch + typing), whisper pop-up not stealing focus,
    chat hotkeys, live search pop-ups. Windows-only code (`focus_game`) couldn't be compiled in the cloud.

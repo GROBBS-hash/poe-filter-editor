@@ -77,6 +77,8 @@ pub struct Settings {
     pub thanks_message: String,
     /// Chat hotkeys: one key types one command (e.g. F7 -> /hideout).
     pub chat_keys: Vec<ChatKey>,
+    /// Map regex / trade tool choices.
+    pub map_tool: crate::mapregex::MapTool,
 }
 
 /// A hotkey that types one chat command in game.
@@ -92,7 +94,7 @@ impl Default for Settings {
             cycle_enabled: false, fallback_area_level: 83, claude_api_key: String::new(),
             key_build: "F6".into(), pob_link: String::new(), pob_stage: None, pob_follow: true,
             key_price: "Ctrl+D".into(), map_avoid: None,
-            trade_helper: true, thanks_message: "thanks, good luck!".into(), chat_keys: vec![] }
+            trade_helper: true, thanks_message: "thanks, good luck!".into(), chat_keys: vec![], map_tool: Default::default() }
     }
 }
 

@@ -667,3 +667,18 @@ input[type=range] { accent-color: var(--gold); }
 .tw-pr { white-space: nowrap; }
 .tw-other { white-space: nowrap; margin-right: 2px; }
 .tw-ratio { margin: 2px 0 6px; }
+
+/* Maps page */
+.map-regex { width: 100%; box-sizing: border-box; font-family: ui-monospace, Consolas, monospace; font-size: 13px; background: rgba(0,0,0,0.3);
+  color: #f0d890; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 8px; resize: vertical; }
+.warn-text { color: #ff8080; }
+.map-wants { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px 16px; margin: 8px 0; }
+.map-wants label { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; }
+.map-wants .num { width: 70px; }
+.map-mods { max-height: 460px; overflow: auto; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 4px 8px; }
+.map-mod { display: flex; gap: 8px; align-items: flex-start; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 13px; cursor: pointer; }
+.map-mod.on span { color: #ff9b9b; }
+.map-nm { margin-left: 6px; font-size: 11px; padding: 1px 5px; border-radius: 4px; background: rgba(150,90,220,0.3); color: #dcc8ff; }
+.map-trade-list { list-style: none; padding: 0; margin: 6px 0; }
+.map-trade-list li { display: flex; gap: 10px; align-items: center; padding: 3px 0; font-size: 13px; }
+.map-wants label.check { justify-content: flex-start; margin: 0; }

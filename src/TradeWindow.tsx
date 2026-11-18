@@ -79,6 +79,7 @@ function SavedPanel({ list, setList, onRun }: { list: Saved[]; setList: (l: Save
 /** Ctrl+D on a map: its mods, the ones you can't run in red. */
 function MapCheck({ map }: { map: MapInfo }) {
   const bad = map.mods.filter((m) => m.warn);
+  const [copied, setCopied] = useState("");
   return (
     <div className="tw-map">
       <div className={`tw-map-head ${bad.length ? "bad" : map.unidentified ? "" : "ok"}`}>
@@ -92,7 +93,12 @@ function MapCheck({ map }: { map: MapInfo }) {
           <li key={i} className={m.warn ? "bad" : ""}>{m.text}{m.warn && <span className="tw-map-tag">{m.warn}</span>}</li>
         ))}
       </ul>
-      <div className="muted small">Change which mods to warn about in Settings → Map check.</div>
+      <div className="row">
+        <button className="small" onClick={() => invoke<string>("map_regex_copy").then((r) => setCopied(r ? "Copied: paste it in your map stash search" : "Nothing to copy yet: set it up on the Maps page")).catch((e) => setCopied(String(e)))}>
+          Copy map regex</button>
+        {copied && <span className="muted small">{copied}</span>}
+      </div>
+      <div className="muted small">Change which mods to warn about in Settings → Map check. Build the regex on the Maps page.</div>
     </div>
   );
 }

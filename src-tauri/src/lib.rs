@@ -680,6 +680,110 @@ fn rare_estimate(app: AppHandle, text: String) -> Result<Option<(f64, f64, Strin
     Ok(filter_core::trade::poeprices(&trade_api::poeprices(&league, &text)?))
 }
 
+// ---------- map tools (regex + trade) ----------
+
+const POERE: &str = "https://data.poe.re";
+const POERE_UA: &str = "poe-filter-editor/0.1 (local app)";
+
+/// The map mod list from poe.re: downloaded once a day (kept on disk), else the last
+/// copy, else the one built into the app. Returns (mods, where it came from).
+fn map_mods(state: &AppState) -> (Vec<filter_core::mapregex::MapModEntry>, String) {
+    static CACHE: Mutex<Option<(std::time::Instant, Vec<filter_core::mapregex::MapModEntry>, String)>> = Mutex::new(None);
+    if let Some((t, m, src)) = CACHE.lock().unwrap().as_ref() {
+        if t.elapsed() < Duration::from_secs(6 * 3600) { return (m.clone(), src.clone()); }
+    }
+    let mods_path = state.data_dir.join("poere_mapmods.json");
+    let ids_path = state.data_dir.join("poere_trade_ids.json");
+    let fresh = std::fs::metadata(&mods_path).and_then(|m| m.modified()).ok()
+        .and_then(|t| std::time::SystemTime::now().duration_since(t).ok()).map(|a| a < Duration::from_secs(86_400)).unwrap_or(false);
+    let get = |url: &str| -> Result<serde_json::Value, String> {
+        ureq::get(url).set("User-Agent", POERE_UA).timeout(Duration::from_secs(15)).call().map_err(err)?
+            .into_json::<serde_json::Value>().map_err(err)
+    };
+    if !fresh {
+        let download = || -> Result<(), String> {
+            let cur = get(&format!("{POERE}/current.json"))?;
+            let patch = cur["current"]["poe1"]["patch"].as_str().ok_or("no patch")?;
+            let commit = cur["current"]["poe1"]["commit"].as_str().unwrap_or("");
+            let base = format!("{POERE}/generated/poe1/{patch}");
+            let mods = get(&format!("{base}/mapmods/Generated.Map.ENGLISH.min.json?v={commit}"))?;
+            let ids = get(&format!("{base}/trade-ids/Generated.TradeIds.Map.min.json?v={commit}"))?;
+            if mods["tokens"].as_array().map(|a| a.is_empty()).unwrap_or(true) { return Err("empty".into()); }
+            std::fs::write(&mods_path, mods.to_string()).map_err(err)?;
+            std::fs::write(&ids_path, ids.to_string()).map_err(err)?;
+            let _ = std::fs::write(state.data_dir.join("poere_patch.txt"), patch);
+            Ok(())
+        };
+        let _ = download();
+    }
+    let read = |p: &Path| std::fs::read_to_string(p).ok().and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok());
+    let (mods, src) = match (read(&mods_path), read(&ids_path)) {
+        (Some(m), Some(i)) => {
+            let patch = std::fs::read_to_string(state.data_dir.join("poere_patch.txt")).unwrap_or_default();
+            (filter_core::mapregex::load(&m, &i), format!("poe.re data, patch {}", patch.trim()))
+        }
+        _ => { let (m, i) = filter_core::mapregex::bundled(); (filter_core::mapregex::load(&m, &i), "poe.re data (built-in copy)".into()) }
+    };
+    *CACHE.lock().unwrap() = Some((std::time::Instant::now(), mods.clone(), src.clone()));
+    (mods, src)
+}
+
+#[derive(Serialize)]
+struct MapToolState { mods: Vec<filter_core::mapregex::MapModEntry>, bad: Vec<i64>, wants: filter_core::mapregex::MapWants, source: String }
+
+/// The map tool page: every map mod, which you can't run, and what you want.
+#[tauri::command]
+async fn map_tool_get(app: AppHandle) -> Result<MapToolState, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        let (mods, source) = map_mods(&state);
+        let s = state.store.lock().unwrap().settings.clone();
+        let bad = s.map_tool.bad.clone().unwrap_or_else(|| filter_core::mapregex::default_bad(&mods, s.map_avoid.as_deref()));
+        MapToolState { mods, bad, wants: s.map_tool.wants, source }
+    }).await.map_err(err)
+}
+
+#[tauri::command]
+fn map_tool_save(state: State<AppState>, bad: Vec<i64>, wants: filter_core::mapregex::MapWants) -> Result<(), String> {
+    let mut s = state.store.lock().unwrap();
+    s.settings.map_tool = filter_core::mapregex::MapTool { bad: Some(bad), wants };
+    s.save(&state.store_path).map_err(err)
+}
+
+#[tauri::command]
+fn map_tool_regex(state: State<AppState>, bad: Vec<i64>, wants: filter_core::mapregex::MapWants) -> String {
+    filter_core::mapregex::regex(&map_mods(&state).0, &bad, &wants)
+}
+
+/// Your saved map regex on the clipboard (from the Ctrl+D map window).
+#[tauri::command]
+fn map_regex_copy(app: AppHandle) -> Result<String, String> {
+    let state = app.state::<AppState>();
+    let (mods, _) = map_mods(&state);
+    let s = state.store.lock().unwrap().settings.clone();
+    let bad = s.map_tool.bad.clone().unwrap_or_else(|| filter_core::mapregex::default_bad(&mods, s.map_avoid.as_deref()));
+    let r = filter_core::mapregex::regex(&mods, &bad, &s.map_tool.wants);
+    app.clipboard().write_text(r.clone()).map_err(err)?;
+    Ok(r)
+}
+
+/// Maps for sale on the trade site without your bad mods and with your minimums.
+#[tauri::command]
+async fn map_tool_trade(app: AppHandle, bad: Vec<i64>, wants: filter_core::mapregex::MapWants) -> Result<TradeResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        *LAST_MANUAL.lock().unwrap() = Some(std::time::Instant::now());
+        let state = app.state::<AppState>();
+        let q = filter_core::mapregex::trade_query(&map_mods(&state).0, &bad, &wants);
+        let (poe2, league) = trade_league(&app);
+        let (id, ids, total) = trade_api::search(poe2, &league, &q)?;
+        let fetched = trade_api::fetch(poe2, &ids, &id)?;
+        let rates = currency_rates(&app);
+        let listings = filter_core::trade::listings(&fetched, &rates);
+        Ok(TradeResult { summary: filter_core::trade::summary(&listings), total, url: trade_api::site_url(poe2, &league, &id),
+            divine: rates.get("divine").copied(), listings })
+    }).await.map_err(err)?
+}
+
 /// Every map mod the map check knows (for Settings).
 #[tauri::command]
 fn map_dangers() -> Vec<&'static str> {
@@ -1963,7 +2067,7 @@ pub fn run() {
             list_farm_presets,
             apply_farm_preset,
             list_level_presets,
-            get_tiers, get_rule_section, trade_search, trade_bulk, rare_estimate, map_dangers, map_suggest, trade_action, hide_trades_window, saved_list, saved_add, saved_delete, saved_live, send_whisper, copy_text, hide_trade_window, keep_on_screen,
+            get_tiers, get_rule_section, trade_search, trade_bulk, rare_estimate, map_dangers, map_suggest, map_tool_get, map_tool_save, map_tool_regex, map_regex_copy, map_tool_trade, trade_action, hide_trades_window, saved_list, saved_add, saved_delete, saved_live, send_whisper, copy_text, hide_trade_window, keep_on_screen,
             move_tier_item,
             stack_choices,
             gear_setup,
