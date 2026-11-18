@@ -219,12 +219,40 @@ pub struct LevelOptions {
     pub rares_from: u32,
     /// From that level on, hide white and blue armour too.
     pub hide_armour: bool,
+    /// Item progression (up to 3 types): the newest base of each is highlighted as you level.
+    pub progression: Vec<String>,
+}
+
+/// Base drop levels per item type (PoE 1).
+pub fn drop_levels() -> &'static std::collections::HashMap<String, Vec<(String, u32)>> {
+    static MAP: std::sync::OnceLock<std::collections::HashMap<String, Vec<(String, u32)>>> = std::sync::OnceLock::new();
+    MAP.get_or_init(|| {
+        let raw: std::collections::HashMap<String, serde_json::Map<String, serde_json::Value>> =
+            serde_json::from_str(include_str!("../data/poe1_droplevels.json")).unwrap_or_default();
+        raw.into_iter().map(|(c, m)| {
+            let mut v: Vec<(String, u32)> = m.into_iter().map(|(b, l)| (b, l.as_u64().unwrap_or(1) as u32)).collect();
+            v.sort_by_key(|x| x.1);
+            (c, v)
+        }).collect()
+    })
+}
+
+/// (bases, from area level, below area level) for each step of a type's progression.
+pub fn progression_steps(class: &str) -> Vec<(Vec<String>, u32, u32)> {
+    let Some(list) = drop_levels().get(class) else { return vec![] };
+    let mut levels: Vec<u32> = list.iter().map(|x| x.1).filter(|l| *l < 68).collect();
+    levels.dedup();
+    levels.iter().enumerate().map(|(i, &l)| {
+        // Still worth a look a few levels after the next base appears.
+        let until = levels.get(i + 1).map(|n| (n + 4).min(68)).unwrap_or(68);
+        (list.iter().filter(|x| x.1 == l).map(|x| x.0.clone()).collect(), l, until)
+    }).collect()
 }
 
 impl Default for LevelOptions {
     fn default() -> Self {
         Self { build: "custom".into(), keep: vec![], armour_types: vec![], vendor_rares: vec![0, 1], aggressive: false,
-            minion: false, rares_from: 16, hide_armour: false }
+            minion: false, rares_from: 16, hide_armour: false, progression: vec![] }
     }
 }
 
@@ -298,6 +326,18 @@ pub fn level_rules_opts(game: Game, o: &LevelOptions, style: &CustomStyle) -> Ve
             out.push(Rule::Override { label: lbl(&format!("white & blue armour hidden from area {n}")), show: false, conditions: c, actions: vec![] });
         }
     }
+    // Item progression: white/blue copies of the newest base, on top of the hides above.
+    if poe1 {
+        let subtle = CustomStyle { beam: None, minimap: None, font_size: style.font_size.min(40), ..style.clone() };
+        for class in o.progression.iter().take(3) {
+            for (bases, from, below) in progression_steps(class) {
+                out.push(Rule::Override { label: lbl(&format!("{class} progression")), show: true,
+                    conditions: vec![format!("AreaLevel >= {from}"), format!("AreaLevel < {below}"), "Rarity <= Magic".into(),
+                        format!("Class == \"{class}\""), format!("BaseType == {}", quote(&bases))],
+                    actions: style_actions(&subtle) });
+            }
+        }
+    }
     if o.minion && poe1 {
         let bases: Vec<String> = MINION_BASES.iter().map(|b| b.to_string()).collect();
         out.push(Rule::Override { label: lbl("minion bases stand out"), show: true,
@@ -327,6 +367,9 @@ mod tests {
         for c in weapon_classes(Game::Poe1) { assert!(real.contains(&c.to_string()), "{c}"); }
         for b in MINION_BASES { assert!(base_classes().contains_key(b), "{b}"); }
         assert_eq!(crate::item::defences().get("Vine Circlet").map(String::as_str), Some("es"));
+        let w = progression_steps("Wands");
+        assert_eq!(w[0], (vec!["Driftwood Wand".to_string()], 1, 10));
+        assert!(w.iter().all(|s| s.1 < s.2 && s.2 <= 68));
     }
 
     #[test]

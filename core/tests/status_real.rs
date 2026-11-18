@@ -116,6 +116,13 @@ fn levelling_preset_on_real_filter() {
     // Maps untouched.
     assert!(!v(&wand, 80).by_user_edit && !v(&ar, 80).by_user_edit && !v(&axe, 80).by_user_edit);
 
+    // Item progression for wands: a white Quartz Wand stands out at area 20 even though white wands are hidden then.
+    let segs2 = build(&LevelOptions { progression: vec!["Wands".into()], ..o.clone() });
+    let quartz = item("Item Class: Wands\nRarity: Normal\nQuartz Wand\n--------\nItem Level: 20\n");
+    let v2 = status(&segs2, &quartz, Some(20), false).verdict;
+    assert_eq!((v2.visibility.as_str(), v2.reason.as_str()), ("Show", "Levelling (Spells & Minions): Wands progression"));
+    assert_eq!(status(&segs2, &quartz, Some(40), false).verdict.visibility, "Hide");
+
     // Aggressive: linked gear hidden too.
     let segs = build(&LevelOptions { aggressive: true, ..o.clone() });
     assert_eq!(status(&segs, &linked, Some(20), false).verdict.visibility, "Hide");

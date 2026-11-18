@@ -6,12 +6,12 @@ import { standOut } from "./Find";
 type Build = { id: string; title: string; keep: string[]; armour: string[] };
 type Opts = {
   build: string; keep: string[]; armour_types: string[]; vendor_rares: number[];
-  aggressive: boolean; minion: boolean; rares_from: number; hide_armour: boolean;
+  aggressive: boolean; minion: boolean; rares_from: number; hide_armour: boolean; progression: string[];
 };
 type State = { builds: Build[]; weapons: string[]; armour_types: [string, string][]; vendor_ranges: [number, number][]; current: Opts | null };
 
 const CHIPS = ["Purple", "Yellow", "Cyan", "Red", "Green", "Orange", "Pink", "White"];
-const DEFAULT: Opts = { build: "custom", keep: [], armour_types: [], vendor_rares: [0, 1], aggressive: false, minion: false, rares_from: 16, hide_armour: false };
+const DEFAULT: Opts = { build: "custom", keep: [], armour_types: [], vendor_rares: [0, 1], aggressive: false, minion: false, rares_from: 16, hide_armour: false, progression: [] };
 
 /** Like FilterBlade's "Auto-Adjust: Campaign": pick a build, weapon and armour types, and what to keep for vendoring. */
 export default function LevelSetup({ onDone }: { onDone: (msg: string) => void }) {
@@ -24,7 +24,7 @@ export default function LevelSetup({ onDone }: { onDone: (msg: string) => void }
     setSt(s);
     if (s.current) {
       // Empty armour list means "all".
-      setO({ ...s.current, armour_types: s.current.armour_types.length ? s.current.armour_types : s.armour_types.map((a) => a[0]) });
+      setO({ ...DEFAULT, ...s.current, armour_types: s.current.armour_types.length ? s.current.armour_types : s.armour_types.map((a) => a[0]) });
     } else {
       setO({ ...DEFAULT, armour_types: s.armour_types.map((a) => a[0]) });
     }
@@ -81,6 +81,18 @@ export default function LevelSetup({ onDone }: { onDone: (msg: string) => void }
           <button key={id} className={`lvl-tile ${o.armour_types.includes(id) ? "on" : ""}`}
             onClick={() => custom({ armour_types: toggle(o.armour_types, id) })}>{name}</button>
         ))}
+      </div>
+
+      <div className="se-label">Item progression <span className="muted small">(pick up to 3: the newest white/blue base of each stands out as you level, e.g. Quartz Wand at 18 replacing Carved Wand)</span></div>
+      <div className="lvl-grid">
+        {st.weapons.filter((w) => !["Quivers", "Shields"].includes(w)).map((w) => {
+          const on = (o.progression ?? []).includes(w);
+          const full = !on && (o.progression ?? []).length >= 3;
+          return (
+            <button key={w} disabled={full} className={`lvl-tile ${on ? "on" : ""}`}
+              onClick={() => set({ progression: on ? o.progression.filter((x) => x !== w) : [...(o.progression ?? []), w] })}>{w}</button>
+          );
+        })}
       </div>
 
       <div className="se-label">Extras</div>
