@@ -268,3 +268,5 @@ code { background: #000; padding: 1px 5px; border-radius: 4px; color: var(--gold
 .th-card .dp-ground { padding: 10px; }
 
 .farm.on { border-color: var(--gold); }
+.ticks { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 4px 12px; margin: 8px 0; }
+.tick { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }

@@ -69,8 +69,12 @@ export default function Find({ onChange }: { onChange: () => void }) {
   const [weapon, setWeapon] = useState("Two Hand Maces");
   const [oldWeapon, setOldWeapon] = useState("");
   const [buildColour, setBuildColour] = useState("Cyan");
-  const [levels, setLevels] = useState<Preset[]>([]);
+  type LevelBuild = { id: string; title: string; hint: string; keep: string[] };
+  const [levels, setLevels] = useState<LevelBuild[]>([]);
+  const [allWeapons, setAllWeapons] = useState<string[]>([]);
   const [levelOn, setLevelOn] = useState<string | null>(null);
+  const [levelKeep, setLevelKeep] = useState<string[]>([]);
+  const [editing, setEditing] = useState<{ build: LevelBuild; keep: string[] } | null>(null);
   const [levelColour, setLevelColour] = useState("Cyan");
   const [farmColour, setFarmColour] = useState<Record<string, string>>({});
   const [msg, setMsg] = useState("");
@@ -79,7 +83,8 @@ export default function Find({ onChange }: { onChange: () => void }) {
   const [planned, setPlanned] = useState<{ plan: Plan | null; used_ai: boolean } | null>(null);
   const timer = useRef<number | undefined>(undefined);
 
-  const loadLevels = () => invoke<[Preset[], string | null]>("list_level_presets").then(([l, on]) => { setLevels(l); setLevelOn(on); }).catch(() => {});
+  const loadLevels = () => invoke<{ builds: LevelBuild[]; all: string[]; current: string | null; current_keep: string[] }>("list_level_presets")
+    .then((r) => { setLevels(r.builds); setAllWeapons(r.all); setLevelOn(r.current); setLevelKeep(r.current_keep); }).catch(() => {});
   useEffect(() => { invoke<Preset[]>("list_farm_presets").then(setPresets).catch(() => {}); loadLevels(); }, []);
   useEffect(() => {
     window.clearTimeout(timer.current);
@@ -111,9 +116,10 @@ export default function Find({ onChange }: { onChange: () => void }) {
       done(`Every ${weapon} now stands out in ${buildColour.toLowerCase()}${oldWeapon ? `, and normal/magic ${oldWeapon} are hidden` : ""}. Press F4 in game.`);
     } catch (e) { setMsg(String(e)); }
   };
-  const applyLevel = async (id: string, title: string) => {
+  const applyLevel = async (id: string, title: string, keep: string[] = []) => {
     try {
-      await invoke("apply_level_preset", { id, style: standOut(levelColour) });
+      await invoke("apply_level_preset", { id, keep, style: standOut(levelColour) });
+      setEditing(null);
       loadLevels();
       done(id === "off" ? "Levelling preset removed. Press F4 in game."
         : `${title}: while levelling, your weapons stand out in ${levelColour.toLowerCase()} and other weapons are hidden (uniques always show). Press F4 in game.`);
@@ -193,11 +199,38 @@ export default function Find({ onChange }: { onChange: () => void }) {
             <div key={p.id} className={`farm ${levelOn === p.title ? "on" : ""}`}>
               <b>{p.title}</b>
               <span className="muted small">{p.hint}</span>
-              <button className={levelOn === p.title ? "" : "primary"} onClick={() => applyLevel(p.id, p.title)}>
-                {levelOn === p.title ? "Using this ✓" : "Use this"}</button>
+              {levelOn === p.title && levelKeep.join() !== p.keep.join() && (
+                <span className="small">Your pick: {levelKeep.join(", ")}</span>
+              )}
+              <div className="row">
+                <button className={levelOn === p.title ? "" : "primary"} onClick={() => applyLevel(p.id, p.title, levelOn === p.title ? levelKeep : p.keep)}>
+                  {levelOn === p.title ? "Using this ✓" : "Use this"}</button>
+                <button className="link" onClick={() => setEditing(editing?.build.id === p.id ? null
+                  : { build: p, keep: levelOn === p.title ? levelKeep : p.keep })}>Edit weapons</button>
+              </div>
             </div>
           ))}
         </div>
+        {editing && (
+          <div className="plan">
+            <div><b>{editing.build.title}</b>: tick the weapon types you want while levelling. Unticked ones are hidden (uniques and 4-links still show).</div>
+            <div className="ticks">
+              {allWeapons.map((w) => (
+                <label key={w} className="tick">
+                  <input type="checkbox" checked={editing.keep.includes(w)}
+                    onChange={(e) => setEditing({ ...editing, keep: e.target.checked ? [...editing.keep, w] : editing.keep.filter((x) => x !== w) })} />
+                  {w}
+                </label>
+              ))}
+            </div>
+            <div className="row">
+              <button className="primary" disabled={editing.keep.length === 0}
+                onClick={() => applyLevel(editing.build.id, editing.build.title, editing.keep)}>Use with these</button>
+              <button className="link" onClick={() => setEditing({ ...editing, keep: editing.build.keep })}>Reset to default</button>
+              <button onClick={() => setEditing(null)}>Cancel</button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="card">

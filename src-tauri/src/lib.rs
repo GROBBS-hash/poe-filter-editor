@@ -9,7 +9,7 @@ use filter_core::{
     neversink,
     history::History,
     ask::{claude_tool, plan, read_offline, Plan, Request},
-    search::{farm_presets, farm_rules, level_presets, level_rules, search, Found, Preset, LEVEL_PREFIX},
+    search::{farm_presets, farm_rules, level_keep, level_presets, level_rules_with, search, weapon_classes, Found, Preset, LEVEL_PREFIX},
     item::{is_stackable, parse_item, resolve_magic_base, Item},
     preview::{preview, PreviewDrop},
     prices::{default_settings, price_of, PriceFile, PriceSettings},
@@ -1055,25 +1055,54 @@ fn apply_farm_preset(state: State<AppState>, id: String, style: CustomStyle) -> 
     save_and_build(&state, &store, &pid)
 }
 
+#[derive(serde::Serialize)]
+struct LevelBuild { id: String, title: String, hint: String, keep: Vec<String> }
+
+#[derive(serde::Serialize)]
+struct LevelState {
+    builds: Vec<LevelBuild>,
+    /// Every weapon type for this game, for the edit ticks.
+    all: Vec<String>,
+    /// The build in use (its title) and what it keeps.
+    current: Option<String>,
+    current_keep: Vec<String>,
+}
+
 /// Build types for levelling, for the active profile's game.
 #[tauri::command]
-fn list_level_presets(state: State<AppState>) -> (Vec<Preset>, Option<String>) {
+fn list_level_presets(state: State<AppState>) -> LevelState {
     let store = state.store.lock().unwrap();
     let p = store.active.as_ref().and_then(|id| store.profiles.get(id));
     let game = p.map(|p| p.game).unwrap_or(filter_core::profiles::Game::Poe1);
-    let current = p.and_then(|p| p.rules.iter().map(rule_label).find(|l| l.starts_with(LEVEL_PREFIX)))
-        .and_then(|l| l.split('(').nth(1).and_then(|x| x.split(')').next()).map(String::from));
-    (level_presets(game), current)
+    let all: Vec<String> = weapon_classes(game).iter().map(|c| c.to_string()).collect();
+    let mut current = None;
+    let mut current_keep = vec![];
+    if let Some(p) = p {
+        for r in &p.rules {
+            if let filter_core::rules::Rule::Override { label, show: true, conditions, .. } = r {
+                if !label.starts_with(LEVEL_PREFIX) { continue; }
+                current = label.split('(').nth(1).and_then(|x| x.split(')').next()).map(String::from);
+                if let Some(c) = conditions.iter().find(|c| c.starts_with("Class")) {
+                    current_keep = all.iter().filter(|a| c.contains(&format!("\"{a}\""))).cloned().collect();
+                }
+            }
+        }
+    }
+    let builds = level_presets(game).into_iter().map(|b| LevelBuild {
+        id: b.id.into(), title: b.title.into(), hint: b.hint.into(),
+        keep: level_keep(b.id, game).iter().map(|c| c.to_string()).collect(),
+    }).collect();
+    LevelState { builds, all, current, current_keep }
 }
 
-/// Sets the levelling build type ("off" removes it). Only one at a time.
+/// Sets the levelling build type ("off" removes it), with your pick of weapon types. One at a time.
 #[tauri::command]
-fn apply_level_preset(state: State<AppState>, id: String, style: CustomStyle) -> Result<Vec<String>, String> {
+fn apply_level_preset(state: State<AppState>, id: String, keep: Vec<String>, style: CustomStyle) -> Result<Vec<String>, String> {
     let mut store = state.store.lock().unwrap();
     let pid = store.active.clone().ok_or("Set up a profile first")?;
     let game = store.profiles.get(&pid).ok_or("Profile not found")?.game;
-    let rules = if id == "off" { vec![] } else { level_rules(&id, game, &style) };
-    if id != "off" && rules.is_empty() { return Err("Unknown preset".into()); }
+    let rules = if id == "off" { vec![] } else { level_rules_with(&id, game, &keep, &style) };
+    if id != "off" && rules.is_empty() { return Err("Pick at least one weapon type".into()); }
     remember(&state, &store, &pid, &if id == "off" { "Levelling preset off".to_string() } else { format!("Levelling preset: {id}") });
     let p = store.profiles.get_mut(&pid).ok_or("Profile not found")?;
     p.rules.retain(|r| !rule_label(r).starts_with(LEVEL_PREFIX));
