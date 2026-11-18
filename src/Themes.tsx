@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { ProfileInfo } from "./types";
 
 type LevelLook = { text: number[]; border: number[] | null; background: number[] };
-type Theme = { name: string; levels: LevelLook[]; classic?: Record<string, number[]> | null };
+type Theme = { name: string; levels: LevelLook[]; classic?: Record<string, number[]> | null; neversink_style?: string | null; game?: string | null };
 
 /** Classic style, same maths as the app's filter builder: the item kind's
  *  colour, more solid and brighter the better the item. */
@@ -44,6 +44,7 @@ const NEVERSINK: Theme = { name: "", levels: [
   { text: [180, 180, 180, 255], border: null, background: [0, 0, 0, 180] },
 ] };
 
+const PALETTES = ["Dracula", "Nord", "Catppuccin", "Gruvbox", "Tokyo Night", "Solarized", "Rosé Pine", "Monokai", "One Dark"];
 const css = (c: number[] | null) => (c ? `rgba(${c[0]},${c[1]},${c[2]},${c[3] / 255})` : "transparent");
 const hex = (c: number[]) => "#" + c.slice(0, 3).map((n) => n.toString(16).padStart(2, "0")).join("");
 const fromHex = (h: string, a = 255) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)).concat(a);
@@ -175,7 +176,8 @@ export default function Themes({ profile, onChange }: { profile: ProfileInfo; on
     const taken = new Set([...(list?.builtin ?? []), ...(list?.custom ?? [])].map((x) => x.name));
     let n = `${t.name || "NeverSink"} (mine)`, i = 2;
     while (taken.has(n)) n = `${t.name || "NeverSink"} (mine ${i++})`;
-    setEditing({ theme: { ...JSON.parse(JSON.stringify(t)), name: n }, oldName: null });
+    // A copy of a NeverSink style becomes an editable six-level theme from its colours.
+    setEditing({ theme: { ...JSON.parse(JSON.stringify(t)), name: n, neversink_style: null, game: null }, oldName: null });
   };
 
   if (editing) {
@@ -213,11 +215,24 @@ export default function Themes({ profile, onChange }: { profile: ProfileInfo; on
         <p className="muted">A theme recolours NeverSink's labels by how valuable they are, from Chase down to Junk. Sizes, beams, icons and sounds stay the same, and your own edits and price tiers keep their own looks.</p>
         {msg && <div className="note">{msg}</div>}
       </div>
-      <div className="th-grid">
-        {card(NEVERSINK, "neversink")}
-        {list.custom.map((t) => card(t, "custom"))}
-        {list.builtin.map((t) => card(t, "builtin"))}
-      </div>
+      {(() => {
+        const game = profile.game === "Poe1" ? "poe1" : "poe2";
+        const fits = (t: Theme) => !t.game || t.game === game;
+        const ours = list.builtin.filter((t) => !t.neversink_style && !PALETTES.includes(t.name));
+        const palettes = list.builtin.filter((t) => PALETTES.includes(t.name));
+        const neversink = list.builtin.filter((t) => t.neversink_style && fits(t));
+        return <>
+          <div className="th-grid">
+            {card(NEVERSINK, "neversink")}
+            {list.custom.map((t) => card(t, "custom"))}
+            {ours.map((t) => card(t, "builtin"))}
+          </div>
+          <h2 className="th-section">NeverSink's styles <span className="muted small">the same ones FilterBlade offers, copied rule by rule</span></h2>
+          <div className="th-grid">{neversink.map((t) => card(t, "builtin"))}</div>
+          <h2 className="th-section">Popular colour palettes <span className="muted small">from well-loved app and code-editor themes</span></h2>
+          <div className="th-grid">{palettes.map((t) => card(t, "builtin"))}</div>
+        </>;
+      })()}
     </>
   );
 }
