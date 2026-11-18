@@ -8,6 +8,7 @@ use filter_core::{
     item::{is_stackable, parse_item, resolve_magic_base, Item},
     prices::{default_settings, price_of, PriceFile, PriceSettings},
     profiles::{build_with_prices, Game, Store},
+    themes::{builtin_themes, Theme},
     rules::{add_rule, custom_rule, edited_rule, known_bases, locate, quick_rule, rule_detail, Action, CustomStyle, Location, MatchOpts, Rule, RuleDetail, RuleEdit},
 };
 use serde::Serialize;
@@ -314,6 +315,7 @@ struct ProfileInfo {
     output_file: String,
     parent: Option<String>,
     rules: Vec<RuleInfo>,
+    theme: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -345,6 +347,7 @@ fn overview(state: State<AppState>) -> Overview {
                 base_file: p.base_file.clone(),
                 output_file: p.output_file.clone(),
                 parent: p.parent.clone(),
+                theme: p.theme.clone(),
                 rules: p
                     .rules
                     .iter()
@@ -607,6 +610,64 @@ fn item_price(state: State<AppState>, item: Item) -> Option<(f64, String)> {
     price_of(f, item.name.as_deref(), &item.base_type, &item.rarity).map(|v| (v, f.unit.clone()))
 }
 
+#[derive(Serialize)]
+struct ThemeList { builtin: Vec<Theme>, custom: Vec<Theme> }
+
+#[tauri::command]
+fn list_themes(state: State<AppState>) -> ThemeList {
+    ThemeList { builtin: builtin_themes(), custom: state.store.lock().unwrap().themes.clone() }
+}
+
+/// Picks a theme for a filter (None = NeverSink's own look) and rebuilds it.
+#[tauri::command]
+fn set_profile_theme(state: State<AppState>, id: String, name: Option<String>) -> Result<Vec<String>, String> {
+    let mut store = state.store.lock().unwrap();
+    store.profiles.get_mut(&id).ok_or("Profile not found")?.theme = name;
+    save_and_build(&state, &store, &id)
+}
+
+/// Rebuilds every filter using one of these themes.
+fn rebuild_using(state: &AppState, store: &Store, names: &[String]) {
+    let ids: Vec<String> = store.profiles.values()
+        .filter(|p| p.theme.as_ref().map(|t| names.contains(t)).unwrap_or(false)).map(|p| p.id.clone()).collect();
+    for id in ids { let _ = save_and_build(state, store, &id); }
+}
+
+/// Saves one of your themes (new, or replacing `old_name`).
+#[tauri::command]
+fn save_theme(state: State<AppState>, theme: Theme, old_name: Option<String>) -> Result<(), String> {
+    let name = theme.name.trim().to_string();
+    if name.is_empty() { return Err("Give your theme a name".into()); }
+    if builtin_themes().iter().any(|t| t.name.eq_ignore_ascii_case(&name)) {
+        return Err(format!("“{name}” is a built-in theme; pick another name"));
+    }
+    if theme.levels.len() != 6 { return Err("A theme needs all six levels".into()); }
+    let mut store = state.store.lock().unwrap();
+    let replacing = old_name.clone().unwrap_or_else(|| name.clone());
+    if store.themes.iter().any(|t| t.name.eq_ignore_ascii_case(&name) && !t.name.eq_ignore_ascii_case(&replacing)) {
+        return Err(format!("You already have a theme called “{name}”"));
+    }
+    store.themes.retain(|t| t.name != replacing);
+    store.themes.push(Theme { name: name.clone(), ..theme });
+    for p in store.profiles.values_mut() {
+        if p.theme.as_deref() == Some(replacing.as_str()) { p.theme = Some(name.clone()); }
+    }
+    store.save(&state.store_path).map_err(err)?;
+    rebuild_using(&state, &store, &[name]);
+    Ok(())
+}
+
+#[tauri::command]
+fn delete_theme(state: State<AppState>, name: String) -> Result<(), String> {
+    let mut store = state.store.lock().unwrap();
+    store.themes.retain(|t| t.name != name);
+    let ids: Vec<String> = store.profiles.values().filter(|p| p.theme.as_deref() == Some(name.as_str())).map(|p| p.id.clone()).collect();
+    for id in &ids { if let Some(p) = store.profiles.get_mut(id) { p.theme = None; } }
+    store.save(&state.store_path).map_err(err)?;
+    for id in ids { let _ = save_and_build(&state, &store, &id); }
+    Ok(())
+}
+
 #[tauri::command]
 fn set_batch_mode(app: AppHandle, on: bool) {
     if on {
@@ -728,7 +789,11 @@ pub fn run() {
             get_price_settings,
             set_price_settings,
             refresh_prices,
-            item_price
+            item_price,
+            list_themes,
+            set_profile_theme,
+            save_theme,
+            delete_theme
         ])
         .run(tauri::generate_context!())
         .expect("error while running the app");

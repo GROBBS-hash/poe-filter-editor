@@ -24,6 +24,7 @@ export type ProfileInfo = {
   output_file: string;
   parent?: string | null;
   rules: { index: number; label: string }[];
+  theme?: string | null;
 };
 
 export type Overview = {

@@ -4,6 +4,7 @@
 use crate::filter::{parse_filter, render_filter};
 use crate::prices::{price_blocks, PriceFile, PriceSettings};
 use crate::rules::{apply_with_extra, Rule};
+use crate::themes::{apply_theme, builtin_themes, find_theme, Theme};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fs, io, path::Path};
 
@@ -22,12 +23,18 @@ pub struct Profile {
     /// Price tiering for this filter (off until you switch it on).
     #[serde(default)]
     pub prices: Option<PriceSettings>,
+    /// Colour theme for NeverSink's labels (None = NeverSink's own look).
+    #[serde(default)]
+    pub theme: Option<String>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Store {
     pub profiles: BTreeMap<String, Profile>,
     pub active: Option<String>,
+    /// Themes you've made.
+    #[serde(default)]
+    pub themes: Vec<Theme>,
 }
 
 pub fn slug(name: &str) -> String {
@@ -51,7 +58,7 @@ impl Store {
         let id = slug(name);
         self.profiles.insert(id.clone(), Profile {
             id: id.clone(), name: name.into(), game, base_file: base_file.into(),
-            output_file: format!("{name}.filter"), parent: None, rules: vec![], prices: None,
+            output_file: format!("{name}.filter"), parent: None, rules: vec![], prices: None, theme: None,
         });
         self.active.get_or_insert(id.clone());
         id
@@ -99,6 +106,9 @@ pub fn build_with_prices(store: &Store, id: &str, filter_dir: &Path, prices: Opt
     let base = fs::read_to_string(filter_dir.join(&p.base_file))?;
     let nl = if base.contains("\r\n") { "\r\n" } else { "\n" };
     let mut segs = parse_filter(&base);
+    if let Some(theme) = p.theme.as_deref().and_then(|n| find_theme(n, &store.themes, &builtin_themes()).cloned()) {
+        apply_theme(&mut segs, &theme);
+    }
     let extra = match (&p.prices, prices) {
         (Some(settings), Some(file)) => price_blocks(settings, file, nl),
         _ => String::new(),

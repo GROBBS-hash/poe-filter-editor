@@ -6,3 +6,4 @@ pub mod item;
 pub mod prices;
 pub mod profiles;
 pub mod rules;
+pub mod themes;

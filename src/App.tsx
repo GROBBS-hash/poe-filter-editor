@@ -7,8 +7,9 @@ import Profiles from "./Profiles";
 import Edits from "./Edits";
 import Batch from "./Batch";
 import Prices from "./Prices";
+import Themes from "./Themes";
 
-type Tab = "edits" | "prices" | "batch" | "profiles";
+type Tab = "edits" | "prices" | "themes" | "batch" | "profiles";
 
 export default function App() {
   const [ov, setOv] = useState<Overview | null>(null);
@@ -48,15 +49,16 @@ export default function App() {
       </header>
 
       <nav className="tabs">
-        {(["edits", "prices", "batch", "profiles"] as Tab[]).map((t) => (
+        {(["edits", "prices", "themes", "batch", "profiles"] as Tab[]).map((t) => (
           <button key={t} className={tab === t ? "tab on" : "tab"} onClick={() => setTab(t)}>
-            {{ edits: "My edits", prices: "Prices", batch: "Batch mode", profiles: "Profiles" }[t]}
+            {{ edits: "My edits", prices: "Prices", themes: "Themes", batch: "Batch mode", profiles: "Profiles" }[t]}
           </button>
         ))}
       </nav>
 
       {tab === "edits" && <Edits profile={active} onChange={refresh} />}
       {tab === "prices" && <Prices profile={active} />}
+      {tab === "themes" && <Themes profile={active} onChange={refresh} />}
       {tab === "batch" && <Batch on={ov.batch_on} onChange={refresh} />}
       {tab === "profiles" && <Profiles ov={ov} active={active} onChange={refresh} />}
     </div>
