@@ -7,6 +7,7 @@ use filter_core::{
     area::{find_log, read_area_level, selected_filter},
     ground::{ground_item, known_names, match_base, LabelColours},
     neversink,
+    history::History,
     ask::{claude_tool, plan, read_offline, Plan, Request},
     search::{farm_presets, farm_rules, search, Found, Preset},
     item::{is_stackable, parse_item, resolve_magic_base, Item},
@@ -37,6 +38,9 @@ struct AppState {
     /// Latest prices per game, downloaded hourly from the app's own price cache.
     prices: Mutex<std::collections::HashMap<Game, PriceFile>>,
     data_dir: PathBuf,
+    /// Every filter's recent changes, for going back.
+    history: Mutex<History>,
+    history_path: PathBuf,
     /// Registered hotkeys: shortcut id -> what it does.
     hotkeys: Mutex<std::collections::HashMap<u32, HotAction>>,
 }
@@ -180,6 +184,15 @@ fn update_neversink(app: &AppHandle) {
             for id in ids { let _ = save_and_build(&state, &store, &id); }
             let _ = app.emit("neversink-updated", version.unwrap_or_default());
         }
+    }
+}
+
+/// Saves a filter's setup before a change, so it can be gone back to.
+fn remember(state: &AppState, store: &Store, id: &str, what: &str) {
+    if let Some(p) = store.profiles.get(id) {
+        let mut h = state.history.lock().unwrap();
+        h.record(p, what);
+        let _ = h.save(&state.history_path);
     }
 }
 
@@ -602,6 +615,7 @@ fn apply_quick_action(
     let id = store.active.clone().ok_or("Set up a profile first")?;
     let rule = quick_rule(&item, action, colour.as_deref(), &opts.unwrap_or_default());
     let label = rule_label(&rule);
+    remember(&state, &store, &id, &label);
     add_rule(&mut store.profiles.get_mut(&id).ok_or("Profile not found")?.rules, rule);
     let warnings = save_and_build(&state, &store, &id)?;
     Ok(ActionResult { label, warnings })
@@ -614,6 +628,7 @@ fn apply_custom_style(state: State<AppState>, item: Item, style: CustomStyle, op
     let id = store.active.clone().ok_or("Set up a profile first")?;
     let rule = custom_rule(&item, &style, &opts.unwrap_or_default());
     let label = rule_label(&rule);
+    remember(&state, &store, &id, &label);
     add_rule(&mut store.profiles.get_mut(&id).ok_or("Profile not found")?.rules, rule);
     let warnings = save_and_build(&state, &store, &id)?;
     Ok(ActionResult { label, warnings })
@@ -650,14 +665,55 @@ fn sound_data(state: State<AppState>, file: String) -> Result<String, String> {
 fn undo_last(state: State<AppState>) -> Result<Option<String>, String> {
     let mut store = state.store.lock().unwrap();
     let id = store.active.clone().ok_or("Set up a profile first")?;
-    let removed = store.profiles.get_mut(&id).ok_or("Profile not found")?.rules.pop();
+    // Undo = go back to before the latest change (any kind of change).
+    let back = {
+        let mut h = state.history.lock().unwrap();
+        let n = h.list(&id).len();
+        if n == 0 { return Ok(None); }
+        let what = h.list(&id)[n - 1].what.clone();
+        let current = store.profiles.get(&id).ok_or("Profile not found")?.clone();
+        let p = h.go_back(&current, n - 1);
+        let _ = h.save(&state.history_path);
+        p.map(|p| (p, what))
+    };
+    let Some((profile, what)) = back else { return Ok(None) };
+    store.profiles.insert(id.clone(), profile);
     save_and_build(&state, &store, &id)?;
-    Ok(removed.as_ref().map(rule_label))
+    Ok(Some(what))
+}
+
+#[derive(Serialize)]
+struct HistoryItem { index: usize, at: u64, what: String }
+
+/// Recent changes to a filter, newest first.
+#[tauri::command]
+fn get_history(state: State<AppState>, id: String) -> Vec<HistoryItem> {
+    let h = state.history.lock().unwrap();
+    h.list(&id).iter().enumerate().rev().map(|(index, e)| HistoryItem { index, at: e.at, what: e.what.clone() }).collect()
+}
+
+/// Puts a filter back the way it was before change `index` (undoable).
+#[tauri::command]
+fn go_back(state: State<AppState>, id: String, index: usize) -> Result<Vec<String>, String> {
+    let mut store = state.store.lock().unwrap();
+    let current = store.profiles.get(&id).ok_or("Profile not found")?.clone();
+    let back = {
+        let mut h = state.history.lock().unwrap();
+        let p = h.go_back(&current, index).ok_or("That change isn't in the history any more")?;
+        let _ = h.save(&state.history_path);
+        p
+    };
+    store.profiles.insert(id.clone(), back);
+    save_and_build(&state, &store, &id)
 }
 
 #[tauri::command]
 fn delete_rule(state: State<AppState>, id: String, index: usize) -> Result<(), String> {
     let mut store = state.store.lock().unwrap();
+    if let Some(r) = store.profiles.get(&id).and_then(|p| p.rules.get(index)) {
+        let what = format!("Removed: {}", rule_label(r));
+        remember(&state, &store, &id, &what);
+    }
     let p = store.profiles.get_mut(&id).ok_or("Profile not found")?;
     if index < p.rules.len() {
         p.rules.remove(index);
@@ -685,10 +741,11 @@ fn get_rule(state: State<AppState>, id: Option<String>, index: Option<usize>, la
 #[tauri::command]
 fn update_rule(state: State<AppState>, id: String, index: usize, edit: RuleEdit) -> Result<ActionResult, String> {
     let mut store = state.store.lock().unwrap();
-    let p = store.profiles.get_mut(&id).ok_or("Profile not found")?;
-    let old = p.rules.get(index).ok_or("That edit no longer exists")?;
+    let old = store.profiles.get(&id).ok_or("Profile not found")?.rules.get(index).ok_or("That edit no longer exists")?;
     let new = edited_rule(old, &edit).ok_or("This edit can't be changed")?;
     let label = rule_label(&new);
+    remember(&state, &store, &id, &format!("Changed: {label}"));
+    let p = store.profiles.get_mut(&id).ok_or("Profile not found")?;
     p.rules[index] = new;
     let warnings = save_and_build(&state, &store, &id)?;
     Ok(ActionResult { label, warnings })
@@ -748,6 +805,7 @@ fn get_price_settings(state: State<AppState>, id: String) -> Result<PricePage, S
 #[tauri::command]
 fn set_price_settings(state: State<AppState>, id: String, settings: PriceSettings) -> Result<Vec<String>, String> {
     let mut store = state.store.lock().unwrap();
+    remember(&state, &store, &id, if settings.enabled { "Price tiers changed" } else { "Price tiers switched off" });
     store.profiles.get_mut(&id).ok_or("Profile not found")?.prices = Some(settings);
     save_and_build(&state, &store, &id)
 }
@@ -801,6 +859,8 @@ fn set_base(state: State<AppState>, id: String, strictness: Option<u8>, file_pat
         _ => return Err("Pick a strictness or a file".into()),
     };
     let mut store = state.store.lock().unwrap();
+    let what = match level { Some(l) => format!("Built on NeverSink {}", neversink::STRICTNESS_NAMES[l as usize]), None => format!("Built on {base_file}") };
+    remember(&state, &store, &id, &what);
     let p = store.profiles.get_mut(&id).ok_or("Profile not found")?;
     p.base_file = base_file;
     p.strictness = level;
@@ -810,6 +870,7 @@ fn set_base(state: State<AppState>, id: String, strictness: Option<u8>, file_pat
 #[tauri::command]
 fn set_profile_theme(state: State<AppState>, id: String, name: Option<String>) -> Result<Vec<String>, String> {
     let mut store = state.store.lock().unwrap();
+    remember(&state, &store, &id, &format!("Theme: {}", name.as_deref().unwrap_or("NeverSink's own colours")));
     store.profiles.get_mut(&id).ok_or("Profile not found")?.theme = name;
     save_and_build(&state, &store, &id)
 }
@@ -941,6 +1002,7 @@ fn apply_farm_preset(state: State<AppState>, id: String, style: CustomStyle) -> 
     if rules.is_empty() { return Err("Unknown preset".into()); }
     let mut store = state.store.lock().unwrap();
     let pid = store.active.clone().ok_or("Set up a profile first")?;
+    remember(&state, &store, &pid, &format!("Preset: {id}"));
     let p = store.profiles.get_mut(&pid).ok_or("Profile not found")?;
     let labels: Vec<String> = rules.iter().map(rule_label).collect();
     p.rules.retain(|r| !labels.contains(&rule_label(r)));
@@ -1010,7 +1072,9 @@ pub fn run() {
             }
             let store = Store::load(&store_path);
             let settings = store.settings.clone();
+            let history_path = data.join("history.json");
             app.manage(AppState { store: Mutex::new(store), store_path,
+                history: Mutex::new(History::load(&history_path)), history_path,
                 prices: Mutex::new(cached), data_dir: data.clone(), hotkeys: Mutex::new(Default::default()) });
             start_price_updates(app.handle().clone());
             if register_hotkeys(app.handle(), &settings).is_err() {
@@ -1085,7 +1149,9 @@ pub fn run() {
             search_items,
             list_farm_presets,
             apply_farm_preset,
-            ask
+            ask,
+            get_history,
+            go_back
         ])
         .run(tauri::generate_context!())
         .expect("error while running the app");

@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ProfileInfo, RuleInfo, RARITY_COLOUR } from "./types";
 import ItemPanel, { RuleDetail, itemFromRule } from "./ItemPanel";
 
@@ -39,6 +39,50 @@ function scope(r: RuleInfo) {
   return parts.join(" · ");
 }
 
+type Change = { index: number; at: number; what: string };
+
+/** Recent changes to this filter, each with "go back to before this". */
+function History({ profile, onChange }: { profile: ProfileInfo; onChange: () => void }) {
+  const [list, setList] = useState<Change[]>([]);
+  const [open, setOpen] = useState(false);
+  const [msg, setMsg] = useState("");
+  const load = () => invoke<Change[]>("get_history", { id: profile.id }).then(setList).catch(() => setList([]));
+  useEffect(() => { load(); }, [profile]); // eslint-disable-line react-hooks/exhaustive-deps
+  const back = async (c: Change) => {
+    try {
+      await invoke("go_back", { id: profile.id, index: c.index });
+      setMsg(`Back to how it was before “${c.what}”. Changed your mind? Use the newest entry to undo that. Press F4 in game.`);
+      onChange();
+      load();
+    } catch (e) { setMsg(String(e)); }
+  };
+  const when = (t: number) => {
+    const d = new Date(t * 1000);
+    const today = d.toDateString() === new Date().toDateString();
+    return (today ? "" : d.toLocaleDateString() + " ") + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+  if (list.length === 0) return null;
+  return (
+    <div className="card">
+      <div className="row between">
+        <h2>History</h2>
+        <button className="link" onClick={() => setOpen(!open)}>{open ? "Hide" : `Show ${list.length} recent change${list.length > 1 ? "s" : ""}`}</button>
+      </div>
+      {open && (
+        <ul className="rules history">
+          {list.map((c) => (
+            <li key={c.index}>
+              <span><span className="muted small">{when(c.at)}</span> {c.what}</span>
+              <button className="link" onClick={() => back(c)}>Go back to before this</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {msg && <div className="note">{msg}</div>}
+    </div>
+  );
+}
+
 export default function Edits({ profile, onChange }: { profile: ProfileInfo; onChange: () => void }) {
   const [msg, setMsg] = useState("");
   const [open, setOpen] = useState<{ index: number; detail: RuleDetail } | null>(null);
@@ -74,6 +118,7 @@ export default function Edits({ profile, onChange }: { profile: ProfileInfo; onC
   const unused = profile.rules.filter((r) => r.shadowed_by).length;
 
   return (
+    <>
     <div className="card">
       <div className="row between">
         <h2>Edits in “{profile.name}”</h2>
@@ -131,5 +176,7 @@ export default function Edits({ profile, onChange }: { profile: ProfileInfo; onC
       )}
       {msg && <div className="note">{msg}</div>}
     </div>
+    <History profile={profile} onChange={onChange} />
+    </>
   );
 }

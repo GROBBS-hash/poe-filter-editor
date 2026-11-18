@@ -106,9 +106,8 @@ fn farm_items(id: &str) -> (Vec<String>, Vec<&'static str>) {
     }
 }
 
-const FARMS: [(&str, &str, &str); 12] = [
+const FARMS: [(&str, &str, &str); 11] = [
     ("essences", "Essences", "Every essence"),
-    ("scarabs", "Scarabs", "Every scarab"),
     ("fossils", "Delve", "Fossils and resonators"),
     ("oils", "Blight", "Every oil"),
     ("delirium", "Delirium", "Delirium orbs and simulacrum splinters"),
@@ -170,7 +169,8 @@ mod tests {
         let p = farm_presets();
         let n = |id: &str| p.iter().find(|x| x.id == id).map(|x| x.count).unwrap_or(0);
         println!("{:?}", p.iter().map(|x| (x.id, x.count)).collect::<Vec<_>>());
-        assert!(n("essences") > 20 && n("scarabs") > 20 && n("fossils") > 10);
+        assert!(n("essences") > 20 && n("fossils") > 10);
+        assert_eq!(n("scarabs"), 0, "scarabs were removed from the game");
         let style = CustomStyle { font_size: 42, text: [255, 0, 0, 255], border: None, background: [0, 0, 0, 255],
             beam: None, minimap: None, sound: crate::rules::Sound::Default, label_hidden: false };
         let r = farm_rules("essences", &style);

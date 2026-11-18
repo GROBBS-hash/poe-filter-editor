@@ -238,3 +238,4 @@ code { background: #000; padding: 1px 5px; border-radius: 4px; color: var(--gold
 .qm-sound > button.on.off { border-color: #a04040; color: #ffb0b0; background: #2a1a1a; }
 .qm-sound input[type=range] { flex: 1; min-width: 50px; accent-color: var(--gold); }
 .qm-vol { font-size: 11px; color: var(--muted); width: 34px; text-align: right; }
+.history li span .muted { display: inline-block; width: 64px; }
