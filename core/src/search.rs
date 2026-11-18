@@ -148,8 +148,94 @@ pub fn farm_rules(id: &str, style: &CustomStyle) -> Vec<Rule> {
     out
 }
 
+// ---------- levelling presets (like FilterBlade's build types) ----------
+
+/// Every weapon-ish item type, per game.
+fn weapon_classes(game: crate::profiles::Game) -> &'static [&'static str] {
+    match game {
+        crate::profiles::Game::Poe1 => &["Bows", "Claws", "Daggers", "One Hand Axes", "One Hand Maces", "One Hand Swords", "Quivers",
+            "Rune Daggers", "Sceptres", "Shields", "Staves", "Thrusting One Hand Swords", "Two Hand Axes", "Two Hand Maces",
+            "Two Hand Swords", "Wands", "Warstaves"],
+        crate::profiles::Game::Poe2 => &["Bows", "Bucklers", "Crossbows", "Foci", "One Hand Maces", "Quarterstaves", "Quivers",
+            "Sceptres", "Shields", "Spears", "Staves", "Two Hand Maces", "Wands"],
+    }
+}
+
+/// (id, title, what it keeps) — the kept item types, per game.
+pub const LEVEL_BUILDS: [(&str, &str, &str); 6] = [
+    ("caster", "Caster", "Wands, staves, sceptres, rune daggers, shields / foci"),
+    ("minion", "Minions", "Wands, sceptres, shields / foci"),
+    ("melee2h", "Two-handed melee", "Two hand axes, maces, swords and staves"),
+    ("melee1h", "One-handed melee", "One hand weapons, claws, daggers and shields"),
+    ("ranged", "Bow / ranged", "Bows and quivers (crossbows and spears in PoE 2)"),
+    ("spear", "Spear (PoE 2)", "Spears and bucklers"),
+];
+
+fn level_keep(id: &str, game: crate::profiles::Game) -> Vec<&'static str> {
+    use crate::profiles::Game::*;
+    match (id, game) {
+        ("caster", Poe1) => vec!["Wands", "Staves", "Sceptres", "Rune Daggers", "Shields"],
+        ("caster", Poe2) => vec!["Wands", "Staves", "Sceptres", "Foci"],
+        ("minion", Poe1) => vec!["Wands", "Sceptres", "Shields"],
+        ("minion", Poe2) => vec!["Wands", "Sceptres", "Foci"],
+        ("melee2h", Poe1) => vec!["Two Hand Axes", "Two Hand Maces", "Two Hand Swords", "Staves", "Warstaves"],
+        ("melee2h", Poe2) => vec!["Two Hand Maces", "Quarterstaves"],
+        ("melee1h", Poe1) => vec!["Claws", "Daggers", "One Hand Axes", "One Hand Maces", "One Hand Swords", "Thrusting One Hand Swords", "Shields"],
+        ("melee1h", Poe2) => vec!["One Hand Maces", "Shields"],
+        ("ranged", Poe1) => vec!["Bows", "Quivers"],
+        ("ranged", Poe2) => vec!["Bows", "Quivers", "Crossbows"],
+        ("spear", Poe2) => vec!["Spears", "Bucklers"],
+        _ => vec![],
+    }
+}
+
+pub fn level_presets(game: crate::profiles::Game) -> Vec<Preset> {
+    LEVEL_BUILDS.iter().filter(|(id, ..)| !level_keep(id, game).is_empty())
+        .map(|(id, title, hint)| Preset { id, title, hint, count: level_keep(id, game).len() }).collect()
+}
+
+pub const LEVEL_PREFIX: &str = "Preset: Levelling";
+
+/// While levelling (area level under 68): your weapon types stand out, every
+/// other weapon type is hidden. Uniques are never touched; in PoE 1, linked
+/// (4+ link) items still show, since they're worth wearing for anyone.
+pub fn level_rules(id: &str, game: crate::profiles::Game, style: &CustomStyle) -> Vec<Rule> {
+    let Some((_, title, _)) = LEVEL_BUILDS.iter().find(|b| b.0 == id) else { return vec![] };
+    let keep = level_keep(id, game);
+    if keep.is_empty() { return vec![]; }
+    let hide: Vec<String> = weapon_classes(game).iter().filter(|c| !keep.contains(c)).map(|c| c.to_string()).collect();
+    let keep: Vec<String> = keep.iter().map(|c| c.to_string()).collect();
+    let mut out = vec![Rule::Override {
+        label: format!("{LEVEL_PREFIX} ({title}): your weapons stand out"), show: true,
+        conditions: vec!["AreaLevel < 68".into(), "Rarity <= Rare".into(), format!("Class == {}", quote(&keep))],
+        actions: style_actions(style),
+    }];
+    let mut cond = vec!["AreaLevel < 68".into(), "Rarity <= Rare".into(), format!("Class == {}", quote(&hide))];
+    if game == crate::profiles::Game::Poe1 {
+        cond.push("LinkedSockets < 4".into());
+    }
+    out.push(Rule::Override { label: format!("{LEVEL_PREFIX} ({title}): other weapons hidden"), show: false, conditions: cond, actions: vec![] });
+    out
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn levelling_presets() {
+        use crate::profiles::Game;
+        let style = CustomStyle { font_size: 40, text: [0, 255, 255, 255], border: None, background: [0, 0, 0, 220],
+            beam: None, minimap: None, sound: crate::rules::Sound::Default, label_hidden: false };
+        let r = level_rules("caster", Game::Poe1, &style);
+        let Rule::Override { conditions, show, .. } = &r[1] else { panic!() };
+        assert!(!show);
+        assert!(conditions[2].contains("\"Two Hand Maces\"") && !conditions[2].contains("\"Wands\""), "{conditions:?}");
+        assert!(level_presets(Game::Poe1).iter().all(|p| p.id != "spear"));
+        assert!(level_presets(Game::Poe2).iter().any(|p| p.id == "spear"));
+        // Every PoE 1 type named is a real item type.
+        let real: BTreeSet<&String> = base_classes().values().collect();
+        for c in weapon_classes(Game::Poe1) { assert!(real.contains(&c.to_string()), "{c}"); }
+    }
+
     use super::*;
     #[test]
     fn nicknames_find_types() {

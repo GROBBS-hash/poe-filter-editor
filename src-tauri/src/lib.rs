@@ -9,7 +9,7 @@ use filter_core::{
     neversink,
     history::History,
     ask::{claude_tool, plan, read_offline, Plan, Request},
-    search::{farm_presets, farm_rules, search, Found, Preset},
+    search::{farm_presets, farm_rules, level_presets, level_rules, search, Found, Preset, LEVEL_PREFIX},
     item::{is_stackable, parse_item, resolve_magic_base, Item},
     preview::{preview, PreviewDrop},
     prices::{default_settings, price_of, PriceFile, PriceSettings},
@@ -1055,6 +1055,32 @@ fn apply_farm_preset(state: State<AppState>, id: String, style: CustomStyle) -> 
     save_and_build(&state, &store, &pid)
 }
 
+/// Build types for levelling, for the active profile's game.
+#[tauri::command]
+fn list_level_presets(state: State<AppState>) -> (Vec<Preset>, Option<String>) {
+    let store = state.store.lock().unwrap();
+    let p = store.active.as_ref().and_then(|id| store.profiles.get(id));
+    let game = p.map(|p| p.game).unwrap_or(filter_core::profiles::Game::Poe1);
+    let current = p.and_then(|p| p.rules.iter().map(rule_label).find(|l| l.starts_with(LEVEL_PREFIX)))
+        .and_then(|l| l.split('(').nth(1).and_then(|x| x.split(')').next()).map(String::from));
+    (level_presets(game), current)
+}
+
+/// Sets the levelling build type ("off" removes it). Only one at a time.
+#[tauri::command]
+fn apply_level_preset(state: State<AppState>, id: String, style: CustomStyle) -> Result<Vec<String>, String> {
+    let mut store = state.store.lock().unwrap();
+    let pid = store.active.clone().ok_or("Set up a profile first")?;
+    let game = store.profiles.get(&pid).ok_or("Profile not found")?.game;
+    let rules = if id == "off" { vec![] } else { level_rules(&id, game, &style) };
+    if id != "off" && rules.is_empty() { return Err("Unknown preset".into()); }
+    remember(&state, &store, &pid, &if id == "off" { "Levelling preset off".to_string() } else { format!("Levelling preset: {id}") });
+    let p = store.profiles.get_mut(&pid).ok_or("Profile not found")?;
+    p.rules.retain(|r| !rule_label(r).starts_with(LEVEL_PREFIX));
+    p.rules.extend(rules);
+    save_and_build(&state, &store, &pid)
+}
+
 #[tauri::command]
 fn set_batch_mode(app: AppHandle, on: bool) {
     if on {
@@ -1201,6 +1227,8 @@ pub fn run() {
             search_items,
             list_farm_presets,
             apply_farm_preset,
+            list_level_presets,
+            apply_level_preset,
             ask,
             get_history,
             get_icons,

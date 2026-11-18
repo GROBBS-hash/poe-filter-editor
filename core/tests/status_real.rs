@@ -66,3 +66,24 @@ fn neversink_hides_plain_normal_boots_everywhere() {
         assert_eq!(status(&segs, &it, Some(lvl), true).verdict.visibility, "Hide");
     }
 }
+
+#[test]
+fn levelling_preset_on_real_filter() {
+    use filter_core::{evaluate::status, filter::{parse_filter, render_filter}, item::parse_item, profiles::Game, rules::*, search::level_rules};
+    let t = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/poe1-semistrict.filter")).unwrap();
+    let mut segs = parse_filter(&t);
+    let style = CustomStyle { font_size: 42, text: [0, 255, 255, 255], border: None, background: [0, 0, 0, 255],
+        beam: None, minimap: None, sound: Sound::Default, label_hidden: false };
+    apply(&mut segs, &level_rules("caster", Game::Poe1, &style), "\r\n");
+    let segs = parse_filter(&render_filter(&segs));
+    let axe = parse_item("Item Class: Two Hand Axes\nRarity: Normal\nStone Axe\n--------\nItem Level: 10\n").unwrap();
+    let wand = parse_item("Item Class: Wands\nRarity: Magic\nDriftwood Wand\n--------\nItem Level: 10\n").unwrap();
+    let uniq = parse_item("Item Class: Two Hand Axes\nRarity: Unique\nLimbsplit\nWoodsplitter\n--------\nItem Level: 10\n").unwrap();
+    let v = |i, lvl| status(&segs, i, Some(lvl), false).verdict;
+    assert_eq!(v(&axe, 10).visibility, "Hide", "{:?}", v(&axe, 10));
+    assert_ne!(v(&wand, 10).visibility, "Hide");
+    assert_eq!(v(&wand, 10).style.font_size, Some(42));
+    assert_ne!(v(&uniq, 10).visibility, "Hide");
+    assert_ne!(v(&wand, 80).style.font_size, Some(42));
+    println!("axe in maps: {:?}", v(&axe, 80).reason);
+}

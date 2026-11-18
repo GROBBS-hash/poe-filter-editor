@@ -69,6 +69,9 @@ export default function Find({ onChange }: { onChange: () => void }) {
   const [weapon, setWeapon] = useState("Two Hand Maces");
   const [oldWeapon, setOldWeapon] = useState("");
   const [buildColour, setBuildColour] = useState("Cyan");
+  const [levels, setLevels] = useState<Preset[]>([]);
+  const [levelOn, setLevelOn] = useState<string | null>(null);
+  const [levelColour, setLevelColour] = useState("Cyan");
   const [farmColour, setFarmColour] = useState<Record<string, string>>({});
   const [msg, setMsg] = useState("");
   const [askText, setAskText] = useState("");
@@ -76,7 +79,8 @@ export default function Find({ onChange }: { onChange: () => void }) {
   const [planned, setPlanned] = useState<{ plan: Plan | null; used_ai: boolean } | null>(null);
   const timer = useRef<number | undefined>(undefined);
 
-  useEffect(() => { invoke<Preset[]>("list_farm_presets").then(setPresets).catch(() => {}); }, []);
+  const loadLevels = () => invoke<[Preset[], string | null]>("list_level_presets").then(([l, on]) => { setLevels(l); setLevelOn(on); }).catch(() => {});
+  useEffect(() => { invoke<Preset[]>("list_farm_presets").then(setPresets).catch(() => {}); loadLevels(); }, []);
   useEffect(() => {
     window.clearTimeout(timer.current);
     if (!q.trim()) { setResults([]); return; }
@@ -105,6 +109,14 @@ export default function Find({ onChange }: { onChange: () => void }) {
         }
       }
       done(`Every ${weapon} now stands out in ${buildColour.toLowerCase()}${oldWeapon ? `, and normal/magic ${oldWeapon} are hidden` : ""}. Press F4 in game.`);
+    } catch (e) { setMsg(String(e)); }
+  };
+  const applyLevel = async (id: string, title: string) => {
+    try {
+      await invoke("apply_level_preset", { id, style: standOut(levelColour) });
+      loadLevels();
+      done(id === "off" ? "Levelling preset removed. Press F4 in game."
+        : `${title}: while levelling, your weapons stand out in ${levelColour.toLowerCase()} and other weapons are hidden (uniques always show). Press F4 in game.`);
     } catch (e) { setMsg(String(e)); }
   };
   const applyFarm = async (p: Preset) => {
@@ -166,6 +178,26 @@ export default function Find({ onChange }: { onChange: () => void }) {
               onClose={() => setChosen(null)} onChanged={onChange} />
           </div>
         )}
+      </div>
+
+      <div className="card">
+        <div className="row between">
+          <h2>Levelling build</h2>
+          {levelOn && <button className="link" onClick={() => applyLevel("off", "")}>Turn off ({levelOn})</button>}
+        </div>
+        <p className="muted small">Like FilterBlade's levelling presets. Until maps (area level 68), the weapons for your build stand out
+          and every other weapon type is hidden. Uniques and 4-links always show. One at a time; maps aren't affected.</p>
+        <div className="row"><span>Stand out in</span><Chips value={levelColour} onPick={setLevelColour} /></div>
+        <div className="farm-grid">
+          {levels.map((p) => (
+            <div key={p.id} className={`farm ${levelOn === p.title ? "on" : ""}`}>
+              <b>{p.title}</b>
+              <span className="muted small">{p.hint}</span>
+              <button className={levelOn === p.title ? "" : "primary"} onClick={() => applyLevel(p.id, p.title)}>
+                {levelOn === p.title ? "Using this ✓" : "Use this"}</button>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="card">

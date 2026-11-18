@@ -70,6 +70,18 @@ export function Preview({ s, text }: { s: CustomStyle; text: string }) {
   );
 }
 
+/** Opacity slider for one colour (the filter's 0–255 alpha, shown as %). */
+function Alpha({ name, c, on }: { name: string; c: number[]; on: (c: number[]) => void }) {
+  const a = c[3] ?? 255;
+  return (
+    <label className="se-a">
+      <span>{name}</span>
+      <input type="range" min={0} max={255} value={a} onChange={(e) => on([c[0], c[1], c[2], +e.target.value])} />
+      <span className="se-num">{Math.round((a / 255) * 100)}%</span>
+    </label>
+  );
+}
+
 function Chips({ value, onPick, allowOff }: { value: string | null; onPick: (v: string | null) => void; allowOff?: boolean }) {
   return (
     <div className="se-chips">
@@ -132,15 +144,22 @@ export default function StyleEditor({ start, label, onSave, onCancel }: {
       {!s.label_hidden && <>
       <div className="se-row">
         <span>Text</span>
-        <input type="color" value={hex(s.text)} onChange={(e) => set({ text: fromHex(e.target.value) })} />
+        <input type="color" value={hex(s.text)} onChange={(e) => set({ text: fromHex(e.target.value, s.text[3] ?? 255) })} />
         <span>Border</span>
         <input type="color" value={hex(s.border ?? [0, 0, 0])} disabled={!s.border}
-          onChange={(e) => set({ border: fromHex(e.target.value) })} />
+          onChange={(e) => set({ border: fromHex(e.target.value, s.border?.[3] ?? 255) })} />
         <input type="checkbox" title="Show a border" checked={!!s.border}
           onChange={(e) => set({ border: e.target.checked ? [255, 255, 255, 255] : null })} />
         <span>Back</span>
         <input type="color" value={hex(s.background)}
           onChange={(e) => set({ background: fromHex(e.target.value, s.background[3]) })} />
+      </div>
+
+      <div className="se-label">Opacity <span className="muted small">(lower = see-through)</span></div>
+      <div className="se-row se-alpha">
+        <Alpha name="Text" c={s.text} on={(c) => set({ text: c })} />
+        {s.border && <Alpha name="Border" c={s.border} on={(c) => set({ border: c })} />}
+        <Alpha name="Back" c={s.background} on={(c) => set({ background: c })} />
       </div>
 
       <div className="se-row">
