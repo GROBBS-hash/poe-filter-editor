@@ -131,8 +131,11 @@ pub fn ground_item(segs: &[Segment], m: &GroundMatch, label: Option<LabelColours
     item.rarity = match class {
         "Divination Cards" => "Divination Card".into(),
         "Skill Gems" | "Support Gems" => "Gem".into(),
-        _ if crate::item::is_gear(&Item { rarity: "Normal".into(), ..item.clone() }) || class.is_empty() =>
-            guess_rarity(segs, &item, label, area_level),
+        _ if crate::item::is_gear(&Item { rarity: "Normal".into(), ..item.clone() }) || class.is_empty() => {
+            let (r, sockets) = guess_rarity_links(segs, &item, label, area_level);
+            item.sockets = sockets;
+            r
+        }
         _ => "Currency".into(),
     };
     item.unidentified = matches!(item.rarity.as_str(), "Magic" | "Rare" | "Unique");
@@ -146,7 +149,14 @@ pub struct LabelColours { pub text: [u8; 3], pub background: [u8; 3] }
 /// Picks the rarity whose look in your filter best matches the label on
 /// screen. The label is visible, so rarities your filter hides are unlikely.
 pub fn guess_rarity(segs: &[Segment], item: &Item, label: Option<LabelColours>, area_level: u32) -> String {
-    let Some(seen) = label else { return "Normal".into() };
+    guess_rarity_links(segs, item, label, area_level).0
+}
+
+/// Like `guess_rarity`, but also considers white/blue items with linked sockets
+/// (which NeverSink shows in their own look while levelling). Returns the
+/// rarity and, when a linked look matched best, the sockets assumed.
+pub fn guess_rarity_links(segs: &[Segment], item: &Item, label: Option<LabelColours>, area_level: u32) -> (String, Option<String>) {
+    let Some(seen) = label else { return ("Normal".into(), None) };
     // The game's default colours, used when the filter doesn't set one.
     let defaults = [("Normal", [200, 200, 200]), ("Magic", [136, 136, 255]), ("Rare", [255, 255, 119]), ("Unique", [175, 96, 37])];
     let dist = |a: [u8; 3], b: [u8; 3]| -> i32 { a.iter().zip(b).map(|(x, y)| (*x as i32 - y as i32).pow(2)).sum() };
@@ -155,18 +165,21 @@ pub fn guess_rarity(segs: &[Segment], item: &Item, label: Option<LabelColours>, 
         c.map(|c| { let a = c[3] as u32; [(c[0] as u32 * a / 255) as u8, (c[1] as u32 * a / 255) as u8, (c[2] as u32 * a / 255) as u8] })
             .unwrap_or([0, 0, 0])
     };
-    defaults
-        .iter()
-        .map(|(r, def)| {
-            let it = Item { rarity: (*r).into(), ..item.clone() };
+    // Plain first; a small nudge so links only win when they explain the label better.
+    let socket_options: [(Option<&str>, i32); 3] = [(None, 0), (Some("R-R-R"), 2_000), (Some("R-R-R-R"), 2_000)];
+    let mut best: Option<(i32, &str, Option<&str>)> = None;
+    for (r, def) in defaults.iter() {
+        for (sockets, nudge) in socket_options {
+            if sockets.is_some() && !matches!(*r, "Normal" | "Magic") { continue; }
+            let it = Item { rarity: (*r).into(), sockets: sockets.map(String::from), ..item.clone() };
             let v = evaluate(segs, &Ctx { item: &it, area_level: Some(area_level), stack: None, from_screen: true });
             let text = v.style.text.map(|t| [t[0], t[1], t[2]]).unwrap_or(*def);
             let hidden_penalty = if v.visibility == "Hide" { 200_000 } else { 0 };
-            (dist(text, seen.text) + dist(bg_of(v.style.background), seen.background) + hidden_penalty, *r)
-        })
-        .min_by_key(|(d, _)| *d)
-        .map(|(_, r)| r.to_string())
-        .unwrap_or_else(|| "Normal".into())
+            let d = dist(text, seen.text) + dist(bg_of(v.style.background), seen.background) + hidden_penalty + nudge;
+            if best.map(|b| d < b.0).unwrap_or(true) { best = Some((d, r, sockets)); }
+        }
+    }
+    best.map(|(_, r, s)| (r.to_string(), s.map(String::from))).unwrap_or_else(|| ("Normal".into(), None))
 }
 
 #[cfg(test)]

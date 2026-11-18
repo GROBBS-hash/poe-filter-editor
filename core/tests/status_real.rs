@@ -123,6 +123,22 @@ fn levelling_preset_on_real_filter() {
     assert_eq!((v2.visibility.as_str(), v2.reason.as_str()), ("Show", "Levelling (Spells & Minions): Wands progression"));
     assert_eq!(status(&segs2, &quartz, Some(40), false).verdict.visibility, "Hide");
 
+    // Off the ground: a white Hussar Brigandine (AR/EV, unpicked) with NeverSink's 4-link look
+    // (white text, dark background) is read as a white 4-link, not a unique.
+    {
+        use filter_core::ground::{ground_item, GroundMatch, LabelColours};
+        let m = GroundMatch { base: "Hussar Brigandine".into(), stack: None, tier: None, superior: false, confidence: 1.0 };
+        let it = ground_item(&segs, &m, Some(LabelColours { text: [200, 200, 200], background: [20, 20, 0] }), 42);
+        assert_eq!((it.rarity.as_str(), it.sockets.as_deref()), ("Normal", Some("R-R-R-R")), "{it:?}");
+        let st = status(&segs, &it, Some(42), true);
+        assert_ne!(st.verdict.visibility, "Hide");
+        assert!(st.assumptions.iter().any(|a| a.contains("4-linked")), "{:?}", st.assumptions);
+        // A plain unlinked look stays a plain guess.
+        let rare = ground_item(&segs, &GroundMatch { base: "Vine Circlet".into(), ..m.clone() },
+            Some(LabelColours { text: [255, 255, 119], background: [0, 0, 0] }), 42);
+        assert_eq!((rare.rarity.as_str(), rare.sockets.as_deref()), ("Rare", None));
+    }
+
     // Aggressive: linked gear hidden too.
     let segs = build(&LevelOptions { aggressive: true, ..o.clone() });
     assert_eq!(status(&segs, &linked, Some(20), false).verdict.visibility, "Hide");

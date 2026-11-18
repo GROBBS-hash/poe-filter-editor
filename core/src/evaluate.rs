@@ -159,12 +159,8 @@ fn check(key: &str, op: &str, vals: &[String], c: &Ctx) -> Tri {
         "StackSize" => cmp_num(c.stack.or(it.stack_size).or(Some(1)), op, vals),
         "Quality" => cmp_num(if c.from_screen { None } else { Some(it.quality.unwrap_or(0)) }, op, vals),
         "MapTier" | "WaypointTier" => cmp_num(it.map_tier, op, vals),
-        // Read from the ground we can't see sockets; most drops have no links, so assume none.
-        "LinkedSockets" => match (&it.sockets, c.from_screen) {
-            (_, true) => cmp_num(Some(0), op, vals),
-            (Some(s), _) => cmp_num(Some(max_links(s)), op, vals),
-            (None, _) => cmp_num(Some(0), op, vals),
-        },
+        // Read from the ground we can't see sockets: assume none unless the label's look says it's linked.
+        "LinkedSockets" => cmp_num(Some(it.sockets.as_deref().map(max_links).unwrap_or(0)), op, vals),
         "Sockets" => match (&it.sockets, c.from_screen) {
             (_, true) => Tri::Unknown,
             _ if vals.iter().any(|v| v.chars().any(|ch| ch.is_alphabetic())) => Tri::Unknown,
@@ -363,7 +359,10 @@ pub fn status_with_fallback(segs: &[Segment], item: &Item, known_area_level: Opt
         assumptions.push(format!("item level {area_level}"));
     }
     if from_screen && is_gear(item) {
-        assumptions.push("not corrupted, unidentified, no linked sockets".into());
+        assumptions.push(match item.sockets.as_deref().map(max_links) {
+            Some(n) if n >= 3 => format!("not corrupted, unidentified, {n}-linked (from its look)"),
+            _ => "not corrupted, unidentified, no linked sockets".into(),
+        });
     }
     let ctx = Ctx { item, area_level: Some(area_level), stack: None, from_screen };
     let verdict = evaluate(segs, &ctx);
