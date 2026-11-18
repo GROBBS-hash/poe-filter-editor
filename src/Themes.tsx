@@ -3,7 +3,29 @@ import { invoke } from "@tauri-apps/api/core";
 import { ProfileInfo } from "./types";
 
 type LevelLook = { text: number[]; border: number[] | null; background: number[] };
-type Theme = { name: string; levels: LevelLook[] };
+type Theme = { name: string; levels: LevelLook[]; classic?: Record<string, number[]> | null };
+
+/** Classic style, same maths as the app's filter builder: the item kind's
+ *  colour, more solid and brighter the better the item. */
+const CATEGORIES = ["Unique", "Rare", "Magic", "Normal", "Currency", "Divination", "Gem", "Fractured", "Top base", "Map", "Quest"];
+function classicLook(hue: number[], i: number): LevelLook {
+  const tint = [0.42, 0.30, 0.20, 0.11, 0.05, 0.0][i];
+  const alpha = [255, 245, 230, 210, 180, 140][i];
+  const shade = [0.45, 0.25, 0.10, 0.0, -0.22, -0.42][i];
+  const mix = (c: number, k: number) => Math.max(0, Math.min(255, Math.round(k >= 0 ? c + (255 - c) * k : c * (1 + k))));
+  const text = [mix(hue[0], shade), mix(hue[1], shade), mix(hue[2], shade), 255];
+  const bg = [Math.floor(hue[0] * tint), Math.floor(hue[1] * tint), Math.floor(hue[2] * tint), alpha];
+  const border = i === 0 ? [255, 255, 255, 255]
+    : i === 1 ? [mix(hue[0], 0.3), mix(hue[1], 0.3), mix(hue[2], 0.3), 255]
+    : i === 2 ? [hue[0], hue[1], hue[2], 255]
+    : i === 3 ? [hue[0], hue[1], hue[2], 140] : null;
+  return { text, border, background: bg };
+}
+/** Six examples showing off a classic theme: [text, kind, level]. */
+const CLASSIC_SAMPLES: [string, string, number][] = [
+  ["Headhunter", "Unique", 0], ["The Doctor", "Divination", 0], ["Divine Orb", "Currency", 1],
+  ["Fractured Vise", "Fractured", 2], ["Rare Ring", "Rare", 3], ["Plain Unique", "Unique", 4],
+];
 
 const LEVELS = [
   { name: "Chase", example: "Mirror of Kalandra" },
@@ -27,6 +49,16 @@ const hex = (c: number[]) => "#" + c.slice(0, 3).map((n) => n.toString(16).padSt
 const fromHex = (h: string, a = 255) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)).concat(a);
 
 function Samples({ t }: { t: Theme }) {
+  if (t.classic) {
+    return (
+      <div className="th-samples">
+        {CLASSIC_SAMPLES.map(([text, kind, level]) => {
+          const l = classicLook(t.classic![kind] ?? [210, 210, 210], level);
+          return <span key={text} className="th-label" style={{ color: css(l.text), borderColor: css(l.border), background: css(l.background) }}>{text}</span>;
+        })}
+      </div>
+    );
+  }
   return (
     <div className="th-samples">
       {t.levels.map((l, i) => (
@@ -44,6 +76,39 @@ function ThemeEditor({ start, isNew, onSave, onCancel }: {
   const [t, setT] = useState<Theme>(JSON.parse(JSON.stringify(start)));
   const setLevel = (i: number, patch: Partial<LevelLook>) =>
     setT((x) => ({ ...x, levels: x.levels.map((l, j) => (j === i ? { ...l, ...patch } : l)) }));
+  if (t.classic) {
+    const setHue = (cat: string, h: string) => setT((x) => ({ ...x, classic: { ...x.classic!, [cat]: fromHex(h).slice(0, 3) } }));
+    return (
+      <div className="card">
+        <h2>{isNew ? "New theme" : `Edit “${start.name}”`}</h2>
+        <input className="text" placeholder="Theme name" value={t.name} onChange={(e) => setT({ ...t, name: e.target.value })} />
+        <p className="muted small">Pick a colour for each kind of item. Better items get a more solid, brighter version of it (left = Chase, right = Junk).</p>
+        <div className="th-edit">
+          {CATEGORIES.map((cat) => {
+            const hue = t.classic![cat] ?? [210, 210, 210];
+            return (
+              <div key={cat} className="th-edit-row">
+                <span className="th-level wide">{cat}</span>
+                <input type="color" value={hex(hue)} onChange={(e) => setHue(cat, e.target.value)} />
+                <span className="th-strip">
+                  {[0, 1, 2, 3, 4, 5].map((i) => {
+                    const l = classicLook(hue, i);
+                    return <span key={i} className="th-chip" title={LEVELS[i].name}
+                      style={{ color: css(l.text), borderColor: css(l.border), background: css(l.background) }}>{LEVELS[i].name}</span>;
+                  })}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <div className="row between">
+          <button onClick={onCancel}>Cancel</button>
+          <button className="primary" disabled={!t.name.trim()} onClick={() => onSave(t)}>Save theme</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="card">
       <h2>{isNew ? "New theme" : `Edit “${start.name}”`}</h2>

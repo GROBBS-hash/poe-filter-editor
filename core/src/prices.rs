@@ -114,7 +114,8 @@ pub fn default_settings(unit: &str) -> PriceSettings {
         groups: Group::ALL.iter().map(|g| GroupSettings {
             group: *g,
             enabled: matches!(g, Group::Uniques | Group::DivinationCards),
-            tiers: tiers(if *g == Group::Uniques { "ShDivine" } else { "1" }),
+            // Tier 1 always gets NeverSink's tier 1 sound: the classic Divine Orb drop.
+            tiers: tiers("6"),
             hide_below: None,
         }).collect(),
     }
