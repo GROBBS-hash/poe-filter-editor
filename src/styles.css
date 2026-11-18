@@ -637,3 +637,19 @@ input[type=range] { accent-color: var(--gold); }
 .tw-map-tag { white-space: nowrap; margin-left: 6px; font-size: 11px; padding: 1px 5px; border-radius: 4px; background: rgba(220,60,60,0.3); color: #ffd0d0; }
 .map-avoid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0 12px; margin-top: 8px; }
 .map-avoid .check { margin: 2px 0; }
+
+/* Trade helper (incoming whispers) */
+.th { padding-top: 4px; }
+.th-head { display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 13px; padding: 2px 2px 6px; cursor: move; }
+.th-row { padding: 6px 4px; border-top: 1px solid rgba(255,255,255,0.07); }
+.th-row.here { background: rgba(60,180,90,0.12); border-radius: 6px; }
+.th-top { display: flex; justify-content: space-between; gap: 6px; align-items: flex-start; }
+.th-item { font-size: 13px; color: #f0d890; }
+.th-x { background: none; border: none; color: var(--muted); font-size: 16px; line-height: 1; cursor: pointer; padding: 0 2px; }
+.th-sub { display: flex; gap: 8px; flex-wrap: wrap; margin: 2px 0; }
+.th-price { color: #9fe3ff; font-weight: 600; }
+.th-here { color: #8fe0a4; font-weight: 600; }
+.th-btns { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 4px; }
+.th-btns button { padding: 4px 0; font-size: 12px; }
+.th-btns button.done { opacity: 0.5; }
+.chat-keys { display: grid; grid-template-columns: 110px 1fr auto; gap: 6px 8px; align-items: center; margin-top: 8px; }

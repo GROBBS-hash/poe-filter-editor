@@ -50,7 +50,7 @@ struct AppState {
 }
 
 #[derive(Clone, Copy, PartialEq)]
-enum HotAction { QuickEdit, Batch, Reload, Cycle, Build, Price }
+enum HotAction { QuickEdit, Batch, Reload, Cycle, Build, Price, Chat(usize) }
 
 /// (Re)registers hotkeys from settings. Errors name the key that failed.
 fn register_hotkeys(app: &AppHandle, s: &Settings) -> Result<(), String> {
@@ -58,6 +58,9 @@ fn register_hotkeys(app: &AppHandle, s: &Settings) -> Result<(), String> {
         (s.key_reload.as_str(), HotAction::Reload), (s.key_build.as_str(), HotAction::Build)];
     if !s.key_price.trim().is_empty() { wanted.push((s.key_price.as_str(), HotAction::Price)); }
     if s.cycle_enabled { wanted.push((s.key_cycle.as_str(), HotAction::Cycle)); }
+    for (i, c) in s.chat_keys.iter().enumerate() {
+        if !c.key.trim().is_empty() && !c.command.trim().is_empty() { wanted.push((c.key.as_str(), HotAction::Chat(i))); }
+    }
     let mut parsed = Vec::new();
     for (key, action) in wanted {
         let sc: Shortcut = key.parse().map_err(|_| format!("“{key}” isn't a key the app understands"))?;
@@ -77,6 +80,9 @@ fn register_hotkeys(app: &AppHandle, s: &Settings) -> Result<(), String> {
             // Another price checker (e.g. Awakened PoE Trade) may own Ctrl+D: carry on without it.
             Err(e) if action == HotAction::Price => {
                 let _ = app.emit("hotkey-warning", format!("Price check key unavailable (another program may own it): {e}"));
+            }
+            Err(e) if matches!(action, HotAction::Chat(_)) => {
+                let _ = app.emit("hotkey-warning", format!("A chat hotkey is unavailable (another program may own it): {e}"));
             }
             Err(e) => return Err(format!("Couldn't use that key (another program may own it): {e}")),
         }
@@ -618,8 +624,14 @@ fn active_filter_name(app: &AppHandle) -> Option<String> {
 
 /// Types "/itemfilter <name>" into the game's chat: one keypress, one command.
 fn reload_in_game(app: &AppHandle, wait_for_focus_ms: u64) -> Result<(), String> {
-    use enigo::{Direction, Enigo, Key, Keyboard, Settings};
     let name = active_filter_name(app).ok_or("Set up a filter first")?;
+    type_in_chat(&format!("/itemfilter {name}"), wait_for_focus_ms)
+}
+
+/// Types one line into the game's chat and sends it (one command per key or button
+/// press, as GGG's rules ask). Only ever types into the game.
+fn type_in_chat(line: &str, wait_for_focus_ms: u64) -> Result<(), String> {
+    use enigo::{Direction, Enigo, Key, Keyboard, Settings};
     // Give focus a moment to return to the game (e.g. after the pop-up closes).
     let mut waited = 0;
     while !game_in_front() {
@@ -637,11 +649,96 @@ fn reload_in_game(app: &AppHandle, wait_for_focus_ms: u64) -> Result<(), String>
         e.key(Key::Unicode('a'), Direction::Click)?;
         e.key(Key::Control, Direction::Release)?;
         e.key(Key::Backspace, Direction::Click)?;
-        e.text(&format!("/itemfilter {name}"))?;
+        e.text(line)?;
         thread::sleep(Duration::from_millis(30));
         e.key(Key::Return, Direction::Click)                // send
     };
     step().map_err(err)
+}
+
+/// Brings the game window to the front (after you click a button in one of our windows).
+#[cfg(windows)]
+fn focus_game() -> bool {
+    use windows::core::{w, PCWSTR};
+    use windows::Win32::UI::WindowsAndMessaging::{FindWindowW, SetForegroundWindow};
+    unsafe {
+        let found = FindWindowW(w!("POEWindowClass"), PCWSTR::null())
+            .or_else(|_| FindWindowW(PCWSTR::null(), w!("Path of Exile")))
+            .or_else(|_| FindWindowW(PCWSTR::null(), w!("Path of Exile 2")));
+        match found {
+            Ok(h) if !h.is_invalid() => SetForegroundWindow(h).as_bool(),
+            _ => false,
+        }
+    }
+}
+#[cfg(not(windows))]
+fn focus_game() -> bool { false }
+
+// ---------- trade helper (incoming whispers) ----------
+
+/// Watches the game's log for trade whispers and buyers arriving, and shows them
+/// in the "trades" window (without taking focus from the game).
+fn start_whisper_watcher(app: AppHandle) {
+    use std::io::{Read, Seek, SeekFrom};
+    thread::spawn(move || {
+        let mut log: Option<(PathBuf, u64)> = None;
+        let mut last_look = std::time::Instant::now().checked_sub(Duration::from_secs(60)).unwrap_or_else(std::time::Instant::now);
+        let mut partial = String::new();
+        loop {
+            thread::sleep(Duration::from_millis(400));
+            let state = app.state::<AppState>();
+            if !state.store.lock().unwrap().settings.trade_helper { continue; }
+            if log.is_none() {
+                if last_look.elapsed() < Duration::from_secs(30) { continue; }
+                last_look = std::time::Instant::now();
+                let poe2 = active_game(&state) == Game::Poe2;
+                // Start at the end: only new whispers.
+                log = find_log(poe2, &[]).and_then(|p| std::fs::metadata(&p).ok().map(|m| (p, m.len())));
+                continue;
+            }
+            let Some((path, offset)) = log.as_mut() else { continue };
+            let Ok(len) = std::fs::metadata(&*path).map(|m| m.len()) else { log = None; continue };
+            if len < *offset { *offset = len; continue; } // log was cleared
+            if len == *offset { continue; }
+            let Ok(mut f) = std::fs::File::open(&*path) else { continue };
+            if f.seek(SeekFrom::Start(*offset)).is_err() { continue; }
+            let mut buf = Vec::new();
+            if f.take(4 * 1024 * 1024).read_to_end(&mut buf).is_err() { continue; }
+            *offset += buf.len() as u64;
+            partial.push_str(&String::from_utf8_lossy(&buf));
+            // Keep a half-written last line for next time.
+            let keep = match partial.rfind('\n') { Some(i) => partial.split_off(i + 1), None => continue };
+            let lines = std::mem::replace(&mut partial, keep);
+            for line in lines.lines() {
+                let Some(ev) = filter_core::whispers::parse_line(line) else { continue };
+                let is_trade = matches!(&ev, filter_core::whispers::LogEvent::Whisper(w) if w.item.is_some());
+                let Some(w) = app.get_webview_window("trades") else { continue };
+                let _ = w.emit("trade-event", &ev);
+                if is_trade && !w.is_visible().unwrap_or(false) {
+                    let front = game_in_front();
+                    let _ = w.show();
+                    if front { focus_game(); } // never steal focus from the game
+                }
+            }
+        }
+    });
+}
+
+/// A trade button: Invite / Trade / Kick / Thanks. Brings the game to the front and
+/// types that one command.
+#[tauri::command]
+async fn trade_action(app: AppHandle, action: String, name: String) -> Result<(), String> {
+    let thanks = app.state::<AppState>().store.lock().unwrap().settings.thanks_message.clone();
+    let line = filter_core::whispers::command(&action, &name, &thanks).ok_or("Unknown button")?;
+    tauri::async_runtime::spawn_blocking(move || {
+        focus_game();
+        type_in_chat(&line, 1500)
+    }).await.map_err(err)?
+}
+
+#[tauri::command]
+fn hide_trades_window(app: AppHandle) {
+    if let Some(w) = app.get_webview_window("trades") { let _ = w.hide(); }
 }
 
 #[tauri::command]
@@ -1662,6 +1759,15 @@ pub fn run() {
                         });
                     } else if action == Some(HotAction::Price) {
                         price_check(app.clone());
+                    } else if let Some(HotAction::Chat(i)) = action {
+                        // One key press, one chat command, and only when the game is in front.
+                        let cmd = state.store.lock().unwrap().settings.chat_keys.get(i).map(|c| c.command.trim().to_string());
+                        if let Some(cmd) = cmd {
+                            let app = app.clone();
+                            thread::spawn(move || {
+                                if let Err(e) = type_in_chat(&cmd, 0) { let _ = app.emit("reload-failed", e); }
+                            });
+                        }
                     } else if action == Some(HotAction::Build) {
                         toggle_build_window(app);
                     } else if action == Some(HotAction::Batch) {
@@ -1684,6 +1790,7 @@ pub fn run() {
                 let _ = register_hotkeys(app.handle(), &Settings::default());
             }
             start_batch_watcher(app.handle().clone());
+            start_whisper_watcher(app.handle().clone());
 
             // Tray icon: the app lives here so hotkeys work while you play.
             use tauri::menu::{Menu, MenuItem};
@@ -1752,7 +1859,7 @@ pub fn run() {
             list_farm_presets,
             apply_farm_preset,
             list_level_presets,
-            get_tiers, get_rule_section, trade_search, trade_bulk, rare_estimate, map_dangers, map_suggest, copy_text, hide_trade_window, keep_on_screen,
+            get_tiers, get_rule_section, trade_search, trade_bulk, rare_estimate, map_dangers, map_suggest, trade_action, hide_trades_window, copy_text, hide_trade_window, keep_on_screen,
             move_tier_item,
             stack_choices,
             gear_setup,

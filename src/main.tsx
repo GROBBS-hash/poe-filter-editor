@@ -4,8 +4,9 @@ import QuickMenu from "./QuickMenu";
 import App from "./App";
 import BuildOverlay from "./BuildOverlay";
 import TradeWindow from "./TradeWindow";
+import TradesWindow from "./TradesWindow";
 import "./styles.css";
 
 const label = getCurrentWindow().label;
-document.body.classList.add(label === "overlay" || label === "build" || label === "trade" ? "overlay" : "main");
-createRoot(document.getElementById("root")!).render(label === "overlay" ? <QuickMenu /> : label === "build" ? <BuildOverlay /> : label === "trade" ? <TradeWindow /> : <App />);
+document.body.classList.add(label === "overlay" || label === "build" || label === "trade" || label === "trades" ? "overlay" : "main");
+createRoot(document.getElementById("root")!).render(label === "overlay" ? <QuickMenu /> : label === "build" ? <BuildOverlay /> : label === "trade" ? <TradeWindow /> : label === "trades" ? <TradesWindow /> : <App />);

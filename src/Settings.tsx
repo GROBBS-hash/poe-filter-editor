@@ -4,7 +4,9 @@ import { invoke } from "@tauri-apps/api/core";
 type Settings = {
   key_quick_edit: string; key_batch: string; key_reload: string; key_cycle: string; key_build: string; key_price?: string;
   cycle_enabled: boolean; fallback_area_level: number; claude_api_key: string; map_avoid?: string[] | null;
+  trade_helper?: boolean; thanks_message?: string; chat_keys?: { key: string; command: string }[];
 };
+const CHAT_IDEAS = ["/hideout", "/kingsmarch", "/menagerie", "/delve", "/exit", "/invite", "/kick", "/afk"];
 type Suggestion = { name: string; why: string };
 
 /** Which map mods Ctrl+D warns about, with a suggestion from the PoB build. */
@@ -94,6 +96,33 @@ export default function SettingsPage() {
             <span>Switch to your next filter (e.g. League Start → Strict 1 → Strict 2) and load it</span></label>
           <KeyBox value={s.key_cycle} disabled={!s.cycle_enabled} onChange={(k) => set({ key_cycle: k })} />
         </div>
+      </div>
+
+      <div className="card">
+        <h2>Trade helper</h2>
+        <p className="muted small">When someone whispers to buy from you, a small list pops up with Invite, Trade, Thanks and Kick buttons.
+          Each button press types one command in game, as GGG's rules allow. It turns green when the buyer is in your area.</p>
+        <label className="check"><input type="checkbox" checked={s.trade_helper ?? true} onChange={(e) => set({ trade_helper: e.target.checked })} />
+          <span>Show incoming trade whispers</span></label>
+        <div className="row">
+          <span className="muted small">Thanks message</span>
+          <input className="text" value={s.thanks_message ?? "thanks, good luck!"} onChange={(e) => set({ thanks_message: e.target.value })} />
+        </div>
+        <h3>Chat hotkeys</h3>
+        <p className="muted small">One key, one command (for example F7 → /hideout). They only type while the game is in front.</p>
+        <div className="chat-keys">
+          {(s.chat_keys ?? []).map((c, i) => {
+            const edit = (p: Partial<{ key: string; command: string }>) =>
+              set({ chat_keys: (s.chat_keys ?? []).map((x, j) => (j === i ? { ...x, ...p } : x)) });
+            return [
+              <KeyBox key={"k" + i} value={c.key || "Pick a key"} onChange={(k) => edit({ key: k })} />,
+              <input key={"c" + i} className="text" list="chat-ideas" value={c.command} placeholder="/hideout" onChange={(e) => edit({ command: e.target.value })} />,
+              <button key={"x" + i} onClick={() => set({ chat_keys: (s.chat_keys ?? []).filter((_, j) => j !== i) })}>Remove</button>,
+            ];
+          })}
+        </div>
+        <datalist id="chat-ideas">{CHAT_IDEAS.map((c) => <option key={c} value={c} />)}</datalist>
+        <div className="row"><button onClick={() => set({ chat_keys: [...(s.chat_keys ?? []), { key: "", command: "/hideout" }] })}>Add a chat hotkey</button></div>
       </div>
 
       <MapAvoid value={s.map_avoid} onChange={(v) => set({ map_avoid: v })} />

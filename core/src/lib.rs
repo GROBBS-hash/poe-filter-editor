@@ -17,4 +17,5 @@ pub mod rules;
 pub mod search;
 pub mod themes;
 pub mod tiers;
+pub mod whispers;
 pub mod trade;
