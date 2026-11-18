@@ -7,6 +7,6 @@ export default defineConfig({
     port: 1420,
     strictPort: true,
     // Don't watch the Rust build folder; Windows locks files in it mid-build.
-    watch: { ignored: ["**/src-tauri/**"] },
+    watch: { ignored: ["**/src-tauri/**", "**/target/**", "**/core/**"] },
   },
 });
