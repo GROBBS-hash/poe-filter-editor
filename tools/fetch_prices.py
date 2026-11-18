@@ -33,6 +33,14 @@ POE2_EXCHANGE = ["Currency", "Fragments", "Abyss", "UncutGems", "LineageSupportG
 POE2_STASH = ["UniqueWeapons", "UniqueArmours", "UniqueAccessories", "UniqueFlasks", "UniqueCharms", "UniqueJewels"]
 
 debug = {}
+# Item name -> picture URL, collected along the way (written to <game>_icons.json).
+icons = {"poe1": {}, "poe2": {}}
+CDN = "https://web.poecdn.com"
+
+
+def add_icon(game, name, url):
+    if name and url and name not in icons[game]:
+        icons[game][name] = url if url.startswith("http") else CDN + url
 poe2_exalted_per_divine = 1.0  # set from the exchange data before uniques are read
 
 
@@ -80,6 +88,7 @@ def exchange(game, league, typ):
     for it in (data.get("items") or []) + (core.get("items") or []):
         if isinstance(it, dict) and it.get("id") is not None:
             names[str(it["id"])] = it.get("name") or it.get("text") or str(it["id"])
+            add_icon(game, it.get("name"), it.get("image") or it.get("icon"))
     # PoE 2 prices come in Divine Orbs; convert to Exalted Orbs for finer steps.
     factor = 1.0
     if game == "poe2":
@@ -102,6 +111,11 @@ def stash_items(game, league, typ):
         debug[f"{game}:stash"] = {"line_sample": [{k: v for k, v in l.items() if k not in ("sparkLine", "lowConfidenceSparkLine", "explicitModifiers", "implicitModifiers", "flavourText", "tradeInfo")} for l in data["lines"][:2]]}
     out = []
     for line in data.get("lines") or []:
+        add_icon(game, line.get("name"), line.get("icon"))
+        if typ.startswith("Unique"):
+            pass  # a unique's picture isn't its base's picture
+        elif line.get("baseType"):
+            add_icon(game, line.get("baseType"), line.get("icon"))
         links = line.get("links") or 0
         if links >= 5:  # 5/6-link prices would wildly overrate the base
             continue
@@ -118,6 +132,15 @@ def stash_items(game, league, typ):
         out.append({"name": name, "base": line.get("baseType") or name, "cat": typ, "value": round(value, 4),
                     "variant": line.get("variant"), "listings": line.get("listingCount")})
     return out
+
+
+def base_type_icons(game, league):
+    """Pictures for every base type (poe.ninja's base type list); prices not used."""
+    if game != "poe1":
+        return
+    data = get(f"/{game}/api/economy/stash/current/item/overview", league=league, type="BaseType")
+    for line in (data or {}).get("lines") or []:
+        add_icon(game, line.get("baseType") or line.get("name"), line.get("icon"))
 
 
 def run(game, exchange_types, stash_types):
@@ -143,6 +166,7 @@ def run(game, exchange_types, stash_types):
         got = stash_items(game, league_id, t)
         items += got
         print(f"  {t}: {len(got)}")
+    base_type_icons(game, league_id)
     if game == "poe1" and core_seen and core_seen.get("primary"):
         unit = str(core_seen["primary"])
     return {
@@ -162,6 +186,9 @@ def main(out_dir):
         if result and result["items"]:
             with open(os.path.join(out_dir, f"{game}.json"), "w", encoding="utf-8") as f:
                 json.dump(result, f, separators=(",", ":"), ensure_ascii=False)
+        if icons[game]:
+            with open(os.path.join(out_dir, f"{game}_icons.json"), "w", encoding="utf-8") as f:
+                json.dump(icons[game], f, separators=(",", ":"), ensure_ascii=False)
     with open(os.path.join(out_dir, "debug.json"), "w", encoding="utf-8") as f:
         json.dump(debug, f, indent=1, ensure_ascii=False, default=str)
 
