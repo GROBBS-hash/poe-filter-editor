@@ -64,7 +64,8 @@ pub fn search(q: &str, extra_bases: &BTreeSet<String>, limit: usize) -> Vec<Foun
         let h = norm(b);
         let hc = format!("{h} {}", norm(&class));
         if words.iter().all(|w| word_in(w, &hc)) {
-            let exact = if h == q { -100 } else if h.starts_with(&q) { -50 } else { 0 };
+            // An exact name beats everything, even an item type of the same name (Gold).
+            let exact = if h == q || h.trim_end_matches('s') == q.trim_end_matches('s') { -3000 } else if h.starts_with(&q) { -50 } else { 0 };
             out.push((1000 + exact + h.len() as i32, Found { base_type: b.clone(), item_class: class }));
         }
     }

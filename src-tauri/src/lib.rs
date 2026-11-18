@@ -6,6 +6,7 @@ use filter_core::{
     area::{find_log, read_area_level, selected_filter},
     ground::{ground_item, known_names, match_base, LabelColours},
     neversink,
+    ask::{claude_tool, plan, read_offline, Plan, Request},
     search::{farm_presets, farm_rules, search, Found, Preset},
     item::{is_stackable, parse_item, resolve_magic_base, Item},
     prices::{default_settings, price_of, PriceFile, PriceSettings},
@@ -871,6 +872,54 @@ fn save_settings(app: AppHandle, state: State<AppState>, settings: Settings) -> 
     store.save(&state.store_path).map_err(err)
 }
 
+/// Asks Claude (with the player's own key) to read a request into a `Request`.
+/// Returns None on any problem, so the offline reader takes over.
+fn ask_claude(key: &str, text: &str) -> Option<Request> {
+    let call = |forced: bool| -> Result<serde_json::Value, ureq::Error> {
+        let mut tool = claude_tool();
+        tool["strict"] = serde_json::json!(true);
+        let mut body = serde_json::json!({
+            "model": "claude-haiku-5-5",
+            "max_tokens": 300,
+            "system": "You turn a Path of Exile player's loot filter request into exactly one make_rule call. \
+                Use the game's own names for items and item types (e.g. 'Two Hand Maces', 'Chaos Orb', 'Divination Cards', 'Gold'). \
+                Default to highlight when they want something to stand out or be easier to see.",
+            "tools": [tool],
+            "messages": [{"role": "user", "content": text}],
+        });
+        if forced { body["tool_choice"] = serde_json::json!({"type": "tool", "name": "make_rule"}); }
+        let resp = ureq::post("https://api.anthropic.com/v1/messages")
+            .set("x-api-key", key).set("anthropic-version", "2023-06-01").set("content-type", "application/json")
+            .timeout(Duration::from_secs(20)).send_json(body)?;
+        Ok(resp.into_json::<serde_json::Value>().unwrap_or_default())
+    };
+    // Some models refuse a forced tool; ask again without forcing if so.
+    let reply = match call(true) {
+        Ok(v) => v,
+        Err(ureq::Error::Status(400, _)) => call(false).ok()?,
+        Err(_) => return None,
+    };
+    let input = reply["content"].as_array()?.iter().find(|b| b["type"] == "tool_use")?["input"].clone();
+    serde_json::from_value::<Request>(input).ok()
+}
+
+#[derive(Serialize)]
+struct AskReply { plan: Option<Plan>, used_ai: bool }
+
+/// "Show gold in a purple highlight" -> a plan to show before doing it.
+#[tauri::command]
+fn ask(app: AppHandle, state: State<AppState>, text: String) -> AskReply {
+    let key = state.store.lock().unwrap().settings.claude_api_key.trim().to_string();
+    let extra: std::collections::BTreeSet<String> = active_filters(&app)
+        .map(|(_, base)| known_bases(&base).into_iter().collect()).unwrap_or_default();
+    if !key.is_empty() {
+        if let Some(p) = ask_claude(&key, &text).and_then(|r| plan(&r, &extra)) {
+            return AskReply { plan: Some(p), used_ai: true };
+        }
+    }
+    AskReply { plan: plan(&read_offline(&text), &extra), used_ai: false }
+}
+
 /// Search by everyday names ("2h mace", "ammy", "chaos").
 #[tauri::command]
 fn search_items(app: AppHandle, q: String) -> Vec<Found> {
@@ -1034,7 +1083,8 @@ pub fn run() {
             save_settings,
             search_items,
             list_farm_presets,
-            apply_farm_preset
+            apply_farm_preset,
+            ask
         ])
         .run(tauri::generate_context!())
         .expect("error while running the app");

@@ -55,12 +55,14 @@ pub struct Settings {
     pub cycle_enabled: bool,
     /// Area level to assume when the game's log can't be found.
     pub fallback_area_level: u32,
+    /// Optional Claude API key for the "ask" box (kept only on this PC).
+    pub claude_api_key: String,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self { key_quick_edit: "F2".into(), key_batch: "F3".into(), key_reload: "F4".into(), key_cycle: "F5".into(),
-            cycle_enabled: false, fallback_area_level: 83 }
+            cycle_enabled: false, fallback_area_level: 83, claude_api_key: String::new() }
     }
 }
 

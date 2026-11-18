@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 
 type Settings = {
   key_quick_edit: string; key_batch: string; key_reload: string; key_cycle: string;
-  cycle_enabled: boolean; fallback_area_level: number;
+  cycle_enabled: boolean; fallback_area_level: number; claude_api_key: string;
 };
 
 /** Click the box, then press the key (or key combo) you want. */
@@ -60,6 +60,14 @@ export default function SettingsPage() {
             onChange={(e) => set({ fallback_area_level: Math.max(1, Math.min(86, +e.target.value || 83)) })} />
           <span className="muted small">{s.fallback_area_level >= 68 ? "(maps)" : "(campaign)"}</span>
         </div>
+      </div>
+
+      <div className="card">
+        <h2>AI for the “Just say what you want” box (optional)</h2>
+        <p className="muted small">The box works without this for common phrases. With your own Claude API key it understands looser wording.
+          Each request costs a fraction of a cent on your Anthropic account. The key is kept only on this PC.</p>
+        <input className="text" type="password" placeholder="sk-ant-…" value={s.claude_api_key}
+          onChange={(e) => set({ claude_api_key: e.target.value.trim() })} />
       </div>
 
       <div className="save-bar">
