@@ -384,6 +384,8 @@ mod tests {
         k.insert("Noble Claw".into());
         k.insert("Eagle Claw".into());
         assert_eq!(match_base("SUPERIOR SHARKSKII", &k).unwrap().base, "Sharkskin Tunic");
+        // Snapshot read-1794999884: the label with a minimap icon after it.
+        assert_eq!(match_base("THRdAT STABBE}Ü", &k).unwrap().base, "Throat Stabber");
         assert_eq!(match_base("NOBLE CLAM", &k).unwrap().base, "Noble Claw");
         assert!(is_item_level("ITEM LEVEL: 61") && is_item_level("ITEM LEVEL:") && !is_item_level("item level and"));
         k.insert("Hope".into());

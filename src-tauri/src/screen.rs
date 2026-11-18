@@ -189,7 +189,11 @@ fn pieces(lines: Vec<Vec<(String, Bx)>>, colour: &dyn Fn(Bx) -> Option<([u8; 3],
         let mid = r[1] + r[3] / 2.0;
         let near = merged.iter().rposition(|(_, m, mc)| {
             let gap = r[0] - (m[0] + m[2]);
-            mid > m[1] && mid < m[1] + m[3] && gap < r[3].max(m[3]) * 0.6 && !far_apart(*mc, c)
+            let h = r[3].max(m[3]);
+            // Words this tight are one label even if their colours look different (a
+            // minimap icon at the end of "THROAT STABBER" tints the last word's colour):
+            // two labels always have their borders between them.
+            mid > m[1] && mid < m[1] + m[3] && gap < h * 0.6 && (!far_apart(*mc, c) || gap < h * 0.45)
         });
         match near {
             Some(i) => {
@@ -247,8 +251,13 @@ fn row_label(merged: &[Piece], cx: f32, cy: f32) -> Option<Piece> {
     let bi = nearest_under(merged, cx, cy)?;
     let r0 = merged[bi].1;
     let mid = r0[1] + r0[3] / 2.0;
+    // Right next to the piece under the mouse counts even in another colour (see pieces()).
+    let touching = |p: &Piece| {
+        let gap = (p.1[0] - (r0[0] + r0[2])).max(r0[0] - (p.1[0] + p.1[2]));
+        gap < r0[3].max(p.1[3]) * 0.45
+    };
     let mut row: Vec<&Piece> = merged.iter()
-        .filter(|p| mid > p.1[1] - p.1[3] * 0.3 && mid < p.1[1] + p.1[3] * 1.3 && !far_apart(p.2, merged[bi].2))
+        .filter(|p| mid > p.1[1] - p.1[3] * 0.3 && mid < p.1[1] + p.1[3] * 1.3 && (!far_apart(p.2, merged[bi].2) || touching(p)))
         .collect();
     row.sort_by(|a, b| a.1[0].partial_cmp(&b.1[0]).unwrap_or(std::cmp::Ordering::Equal));
     // Grow outwards from the nearest piece while the gaps stay small.
@@ -551,6 +560,21 @@ mod tests {
         // A word the reader split in two is joined back.
         let ps = super::pieces(vec![vec![w("KARUI", 100.0, 50.0), w("CH", 155.0, 20.0)], vec![w("OPPER", 176.0, 50.0)]], &|_| white);
         assert_eq!(ps[0].0, "KARUI CHOPPER");
+    }
+
+    #[test]
+    fn icon_tinted_word_still_joins() {
+        // "THROAT STABBER" with a yellow minimap icon after it: the reader saw two lines,
+        // and the second word's colour came out yellow-ish.
+        let white = Some(([230, 230, 230], [90, 90, 50]));
+        let yellow = Some(([250, 230, 40], [90, 90, 50]));
+        let lines = vec![vec![("THRdAT".to_string(), [729.0, 90.0, 129.0, 39.0])], vec![("STABBE}Ü".to_string(), [871.0, 98.0, 146.0, 30.0])]];
+        let ps = super::pieces(lines, &|r: super::Bx| if r[0] < 860.0 { white } else { yellow });
+        assert_eq!(ps.len(), 1);
+        assert_eq!(super::pick_label(&ps, 900.0, 120.0).unwrap().0, "THRdAT STABBE}Ü");
+        // Already split into pieces: the row still joins them.
+        let ps = vec![("THRdAT".to_string(), [729.0, 90.0, 129.0, 39.0], white), ("STABBE}Ü".to_string(), [871.0, 98.0, 146.0, 30.0], yellow)];
+        assert_eq!(super::row_label(&ps, 900.0, 120.0).unwrap().0, "THRdAT STABBE}Ü");
     }
 
     #[test]
