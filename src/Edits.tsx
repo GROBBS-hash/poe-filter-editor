@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useState } from "react";
 import { ProfileInfo } from "./types";
-import RuleEditor, { RuleDetail, RuleEdit } from "./RuleEditor";
+import ItemPanel, { RuleDetail, itemFromRule } from "./ItemPanel";
 
 export default function Edits({ profile, onChange }: { profile: ProfileInfo; onChange: () => void }) {
   const [msg, setMsg] = useState("");
@@ -25,14 +25,6 @@ export default function Edits({ profile, onChange }: { profile: ProfileInfo; onC
       setOpen({ index, detail });
     } catch (e) { setMsg(String(e)); }
   };
-  const save = async (index: number, e: RuleEdit) => {
-    try {
-      const r = await invoke<{ label: string; warnings: string[] }>("update_rule", { id: profile.id, index, edit: e });
-      setMsg(r.warnings[0] ?? `Saved “${r.label}”. Press F4 in game to reload.`);
-      setOpen(null);
-      onChange();
-    } catch (err) { setMsg(String(err)); }
-  };
 
   return (
     <div className="card">
@@ -55,8 +47,11 @@ export default function Edits({ profile, onChange }: { profile: ProfileInfo; onC
                 </span>
               </div>
               {open?.index === r.index && (
-                <div className="rule-edit">
-                  <RuleEditor detail={open.detail} onSave={(e) => save(r.index, e)} onCancel={() => setOpen(null)} />
+                <div className="rule-edit qm">
+                  <ItemPanel key={r.index} inGame={false}
+                    start={{ item: itemFromRule(open.detail), from_screen: false, screen_text: null, confidence: 1 }}
+                    replacing={{ id: profile.id, index: r.index, detail: open.detail }}
+                    onClose={() => setOpen(null)} onChanged={onChange} />
                 </div>
               )}
             </li>

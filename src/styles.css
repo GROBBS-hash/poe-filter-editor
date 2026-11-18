@@ -132,3 +132,7 @@ code { background: #000; padding: 1px 5px; border-radius: 4px; color: var(--gold
   border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
 .qm-inline { background: none; border: none; padding: 0 2px; font-size: 11px; color: #9fd0ff; text-decoration: underline; }
 .qm .re { font-size: 13px; }
+.qm-editing { font-size: 12px; line-height: 1.4; color: #cfe3ff; background: #16263a; border: 1px solid #355a85;
+  border-radius: 6px; padding: 6px 8px; margin-bottom: 8px; }
+.qm-editing b { color: #fff; font-weight: normal; }
+.rule-edit.qm { width: 300px; margin: 10px auto 4px; box-shadow: none; }
