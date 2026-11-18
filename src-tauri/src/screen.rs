@@ -62,7 +62,8 @@ mod imp {
 
     // Wide enough for the longest labels even with the mouse at one end.
     const W: i32 = 1800;
-    const H: i32 = 120;
+    // Tall enough for big labels that wrap onto two lines.
+    const H: i32 = 240;
 
     /// Grabs a W x H strip centred on the mouse. Returns BGRA pixels.
     fn capture(cx: i32, cy: i32) -> windows::core::Result<(Vec<u8>, i32, i32)> {
@@ -174,11 +175,27 @@ mod imp {
                 None => merged.push((t, r)),
             }
         }
-        let best = merged.into_iter().map(|(t, r)| (dist_to(&r, cx, cy), t, r))
+        let best = merged.iter().enumerate().map(|(i, (_, r))| (dist_to(r, cx, cy), i))
             .min_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
-        let Some((_, text, r)) = best else {
+        let Some((_, bi)) = best else {
             return Ok(ScreenRead { text: String::new(), colours: None });
         };
+        // Big labels wrap ("BLOOD PRICE" over "REAVER HELMET"): join lines stacked right above/below,
+        // lined up with this one, top to bottom.
+        let r0 = merged[bi].1;
+        let stacked = |r: &Rect| {
+            let overlap = (r.X + r.Width).min(r0.X + r0.Width) - r.X.max(r0.X);
+            let gap_below = r.Y - (r0.Y + r0.Height);
+            let gap_above = r0.Y - (r.Y + r.Height);
+            let close = |g: f32| g > -r0.Height * 0.3 && g < r0.Height * 0.8;
+            overlap > r0.Width.min(r.Width) * 0.3 && (close(gap_below) || close(gap_above))
+                && (r.Height - r0.Height).abs() < r0.Height * 0.35
+        };
+        let mut block: Vec<&(String, Rect)> = merged.iter().enumerate()
+            .filter(|(i, (_, r))| *i == bi || stacked(r)).map(|(_, x)| x).collect();
+        block.sort_by(|a, b| a.1.Y.partial_cmp(&b.1.Y).unwrap_or(std::cmp::Ordering::Equal));
+        let text = block.iter().map(|x| x.0.as_str()).collect::<Vec<_>>().join(" ");
+        let r = r0;
 
         // Colour of the text inside that line, from the original pixels.
         let mut px = Vec::new();
