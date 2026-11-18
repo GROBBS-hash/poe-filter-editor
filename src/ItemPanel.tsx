@@ -24,7 +24,7 @@ export function itemFromRule(d: RuleDetail): Item {
 }
 type Style = CurrentStyle & { sound?: string | null; minimap?: string | null };
 type Status = {
-  verdict: { visibility: string; style: Style; decided_by: string; by_user_edit: boolean; uncertain: string[] };
+  verdict: { visibility: string; style: Style; decided_by: string; by_user_edit: boolean; reason: string; uncertain: string[] };
   by_stack: { from: number; visibility: string }[];
   assumptions: string[];
 };
@@ -306,7 +306,8 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
           <div className="qm-by">
             {v.by_user_edit ? <>Your edit: <b>{v.decided_by}</b>{" "}
               {!replacing && <button className="qm-inline" onClick={() => openRule(v.decided_by)}>Edit this rule</button>}</>
-              : v.decided_by.startsWith("Price") ? <>Price tiers: {v.decided_by}</> : <>NeverSink: {v.decided_by}</>}
+              : v.decided_by.startsWith("Price") ? <>Price tiers: {v.decided_by}</>
+              : <span title={`NeverSink rule: ${v.decided_by}`}>Why: {v.reason}</span>}
           </div>
           {v.uncertain.length > 0 && (
             <div className="qm-unsure" title={v.uncertain.join("\n")}>

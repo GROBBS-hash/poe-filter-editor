@@ -37,6 +37,8 @@ pub struct Verdict {
     /// Which block decided it, e.g. "uniques › t2", or your edit's label.
     pub decided_by: String,
     pub by_user_edit: bool,
+    /// Plain-English reason, e.g. "Plain normal/magic gear, once you're in maps".
+    pub reason: String,
     /// Earlier blocks that might apply depending on things we can't see (mods etc).
     pub uncertain: Vec<String>,
 }
@@ -322,12 +324,14 @@ pub fn evaluate(segs: &[Segment], c: &Ctx) -> Verdict {
                 style.label_hidden = label_invisible(&style);
                 if !cont {
                     let (decided_by, by_user_edit) = describe(b);
-                    return Verdict { visibility: b.visibility.clone(), style, decided_by, by_user_edit, uncertain };
+                    let reason = if by_user_edit || b.type_path.is_empty() { decided_by.clone() } else { crate::explain::explain(b) };
+                    return Verdict { visibility: b.visibility.clone(), style, decided_by, by_user_edit, reason, uncertain };
                 }
             }
         }
     }
-    Verdict { visibility: "None".into(), style, decided_by: "no rule matched".into(), by_user_edit: false, uncertain }
+    Verdict { visibility: "None".into(), style, decided_by: "no rule matched".into(), by_user_edit: false,
+        reason: "Not covered by any rule (the game shows it normally)".into(), uncertain }
 }
 
 /// Full status, including whether stack size changes the outcome.
