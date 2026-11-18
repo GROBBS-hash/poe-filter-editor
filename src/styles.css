@@ -663,3 +663,7 @@ input[type=range] { accent-color: var(--gold); }
 .th-live-row { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; margin: 3px 0; }
 .th-live-row button { padding: 2px 8px; font-size: 12px; }
 .th-live-row button.done { opacity: 0.5; }
+.cur-icon { width: 16px; height: 16px; vertical-align: -3px; margin-left: 2px; }
+.tw-pr { white-space: nowrap; }
+.tw-other { white-space: nowrap; margin-right: 2px; }
+.tw-ratio { margin: 2px 0 6px; }

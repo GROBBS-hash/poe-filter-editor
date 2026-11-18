@@ -40,3 +40,20 @@ export function ItemIcon({ name, base, size = 32 }: { name?: string | null; base
   if (!url || broken) return null;
   return <img className="item-icon" src={url} alt="" width={size} height={size} loading="lazy" onError={() => setBroken(true)} />;
 }
+
+/** Fallback pictures for the two trade currencies (the game's own art on GGG's CDN). */
+const CURRENCY_ART: Record<string, string> = {
+  chaos: "https://web.poecdn.com/image/Art/2DItems/Currency/CurrencyRerollRare.png",
+  divine: "https://web.poecdn.com/image/Art/2DItems/Currency/CurrencyModValues.png",
+};
+const CURRENCY_NAME: Record<string, string> = { chaos: "Chaos Orb", divine: "Divine Orb", exalted: "Exalted Orb" };
+
+/** A small chaos / divine orb picture next to a price. */
+export function CurrencyIcon({ id, size = 16 }: { id: string; size?: number }) {
+  const icons = useIcons();
+  const url = icons[CURRENCY_NAME[id] ?? ""] || CURRENCY_ART[id] || null;
+  const [broken, setBroken] = useState(false);
+  // No picture: say it in words instead.
+  if (!url || broken) return <span className="cur-text"> {id === "divine" ? "div" : id === "chaos" ? "c" : id}</span>;
+  return <img className="cur-icon" src={url} alt={id} title={CURRENCY_NAME[id] ?? id} width={size} height={size} onError={() => setBroken(true)} />;
+}

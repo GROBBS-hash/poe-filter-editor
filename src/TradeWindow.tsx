@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { ItemIcon } from "./icons";
+import { CurrencyIcon, ItemIcon } from "./icons";
 import { Item, RARITY_COLOUR, itemTitle } from "./types";
 
 type StatFilter = { id: string; label: string; value: number; min: number | null; enabled: boolean; kind: string; tier: number | null; junk?: boolean };
@@ -30,6 +30,20 @@ function ago(iso: string) {
 function money(c: number, divine: number | null) {
   if (divine && c >= divine) return `${(c / divine).toFixed(c / divine < 10 ? 1 : 0)} div`;
   return `${c < 1 ? +c.toFixed(2) : c < 10 ? +c.toFixed(1) : Math.round(c)}c`;
+}
+
+/** A price with its orb picture, e.g. "180 [chaos]". */
+function Price({ n, cur }: { n: number; cur: string }) {
+  const v = n < 1 ? +n.toFixed(3) : n < 10 ? +n.toFixed(2) : n < 100 ? +n.toFixed(1) : Math.round(n);
+  return <span className="tw-pr">{v}{["chaos", "divine"].includes(cur) ? <CurrencyIcon id={cur} /> : <> {UNIT[cur] ?? cur}</>}</span>;
+}
+
+/** The same price in the other currency: chaos -> divine, divine -> chaos. */
+function Other({ n, cur, divine }: { n: number; cur: string; divine: number | null }) {
+  if (!divine) return null;
+  if (cur === "chaos") return n / divine < 0.01 ? null : <span className="tw-other">= <Price n={n / divine} cur="divine" /></span>;
+  if (cur === "divine") return <span className="tw-other">= <Price n={n * divine} cur="chaos" /></span>;
+  return null;
 }
 
 /** Whether the trade site is worth asking: poe.ninja already prices currency, cards, etc. */
@@ -229,18 +243,30 @@ export default function TradeWindow() {
       {check.bulk && (
         <div className="tw-res">
           <div className="tw-sum tw-bulkhead">
-            <span>Bulk: {bulk?.offers[0] ? <>from <b>{money(bulk.offers[0].pay_currency === "divine" && bulk.divine ? bulk.offers[0].each * bulk.divine : bulk.offers[0].each, bulk.divine)}</b> each</> : busy ? "checking…" : "no offers"}</span>
+            <span>{bulk?.offers[0] ? <>From <b><Price n={bulk.offers[0].each} cur={bulk.offers[0].pay_currency} /></b> each
+              {" "}<Other n={bulk.offers[0].each} cur={bulk.offers[0].pay_currency} divine={bulk.divine} /></> : busy ? "checking…" : "no offers"}</span>
             <span className="tw-pay">
               {(["chaos", "divine"] as const).map((p) => (
-                <button key={p} className={pay === p ? "on" : ""} onClick={() => { setPay(p); runBulk(check.bulk!, p); }}>{p === "chaos" ? "for chaos" : "for divines"}</button>
+                <button key={p} className={pay === p ? "on" : ""} onClick={() => { setPay(p); runBulk(check.bulk!, p); }}>
+                  pay in <CurrencyIcon id={p} /></button>
               ))}
             </span>
           </div>
+          {bulk?.offers[0] && bulk.divine && (() => {
+            // How many you get for one divine / one chaos: the ratio people trade at.
+            const eachChaos = bulk.offers[0].pay_currency === "divine" ? bulk.offers[0].each * bulk.divine : bulk.offers[0].each;
+            const perDiv = bulk.divine / eachChaos;
+            return <div className="tw-ratio muted small">
+              1 <CurrencyIcon id="divine" /> ≈ <b>{perDiv >= 10 ? Math.round(perDiv) : +perDiv.toFixed(1)}</b> {it.base_type}
+              {eachChaos < 1 && <> · 1 <CurrencyIcon id="chaos" /> ≈ <b>{+(1 / eachChaos).toFixed(1)}</b></>}
+              {" "}· 1 <CurrencyIcon id="divine" /> = <Price n={bulk.divine} cur="chaos" />
+            </div>;
+          })()}
           <ul className="tw-list">
             {bulk?.offers.map((o, i) => (
               <li key={i}>
-                <span className="tw-price">{+o.each.toFixed(o.each < 1 ? 3 : 2)} {o.pay_currency}</span>
-                <span className="muted small">{o.get > 1 ? `${o.pay} for ${o.get}` : ""}</span>
+                <span className="tw-price"><Price n={o.each} cur={o.pay_currency} /></span>
+                <span className="muted small"><Other n={o.each} cur={o.pay_currency} divine={bulk.divine} />{o.get > 1 ? ` · ${o.pay} for ${o.get}` : ""}</span>
                 <span className="tw-seller muted small">{o.stock} in stock · {o.account}</span>
                 {o.whisper && <button className="link small" onClick={() => copy(o.whisper, "b" + i)}>{copied === "b" + i ? "Copied" : "Whisper"}</button>}
               </li>
@@ -260,8 +286,8 @@ export default function TradeWindow() {
           <ul className="tw-list">
             {res.listings.map((l, i) => (
               <li key={i}>
-                <span className="tw-price" title={l.chaos != null && l.currency !== "chaos" ? `≈ ${money(l.chaos, divine)}` : undefined}>{+l.amount.toFixed(2)} {l.currency}</span>
-                <span className="muted small">{l.ilvl ? `ilvl ${l.ilvl} · ` : ""}{ago(l.indexed)}</span>
+                <span className="tw-price"><Price n={l.amount} cur={l.currency} /></span>
+                <span className="muted small"><Other n={l.amount} cur={l.currency} divine={divine} />{l.ilvl ? ` · ilvl ${l.ilvl}` : ""} · {ago(l.indexed)}</span>
                 <span className="tw-seller muted small">{l.account}</span>
                 {l.whisper && <button className="link small" onClick={() => copy(l.whisper, "l" + i)}>
                   {copied === "l" + i ? "Copied" : "Whisper"}</button>}
