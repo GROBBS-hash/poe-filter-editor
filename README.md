@@ -17,7 +17,8 @@ To make an installer: `npm run tauri build` (the installer lands in `src-tauri/t
 
 1. First launch asks: which game, which NeverSink filter, and what to call your filter (default "League Start").
 2. In game, open Options > Game > Item Filter and pick **League Start**. Play in **Windowed Fullscreen** so the pop-up can appear over the game.
-3. Hover any item and press **F2**. Pick Hide, Louder, Quieter or a highlight colour.
+3. Hover any item and press **F2**, in your inventory, stash, or **on the ground**. The pop-up shows what your filter does to it right now (shown or hidden, how it looks, its sound, stack rules), then pick Hide, Louder, Quieter or a highlight colour.
+   - On the ground, the app reads the label with Windows' built-in text recognition. It guesses the rarity from the label colour; tap a different rarity if it's wrong.
 4. Type `/itemfilter League Start` in chat to reload. Done.
 
 - **F3** turns on batch mode: Ctrl+C as many items as you like, then set them all at once in the app.

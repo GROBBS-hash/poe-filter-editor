@@ -23,7 +23,7 @@
         "label": "overlay",
         "title": "Quick edit",
         "width": 300,
-        "height": 300,
+        "height": 470,
         "transparent": true,
         "decorations": false,
         "alwaysOnTop": true,

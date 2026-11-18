@@ -1,5 +1,9 @@
+mod screen;
+
 use filter_core::{
-    filter::parse_filter,
+    evaluate::{status, Status},
+    filter::{parse_filter, Segment},
+    ground::{ground_item, known_names, match_base},
     item::{parse_item, resolve_magic_base, Item},
     profiles::{build, Game, Store},
     rules::{known_bases, locate, quick_rule, Action, Location, MatchOpts, Rule},
@@ -53,6 +57,53 @@ fn read_item(app: &AppHandle, text: &str) -> Option<Item> {
     Some(item)
 }
 
+/// Area level used when we can't know the item level (items on the ground).
+const ASSUMED_AREA_LEVEL: u32 = 83;
+
+/// The filter the game is actually using (with your edits), and the clean base.
+fn active_filters(app: &AppHandle) -> Option<(Vec<Segment>, Vec<Segment>)> {
+    let state = app.state::<AppState>();
+    let store = state.store.lock().unwrap();
+    let p = store.active.as_ref().and_then(|id| store.profiles.get(id))?;
+    let dir = filter_dir(p.game);
+    let base = std::fs::read_to_string(dir.join(&p.base_file)).ok()?;
+    let out = std::fs::read_to_string(dir.join(&p.output_file)).unwrap_or_else(|_| base.clone());
+    Some((parse_filter(&out), parse_filter(&base)))
+}
+
+#[derive(Serialize, Clone)]
+struct Picked {
+    item: Item,
+    from_screen: bool,
+    screen_text: Option<String>,
+    confidence: f32,
+}
+
+/// No item text on the clipboard: read the ground label under the mouse instead.
+fn read_from_ground(app: &AppHandle) -> Result<Picked, String> {
+    let read = screen::read_label_under_cursor()?;
+    if read.text.trim().is_empty() {
+        return Err("Couldn't see an item label under your mouse".into());
+    }
+    let (live, base) = active_filters(app).ok_or("Set up a filter first")?;
+    let names = known_names(&known_bases(&base));
+    let m = match_base(&read.text, &names)
+        .ok_or_else(|| format!("Read \"{}\" but couldn't match it to an item", read.text))?;
+    let item = ground_item(&live, &m, read.rgb, ASSUMED_AREA_LEVEL);
+    Ok(Picked { item, from_screen: true, screen_text: Some(read.text), confidence: m.confidence })
+}
+
+fn show_overlay(app: &AppHandle, event: &str, payload: impl Serialize + Clone) {
+    if let Some(w) = app.get_webview_window("overlay") {
+        if let Ok(pos) = w.cursor_position() {
+            let _ = w.set_position(PhysicalPosition::new(pos.x as i32 + 12, pos.y as i32 + 12));
+        }
+        let _ = w.emit(event, payload);
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
+}
+
 // ---------- hotkeys ----------
 
 fn send_ctrl_c() {
@@ -79,14 +130,14 @@ fn quick_edit(app: AppHandle) {
             }
         }
         let _ = app.clipboard().write_text(before);
-        let Some(item) = read_item(&app, &text) else { return };
-        if let Some(w) = app.get_webview_window("overlay") {
-            if let Ok(pos) = w.cursor_position() {
-                let _ = w.set_position(PhysicalPosition::new(pos.x as i32 + 12, pos.y as i32 + 12));
-            }
-            let _ = w.emit("item-picked", &item);
-            let _ = w.show();
-            let _ = w.set_focus();
+        // Inventory/stash: the game copied the item. Ground: read the label instead.
+        let picked = match read_item(&app, &text) {
+            Some(item) => Ok(Picked { item, from_screen: false, screen_text: None, confidence: 1.0 }),
+            None => read_from_ground(&app),
+        };
+        match picked {
+            Ok(p) => show_overlay(&app, "item-picked", p),
+            Err(e) => show_overlay(&app, "pick-failed", e),
         }
     });
 }
@@ -298,6 +349,14 @@ fn locate_item(state: State<AppState>, item: Item) -> Vec<Location> {
         .unwrap_or_default()
 }
 
+/// What the filter currently does to this item: shown or hidden, its look,
+/// its sound, and whether stack size changes that.
+#[tauri::command]
+fn item_status(app: AppHandle, item: Item, from_screen: bool) -> Result<Status, String> {
+    let (live, _) = active_filters(&app).ok_or("Set up a filter first")?;
+    Ok(status(&live, &item, ASSUMED_AREA_LEVEL, from_screen))
+}
+
 #[tauri::command]
 fn set_batch_mode(app: AppHandle, on: bool) {
     if on {
@@ -389,6 +448,7 @@ pub fn run() {
             delete_rule,
             rebuild,
             locate_item,
+            item_status,
             set_batch_mode
         ])
         .run(tauri::generate_context!())

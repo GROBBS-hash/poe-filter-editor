@@ -1,0 +1,377 @@
+//! Works out what a filter does to an item, the way the game does it:
+//! read blocks top to bottom, first full match wins (Continue keeps going).
+//! Conditions we can't check from the copied text (mods, influences...) are
+//! "unknown"; we report those honestly instead of guessing.
+
+use crate::filter::{Block, Segment};
+use crate::item::{is_gear, max_links, Item};
+use serde::Serialize;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Tri { Yes, No, Unknown }
+
+#[derive(Debug, Clone, Default, Serialize, PartialEq)]
+pub struct Style {
+    pub font_size: Option<u32>,
+    pub text: Option<[u8; 4]>,
+    pub border: Option<[u8; 4]>,
+    pub background: Option<[u8; 4]>,
+    pub sound: Option<String>,   // "Sound 1", "custom.mp3", or None
+    pub muted: bool,             // DisableDropSound
+    pub minimap: Option<String>, // "Large Red Star"
+    pub beam: Option<String>,    // "Red"
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct Verdict {
+    /// "Show", "Hide" or "Minimal". "None" = no block matched (game shows it plainly).
+    pub visibility: String,
+    pub style: Style,
+    /// Which block decided it, e.g. "uniques › t2", or your edit's label.
+    pub decided_by: String,
+    pub by_user_edit: bool,
+    /// Earlier blocks that might apply depending on things we can't see (mods etc).
+    pub uncertain: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct StackNote { pub from: u32, pub visibility: String }
+
+#[derive(Debug, Clone, Serialize)]
+pub struct Status {
+    pub verdict: Verdict,
+    /// Set when the outcome changes with stack size: [(1, Hide), (6, Show)]
+    pub by_stack: Vec<StackNote>,
+    /// Things we assumed, e.g. "item level 83 (ground item)".
+    pub assumptions: Vec<String>,
+}
+
+/// What we know about the item, plus assumptions for unknowns.
+#[derive(Debug, Clone)]
+pub struct Ctx<'a> {
+    pub item: &'a Item,
+    pub area_level: Option<u32>,
+    pub stack: Option<u32>,
+    /// Item came from the screen: booleans like Corrupted aren't known.
+    pub from_screen: bool,
+}
+
+const RARITIES: [&str; 4] = ["Normal", "Magic", "Rare", "Unique"];
+
+/// Splits `Key op values` and drops trailing comments outside quotes.
+fn split_condition(line: &str) -> Option<(&str, &str, Vec<String>)> {
+    let line = strip_comment(line.trim());
+    if line.is_empty() { return None; }
+    let (key, rest) = line.split_once(char::is_whitespace).unwrap_or((line, ""));
+    let rest = rest.trim();
+    let ops = ["==", "!=", "<=", ">=", "=", "<", ">"];
+    let (op, vals) = ops.iter()
+        .find_map(|o| rest.strip_prefix(o).map(|v| (*o, v.trim())))
+        .unwrap_or(("", rest));
+    Some((key, op, values(vals)))
+}
+
+fn strip_comment(s: &str) -> &str {
+    let mut in_q = false;
+    for (i, c) in s.char_indices() {
+        match c { '"' => in_q = !in_q, '#' if !in_q => return s[..i].trim_end(), _ => {} }
+    }
+    s
+}
+
+fn values(s: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut cur = String::new();
+    let mut in_q = false;
+    for c in s.chars() {
+        match c {
+            '"' => { in_q = !in_q; if !in_q { out.push(std::mem::take(&mut cur)); } }
+            c if c.is_whitespace() && !in_q => { if !cur.is_empty() { out.push(std::mem::take(&mut cur)); } }
+            c => cur.push(c),
+        }
+    }
+    if !cur.is_empty() { out.push(cur); }
+    out
+}
+
+fn cmp_num(have: Option<u32>, op: &str, vals: &[String]) -> Tri {
+    let Some(h) = have else { return Tri::Unknown };
+    let nums: Vec<u32> = vals.iter().filter_map(|v| v.parse().ok()).collect();
+    let Some(&v) = nums.first() else { return Tri::Unknown };
+    let ok = match op {
+        "<" => h < v, "<=" => h <= v, ">" => h > v, ">=" => h >= v,
+        "!=" => !nums.contains(&h),
+        _ => nums.contains(&h),
+    };
+    if ok { Tri::Yes } else { Tri::No }
+}
+
+fn cmp_text(have: &str, op: &str, vals: &[String]) -> Tri {
+    let hit = vals.iter().any(|v| if op == "==" { have == v } else { have.contains(v.as_str()) });
+    let ok = if op == "!=" { !hit } else { hit };
+    if ok { Tri::Yes } else { Tri::No }
+}
+
+fn cmp_bool(have: Option<bool>, vals: &[String]) -> Tri {
+    let Some(h) = have else { return Tri::Unknown };
+    match vals.first().map(|v| v.eq_ignore_ascii_case("true")) {
+        Some(want) if want == h => Tri::Yes,
+        Some(_) => Tri::No,
+        None => Tri::Unknown,
+    }
+}
+
+fn check(key: &str, op: &str, vals: &[String], c: &Ctx) -> Tri {
+    let it = c.item;
+    let gear_like = RARITIES.contains(&it.rarity.as_str());
+    match key {
+        "Class" => if it.item_class.is_empty() { Tri::Unknown } else { cmp_text(&it.item_class, op, vals) },
+        "BaseType" => cmp_text(&it.base_type, op, vals),
+        "Rarity" => {
+            let Some(rank) = RARITIES.iter().position(|r| *r == it.rarity) else {
+                // Currency, gems etc. are "Normal" to the filter.
+                return cmp_rarity(0, op, vals);
+            };
+            cmp_rarity(rank, op, vals)
+        }
+        "ItemLevel" => cmp_num(it.item_level.or(c.area_level), op, vals),
+        "AreaLevel" => cmp_num(c.area_level, op, vals),
+        "StackSize" => cmp_num(c.stack.or(it.stack_size).or(Some(1)), op, vals),
+        "Quality" => cmp_num(if c.from_screen { None } else { Some(it.quality.unwrap_or(0)) }, op, vals),
+        "MapTier" | "WaypointTier" => cmp_num(it.map_tier, op, vals),
+        "LinkedSockets" => match (&it.sockets, c.from_screen) {
+            (_, true) => Tri::Unknown,
+            (Some(s), _) => cmp_num(Some(max_links(s)), op, vals),
+            (None, _) => cmp_num(Some(0), op, vals),
+        },
+        "Sockets" => match (&it.sockets, c.from_screen) {
+            (_, true) => Tri::Unknown,
+            _ if vals.iter().any(|v| v.chars().any(|ch| ch.is_alphabetic())) => Tri::Unknown,
+            (Some(s), _) => cmp_num(Some(s.chars().filter(|ch| ch.is_alphabetic()).count() as u32), op, vals),
+            (None, _) => cmp_num(Some(0), op, vals),
+        },
+        "Corrupted" => cmp_bool(if c.from_screen { Some(false) } else { Some(it.corrupted) }, vals),
+        "Mirrored" => cmp_bool(if c.from_screen { Some(false) } else { Some(it.mirrored) }, vals),
+        "Identified" => cmp_bool(
+            if c.from_screen { gear_like.then_some(false) } else { Some(!it.unidentified) }, vals),
+        "FracturedItem" | "SynthesisedItem" | "Replica" | "Foulborn" | "Scourged" | "IsVaalUnique"
+        | "ElderMap" | "ShapedMap" | "BlightedMap" | "UberBlightedMap"
+        | "TransfiguredGem" | "ZanaMemory" | "Imbued" =>
+            if c.from_screen { Tri::Unknown } else { cmp_bool(Some(false), vals) },
+        "MemoryStrands" if !c.from_screen => cmp_num(Some(it.memory_strands.unwrap_or(0)), op, vals),
+        // Things only gear can have: rule them out for currency, gems, cards...
+        "HasExplicitMod" | "UnidentifiedItemTier" | "MemoryStrands" | "HasInfluence" | "HasEaterOfWorldsImplicit"
+        | "HasSearingExarchImplicit" | "EnchantmentPassiveNum" | "HasEnchantment" | "SocketGroup"
+        | "HasCruciblePassiveTree" | "HasImplicitMod" | "AnyEnchantment" | "CorruptedMods"
+            if !is_gear(it) && !it.item_class.is_empty() => absent(key, op, vals),
+        _ => Tri::Unknown,
+    }
+}
+
+/// The item has none of this. "HasExplicitMod >= 2 ..." -> No, "HasInfluence None" -> Yes.
+fn absent(key: &str, op: &str, vals: &[String]) -> Tri {
+    if vals.first().map(|v| v.eq_ignore_ascii_case("false")).unwrap_or(false) { return Tri::Yes; }
+    if vals.first().map(|v| v.eq_ignore_ascii_case("true")).unwrap_or(false) { return Tri::No; }
+    if key == "HasInfluence" {
+        return if vals.iter().any(|v| v == "None") { Tri::Yes } else { Tri::No };
+    }
+    let first_num = vals.first().and_then(|v| v.parse::<u32>().ok());
+    match (op, first_num) {
+        ("<" | "<=", Some(_)) => Tri::Yes,
+        ("=" | "==", Some(0)) | (">=", Some(0)) => Tri::Yes,
+        _ => Tri::No,
+    }
+}
+
+fn cmp_rarity(rank: usize, op: &str, vals: &[String]) -> Tri {
+    let ranks: Vec<usize> = vals.iter().filter_map(|v| RARITIES.iter().position(|r| r == v)).collect();
+    let Some(&v) = ranks.first() else { return Tri::Unknown };
+    let ok = match op {
+        "<" => rank < v, "<=" => rank <= v, ">" => rank > v, ">=" => rank >= v,
+        "!=" => !ranks.contains(&rank), _ => ranks.contains(&rank),
+    };
+    if ok { Tri::Yes } else { Tri::No }
+}
+
+fn colour(vals: &[String]) -> Option<[u8; 4]> {
+    let n: Vec<u8> = vals.iter().filter_map(|v| v.parse().ok()).collect();
+    (n.len() >= 3).then(|| [n[0], n[1], n[2], *n.get(3).unwrap_or(&255)])
+}
+
+fn apply_actions(b: &Block, s: &mut Style) -> bool {
+    let mut cont = false;
+    for line in &b.lines {
+        let Some((key, _, v)) = split_condition(line) else { continue };
+        match key {
+            "SetFontSize" => s.font_size = v.first().and_then(|x| x.parse().ok()),
+            "SetTextColor" => s.text = colour(&v),
+            "SetBorderColor" => s.border = colour(&v),
+            "SetBackgroundColor" => s.background = colour(&v),
+            "PlayAlertSound" | "PlayAlertSoundPositional" => {
+                s.sound = v.first().map(|x| format!("Sound {x}"));
+                s.muted = false;
+            }
+            "CustomAlertSound" | "CustomAlertSoundOptional" => {
+                s.sound = v.first().map(|x| x.rsplit(['/', '\\']).next().unwrap_or(x).to_string());
+                s.muted = false;
+            }
+            "DisableDropSound" => { s.muted = true; s.sound = None; }
+            "EnableDropSound" => s.muted = false,
+            "MinimapIcon" if v.first().map(|x| x != "-1").unwrap_or(false) => {
+                let size = ["Large", "Medium", "Small"].get(v[0].parse::<usize>().unwrap_or(2)).unwrap_or(&"Small");
+                s.minimap = Some(format!("{size} {} {}", v.get(1).cloned().unwrap_or_default(), v.get(2).cloned().unwrap_or_default()).trim().to_string());
+            }
+            "PlayEffect" if v.first().map(|x| x != "None").unwrap_or(false) => s.beam = v.first().cloned(),
+            "Continue" => cont = true,
+            _ => {}
+        }
+    }
+    cont
+}
+
+fn describe(b: &Block) -> (String, bool) {
+    let content = b.header.trim_end();
+    if let Some((_, label)) = content.split_once(" # ").filter(|_| b.type_path.is_empty()) {
+        let label = label.trim();
+        if ["Hide: ", "Highlight: ", "Louder: ", "Quieter: "].iter().any(|p| label.starts_with(p)) {
+            return (label.to_string(), true);
+        }
+    }
+    if b.type_path.is_empty() {
+        return ("an untagged rule".into(), false);
+    }
+    let mut s = b.type_path.join(" › ");
+    if let Some(t) = &b.tier { s.push_str(&format!(" › {t}")); }
+    (s, false)
+}
+
+const CONDITION_KEYS_ARE_NOT_ACTIONS: [&str; 10] = [
+    "SetFontSize", "SetTextColor", "SetBorderColor", "SetBackgroundColor", "PlayAlertSound",
+    "PlayAlertSoundPositional", "CustomAlertSound", "CustomAlertSoundOptional", "MinimapIcon", "PlayEffect",
+];
+const OTHER_ACTIONS: [&str; 4] = ["DisableDropSound", "EnableDropSound", "Continue", "DisableDropSoundIfAlertSound"];
+
+pub fn evaluate(segs: &[Segment], c: &Ctx) -> Verdict {
+    let mut style = Style::default();
+    let mut uncertain = Vec::new();
+    for s in segs {
+        let Segment::Block(b) = s else { continue };
+        let mut result = Tri::Yes;
+        let mut unknown_keys = Vec::new();
+        for line in &b.lines {
+            let Some((key, op, vals)) = split_condition(line) else { continue };
+            if CONDITION_KEYS_ARE_NOT_ACTIONS.contains(&key) || OTHER_ACTIONS.contains(&key) { continue; }
+            match check(key, op, &vals, c) {
+                Tri::No => { result = Tri::No; break; }
+                Tri::Unknown => { result = Tri::Unknown; unknown_keys.push(key.to_string()); }
+                Tri::Yes => {}
+            }
+        }
+        match result {
+            Tri::No => continue,
+            Tri::Unknown => {
+                if uncertain.len() < 5 {
+                    let (d, _) = describe(b);
+                    unknown_keys.dedup();
+                    uncertain.push(format!("{d} (if {})", unknown_keys.join(", ")));
+                }
+            }
+            Tri::Yes => {
+                let cont = apply_actions(b, &mut style);
+                if !cont {
+                    let (decided_by, by_user_edit) = describe(b);
+                    return Verdict { visibility: b.visibility.clone(), style, decided_by, by_user_edit, uncertain };
+                }
+            }
+        }
+    }
+    Verdict { visibility: "None".into(), style, decided_by: "no rule matched".into(), by_user_edit: false, uncertain }
+}
+
+/// Full status, including whether stack size changes the outcome.
+pub fn status(segs: &[Segment], item: &Item, area_level: u32, from_screen: bool) -> Status {
+    let mut assumptions = Vec::new();
+    if item.item_level.is_none() && RARITIES.contains(&item.rarity.as_str()) {
+        assumptions.push(format!("item level {area_level}"));
+    }
+    if from_screen {
+        assumptions.push("not corrupted, unidentified".into());
+    }
+    let ctx = Ctx { item, area_level: Some(area_level), stack: None, from_screen };
+    let verdict = evaluate(segs, &ctx);
+
+    // Look for StackSize thresholds on blocks that mention this base.
+    let mut points: Vec<u32> = vec![1];
+    for s in segs {
+        let Segment::Block(b) = s else { continue };
+        if !b.lines.iter().any(|l| l.contains("StackSize")) { continue; }
+        let names_base = b.base_types().iter().any(|x| x == &item.base_type || item.base_type.contains(x.as_str()));
+        if !names_base { continue; }
+        for l in &b.lines {
+            if let Some(("StackSize", op, v)) = split_condition(l) {
+                if let Some(n) = v.first().and_then(|x| x.parse::<u32>().ok()) {
+                    points.push(match op { ">" => n + 1, "<" => n, "<=" => n + 1, _ => n });
+                }
+            }
+        }
+    }
+    points.sort();
+    points.dedup();
+    let mut by_stack: Vec<StackNote> = Vec::new();
+    if points.len() > 1 {
+        for p in points {
+            let v = evaluate(segs, &Ctx { stack: Some(p), ..ctx.clone() });
+            if by_stack.last().map(|l| l.visibility != v.visibility).unwrap_or(true) {
+                by_stack.push(StackNote { from: p, visibility: v.visibility });
+            }
+        }
+        if by_stack.len() < 2 { by_stack.clear(); }
+    }
+    Status { verdict, by_stack, assumptions }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::filter::parse_filter;
+    use crate::item::parse_item;
+
+    const F: &str = "Show # $type->currency $tier->t1\n    BaseType == \"Divine Orb\"\n    SetFontSize 45\n    SetTextColor 255 0 0 255\n    PlayAlertSound 1 300\n\nHide # $type->currency $tier->wisdom\n    StackSize < 6\n    BaseType == \"Scroll of Wisdom\"\n\nShow # $type->currency $tier->wisdomstack\n    BaseType == \"Scroll of Wisdom\"\n    SetFontSize 30\n\nShow # $type->rare $tier->mods\n    HasExplicitMod \"of Haast\"\n    Rarity Rare\n    SetFontSize 40\n\nHide # $type->rare $tier->rest\n    Rarity Rare\n";
+
+    fn item(t: &str) -> Item { parse_item(t).unwrap() }
+
+    #[test]
+    fn shown_with_style() {
+        let s = status(&parse_filter(F), &item("Item Class: Stackable Currency\nRarity: Currency\nDivine Orb\n"), 83, false);
+        assert_eq!(s.verdict.visibility, "Show");
+        assert_eq!(s.verdict.style.font_size, Some(45));
+        assert_eq!(s.verdict.style.text, Some([255, 0, 0, 255]));
+        assert_eq!(s.verdict.style.sound.as_deref(), Some("Sound 1"));
+        assert_eq!(s.verdict.decided_by, "currency › t1");
+    }
+
+    #[test]
+    fn stack_size_changes_outcome() {
+        let s = status(&parse_filter(F), &item("Item Class: Stackable Currency\nRarity: Currency\nScroll of Wisdom\n--------\nStack Size: 2/40\n"), 83, false);
+        assert_eq!(s.verdict.visibility, "Hide");
+        let v: Vec<(u32, &str)> = s.by_stack.iter().map(|n| (n.from, n.visibility.as_str())).collect();
+        assert_eq!(v, vec![(1, "Hide"), (6, "Show")]);
+    }
+
+    #[test]
+    fn unknown_mods_are_reported_not_guessed() {
+        let s = status(&parse_filter(F), &item("Item Class: Rings\nRarity: Rare\nDoom Loop\nCoral Ring\n"), 83, false);
+        assert_eq!(s.verdict.visibility, "Hide");
+        assert_eq!(s.verdict.uncertain.len(), 1);
+        assert!(s.verdict.uncertain[0].contains("HasExplicitMod"));
+    }
+
+    #[test]
+    fn user_edit_label() {
+        let f = format!("Hide # Hide: Divine Orb\n    BaseType == \"Divine Orb\"\n\n{F}");
+        let s = status(&parse_filter(&f), &item("Item Class: Stackable Currency\nRarity: Currency\nDivine Orb\n"), 83, false);
+        assert_eq!(s.verdict.visibility, "Hide");
+        assert!(s.verdict.by_user_edit);
+        assert_eq!(s.verdict.decided_by, "Hide: Divine Orb");
+    }
+}

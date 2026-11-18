@@ -1,7 +1,8 @@
 //! Parses the text Path of Exile puts on the clipboard when you Ctrl+C an item.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::sync::OnceLock;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct Item {
@@ -17,6 +18,8 @@ pub struct Item {
     pub corrupted: bool,
     pub mirrored: bool,
     pub unidentified: bool,
+    #[serde(default)]
+    pub memory_strands: Option<u32>,
 }
 
 const SEP: &str = "--------";
@@ -64,6 +67,8 @@ pub fn parse_item(text: &str) -> Option<Item> {
             item.quality = v.split_whitespace().next().and_then(num);
         } else if let Some(v) = line.strip_prefix("Sockets: ") {
             item.sockets = Some(v.trim().to_string());
+        } else if let Some(v) = line.strip_prefix("Memory Strands: ") {
+            item.memory_strands = num(v);
         } else if let Some(v) = line.strip_prefix("Map Tier: ") {
             item.map_tier = num(v);
         } else if *line == "Corrupted" {
@@ -90,6 +95,28 @@ pub fn resolve_magic_base(item: &mut Item, known_bases: &HashSet<String>) {
     {
         item.base_type = best.clone();
     }
+}
+
+/// Every PoE 1 base type with its item class, from the game's own data.
+pub fn base_classes() -> &'static HashMap<String, String> {
+    static MAP: OnceLock<HashMap<String, String>> = OnceLock::new();
+    MAP.get_or_init(|| serde_json::from_str(include_str!("../data/poe1_bases.json")).unwrap_or_default())
+}
+
+/// Fills in the item class when we only know the base (items read off the ground).
+pub fn fill_class(item: &mut Item) {
+    if item.item_class.trim().is_empty() {
+        if let Some(c) = base_classes().get(&item.base_type) {
+            item.item_class = c.clone();
+        }
+    }
+}
+
+/// Gear can roll mods; currency, gems, cards etc. can't.
+pub fn is_gear(item: &Item) -> bool {
+    matches!(item.rarity.as_str(), "Normal" | "Magic" | "Rare" | "Unique")
+        && !matches!(item.item_class.as_str(), "Stackable Currency" | "Divination Cards" | "Map Fragments"
+            | "Skill Gems" | "Support Gems" | "Quest Items" | "Incubators" | "Delve Stackable Socketable Currency")
 }
 
 /// How many links the biggest group has, e.g. "R-G-B G" -> 3.

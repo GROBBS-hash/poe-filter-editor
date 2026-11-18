@@ -915,6 +915,7 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+ "strsim",
 ]
 
 [[package]]
@@ -2640,6 +2641,7 @@ dependencies = [
  "tauri-plugin-clipboard-manager",
  "tauri-plugin-dialog",
  "tauri-plugin-global-shortcut",
+ "windows 0.61.3",
 ]
 
 [[package]]

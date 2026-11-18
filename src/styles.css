@@ -61,3 +61,22 @@ code { background: #000; padding: 1px 5px; border-radius: 4px; color: var(--gold
 .qm-foot { display: flex; justify-content: space-between; }
 .qm-link { background: none; border: none; color: var(--muted); font-size: 12px; padding: 4px; }
 .qm-toast { margin-top: 6px; font-size: 12px; color: #9fe39f; text-align: center; }
+
+/* status box in the quick menu */
+.qm-status { border: 1px solid #3a3022; border-radius: 8px; padding: 8px; margin: 6px 0 8px; background: rgba(0,0,0,.35); }
+.qm-status.is-shown { border-color: #2f6b3a; }
+.qm-status.is-hidden { border-color: #7a2c2c; }
+.qm-status-top { display: flex; align-items: center; gap: 8px; }
+.qm-pill { font-size: 11px; letter-spacing: 1px; padding: 3px 7px; border-radius: 4px; font-family: system-ui, sans-serif; font-weight: 700; }
+.is-shown .qm-pill { background: #1f4d29; color: #9ff0ad; }
+.is-hidden .qm-pill { background: #5a1f1f; color: #ffb0b0; }
+.qm-preview { border: 2px solid transparent; padding: 1px 6px; border-radius: 2px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; max-width: 190px; }
+.qm-facts { font-size: 12px; color: #cfc4ad; margin-top: 5px; }
+.qm-by { font-size: 11px; color: var(--muted); margin-top: 5px; }
+.qm-by b { color: var(--gold); font-weight: normal; }
+.qm-unsure { font-size: 11px; color: #8d8270; margin-top: 3px; font-style: italic; }
+.qm-rarity { display: flex; gap: 4px; margin: 6px 0 2px; }
+.qm-rarity button { flex: 1; padding: 4px 0; font-size: 12px; background: #1a1510; }
+.qm-rarity button.on { border-color: currentColor; background: #2a2219; }
+.qm-fail { font-size: 13px; color: #ffb0b0; text-align: center; padding: 6px; }
