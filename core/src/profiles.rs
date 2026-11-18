@@ -7,7 +7,7 @@ use crate::rules::{apply_with_extra, Rule};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fs, io, path::Path};
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Game { Poe1, Poe2 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

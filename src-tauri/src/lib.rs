@@ -6,7 +6,8 @@ use filter_core::{
     area::{find_log, read_area_level, selected_filter},
     ground::{ground_item, known_names, match_base, LabelColours},
     item::{is_stackable, parse_item, resolve_magic_base, Item},
-    profiles::{build, Game, Store},
+    prices::{default_settings, price_of, PriceFile, PriceSettings},
+    profiles::{build_with_prices, Game, Store},
     rules::{custom_rule, edited_rule, known_bases, locate, quick_rule, rule_detail, Action, CustomStyle, Location, MatchOpts, Rule, RuleDetail, RuleEdit},
 };
 use serde::Serialize;
@@ -28,6 +29,56 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Shortcut, ShortcutSt
 struct AppState {
     store: Mutex<Store>,
     store_path: PathBuf,
+    /// Latest prices per game, downloaded hourly from the app's own price cache.
+    prices: Mutex<std::collections::HashMap<Game, PriceFile>>,
+    data_dir: PathBuf,
+}
+
+const PRICE_URL: &str = "https://raw.githubusercontent.com/GROBBS-hash/poe-filter-editor/prices";
+
+fn game_key(g: Game) -> &'static str { match g { Game::Poe1 => "poe1", Game::Poe2 => "poe2" } }
+
+/// Downloads the latest prices. Returns the games whose prices changed.
+fn fetch_prices(app: &AppHandle) -> Vec<Game> {
+    let state = app.state::<AppState>();
+    let mut changed = Vec::new();
+    for g in [Game::Poe1, Game::Poe2] {
+        let url = format!("{PRICE_URL}/{}.json", game_key(g));
+        let Ok(resp) = ureq::get(&url).set("User-Agent", "poe-filter-editor").timeout(Duration::from_secs(20)).call() else { continue };
+        let Ok(body) = resp.into_string() else { continue };
+        let Ok(file) = serde_json::from_str::<PriceFile>(&body) else { continue };
+        let mut prices = state.prices.lock().unwrap();
+        if prices.get(&g).map(|p| p.updated != file.updated).unwrap_or(true) {
+            let _ = std::fs::write(state.data_dir.join(format!("prices_{}.json", game_key(g))), &body);
+            prices.insert(g, file);
+            changed.push(g);
+        }
+    }
+    changed
+}
+
+/// Rebuild every filter that uses price tiers for these games.
+fn rebuild_priced(app: &AppHandle, games: &[Game]) {
+    let state = app.state::<AppState>();
+    let store = state.store.lock().unwrap();
+    let ids: Vec<String> = store.profiles.values()
+        .filter(|p| games.contains(&p.game) && p.prices.as_ref().map(|s| s.enabled).unwrap_or(false))
+        .map(|p| p.id.clone()).collect();
+    for id in ids {
+        let _ = save_and_build(&state, &store, &id);
+    }
+}
+
+/// Hourly price updates in the background.
+fn start_price_updates(app: AppHandle) {
+    thread::spawn(move || loop {
+        let changed = fetch_prices(&app);
+        if !changed.is_empty() {
+            rebuild_priced(&app, &changed);
+            let _ = app.emit("prices-updated", ());
+        }
+        thread::sleep(Duration::from_secs(60 * 60));
+    });
 }
 
 static BATCH_ON: AtomicBool = AtomicBool::new(false);
@@ -313,7 +364,8 @@ fn overview(state: State<AppState>) -> Overview {
 fn save_and_build(state: &AppState, store: &Store, id: &str) -> Result<Vec<String>, String> {
     store.save(&state.store_path).map_err(err)?;
     let game = store.profiles.get(id).ok_or("Profile not found")?.game;
-    build(store, id, &filter_dir(game)).map_err(err)
+    let prices = state.prices.lock().unwrap();
+    build_with_prices(store, id, &filter_dir(game), prices.get(&game)).map_err(err)
 }
 
 #[tauri::command]
@@ -511,6 +563,50 @@ fn item_status(app: AppHandle, item: Item, from_screen: bool) -> Result<StatusRe
 #[derive(Serialize)]
 struct StatusReply { status: Status, area_level: Option<u32>, game_filter: Option<GameFilter>, stackable: bool }
 
+#[derive(Serialize)]
+struct PriceInfo { league: String, updated: String, unit: String, count: usize }
+
+#[derive(Serialize)]
+struct PricePage { settings: PriceSettings, info: Option<PriceInfo>, game: Game }
+
+/// The Prices screen: this filter's tier settings and the latest price data.
+#[tauri::command]
+fn get_price_settings(state: State<AppState>, id: String) -> Result<PricePage, String> {
+    let store = state.store.lock().unwrap();
+    let p = store.profiles.get(&id).ok_or("Profile not found")?;
+    let prices = state.prices.lock().unwrap();
+    let file = prices.get(&p.game);
+    let unit = file.map(|f| f.unit.clone()).unwrap_or_else(|| if p.game == Game::Poe1 { "chaos".into() } else { "exalted".into() });
+    Ok(PricePage {
+        settings: p.prices.clone().unwrap_or_else(|| default_settings(&unit)),
+        info: file.map(|f| PriceInfo { league: f.league_name.clone().unwrap_or_else(|| f.league.clone()), updated: f.updated.clone(), unit: f.unit.clone(), count: f.items.len() }),
+        game: p.game,
+    })
+}
+
+#[tauri::command]
+fn set_price_settings(state: State<AppState>, id: String, settings: PriceSettings) -> Result<Vec<String>, String> {
+    let mut store = state.store.lock().unwrap();
+    store.profiles.get_mut(&id).ok_or("Profile not found")?.prices = Some(settings);
+    save_and_build(&state, &store, &id)
+}
+
+#[tauri::command]
+fn refresh_prices(app: AppHandle) -> bool {
+    let changed = fetch_prices(&app);
+    rebuild_priced(&app, &changed);
+    !changed.is_empty()
+}
+
+/// What poe.ninja says this item is worth (for the pop-up).
+#[tauri::command]
+fn item_price(state: State<AppState>, item: Item) -> Option<(f64, String)> {
+    let game = active_game(&state);
+    let prices = state.prices.lock().unwrap();
+    let f = prices.get(&game)?;
+    price_of(f, item.name.as_deref(), &item.base_type, &item.rarity).map(|v| (v, f.unit.clone()))
+}
+
 #[tauri::command]
 fn set_batch_mode(app: AppHandle, on: bool) {
     if on {
@@ -562,7 +658,17 @@ pub fn run() {
             let data = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data)?;
             let store_path = data.join("profiles.json");
-            app.manage(AppState { store: Mutex::new(Store::load(&store_path)), store_path });
+            // Start from the last downloaded prices, then keep them fresh.
+            let mut cached = std::collections::HashMap::new();
+            for g in [Game::Poe1, Game::Poe2] {
+                if let Some(f) = std::fs::read_to_string(data.join(format!("prices_{}.json", game_key(g)))).ok()
+                    .and_then(|t| serde_json::from_str::<PriceFile>(&t).ok()) {
+                    cached.insert(g, f);
+                }
+            }
+            app.manage(AppState { store: Mutex::new(Store::load(&store_path)), store_path,
+                prices: Mutex::new(cached), data_dir: data.clone() });
+            start_price_updates(app.handle().clone());
             app.global_shortcut().register(f2)?;
             app.global_shortcut().register(f3)?;
             app.global_shortcut().register(f4)?;
@@ -618,7 +724,11 @@ pub fn run() {
             update_rule,
             locate_item,
             item_status,
-            set_batch_mode
+            set_batch_mode,
+            get_price_settings,
+            set_price_settings,
+            refresh_prices,
+            item_price
         ])
         .run(tauri::generate_context!())
         .expect("error while running the app");

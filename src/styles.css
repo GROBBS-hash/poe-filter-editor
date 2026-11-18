@@ -136,3 +136,20 @@ code { background: #000; padding: 1px 5px; border-radius: 4px; color: var(--gold
   border-radius: 6px; padding: 6px 8px; margin-bottom: 8px; }
 .qm-editing b { color: #fff; font-weight: normal; }
 .rule-edit.qm { width: 300px; margin: 10px auto 4px; box-shadow: none; }
+
+/* prices */
+.qm-price { font-size: 13px; color: #ffd76a; margin-top: 3px; }
+.qm-price span { color: var(--muted); font-size: 11px; }
+.big-check { font-size: 16px; color: var(--text); margin: 10px 0 2px; }
+.group-title { font-size: 16px; color: #f3e6c4; }
+.card.dim { opacity: .5; }
+.tiers { list-style: none; padding: 0; margin: 8px 0; }
+.tiers li { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #2c241a; flex-wrap: wrap; }
+.tiers input, .hide-below input[type=number] { width: 80px; font: inherit; color: var(--text); background: #120f0b;
+  border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
+.tier-name { color: var(--gold); width: 52px; }
+.tier-preview { flex: 1; display: flex; justify-content: center; min-width: 110px; }
+.hide-below { margin-top: 12px; color: var(--text); }
+.save-bar { position: sticky; bottom: 0; display: flex; justify-content: flex-end; align-items: center; gap: 12px;
+  padding: 10px 0; background: var(--bg); }
+.prices-style .qm { width: 300px; margin: 10px auto; }

@@ -6,8 +6,9 @@ import Setup from "./Setup";
 import Profiles from "./Profiles";
 import Edits from "./Edits";
 import Batch from "./Batch";
+import Prices from "./Prices";
 
-type Tab = "edits" | "batch" | "profiles";
+type Tab = "edits" | "prices" | "batch" | "profiles";
 
 export default function App() {
   const [ov, setOv] = useState<Overview | null>(null);
@@ -36,7 +37,7 @@ export default function App() {
       <header className="top">
         <div>
           <div className="brand">PoE Filter Editor</div>
-          <div className="muted">F2 on an item = quick edit · F3 = batch mode</div>
+          <div className="muted">F2 on an item = quick edit · F3 = batch mode · F4 = reload filter</div>
         </div>
         <select className="profile-pick" value={active.id}
           onChange={async (e) => { await invoke("set_active", { id: e.target.value }); refresh(); }}>
@@ -47,14 +48,15 @@ export default function App() {
       </header>
 
       <nav className="tabs">
-        {(["edits", "batch", "profiles"] as Tab[]).map((t) => (
+        {(["edits", "prices", "batch", "profiles"] as Tab[]).map((t) => (
           <button key={t} className={tab === t ? "tab on" : "tab"} onClick={() => setTab(t)}>
-            {{ edits: "My edits", batch: "Batch mode", profiles: "Profiles" }[t]}
+            {{ edits: "My edits", prices: "Prices", batch: "Batch mode", profiles: "Profiles" }[t]}
           </button>
         ))}
       </nav>
 
       {tab === "edits" && <Edits profile={active} onChange={refresh} />}
+      {tab === "prices" && <Prices profile={active} />}
       {tab === "batch" && <Batch on={ov.batch_on} onChange={refresh} />}
       {tab === "profiles" && <Profiles ov={ov} active={active} onChange={refresh} />}
     </div>

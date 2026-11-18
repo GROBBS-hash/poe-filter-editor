@@ -92,6 +92,10 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
     }
   }, []);
   useEffect(() => { refresh(start); }, [refresh, start]);
+  const [price, setPrice] = useState<[number, string] | null>(null);
+  useEffect(() => {
+    invoke<[number, string] | null>("item_price", { item: picked.item }).then(setPrice).catch(() => setPrice(null));
+  }, [picked.item]);
 
   const setRarity = (rarity: string) => {
     const p = { ...picked, item: { ...picked.item, rarity } };
@@ -246,6 +250,13 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
       <div className="qm-head">
         <div className="qm-name" style={{ color: RARITY_COLOUR[item.rarity] ?? "#ddd" }}>{itemTitle(item)}</div>
         <div className="qm-sub">{itemSub(item)}</div>
+        {price && (
+          <div className="qm-price">
+            ≈ {price[0] >= 100 ? Math.round(price[0]).toLocaleString() : +price[0].toFixed(price[0] < 1 ? 2 : 1)}
+            {({ chaos: "c", exalted: "ex", divine: "div" } as Record<string, string>)[price[1]] ?? price[1]}
+            <span> on poe.ninja{item.rarity === "Unique" && !item.name ? " (best unique on this base)" : ""}</span>
+          </div>
+        )}
         {picked.from_screen && (
           <div className="qm-where">Read from the ground: “{picked.screen_text}”{picked.confidence < 1 ? " (best guess)" : ""}</div>
         )}
