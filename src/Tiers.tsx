@@ -7,6 +7,37 @@ import { ItemIcon } from "./icons";
 
 type TierRow = { tier: string; name: string; visibility: string; style: CurrentStyle; bases: string[]; note: string; min_stack: number | null };
 
+/** "+ Add item": search any item and put it in this tier. */
+function AddItem({ onAdd }: { onAdd: (base: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const [res, setRes] = useState<{ base_type: string; item_class: string }[]>([]);
+  useEffect(() => {
+    if (q.trim().length < 2) { setRes([]); return; }
+    const id = window.setTimeout(() => invoke<{ base_type: string; item_class: string }[]>("search_items", { q })
+      .then((r) => setRes(r.filter((x) => x.base_type).slice(0, 8))).catch(() => setRes([])), 150);
+    return () => window.clearTimeout(id);
+  }, [q]);
+  if (!open) return <button className="link small add-item" onClick={() => setOpen(true)}>+ Add item</button>;
+  return (
+    <span className="add-box">
+      <input autoFocus placeholder="Item name…" value={q} onChange={(e) => setQ(e.target.value)}
+        onKeyDown={(e) => e.key === "Escape" && setOpen(false)} />
+      <button className="link small" onClick={() => { setOpen(false); setQ(""); }}>Cancel</button>
+      {res.length > 0 && (
+        <ul className="results add-results">
+          {res.map((r) => (
+            <li key={r.base_type} onClick={() => { onAdd(r.base_type); setOpen(false); setQ(""); }}>
+              <span className="with-icon"><ItemIcon base={r.base_type} size={20} />{r.base_type}</span>
+              <span className="muted small">{r.item_class}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </span>
+  );
+}
+
 /** "Stacks of N+": saves when you leave the box or press Enter. */
 function StackBox({ value, onSave }: { value: number; onSave: (n: number) => void }) {
   const [v, setV] = useState(String(value));
@@ -73,6 +104,12 @@ export default function Tiers({ profile, onChange }: { profile: ProfileInfo; onC
       style: patch.style ?? null, minStack: patch.minStack ?? null, reset: !!patch.reset }),
       patch.reset ? `${t.name} is back to NeverSink's.` : patch.style ? `${t.name} restyled.`
         : patch.minStack ? `${t.name} now applies to stacks of ${patch.minStack}+.` : `${t.name} ${patch.show ? "shown" : "hidden"}.`);
+  const addTo = (t: TierRow, base: string) => {
+    // Already listed in an earlier section of this filter? Then that one wins in game; say so.
+    const elsewhere = sections.find((x) => x !== section && x.tiers.some((y) => y.bases.includes(base)));
+    done(invoke("move_tier_item", { id: profile.id, typePath: section!.type_path, base, toTier: t.tier }),
+      `${base} added to ${t.name}.` + (elsewhere ? ` Note: it's also in “${elsewhere.title}”; if that comes first in NeverSink's filter, that one still decides.` : ""));
+  };
   const drop = (t: TierRow) => {
     if (!drag || drag.from === t.tier) return;
     done(invoke("move_tier_item", { id: profile.id, typePath: section!.type_path, base: drag.base, toTier: t.tier }),
@@ -115,7 +152,7 @@ export default function Tiers({ profile, onChange }: { profile: ProfileInfo; onC
           <div className="card">
             <h2>{section.title} <Tip>NeverSink sorts items into tiers, best at the top. <b>Untick</b> a tier to hide everything in it.
               <b> Click the label</b> to change how the whole tier looks. <b>Drag</b> an item onto another tier to move it there
-              (e.g. drag Chaos Orb up a tier). <b>Copy/Paste</b> gives one tier another tier's look. <b>Reset</b> puts a tier back
+              (e.g. drag Chaos Orb up a tier). <b>+ Add item</b> puts any item in a tier, e.g. add a currency to “Stacks of 6+” to give its stacks that look while single drops keep their normal one. <b>Copy/Paste</b> gives one tier another tier's look. <b>Reset</b> puts a tier back
               to NeverSink's. Your changes survive NeverSink updates and strictness changes.</Tip></h2>
             {section.tiers.map((t) => {
               const key = t.tier;
@@ -168,6 +205,7 @@ export default function Tiers({ profile, onChange }: { profile: ProfileInfo; onC
                         {open ? "Show fewer" : `+${t.bases.length - SHOW_ITEMS} more`}
                       </button>
                     )}
+                    <AddItem onAdd={(b) => addTo(t, b)} />
                   </div>
                 </div>
               );

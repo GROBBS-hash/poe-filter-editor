@@ -34,6 +34,10 @@ const KNOWN: &[(&str, &str, &str)] = &[
     ("currency", "Currency", "Currency"),
     ("currency->stackedthree", "Currency", "Stacks of 3+"),
     ("currency->stackedsix", "Currency", "Stacks of 6+"),
+    ("currency->stackedsupplieswisdom", "Currency", "Wisdom scroll stacks"),
+    ("currency->stackedsuppliesportal", "Currency", "Portal scroll stacks"),
+    ("currency->stackedsupplieshigh", "Currency", "Transmutation stacks"),
+    ("currency->stackedsupplieslow", "Currency", "Augmentation stacks"),
     ("currency->leveling", "Currency", "Campaign currency"),
     ("currency->levelingstacked", "Currency", "Campaign currency stacks"),
     ("divination", "Divination cards", "Divination cards"),
@@ -63,7 +67,14 @@ const KNOWN: &[(&str, &str, &str)] = &[
 
 /// "t2divine" -> "Tier 2 (divine)", "exhide" -> "Hidden extras".
 pub fn tier_name(t: &str) -> String {
-    if t == "exhide" { return "Hidden extras".into(); }
+    match t {
+        "exhide" => return "Hidden extras".into(),
+        "tportal" => return "Portal scrolls".into(),
+        "twisdom" => return "Wisdom scrolls".into(),
+        "scrollfragments" => return "Scroll fragments".into(),
+        "anyother" | "any" => return "Any other".into(),
+        _ => {}
+    }
     if let Some(rest) = t.strip_prefix('t') {
         let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
         if !digits.is_empty() {
@@ -150,6 +161,9 @@ mod tests {
         assert_eq!(cur.title, "Currency");
         assert!(cur.tiers[0].bases.contains(&"Mirror of Kalandra".to_string()), "{:?}", cur.tiers[0]);
         assert_eq!(tier_name("t2divine"), "Tier 2 (divine)");
+        assert_eq!(tier_name("twisdom"), "Wisdom scrolls");
+        let w = s.iter().find(|x| x.title == "Wisdom scroll stacks").unwrap();
+        assert_eq!(w.tiers.iter().map(|t| t.min_stack.unwrap()).collect::<Vec<_>>(), vec![10, 5, 3]);
         let stacks = s.iter().find(|x| x.title == "Stacks of 3+").unwrap();
         assert!(stacks.tiers[0].note.contains("stacks of 3+"), "{:?}", stacks.tiers[0].note);
         assert!(s.iter().any(|x| x.title == "Divination cards" && x.tiers.len() >= 5));
@@ -166,6 +180,26 @@ mod tests {
         let after = sections(&parse_filter(&render_filter(&segs)));
         let has = |t: &str| after[0].tiers.iter().find(|x| x.tier == t).unwrap().bases.contains(&"Chaos Orb".to_string());
         assert!(has("t2divine") && !has(&from));
+    }
+
+    #[test]
+    fn add_a_currency_to_a_stack_tier() {
+        use crate::evaluate::status;
+        let text = fixture();
+        let segs0 = parse_filter(&text);
+        let secs = sections(&segs0);
+        let stacked: Vec<&String> = secs.iter().filter(|x| x.title.starts_with("Stacks") || x.title.ends_with("stacks"))
+            .flat_map(|x| x.tiers.iter().flat_map(|t| t.bases.iter())).collect();
+        // A currency NeverSink only tiers as single drops.
+        let base = secs[0].tiers.iter().flat_map(|t| t.bases.iter()).find(|b| !stacked.contains(b)).unwrap().clone();
+        let mut segs = parse_filter(&text);
+        apply(&mut segs, &[Rule::MoveBase { type_path: vec!["currency".into(), "stackedsix".into()], base: base.clone(), to_tier: "t7".into() }], "\r\n");
+        let segs = parse_filter(&render_filter(&segs));
+        let it = |n| crate::item::Item { item_class: "Stackable Currency".into(), rarity: "Currency".into(), base_type: base.clone(), stack_size: Some(n), ..Default::default() };
+        let v6 = status(&segs, &it(6), Some(70), false).verdict;
+        let v1 = status(&segs, &it(1), Some(70), false).verdict;
+        assert!(v6.decided_by.contains("stackedsix") && v6.decided_by.contains("t7"), "{base}: {}", v6.decided_by);
+        assert!(!v1.decided_by.contains("stackedsix"), "single drops keep their normal tier");
     }
 
     #[test]
