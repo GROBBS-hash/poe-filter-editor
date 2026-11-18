@@ -116,7 +116,7 @@ pub fn quick_rule(item: &Item, action: Action, colour_name: Option<&str>, opts: 
     who.push_str(opts.when.words());
 
     let (show, actions, verb) = match action {
-        Action::Hide => (false, vec!["DisableDropSound".into()], "Hide"),
+        Action::Hide => (false, vec!["DisableDropSound True".into()], "Hide"),
         Action::Highlight => {
             let (rgb, icon) = colour(colour_name.unwrap_or("purple"));
             (true, vec![
@@ -129,7 +129,7 @@ pub fn quick_rule(item: &Item, action: Action, colour_name: Option<&str>, opts: 
             ], "Highlight")
         }
         Action::Louder => (true, vec!["SetFontSize 45".into(), "PlayAlertSound 2 300".into()], "Louder"),
-        Action::Quieter => (true, vec!["SetFontSize 26".into(), "DisableDropSound".into()], "Quieter"),
+        Action::Quieter => (true, vec!["SetFontSize 26".into(), "DisableDropSound True".into()], "Quieter"),
     };
     Rule::Override { label: format!("{verb}: {who}"), show, conditions, actions }
 }
@@ -202,7 +202,7 @@ pub fn style_actions(s: &CustomStyle) -> Vec<String> {
     };
     match &s.sound {
         Sound::Default => {}
-        Sound::Off => a.push("DisableDropSound".into()),
+        Sound::Off => a.push("DisableDropSound True".into()),
         Sound::Builtin { id, volume } => {
             let id = match id.parse::<u32>() {
                 Ok(n) => n.clamp(1, 16).to_string(),
@@ -598,7 +598,7 @@ mod tests {
             beam: None, minimap: None, sound: Sound::Off, label_hidden: false };
         let a = style_actions(&style);
         assert!(a.contains(&"SetFontSize 45".to_string()));
-        assert!(a.contains(&"DisableDropSound".to_string()));
+        assert!(a.contains(&"DisableDropSound True".to_string()));
         assert!(a.contains(&"PlayEffect None".to_string()));
         assert!(a.contains(&"MinimapIcon -1".to_string()));
     }

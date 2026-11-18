@@ -169,7 +169,7 @@ pub fn price_blocks(settings: &PriceSettings, file: &PriceFile, nl: &str) -> Str
                 out.push_str(&format!("Hide # Price: {} worth under {limit}{u}{nl}", g.group.title()));
                 for c in g.group.conditions() { out.push_str(&format!("    {c}{nl}")); }
                 out.push_str(&format!("    BaseType == {}{nl}", base_list(&names)));
-                out.push_str(&format!("    DisableDropSound{nl}{nl}"));
+                out.push_str(&format!("    DisableDropSound True{nl}{nl}"));
             }
         }
     }
