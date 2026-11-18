@@ -294,6 +294,13 @@ fn read_from_ground(app: &AppHandle) -> Result<Picked, String> {
     let (read, tip_lines) = screen::read_ground(&accept)?;
     // The game's hover box: bigger and clearer than the label, and it says the rarity.
     let tip = filter_core::ground::from_tooltip(&tip_lines, &names);
+    let label = if read.text.trim().is_empty() { None } else { match_base(&read.text, &names) };
+    // Only trust the box if it's about the same item as the label: same base, or
+    // what was read off the label fits the box's name ("SUPERIOR" isn't "Moon Orb").
+    let tip = tip.filter(|t| {
+        label.as_ref().map(|l| l.base == t.found.base).unwrap_or(false)
+            || filter_core::ground::text_fits(&read.text, &t.header)
+    });
     // Failed reads are saved next to your filters (ReaderSnapshots) so they can be looked at and fixed.
     let keep = |why: &str| {
         let game = active_game(&app.state::<AppState>());
@@ -301,7 +308,6 @@ fn read_from_ground(app: &AppHandle) -> Result<Picked, String> {
             .map(|p| format!(" (saved what it saw: {})", p.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default()))
             .unwrap_or_default()
     };
-    let label = if read.text.trim().is_empty() { None } else { match_base(&read.text, &names) };
     let m = match (label, &tip) {
         // Same item both ways: the label knows the stack size and tier.
         (Some(l), Some(t)) if l.base == t.found.base => l,

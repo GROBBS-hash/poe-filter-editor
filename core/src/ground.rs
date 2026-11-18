@@ -32,6 +32,21 @@ pub struct TooltipRead {
     pub unidentified: bool,
     /// From the colour of the name at the top: Normal / Magic / Rare / Unique.
     pub rarity: Option<String>,
+    /// The name line(s) at the top, as read.
+    pub header: String,
+}
+
+/// Does a piece of a label (what the reader caught: "CHOPP", "SUPERIOR") fit in
+/// this longer text? Used to check the hover box is about the same item.
+pub fn text_fits(part: &str, whole: &str) -> bool {
+    let p = compact(part);
+    let w = compact(whole);
+    if p.len() < 3 { return true; }
+    if w.contains(&p) { return true; }
+    let chars: Vec<char> = w.chars().collect();
+    let n = p.chars().count();
+    (n.saturating_sub(1).max(1)..=(n + 2).min(chars.len())).any(|len| chars.windows(len)
+        .any(|win| strsim::jaro_winkler(&win.iter().collect::<String>(), &p) >= 0.86))
 }
 
 /// Rarity from the colour of the item's name in the hover box.
@@ -64,7 +79,8 @@ pub fn from_tooltip(lines: &[(String, Option<[u8; 3]>)], known: &HashSet<String>
         if found.unique.is_none() && i > 0 {
             found.unique = unique_on_label(&format!("{} {}", lines[i - 1].0, lines[i].0), &found.base);
         }
-        return Some(TooltipRead { found, item_level, unidentified, rarity });
+        let header = if i > 0 { format!("{} {}", lines[i - 1].0, lines[i].0) } else { lines[i].0.clone() };
+        return Some(TooltipRead { found, item_level, unidentified, rarity, header });
     }
     None
 }
@@ -181,10 +197,12 @@ pub fn match_base(text: &str, known: &HashSet<String>) -> Option<GroundMatch> {
         let c = compact(b);
         let n = c.chars().count();
         if n < 4 { continue; }
-        // Short names fit by chance inside longer words: only when they're most of the text.
-        if n < 7 && n * 10 < t.len() * 6 { continue; }
-        let lo = n.saturating_sub(2).max(1);
-        for len in lo..=(n + 2).min(chars.len()) {
+        // Short names fit by chance inside longer words ("hope" in "chopp"):
+        // they're only compared with the whole text.
+        let lo = if n < 7 { chars.len() } else { n.saturating_sub(2).max(1) };
+        let hi = if n < 7 { chars.len() } else { (n + 2).min(chars.len()) };
+        if n < 7 && (chars.len() + 2 < n || chars.len() > n + 2) { continue; }
+        for len in lo..=hi {
             for w in chars.windows(len) {
                 let window: String = w.iter().collect();
                 let score = strsim::jaro_winkler(&window, &c);
@@ -196,6 +214,13 @@ pub fn match_base(text: &str, known: &HashSet<String>) -> Option<GroundMatch> {
     }
     if let Some((s, b)) = best.filter(|(s, _)| *s >= 0.9) {
         return Some(GroundMatch { unique: unique_on_label(text, b.clone().as_str()), base: b.clone(), stack, tier, superior, confidence: s as f32 });
+    }
+    // Only part of the label read ("CHOPP"): accept it if exactly one name holds that part.
+    if t.len() >= 5 {
+        let has: Vec<&String> = known.iter().filter(|b| compact(b).contains(&t)).collect();
+        if has.len() == 1 {
+            return Some(GroundMatch { unique: unique_on_label(text, has[0].clone().as_str()), base: has[0].clone(), stack, tier, superior, confidence: 0.75 });
+        }
     }
     // Start of the label cut off ("onic Spirit Shield"): accept it if exactly one name ends that way.
     if t.len() >= 8 {
@@ -287,6 +312,19 @@ mod tests {
     fn known() -> HashSet<String> {
         ["Coral Ring", "Ring", "Chaos Orb", "Orb of Alteration", "Leather Belt", "Divine Orb"]
             .iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn part_of_a_label() {
+        let mut k = known();
+        k.insert("Hope".into());
+        k.insert("Karui Chopper".into());
+        k.insert("Moon Orb".into());
+        assert_eq!(match_base("CHOPP", &k).unwrap().base, "Karui Chopper");
+        assert!(text_fits("CHOPP", "KARUI CHOPPER"));
+        assert!(text_fits("SUPERIOR", "Superior Sharkskin Tunic"));
+        assert!(!text_fits("SUPERIOR", "Moon Orb"));
+        assert!(!text_fits("CHOPP", "Hope"));
     }
 
     #[test]

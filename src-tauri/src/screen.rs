@@ -257,7 +257,14 @@ fn tooltip_lines(all: &[Piece], cx: f32, cy: f32) -> TooltipLines {
         (pm - mid).abs() < h * 14.0 && p.1[1] > il.1[1] - h * 30.0 && p.1[1] < il.1[1] + h * 12.0
     }).collect();
     col.sort_by(|a, b| a.1[1].partial_cmp(&b.1[1]).unwrap_or(std::cmp::Ordering::Equal));
-    col.into_iter().map(|p| (p.0.clone(), p.2.map(|c| c.0))).collect()
+    // Only the box itself: lines packed together around "Item Level". Text further
+    // up with a gap (the quest tracker's "Find the Moon Orb") isn't part of it.
+    let Some(at) = col.iter().position(|p| std::ptr::eq(*p, il)) else { return vec![] };
+    let gap = |a: &Piece, b: &Piece| b.1[1] - (a.1[1] + a.1[3]);
+    let (mut lo, mut hi) = (at, at);
+    while lo > 0 && gap(col[lo - 1], col[lo]) < h * 2.5 { lo -= 1; }
+    while hi + 1 < col.len() && gap(col[hi], col[hi + 1]) < h * 2.5 { hi += 1; }
+    col[lo..=hi].iter().map(|p| (p.0.clone(), p.2.map(|c| c.0))).collect()
 }
 
 /// For washed-out pictures (HDR screens): darkest channel, strong contrast curve,
@@ -528,8 +535,11 @@ mod tests {
     #[test]
     fn hover_box_column() {
         let p = |t: &str, x: f32, y: f32| (t.to_string(), [x, y, 120.0, 16.0], None);
-        let all = vec![p("TYRANT'S SEKHEM", 900.0, 300.0), p("Sceptre", 920.0, 320.0), p("Item Level: 70", 910.0, 380.0),
-            p("Unidentified", 915.0, 460.0), p("PORTAL", 100.0, 350.0)];
+        let all = vec![p("TYRANT'S SEKHEM", 900.0, 300.0), p("Sceptre", 920.0, 320.0), p("Item Level: 70", 910.0, 345.0),
+            p("Unidentified", 915.0, 380.0), p("PORTAL", 100.0, 350.0)];
+        let mut all = all;
+        // The quest tracker above, with a gap: not part of the box.
+        all.push(p("Find the Moon Orb", 900.0, 120.0));
         let lines = super::tooltip_lines(&all, 500.0, 500.0);
         let t: Vec<_> = lines.iter().map(|l| l.0.as_str()).collect();
         assert_eq!(t, ["TYRANT'S SEKHEM", "Sceptre", "Item Level: 70", "Unidentified"]);
