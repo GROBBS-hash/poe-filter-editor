@@ -34,6 +34,7 @@ export default function Tiers({ profile, onChange }: { profile: ProfileInfo; onC
   const [drag, setDrag] = useState<{ base: string; from: string } | null>(null);
   const [over, setOver] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
+  const [found, setFound] = useState<{ base: string; tier: string } | null>(null);
   const [copied, setCopied] = useState<{ style: CustomStyle; from: string } | null>(null);
 
   const load = () => invoke<Section[]>("get_tiers", { id: profile.id }).then((s) => {
@@ -53,6 +54,15 @@ export default function Tiers({ profile, onChange }: { profile: ProfileInfo; onC
   const hits = needle.length >= 2
     ? sections.flatMap((s) => s.tiers.flatMap((t) => t.bases.filter((b) => b.toLowerCase().includes(needle)).map((b) => ({ s, t, b })))).slice(0, 12)
     : [];
+
+  useEffect(() => {
+    if (!found) return;
+    const id = window.setTimeout(() => {
+      document.querySelector(`[data-chip="${CSS.escape(found.tier + "|" + found.base)}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 50);
+    const off = window.setTimeout(() => setFound(null), 2500);
+    return () => { window.clearTimeout(id); window.clearTimeout(off); };
+  }, [found, sel]);
 
   const section = sections.find((s) => s.type_path.join(">") === sel);
   const done = async (p: Promise<unknown>, m: string) => {
@@ -77,7 +87,12 @@ export default function Tiers({ profile, onChange }: { profile: ProfileInfo; onC
         {hits.length > 0 && (
           <ul className="results">
             {hits.map(({ s, t, b }) => (
-              <li key={s.title + t.tier + b} onClick={() => { setSel(s.type_path.join(">")); setQ(""); }}>
+              <li key={s.title + t.tier + b} onClick={() => {
+                setSel(s.type_path.join(">")); setQ(""); setEditing(null);
+                // Make sure it's not tucked behind "+N more", then scroll to it and make it glow.
+                if (t.bases.indexOf(b) >= SHOW_ITEMS) setExpanded((x) => ({ ...x, [t.tier]: true }));
+                setFound({ base: b, tier: t.tier });
+              }}>
                 <span className="with-icon"><ItemIcon base={b} size={20} />{b}</span>
                 <span className="muted small">{s.title} · {t.name}</span>
               </li>
@@ -140,7 +155,8 @@ export default function Tiers({ profile, onChange }: { profile: ProfileInfo; onC
                   )}
                   <div className="tier-items">
                     {items.map((b) => (
-                      <span key={b} className={`chip ${drag?.base === b ? "dragging" : ""}`} draggable
+                      <span key={b} data-chip={`${key}|${b}`}
+                        className={`chip ${drag?.base === b ? "dragging" : ""} ${found?.base === b && found.tier === key ? "found" : ""}`} draggable
                         onDragStart={(e) => { e.dataTransfer.setData("text/plain", b); e.dataTransfer.effectAllowed = "move"; setDrag({ base: b, from: key }); }}
                         onDragEnd={() => { setDrag(null); setOver(null); }}
                         title={`Drag to another tier`}>
