@@ -26,6 +26,9 @@ To make an installer: `npm run tauri build` (the installer lands in `src-tauri/t
 - **Undo last** is in the pop-up. Every edit is also listed under *My edits*, where you can remove any of them.
 - **Prices** tab: switch on price tiers per filter. Uniques, divination cards, currency and other items get your own value tiers (look + sound per tier) from poe.ninja prices, updated hourly. Optional "only show ones worth at least X". Your own edits always win over price tiers.
 - Prices come from this repo's `prices` branch, refreshed hourly by a GitHub Action (`tools/fetch_prices.py`), so the app never calls poe.ninja from players' PCs.
+- **Find** tab: type what you want ("show gold over 500 in purple"), search by nicknames ("2h mace", "ammy"), rules for a whole item type, build-switch and league-mechanic presets.
+- **Profiles**: pick NeverSink's strictness per filter (downloaded from his GitHub, updated every 6 hours) or your own FilterBlade file.
+- **Settings**: your own hotkeys, an optional key to cycle filters (off by default), area level fallback, optional Claude API key for the ask box.
 - **Themes** tab: recolour NeverSink's labels by value (Chase, High, Good, Medium, Low, Junk). Six built-in themes, or copy one and make your own. Picked per filter; sizes, beams, icons and sounds stay.
 - **Profiles > Save as new** makes a stricter copy without touching your league-start filter.
 - Your NeverSink file is never changed. Edits are stored by the app and written into a separate filter. After downloading a new NeverSink version over the old file, press **Rebuild**.
