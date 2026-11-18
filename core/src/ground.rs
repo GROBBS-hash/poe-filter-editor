@@ -383,6 +383,7 @@ mod tests {
         k.insert("Sharkskin Tunic".into());
         k.insert("Noble Claw".into());
         k.insert("Eagle Claw".into());
+        k.insert("Throat Stabber".into());
         assert_eq!(match_base("SUPERIOR SHARKSKII", &k).unwrap().base, "Sharkskin Tunic");
         // Snapshot read-1794999884: the label with a minimap icon after it.
         assert_eq!(match_base("THRdAT STABBE}Ü", &k).unwrap().base, "Throat Stabber");
