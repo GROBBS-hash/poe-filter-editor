@@ -3,8 +3,50 @@ import { invoke } from "@tauri-apps/api/core";
 
 type Settings = {
   key_quick_edit: string; key_batch: string; key_reload: string; key_cycle: string; key_build: string; key_price?: string;
-  cycle_enabled: boolean; fallback_area_level: number; claude_api_key: string;
+  cycle_enabled: boolean; fallback_area_level: number; claude_api_key: string; map_avoid?: string[] | null;
 };
+type Suggestion = { name: string; why: string };
+
+/** Which map mods Ctrl+D warns about, with a suggestion from the PoB build. */
+function MapAvoid({ value, onChange }: { value: string[] | null | undefined; onChange: (v: string[] | null) => void }) {
+  const [all, setAll] = useState<string[]>([]);
+  const [why, setWhy] = useState<Record<string, string>>({});
+  const [note, setNote] = useState("");
+  useEffect(() => { invoke<string[]>("map_dangers").then(setAll).catch(() => {}); }, []);
+  const on = (n: string) => value == null || value.includes(n);
+  const toggle = (n: string) => {
+    const cur = value ?? all;
+    onChange(cur.includes(n) ? cur.filter((x) => x !== n) : [...cur, n]);
+  };
+  const suggest = async () => {
+    try {
+      const s = await invoke<Suggestion[]>("map_suggest");
+      onChange(s.map((x) => x.name));
+      setWhy(Object.fromEntries(s.map((x) => [x.name, x.why])));
+      setNote(`Ticked ${s.length} from your build. Check them over, then Save.`);
+    } catch (e) { setNote(String(e)); }
+  };
+  return (
+    <div className="card">
+      <h2>Map check</h2>
+      <p className="muted small">Press your price check key on a map to see its mods. The ones ticked here show in red as mods you can't run.</p>
+      <div className="row">
+        <button onClick={suggest}>Suggest from my build</button>
+        <button onClick={() => { onChange(null); setWhy({}); setNote(""); }}>Tick all</button>
+        <button onClick={() => { onChange([]); setWhy({}); setNote(""); }}>Untick all</button>
+      </div>
+      {note && <p className="note small">{note}</p>}
+      <div className="map-avoid">
+        {all.map((n) => (
+          <label key={n} className="check" title={why[n]}>
+            <input type="checkbox" checked={on(n)} onChange={() => toggle(n)} />
+            <span>{n}{why[n] && <span className="muted small"> · {why[n]}</span>}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /** Click the box, then press the key (or key combo) you want. */
 function KeyBox({ value, onChange, disabled }: { value: string; onChange: (k: string) => void; disabled?: boolean }) {
@@ -53,6 +95,8 @@ export default function SettingsPage() {
           <KeyBox value={s.key_cycle} disabled={!s.cycle_enabled} onChange={(k) => set({ key_cycle: k })} />
         </div>
       </div>
+
+      <MapAvoid value={s.map_avoid} onChange={(v) => set({ map_avoid: v })} />
 
       <div className="card">
         <h2>Area level</h2>

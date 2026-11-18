@@ -69,6 +69,8 @@ pub struct Settings {
     pub pob_follow: bool,
     /// Price check the item under the mouse (like Awakened PoE Trade).
     pub key_price: String,
+    /// Map mods to warn about on Ctrl+D (None = every known danger).
+    pub map_avoid: Option<Vec<String>>,
 }
 
 impl Default for Settings {
@@ -76,7 +78,7 @@ impl Default for Settings {
         Self { key_quick_edit: "F2".into(), key_batch: "F3".into(), key_reload: "F4".into(), key_cycle: "F5".into(),
             cycle_enabled: false, fallback_area_level: 83, claude_api_key: String::new(),
             key_build: "F6".into(), pob_link: String::new(), pob_stage: None, pob_follow: true,
-            key_price: "Ctrl+D".into() }
+            key_price: "Ctrl+D".into(), map_avoid: None }
     }
 }
 

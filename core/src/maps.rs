@@ -1,0 +1,266 @@
+//! Map check (Ctrl+D on a map): which of its mods are ones you said you can't run,
+//! and a starting list of those suggested from your Path of Building build.
+
+use crate::pob::Build;
+use serde::Serialize;
+
+/// Map mods that are a problem for many builds: (words the mod contains, short name).
+/// Matching ignores capitals; every word group must be in the mod.
+pub const MAP_DANGER: &[(&[&str], &str)] = &[
+    (&["reflect", "elemental damage"], "Elemental reflect"),
+    (&["reflect", "physical damage"], "Physical reflect"),
+    (&["cannot regenerate"], "No regen"),
+    (&["cannot leech"], "No leech"),
+    (&["maximum resistances"], "Less max res"),
+    (&["recovery rate of life and energy shield"], "Less recovery"),
+    (&["avoid elemental ailments"], "Monsters avoid ailments"),
+    (&["effect of curses"], "Less curse effect"),
+    (&["hexproof"], "Hexproof"),
+    (&["cannot be stunned"], "Monsters can't be stunned"),
+    (&["temporal chains"], "Temp chains"),
+    (&["elemental weakness"], "Elemental weakness"),
+    (&["enfeeble"], "Enfeeble"),
+    (&["vulnerability"], "Vulnerability"),
+    (&["extra maximum energy shield"], "Monster ES"),
+    (&["burning ground"], "Burning ground"),
+    (&["shocked ground"], "Shocked ground"),
+    (&["chilled ground"], "Chilled ground"),
+    (&["consecrated ground"], "Monster consecrated ground"),
+    (&["poison on hit"], "Monsters poison"),
+    (&["bleeding"], "Monsters bleed"),
+    (&["monsters", "as extra"], "Extra monster damage"),
+    (&["monsters", "critical strike"], "Monster crits"),
+    (&["flask charges"], "Fewer flask charges"),
+    (&["chance to block"], "Less block"),
+    (&["less armour"], "Less armour"),
+    (&["less area of effect"], "Less area of effect"),
+    (&["additional projectiles"], "Extra monster projectiles"),
+    (&["action speed cannot be modified"], "Monsters can't be slowed"),
+    (&["steal power, frenzy and endurance"], "Monsters steal charges"),
+    (&["buffs on players expire"], "Buffs expire faster"),
+    (&["point blank"], "Point blank"),
+    (&["blind on hit"], "Monsters blind"),
+    (&["monsters", "accuracy"], "Monster accuracy"),
+    (&["impale"], "Monsters impale"),
+    (&["cooldown recovery"], "Less cooldown recovery"),
+    (&["non-curse auras"], "Less aura effect"),
+];
+
+/// Every danger's short name, in list order (for Settings).
+pub fn danger_names() -> Vec<&'static str> {
+    let mut v: Vec<&str> = Vec::new();
+    for (_, n) in MAP_DANGER { if !v.contains(n) { v.push(n); } }
+    v
+}
+
+fn danger_of(text: &str) -> Option<&'static str> {
+    let t = text.to_lowercase();
+    MAP_DANGER.iter().find(|(words, _)| words.iter().all(|w| t.contains(w))).map(|(_, n)| *n)
+}
+
+/// One mod line of a map, and the warning name if it's one you can't run.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct MapMod {
+    pub text: String,
+    pub warn: Option<String>,
+}
+
+/// What the price window shows for a map.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct MapInfo {
+    pub mods: Vec<MapMod>,
+    pub unidentified: bool,
+    pub tier: Option<u32>,
+    /// Item quantity / pack size etc. ("Item Quantity: +80%").
+    pub stats: Vec<String>,
+}
+
+/// Is this item a map (PoE 1 maps, PoE 2 waystones)?
+pub fn is_map(item_class: &str) -> bool {
+    matches!(item_class, "Maps" | "Waystones" | "Memories")
+}
+
+/// Removes roll ranges "25(20-25)" -> "25" and drops the trailing "(implicit)" style tags.
+fn tidy(line: &str) -> String {
+    let mut out = String::new();
+    let mut depth = 0;
+    let mut buf = String::new();
+    for c in line.chars() {
+        match c {
+            '(' => { depth += 1; buf.clear(); }
+            ')' if depth > 0 => {
+                depth -= 1;
+                let numeric = buf.chars().all(|c| c.is_ascii_digit() || "-.+ ".contains(c));
+                let tag = ["implicit", "crafted", "enchant", "fractured", "augmented"].contains(&buf.trim());
+                if !numeric && !tag { out.push('('); out.push_str(&buf); out.push(')'); }
+            }
+            _ if depth > 0 => buf.push(c),
+            _ => out.push(c),
+        }
+    }
+    out.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// Reads a copied map (plain Ctrl+C or advanced Ctrl+Alt+C). `avoid` = None warns about every known danger.
+pub fn map_info(text: &str, avoid: Option<&[String]>) -> MapInfo {
+    let text = text.replace('\r', "");
+    let sections: Vec<Vec<&str>> = text.split("--------")
+        .map(|s| s.lines().map(str::trim).filter(|l| !l.is_empty()).collect()).collect();
+    let mut info = MapInfo { mods: vec![], unidentified: false, tier: None, stats: vec![] };
+    let ilvl_at = sections.iter().position(|s| s.iter().any(|l| l.starts_with("Item Level:")));
+    for (i, sec) in sections.iter().enumerate() {
+        for l in sec {
+            if let Some(t) = l.strip_prefix("Map Tier: ").or_else(|| l.strip_prefix("Waystone Tier: ")) {
+                info.tier = t.trim().parse().ok();
+            }
+            if ["Item Quantity:", "Item Rarity:", "Monster Pack Size:", "More Maps:", "More Scarabs:", "More Currency:", "More Divination Cards:"]
+                .iter().any(|p| l.starts_with(p)) {
+                info.stats.push(tidy(l));
+            }
+        }
+        if *sec == ["Unidentified"] || sec.contains(&"Unidentified") { info.unidentified = true; }
+        let Some(start) = ilvl_at else { continue };
+        if i <= start { continue; }
+        // Not mods: the "how to use" text, flavour, corrupted/unidentified markers.
+        if sec.iter().any(|l| l.starts_with("Travel to") || l.starts_with("Place into") || l.starts_with("Right click")
+            || l.starts_with("Note:") || *l == "Corrupted" || *l == "Unidentified" || *l == "Mirrored" || l.starts_with("Can be used")) {
+            continue;
+        }
+        for l in sec {
+            if l.starts_with('{') || l.starts_with('(') || l.starts_with("Monster Level:") || l.starts_with("Area Level:") { continue; }
+            let t = tidy(l);
+            if t.is_empty() { continue; }
+            let warn = danger_of(&t).filter(|n| avoid.map(|a| a.iter().any(|x| x == n)).unwrap_or(true)).map(String::from);
+            info.mods.push(MapMod { text: t, warn });
+        }
+    }
+    info
+}
+
+/// A suggested "can't run" mod and why.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct Suggestion {
+    pub name: String,
+    pub why: String,
+}
+
+const CURSES: &[&str] = &["despair", "flammability", "frostbite", "conductivity", "vulnerability", "elemental weakness",
+    "enfeeble", "temporal chains", "punishment", "assassin's mark", "poacher's mark", "warlord's mark", "sniper's mark", "hextouch", "blasphemy", "curse on hit"];
+const MINION: &[&str] = &["summon", "raise ", "animate", "spectre", "zombie", "golem", "skeleton", "absolution", "dominating blow"];
+const DOT: &[&str] = &["righteous fire", "essence drain", "contagion", "bane", "soulrend", "vortex", "toxic rain", "caustic arrow",
+    "death aura", "blight", "scorching ray", "wither", "poisonous concoction"];
+const ELEMENTAL: &[&str] = &["fire", "cold", "ice", "frost", "lightning", "spark", "arc", "flame", "glacial", "freez", "shock", "storm",
+    "burn", "elemental", "volcanic", "winter", "cremation", "crackling", "galvanic", "hydrosphere", "comet", "orb of storms", "armageddon"];
+const AILMENT: &[&str] = &["ignite", "burning damage", "unbound ailments", "deadly ailments", "combustion", "immolate", "elemental overload"];
+
+/// Suggests the map mods to warn about, from the build's endgame stage (the last one).
+pub fn suggest(build: &Build) -> Vec<Suggestion> {
+    let mut out: Vec<Suggestion> = Vec::new();
+    let mut add = |name: &str, why: &str| if !out.iter().any(|s| s.name == name) { out.push(Suggestion { name: name.into(), why: why.into() }) };
+    let Some(stage) = build.stages.last() else { return out };
+    let gems: Vec<String> = stage.groups.iter().filter(|g| g.enabled).flat_map(|g| g.gems.iter())
+        .filter(|g| g.enabled).map(|g| g.name.to_lowercase()).collect();
+    let has = |list: &[&str], names: &[String]| names.iter().any(|n| list.iter().any(|k| n.contains(k)));
+    // Main skill: the biggest link group's active gems.
+    let main = stage.groups.iter().filter(|g| g.enabled).max_by_key(|g| g.gems.len());
+    let main_gems: Vec<String> = main.map(|g| g.gems.iter().filter(|x| x.enabled).map(|x| x.name.to_lowercase()).collect()).unwrap_or_default();
+    let main_active: Vec<String> = main.map(|g| g.gems.iter().filter(|x| x.enabled && !x.support).map(|x| x.name.to_lowercase()).collect()).unwrap_or_default();
+    let gear: String = stage.gear.iter().flat_map(|g| g.lines.iter()).map(|l| l.to_lowercase()).collect::<Vec<_>>().join("\n");
+
+    add("Less max res", "Hurts every build: you take a lot more elemental damage");
+    add("No regen", "Most builds need regen for mana (and life)");
+    if has(MINION, &main_active) {
+        // Minions take the reflected damage, not you.
+    } else if has(DOT, &main_active) {
+        // Damage over time isn't reflected.
+    } else if has(ELEMENTAL, &main_gems) {
+        add("Elemental reflect", "Your main skill hits with elemental damage");
+    } else if !main_active.is_empty() {
+        add("Physical reflect", "Your main skill hits with physical damage");
+    } else {
+        add("Elemental reflect", "Reflect kills most hit builds");
+        add("Physical reflect", "Reflect kills most hit builds");
+    }
+    if gear.contains("leech") || gems.iter().any(|g| g.contains("leech")) {
+        add("No leech", "Your build uses life or mana leech");
+    }
+    if has(CURSES, &gems) {
+        add("Hexproof", "Your curses won't work on hexproof monsters");
+        add("Less curse effect", "Your curses get much weaker");
+    }
+    if has(AILMENT, &gems) {
+        add("Monsters avoid ailments", "Your build relies on ignite or other ailments");
+    }
+    if gear.contains("flask") || gems.iter().any(|g| g.contains("flask")) {
+        add("Fewer flask charges", "Your build leans on flasks");
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::pob::{Gem, Group, Stage};
+
+    const MAP: &str = "Item Class: Maps
+Rarity: Rare
+Grim Haunt
+Strand Map
+--------
+Map Tier: 16
+Item Quantity: +80% (augmented)
+Monster Pack Size: +30% (augmented)
+--------
+Item Level: 83
+--------
+Monster Level: 83
+--------
+{ Prefix Modifier \"Hexwarded\" (Tier: 1) }
+60(55-60)% less effect of Curses on Monsters
+{ Suffix Modifier \"of Exposure\" }
+Players cannot Regenerate Life, Mana or Energy Shield
+{ Prefix Modifier \"Fleet\" }
+Monsters have 25(20-25)% increased Movement Speed
+Monsters reflect 18% of Elemental Damage
+--------
+Travel to this Map by using it in a personal Map Device. Maps can only be used once.
+";
+
+    #[test]
+    fn reads_map_and_flags() {
+        let m = map_info(MAP, None);
+        assert_eq!(m.tier, Some(16));
+        assert_eq!(m.stats, ["Item Quantity: +80%", "Monster Pack Size: +30%"]);
+        let t: Vec<(&str, Option<&str>)> = m.mods.iter().map(|x| (x.text.as_str(), x.warn.as_deref())).collect();
+        assert_eq!(t, [
+            ("60% less effect of Curses on Monsters", Some("Less curse effect")),
+            ("Players cannot Regenerate Life, Mana or Energy Shield", Some("No regen")),
+            ("Monsters have 25% increased Movement Speed", None),
+            ("Monsters reflect 18% of Elemental Damage", Some("Elemental reflect")),
+        ]);
+        let only = map_info(MAP, Some(&["No regen".to_string()]));
+        assert_eq!(only.mods.iter().filter(|x| x.warn.is_some()).count(), 1);
+        let unid = map_info("Item Class: Maps\nRarity: Rare\nStrand Map\n--------\nMap Tier: 16\n--------\nItem Level: 83\n--------\nUnidentified\n--------\nTravel to this Map\n", None);
+        assert!(unid.unidentified && unid.mods.is_empty());
+        assert!(is_map("Maps") && !is_map("Rings"));
+        assert!(danger_names().contains(&"Hexproof"));
+    }
+
+    #[test]
+    fn suggests_from_build() {
+        let gem = |n: &str, s: bool| Gem { name: n.into(), level: 20, quality: 0, enabled: true, support: s, colour: "b".into() };
+        let b = Build { class: "Witch".into(), ascendancy: "Elementalist".into(), level: 90, active: 0, stages: vec![Stage {
+            title: "Endgame".into(), tree: None, gear: vec![],
+            groups: vec![
+                Group { label: String::new(), slot: String::new(), enabled: true,
+                    gems: vec![gem("Arc", false), gem("Spell Echo", true), gem("Lightning Penetration", true)] },
+                Group { label: String::new(), slot: String::new(), enabled: true, gems: vec![gem("Conductivity", false)] },
+            ],
+        }]};
+        let names: Vec<String> = suggest(&b).into_iter().map(|s| s.name).collect();
+        assert!(names.contains(&"Elemental reflect".to_string()));
+        assert!(!names.contains(&"Physical reflect".to_string()));
+        assert!(names.contains(&"Hexproof".to_string()));
+        assert!(names.iter().all(|n| danger_names().contains(&n.as_str())));
+    }
+}

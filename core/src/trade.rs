@@ -447,31 +447,6 @@ pub fn offers(v: &Value) -> Vec<Offer> {
     out
 }
 
-// ---------- map check ----------
-
-/// Map mods that are a problem for many builds, with a short reason.
-pub const MAP_DANGER: &[(&str, &str)] = &[
-    ("reflect #% of Elemental Damage", "Elemental reflect"), ("reflect #% of Physical Damage", "Physical reflect"),
-    ("cannot Regenerate", "No regen"), ("Cannot Leech", "No leech"), ("maximum Resistances", "Less max res"),
-    ("reduced Recovery Rate of Life and Energy Shield", "Less recovery"), ("Avoid Elemental Ailments", "Monsters avoid ailments"),
-    ("less effect of Curses", "Less curse effect"), ("cannot be Stunned", "Monsters can't be stunned"),
-    ("Temporal Chains", "Temp chains"), ("Elemental Weakness", "Elemental weakness"), ("Enfeeble", "Enfeeble"),
-    ("Vulnerability", "Vulnerability"), ("are Hexproof", "Hexproof"), ("Life as Extra Maximum Energy Shield", "Monster ES"),
-    ("Burning Ground", "Burning ground"), ("Shocked Ground", "Shocked ground"), ("Chilled Ground", "Chilled ground"),
-    ("Consecrated Ground", "Monster consecrated ground"), ("Poison on Hit", "Monsters poison"), ("Bleeding on Hit", "Monsters bleed"),
-    ("Damage as Extra", "Extra monster damage"), ("Critical Strike Chance", "Monster crits"), ("Flasks gain", "Fewer flask charges"),
-];
-
-/// Each of a map's mods with a warning when it's one you said you can't run
-/// (`avoid` holds the short names; empty = warn about all known dangers).
-pub fn map_check(mods: &[ModLine], avoid: &[String]) -> Vec<(String, Option<String>)> {
-    mods.iter().map(|m| {
-        let (t, _) = template(&m.text);
-        let hit = MAP_DANGER.iter().find(|(k, name)| t.contains(k) && (avoid.is_empty() || avoid.iter().any(|a| a == name)));
-        (m.text.clone(), hit.map(|(_, n)| n.to_string()))
-    }).collect()
-}
-
 // ---------- poeprices.info (rough price for rares) ----------
 
 /// poeprices.info's estimate: (min, max, currency, confidence %).
@@ -564,7 +539,7 @@ Item Level: 75
     }
 
     #[test]
-    fn junk_bulk_and_maps() {
+    fn junk_and_bulk() {
         assert!(is_junk("+# to Accuracy Rating") && !is_junk("+# to maximum Life"));
         let st = StaticIndex::from_json(&json!({ "result": [ { "entries": [ { "id": "divine", "text": "Divine Orb" } ] } ] }));
         assert_eq!(st.id("divine orb").as_deref(), Some("divine"));
@@ -574,12 +549,6 @@ Item Level: 75
         let o = offers(&v);
         assert_eq!((o[0].each, o[0].stock), (180.0, 10));
         assert_eq!(o[0].whisper, "@Bob Hi, I'd like to buy your 2 Divine Orb for my 360 Chaos Orb in Keepers.");
-        let mods = vec![ModLine { text: "Monsters reflect 18% of Elemental Damage".into(), kind: "explicit".into(), tier: None, values: vec![18.0] },
-            ModLine { text: "+20% Monster pack size".into(), kind: "explicit".into(), tier: None, values: vec![20.0] }];
-        let c = map_check(&mods, &[]);
-        assert_eq!(c[0].1.as_deref(), Some("Elemental reflect"));
-        assert_eq!(c[1].1, None);
-        assert_eq!(map_check(&mods, &["No regen".into()])[0].1, None);
     }
 
     #[test]

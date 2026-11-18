@@ -8,7 +8,8 @@ import { Item, RARITY_COLOUR, itemTitle } from "./types";
 type StatFilter = { id: string; label: string; value: number; min: number | null; enabled: boolean; kind: string; tier: number | null; junk?: boolean };
 type Setup = { item: Item; filters: StatFilter[]; base_only: boolean; ilvl_min: number | null; links_min: number | null;
   gem_level: number | null; unknown: string[]; category: string | null; raw?: string };
-type Check = { setup: Setup | null; ninja: [number, string] | null; league: string; from_ground: boolean; error: string | null; bulk?: string | null };
+type MapInfo = { mods: { text: string; warn: string | null }[]; unidentified: boolean; tier: number | null; stats: string[] };
+type Check = { setup: Setup | null; ninja: [number, string] | null; league: string; from_ground: boolean; error: string | null; bulk?: string | null; map?: MapInfo | null };
 type Offer = { pay: number; pay_currency: string; get: number; get_currency: string; each: number; stock: number; account: string; whisper: string };
 type Bulk = { offers: Offer[]; url: string; divine: number | null };
 type Listing = { amount: number; currency: string; chaos: number | null; account: string; indexed: string; whisper: string; ilvl: number | null };
@@ -34,6 +35,27 @@ function money(c: number, divine: number | null) {
 /** Whether the trade site is worth asking: poe.ninja already prices currency, cards, etc. */
 const needsTrade = (c: Check) => !!c.setup && !c.bulk && (!c.ninja || ["Rare", "Magic", "Normal", "Gem"].includes(c.setup.item.rarity)
   || (c.setup.item.rarity === "Unique" && !c.setup.item.name));
+
+/** Ctrl+D on a map: its mods, the ones you can't run in red. */
+function MapCheck({ map }: { map: MapInfo }) {
+  const bad = map.mods.filter((m) => m.warn);
+  return (
+    <div className="tw-map">
+      <div className={`tw-map-head ${bad.length ? "bad" : map.unidentified ? "" : "ok"}`}>
+        {map.unidentified ? "Unidentified: its mods are hidden until you identify it."
+          : bad.length ? `⚠ ${bad.length} mod${bad.length > 1 ? "s" : ""} you can't run` : "✓ Nothing on your can't-run list"}
+        {map.tier != null && <span className="muted small"> · tier {map.tier}</span>}
+      </div>
+      {map.stats.length > 0 && <div className="muted small tw-map-stats">{map.stats.join(" · ")}</div>}
+      <ul className="tw-map-mods">
+        {map.mods.map((m, i) => (
+          <li key={i} className={m.warn ? "bad" : ""}>{m.text}{m.warn && <span className="tw-map-tag">{m.warn}</span>}</li>
+        ))}
+      </ul>
+      <div className="muted small">Change which mods to warn about in Settings → Map check.</div>
+    </div>
+  );
+}
 
 /** The Ctrl+D price window. */
 export default function TradeWindow() {
@@ -118,7 +140,9 @@ export default function TradeWindow() {
           <span className="muted small"> poe.ninja{it.rarity === "Unique" && !it.name ? " (best unique on this base)" : ""}</span></div>
       )}
 
-      {setup.filters.length > 0 && (
+      {check.map && <MapCheck map={check.map} />}
+
+      {setup.filters.length > 0 && !check.map && (
         <div className="tw-stats">
           {setup.filters.map((f, i) => (
             <label key={f.id + i} className={`tw-stat ${f.enabled ? "on" : ""} ${f.junk ? "junk" : ""}`} title={f.junk ? "Rarely changes the price" : undefined}>

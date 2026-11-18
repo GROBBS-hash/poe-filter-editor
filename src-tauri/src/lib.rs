@@ -440,6 +440,8 @@ struct PriceCheck {
     error: Option<String>,
     /// The trade site's bulk id when this sells in bulk (currency, scarabs, cards…).
     bulk: Option<String>,
+    /// Ctrl+D on a map: its mods, with warnings for the ones you said you can't run.
+    map: Option<filter_core::maps::MapInfo>,
 }
 
 fn trade_league(app: &AppHandle) -> (bool, String) {
@@ -476,13 +478,13 @@ fn price_check(app: AppHandle) {
         let payload = if !text.is_empty() {
             match trade_api::stats(&state.data_dir, poe2) {
                 Ok(index) => match filter_core::trade::setup(&text, &index) {
-                    Some(s) => PriceCheck { ninja: ninja_price(&app, &s.item), setup: Some(s), league, from_ground: false, error: None, bulk: None },
-                    None => PriceCheck { setup: None, ninja: None, league, from_ground: false, error: Some("That doesn't look like an item".into()), bulk: None },
+                    Some(s) => PriceCheck { ninja: ninja_price(&app, &s.item), setup: Some(s), league, from_ground: false, error: None, bulk: None, map: None },
+                    None => PriceCheck { setup: None, ninja: None, league, from_ground: false, error: Some("That doesn't look like an item".into()), bulk: None, map: None },
                 },
                 Err(e) => match filter_core::trade::setup(&text, &Default::default()) {
                     Some(s) => PriceCheck { ninja: ninja_price(&app, &s.item), setup: Some(s), league, from_ground: false,
-                        error: Some(format!("Stat list unavailable, searching by name only ({e})")), bulk: None },
-                    None => PriceCheck { setup: None, ninja: None, league, from_ground: false, error: Some(e), bulk: None },
+                        error: Some(format!("Stat list unavailable, searching by name only ({e})")), bulk: None, map: None },
+                    None => PriceCheck { setup: None, ninja: None, league, from_ground: false, error: Some(e), bulk: None, map: None },
                 },
             }
         } else {
@@ -493,12 +495,18 @@ fn price_check(app: AppHandle) {
                     let category = filter_core::trade::category(&item.item_class).map(String::from);
                     let s = filter_core::trade::TradeSetup { item: item.clone(), filters: vec![], base_only: true, ilvl_min: None,
                         links_min: None, gem_level: None, unknown: vec![], category, raw: String::new() };
-                    PriceCheck { ninja: ninja_price(&app, &item), setup: Some(s), league, from_ground: true, error: None, bulk: None }
+                    PriceCheck { ninja: ninja_price(&app, &item), setup: Some(s), league, from_ground: true, error: None, bulk: None, map: None }
                 }
-                Err(e) => PriceCheck { setup: None, ninja: None, league, from_ground: true, error: Some(e), bulk: None },
+                Err(e) => PriceCheck { setup: None, ninja: None, league, from_ground: true, error: Some(e), bulk: None, map: None },
             }
         };
         let mut payload = payload;
+        if let Some(it) = payload.setup.as_ref().map(|s| s.item.clone()) {
+            if filter_core::maps::is_map(&it.item_class) && !payload.from_ground {
+                let avoid = state.store.lock().unwrap().settings.map_avoid.clone();
+                payload.map = Some(filter_core::maps::map_info(&text, avoid.as_deref()));
+            }
+        }
         if let Some(it) = payload.setup.as_ref().map(|s| s.item.clone()) {
             if !matches!(it.rarity.as_str(), "Rare" | "Magic" | "Unique") && filter_core::trade::category(&it.item_class).is_none() {
                 payload.bulk = trade_api::statics(&state.data_dir, poe2).ok().and_then(|st| st.id(&it.base_type));
@@ -562,6 +570,19 @@ fn trade_bulk(app: AppHandle, want: String, pay: String) -> Result<BulkResult, S
 fn rare_estimate(app: AppHandle, text: String) -> Result<Option<(f64, f64, String, f64)>, String> {
     let (_, league) = trade_league(&app);
     Ok(filter_core::trade::poeprices(&trade_api::poeprices(&league, &text)?))
+}
+
+/// Every map mod the map check knows (for Settings).
+#[tauri::command]
+fn map_dangers() -> Vec<&'static str> {
+    filter_core::maps::danger_names()
+}
+
+/// Map mods to warn about, suggested from your imported PoB build.
+#[tauri::command]
+fn map_suggest(state: State<AppState>) -> Result<Vec<filter_core::maps::Suggestion>, String> {
+    let pob = pob_load(&state).ok_or("Import your build on the My build page first")?;
+    Ok(filter_core::maps::suggest(&pob.build))
 }
 
 #[tauri::command]
@@ -1731,7 +1752,7 @@ pub fn run() {
             list_farm_presets,
             apply_farm_preset,
             list_level_presets,
-            get_tiers, get_rule_section, trade_search, trade_bulk, rare_estimate, copy_text, hide_trade_window, keep_on_screen,
+            get_tiers, get_rule_section, trade_search, trade_bulk, rare_estimate, map_dangers, map_suggest, copy_text, hide_trade_window, keep_on_screen,
             move_tier_item,
             stack_choices,
             gear_setup,
