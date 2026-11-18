@@ -1,5 +1,6 @@
 // The app (core logic lives in ../core; both are rebuilt by `tauri dev`).
 mod screen;
+mod trade_api;
 
 use filter_core::{
     evaluate::{status_with_fallback, Status},
@@ -49,12 +50,13 @@ struct AppState {
 }
 
 #[derive(Clone, Copy, PartialEq)]
-enum HotAction { QuickEdit, Batch, Reload, Cycle, Build }
+enum HotAction { QuickEdit, Batch, Reload, Cycle, Build, Price }
 
 /// (Re)registers hotkeys from settings. Errors name the key that failed.
 fn register_hotkeys(app: &AppHandle, s: &Settings) -> Result<(), String> {
     let mut wanted = vec![(s.key_quick_edit.as_str(), HotAction::QuickEdit), (s.key_batch.as_str(), HotAction::Batch),
         (s.key_reload.as_str(), HotAction::Reload), (s.key_build.as_str(), HotAction::Build)];
+    if !s.key_price.trim().is_empty() { wanted.push((s.key_price.as_str(), HotAction::Price)); }
     if s.cycle_enabled { wanted.push((s.key_cycle.as_str(), HotAction::Cycle)); }
     let mut parsed = Vec::new();
     for (key, action) in wanted {
@@ -70,8 +72,14 @@ fn register_hotkeys(app: &AppHandle, s: &Settings) -> Result<(), String> {
     let mut map = state.hotkeys.lock().unwrap();
     map.clear();
     for (sc, action) in parsed {
-        gs.register(sc).map_err(|e| format!("Couldn't use that key (another program may own it): {e}"))?;
-        map.insert(sc.id(), action);
+        match gs.register(sc) {
+            Ok(()) => { map.insert(sc.id(), action); }
+            // Another price checker (e.g. Awakened PoE Trade) may own Ctrl+D: carry on without it.
+            Err(e) if action == HotAction::Price => {
+                let _ = app.emit("hotkey-warning", format!("Price check key unavailable (another program may own it): {e}"));
+            }
+            Err(e) => return Err(format!("Couldn't use that key (another program may own it): {e}")),
+        }
     }
     Ok(())
 }
@@ -375,6 +383,137 @@ fn quick_edit(app: AppHandle) {
             Err(e) => show_overlay(&app, "pick-failed", e),
         }
     });
+}
+
+fn send_ctrl_alt_c() {
+    use enigo::{Direction, Enigo, Key, Keyboard, Settings};
+    if let Ok(mut e) = Enigo::new(&Settings::default()) {
+        let _ = e.key(Key::Control, Direction::Press);
+        let _ = e.key(Key::Alt, Direction::Press);
+        let _ = e.key(Key::Unicode('c'), Direction::Click);
+        let _ = e.key(Key::Alt, Direction::Release);
+        let _ = e.key(Key::Control, Direction::Release);
+    }
+}
+
+// ---------- price check (Ctrl+D) ----------
+
+#[derive(Serialize, Clone)]
+struct PriceCheck {
+    setup: Option<filter_core::trade::TradeSetup>,
+    /// poe.ninja's price (value, unit) when it has the item.
+    ninja: Option<(f64, String)>,
+    league: String,
+    /// Read off the ground (name only, no stats).
+    from_ground: bool,
+    error: Option<String>,
+}
+
+fn trade_league(app: &AppHandle) -> (bool, String) {
+    let state = app.state::<AppState>();
+    let game = active_game(&state);
+    let league = state.prices.lock().unwrap().get(&game).map(|f| f.league.clone()).unwrap_or_else(|| "Standard".into());
+    (game == Game::Poe2, league)
+}
+
+fn ninja_price(app: &AppHandle, item: &Item) -> Option<(f64, String)> {
+    let state = app.state::<AppState>();
+    let game = active_game(&state);
+    let prices = state.prices.lock().unwrap();
+    let f = prices.get(&game)?;
+    price_of(f, item.name.as_deref(), &item.base_type, &item.rarity).map(|v| (v, f.unit.clone()))
+}
+
+/// Ctrl+D: copies the hovered item (advanced copy: mod tiers too) and opens the price window.
+fn price_check(app: AppHandle) {
+    thread::spawn(move || {
+        if !game_in_front() { return; }
+        let before = app.clipboard().read_text().unwrap_or_default();
+        let _ = app.clipboard().write_text(String::new());
+        send_ctrl_alt_c();
+        let mut text = String::new();
+        for _ in 0..10 {
+            thread::sleep(Duration::from_millis(30));
+            text = app.clipboard().read_text().unwrap_or_default();
+            if !text.is_empty() { break; }
+        }
+        let _ = app.clipboard().write_text(before);
+        let (poe2, league) = trade_league(&app);
+        let state = app.state::<AppState>();
+        let payload = if !text.is_empty() {
+            match trade_api::stats(&state.data_dir, poe2) {
+                Ok(index) => match filter_core::trade::setup(&text, &index) {
+                    Some(s) => PriceCheck { ninja: ninja_price(&app, &s.item), setup: Some(s), league, from_ground: false, error: None },
+                    None => PriceCheck { setup: None, ninja: None, league, from_ground: false, error: Some("That doesn't look like an item".into()) },
+                },
+                Err(e) => match filter_core::trade::setup(&text, &Default::default()) {
+                    Some(s) => PriceCheck { ninja: ninja_price(&app, &s.item), setup: Some(s), league, from_ground: false,
+                        error: Some(format!("Stat list unavailable, searching by name only ({e})")) },
+                    None => PriceCheck { setup: None, ninja: None, league, from_ground: false, error: Some(e) },
+                },
+            }
+        } else {
+            // On the ground the game won't copy: read the label for its name.
+            match read_from_ground(&app) {
+                Ok(p) => {
+                    let item = p.item;
+                    let category = filter_core::trade::category(&item.item_class).map(String::from);
+                    let s = filter_core::trade::TradeSetup { item: item.clone(), filters: vec![], base_only: true, ilvl_min: None,
+                        links_min: None, gem_level: None, unknown: vec![], category };
+                    PriceCheck { ninja: ninja_price(&app, &item), setup: Some(s), league, from_ground: true, error: None }
+                }
+                Err(e) => PriceCheck { setup: None, ninja: None, league, from_ground: true, error: Some(e) },
+            }
+        };
+        if let Some(w) = app.get_webview_window("trade") {
+            if let Ok(pos) = w.cursor_position() {
+                let _ = w.set_position(PhysicalPosition::new(pos.x as i32 + 16, (pos.y as i32 - 200).max(0)));
+            }
+            let _ = w.emit("price-check", payload);
+            let _ = w.show();
+            let _ = w.set_focus();
+        }
+    });
+}
+
+#[derive(Serialize)]
+struct TradeResult {
+    listings: Vec<filter_core::trade::Listing>,
+    /// (lowest, typical) in chaos.
+    summary: Option<(f64, f64)>,
+    total: u64,
+    url: String,
+    /// What a Divine Orb is worth in chaos, for showing prices in divines.
+    divine: Option<f64>,
+}
+
+/// Runs the price search on the trade site (from the price window).
+#[tauri::command]
+fn trade_search(app: AppHandle, setup: filter_core::trade::TradeSetup) -> Result<TradeResult, String> {
+    let (poe2, league) = trade_league(&app);
+    let q = filter_core::trade::query(&setup);
+    let (id, ids, total) = trade_api::search(poe2, &league, &q)?;
+    let fetched = trade_api::fetch(poe2, &ids, &id)?;
+    let state = app.state::<AppState>();
+    let game = active_game(&state);
+    let rates = {
+        let prices = state.prices.lock().unwrap();
+        let f = prices.get(&game);
+        filter_core::trade::rates(|name| f.and_then(|f| price_of(f, None, name, "Currency")))
+    };
+    let listings = filter_core::trade::listings(&fetched, &rates);
+    Ok(TradeResult { summary: filter_core::trade::summary(&listings), total, url: trade_api::site_url(poe2, &league, &id),
+        divine: rates.get("divine").copied(), listings })
+}
+
+#[tauri::command]
+fn copy_text(app: AppHandle, text: String) -> Result<(), String> {
+    app.clipboard().write_text(text).map_err(err)
+}
+
+#[tauri::command]
+fn hide_trade_window(app: AppHandle) {
+    if let Some(w) = app.get_webview_window("trade") { let _ = w.hide(); }
 }
 
 /// Is Path of Exile the window in front? We only ever type into the game.
@@ -1442,6 +1581,8 @@ pub fn run() {
                                 let _ = app.emit("reload-failed", e);
                             }
                         });
+                    } else if action == Some(HotAction::Price) {
+                        price_check(app.clone());
                     } else if action == Some(HotAction::Build) {
                         toggle_build_window(app);
                     } else if action == Some(HotAction::Batch) {
@@ -1532,7 +1673,7 @@ pub fn run() {
             list_farm_presets,
             apply_farm_preset,
             list_level_presets,
-            get_tiers, get_rule_section,
+            get_tiers, get_rule_section, trade_search, copy_text, hide_trade_window,
             move_tier_item,
             stack_choices,
             gear_setup,

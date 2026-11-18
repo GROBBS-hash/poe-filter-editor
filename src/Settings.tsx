@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 type Settings = {
-  key_quick_edit: string; key_batch: string; key_reload: string; key_cycle: string; key_build: string;
+  key_quick_edit: string; key_batch: string; key_reload: string; key_cycle: string; key_build: string; key_price?: string;
   cycle_enabled: boolean; fallback_area_level: number; claude_api_key: string;
 };
 
@@ -47,6 +47,7 @@ export default function SettingsPage() {
           <span>Batch mode on/off</span><KeyBox value={s.key_batch} onChange={(k) => set({ key_batch: k })} />
           <span>Reload your filter in game</span><KeyBox value={s.key_reload} onChange={(k) => set({ key_reload: k })} />
           <span>Show/hide your build (PoB)</span><KeyBox value={s.key_build ?? "F6"} onChange={(k) => set({ key_build: k })} />
+          <span>Price check the item under your mouse</span><KeyBox value={s.key_price ?? "Ctrl+D"} onChange={(k) => set({ key_price: k })} />
           <label className="check"><input type="checkbox" checked={s.cycle_enabled} onChange={(e) => set({ cycle_enabled: e.target.checked })} />
             <span>Switch to your next filter (e.g. League Start → Strict 1 → Strict 2) and load it</span></label>
           <KeyBox value={s.key_cycle} disabled={!s.cycle_enabled} onChange={(k) => set({ key_cycle: k })} />
