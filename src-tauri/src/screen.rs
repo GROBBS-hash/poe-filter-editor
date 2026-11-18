@@ -130,14 +130,7 @@ mod imp {
         let (raw, mx, my) = capture(p.x, p.y)?;
         let max = OcrEngine::MaxImageDimension().unwrap_or(2600) as i32;
         let scale = if W * 2 <= max { 2 } else { 1 };
-        let big = upscale(&raw, scale);
-
-        let buffer = CryptographicBuffer::CreateFromByteArray(&big)?;
-        let bitmap = SoftwareBitmap::CreateCopyWithAlphaFromBuffer(
-            &buffer, BitmapPixelFormat::Bgra8, W * scale, H * scale, BitmapAlphaMode::Ignore)?;
         let engine = OcrEngine::TryCreateFromUserProfileLanguages()?;
-        let result = engine.RecognizeAsync(&bitmap)?.get()?;
-
         let (cx, cy) = ((mx * scale) as f32, (my * scale) as f32);
         let union = |a: Rect, r: Rect| {
             let (x1, y1) = (a.X.min(r.X), a.Y.min(r.Y));
@@ -145,15 +138,41 @@ mod imp {
             Rect { X: x1, Y: y1, Width: x2 - x1, Height: y2 - y1 }
         };
         // Every recognised line with its box.
-        let mut lines: Vec<(String, Rect)> = Vec::new();
-        for line in result.Lines()? {
-            let mut rect: Option<Rect> = None;
-            for word in line.Words()? {
-                let r = word.BoundingRect()?;
-                rect = Some(match rect { None => r, Some(a) => union(a, r) });
+        let recognise = |pixels: &[u8]| -> windows::core::Result<Vec<(String, Rect)>> {
+            let big = upscale(pixels, scale);
+            let buffer = CryptographicBuffer::CreateFromByteArray(&big)?;
+            let bitmap = SoftwareBitmap::CreateCopyWithAlphaFromBuffer(
+                &buffer, BitmapPixelFormat::Bgra8, W * scale, H * scale, BitmapAlphaMode::Ignore)?;
+            let result = engine.RecognizeAsync(&bitmap)?.get()?;
+            let mut lines = Vec::new();
+            for line in result.Lines()? {
+                let mut rect: Option<Rect> = None;
+                for word in line.Words()? {
+                    let r = word.BoundingRect()?;
+                    rect = Some(match rect { None => r, Some(a) => union(a, r) });
+                }
+                if let Some(r) = rect { lines.push((line.Text()?.to_string(), r)); }
             }
-            if let Some(r) = rect {
-                lines.push((line.Text()?.to_string(), r));
+            Ok(lines)
+        };
+        // Some filter colours give the reader too little contrast (white text on bright orange):
+        // if nothing is found near the mouse, try again with the darkest colour channel as grey,
+        // then the same inverted.
+        let near_mouse = |lines: &Vec<(String, Rect)>| lines.iter().any(|(_, r)| dist_to(r, cx, cy) < (220.0 * scale as f32).powi(2));
+        let grey = |invert: bool| -> Vec<u8> {
+            let mut out = raw.clone();
+            for px in out.chunks_exact_mut(4) {
+                let v = px[0].min(px[1]).min(px[2]);
+                let v = if invert { 255 - v } else { v };
+                px[0] = v; px[1] = v; px[2] = v;
+            }
+            out
+        };
+        let mut lines = recognise(&raw)?;
+        if !near_mouse(&lines) {
+            for invert in [false, true] {
+                let more = recognise(&grey(invert))?;
+                if near_mouse(&more) { lines = more; break; }
             }
         }
         // The text reader sometimes splits one label into pieces ("KARUI CH" + "OPPER"):
