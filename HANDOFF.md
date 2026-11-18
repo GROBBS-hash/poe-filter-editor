@@ -37,25 +37,32 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   trade site's rate-limit headers and says how long to wait instead of getting timed out; window placed on the side of
   the mouse with more room and kept on screen (both pop-ups). Confirmed working in game (search returned listings).
 
+- Map check (Ctrl+D on a map) — `core/src/maps.rs`: reads every map mod (also ones without numbers), flags those on
+  the Settings list "Map check" (`settings.map_avoid`, None = all), "Suggest from my build" uses the PoB endgame stage
+  (main skill elemental/physical/minion/DoT → reflect, curses → hexproof, leech, ailments, always max res + no regen).
+- Trade helper — `core/src/whispers.rs` + `start_whisper_watcher` in lib.rs: tails Client.txt, trade whispers pop up
+  in the `trades` window (TradesWindow.tsx; shown without taking focus: re-focuses the game via `focus_game`).
+  Invite / Trade / Thanks / Kick: each press = `focus_game` + one `type_in_chat` line. Turns green when the buyer
+  joins your area. Settings: on/off, thanks message, chat hotkeys (`settings.chat_keys`, HotAction::Chat).
+- Saved & live searches — `core/src/saved.rs` (saved_searches.json in the data folder), price window "Save search" +
+  "Saved searches" list (Run / Live / delete; also shown when Ctrl+D has nothing to price). Live = background
+  re-search every 90s (max 3 live), only when `trade_api::has_room` leaves spare requests and not within 20s of a
+  manual price check; new listings pop up in the `trades` window with a Whisper button (types the whisper in game).
+  Official websocket live search needs a POESESSID login, so this polls instead.
+
 ## Left to do (agreed order)
-1. **Map check**: Ctrl+D on a map → list mods with warnings. Core is ready: `trade::map_check(mods, avoid)` +
-   `MAP_DANGER` list. Needs: detect maps in `price_check` (item_class "Maps"), show mods with red flags in TradeWindow,
-   Settings list "map mods I can't run" (default all), ideally suggested from the PoB build (e.g. no regen / reflect).
-2. **Trade helper**: watch the game's Client.txt (we already find the log in `core/src/area.rs`) for incoming whispers
-   ("@From Name: Hi, I would like to buy your …"), show a small list with buttons Invite / Trade / Kick / Thanks.
-   **One chat command per button press** (GGG rule: one action per key press); reuse `reload_in_game`'s typing code.
-   Plus optional chat hotkeys (e.g. /hideout), one command each.
-3. **Saved & live searches**: save a search from the price window, re-run it; live search pop-up when something lists
-   (respect rate limits; price checks take priority).
-4. **Stash value / earnings per hour** (Exilence-style, needs the PoE account OAuth or stash API — research first).
-5. Price check polish ideas: group resistances "any resistance" (count group), collapse duplicate sellers, show price
-   in divines toggle, currency trend chart.
-6. Deferred earlier: installer + auto-update, batch mode tidy-up, PoE 2 coverage.
+1. **GROBBS to test in game**: trade helper buttons (focus switch + typing), whisper pop-up not stealing focus,
+   chat hotkeys, live search pop-ups. Windows-only code (`focus_game`) couldn't be compiled in the cloud.
+2. **Stash value / earnings per hour** (Exilence-style, needs the PoE account OAuth or stash API — research first).
+3. Price check polish ideas: group resistances "any resistance" (count group), collapse duplicate sellers, show price
+   in divines toggle, currency trend chart; map tier filter when price checking maps.
+4. Deferred earlier: installer + auto-update, batch mode tidy-up, PoE 2 coverage.
 
 ## Known caveats
 - This cloud workspace can't reach pathofexile.com / poe.ninja / poeprices.info, so network code is only tested by
   GROBBS in game. Windows-only code (`screen.rs` imp module) can't be compiled here: keep logic in the plain functions
   above it (they have tests) and write the Windows part carefully.
 - Trade site User-Agent: `OAuth poe-filter-editor/0.1 (contact: github repo)`; if Cloudflare starts blocking, revisit.
+- Linux type-check of the app: install libwebkit2gtk-4.1-dev libgtk-3-dev libxdo-dev, then `cargo check -p poe-filter-editor`.
 - Test harness: Playwright scripts mocking `window.__TAURI_INTERNALS__` (render `dist/` after `npm run build`); the
   `trade` window is chosen by window label in `src/main.tsx`.

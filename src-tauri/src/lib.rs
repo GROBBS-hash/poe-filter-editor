@@ -47,6 +47,8 @@ struct AppState {
     history_path: PathBuf,
     /// Registered hotkeys: shortcut id -> what it does.
     hotkeys: Mutex<std::collections::HashMap<u32, HotAction>>,
+    /// Saved price searches (some of them live).
+    saved: Mutex<filter_core::saved::Saved>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -538,23 +540,123 @@ struct TradeResult {
     divine: Option<f64>,
 }
 
+/// Chaos value of each trade currency, from the latest poe.ninja prices.
+fn currency_rates(app: &AppHandle) -> std::collections::HashMap<String, f64> {
+    let state = app.state::<AppState>();
+    let game = active_game(&state);
+    let prices = state.prices.lock().unwrap();
+    let f = prices.get(&game);
+    filter_core::trade::rates(|name| f.and_then(|f| price_of(f, None, name, "Currency")))
+}
+
+/// When you last price checked by hand: live searches wait so yours go first.
+static LAST_MANUAL: Mutex<Option<std::time::Instant>> = Mutex::new(None);
+
 /// Runs the price search on the trade site (from the price window).
 #[tauri::command]
 fn trade_search(app: AppHandle, setup: filter_core::trade::TradeSetup) -> Result<TradeResult, String> {
+    *LAST_MANUAL.lock().unwrap() = Some(std::time::Instant::now());
     let (poe2, league) = trade_league(&app);
     let q = filter_core::trade::query(&setup);
     let (id, ids, total) = trade_api::search(poe2, &league, &q)?;
     let fetched = trade_api::fetch(poe2, &ids, &id)?;
-    let state = app.state::<AppState>();
-    let game = active_game(&state);
-    let rates = {
-        let prices = state.prices.lock().unwrap();
-        let f = prices.get(&game);
-        filter_core::trade::rates(|name| f.and_then(|f| price_of(f, None, name, "Currency")))
-    };
+    let rates = currency_rates(&app);
     let listings = filter_core::trade::listings(&fetched, &rates);
     Ok(TradeResult { summary: filter_core::trade::summary(&listings), total, url: trade_api::site_url(poe2, &league, &id),
         divine: rates.get("divine").copied(), listings })
+}
+
+// ---------- saved & live searches ----------
+
+#[derive(Serialize)]
+struct SavedInfo { id: u64, name: String, live: bool, setup: filter_core::trade::TradeSetup }
+
+fn saved_infos(state: &AppState) -> Vec<SavedInfo> {
+    state.saved.lock().unwrap().list.iter().map(|s| SavedInfo { id: s.id, name: s.name.clone(), live: s.live, setup: s.setup.clone() }).collect()
+}
+
+fn saved_store(state: &AppState) -> Result<Vec<SavedInfo>, String> {
+    state.saved.lock().unwrap().save(&state.data_dir.join("saved_searches.json"))?;
+    Ok(saved_infos(state))
+}
+
+#[tauri::command]
+fn saved_list(state: State<AppState>) -> Vec<SavedInfo> { saved_infos(&state) }
+
+#[tauri::command]
+fn saved_add(state: State<AppState>, name: String, setup: filter_core::trade::TradeSetup) -> Result<Vec<SavedInfo>, String> {
+    state.saved.lock().unwrap().add(&name, setup);
+    saved_store(&state)
+}
+
+#[tauri::command]
+fn saved_delete(state: State<AppState>, id: u64) -> Result<Vec<SavedInfo>, String> {
+    state.saved.lock().unwrap().remove(id);
+    saved_store(&state)
+}
+
+#[tauri::command]
+fn saved_live(state: State<AppState>, id: u64, on: bool) -> Result<Vec<SavedInfo>, String> {
+    state.saved.lock().unwrap().set_live(id, on)?;
+    saved_store(&state)
+}
+
+#[derive(Serialize, Clone)]
+struct LiveHit { search: String, listings: Vec<filter_core::trade::Listing>, url: String }
+
+/// Re-checks each live search on the trade site about every 90 seconds and pops up
+/// anything newly listed. Polite to the site: only when there's room under its
+/// limits with requests to spare, and never just after you price check something.
+fn start_live_searches(app: AppHandle) {
+    thread::spawn(move || {
+        let mut due: std::collections::HashMap<u64, std::time::Instant> = Default::default();
+        loop {
+            thread::sleep(Duration::from_secs(5));
+            let state = app.state::<AppState>();
+            let live: Vec<(u64, String, filter_core::trade::TradeSetup)> = state.saved.lock().unwrap().list.iter()
+                .filter(|s| s.live).map(|s| (s.id, s.name.clone(), s.setup.clone())).collect();
+            due.retain(|id, _| live.iter().any(|l| l.0 == *id));
+            let now = std::time::Instant::now();
+            for (id, name, setup) in live {
+                if due.get(&id).map(|t| *t > now).unwrap_or(false) { continue; }
+                if LAST_MANUAL.lock().unwrap().map(|t| t.elapsed() < Duration::from_secs(20)).unwrap_or(false) { break; }
+                if !trade_api::has_room("search", 3) || !trade_api::has_room("fetch", 3) { break; }
+                let (poe2, league) = trade_league(&app);
+                let q = filter_core::trade::query(&setup);
+                let fresh = match trade_api::search(poe2, &league, &q) {
+                    Ok((sid, ids, _)) => {
+                        due.insert(id, now + Duration::from_secs(90));
+                        let fresh = state.saved.lock().unwrap().fresh(id, &ids);
+                        if fresh.is_empty() { continue; }
+                        (sid, fresh)
+                    }
+                    Err(_) => { due.insert(id, now + Duration::from_secs(180)); continue; }
+                };
+                let (sid, ids) = fresh;
+                let Ok(fetched) = trade_api::fetch(poe2, &ids, &sid) else { continue };
+                let listings = filter_core::trade::listings(&fetched, &currency_rates(&app));
+                if listings.is_empty() { continue; }
+                if let Some(w) = app.get_webview_window("trades") {
+                    let _ = w.emit("live-hit", LiveHit { search: name, listings, url: trade_api::site_url(poe2, &league, &sid) });
+                    if !w.is_visible().unwrap_or(false) {
+                        let front = game_in_front();
+                        let _ = w.show();
+                        if front { focus_game(); }
+                    }
+                }
+            }
+        }
+    });
+}
+
+/// Sends a seller the trade site's whisper: brings the game to the front and types it (one message per press).
+#[tauri::command]
+async fn send_whisper(text: String) -> Result<(), String> {
+    if !text.starts_with('@') { return Err("That isn't a whisper".into()); }
+    tauri::async_runtime::spawn_blocking(move || {
+        focus_game();
+        type_in_chat(&text, 1500)
+    }).await.map_err(err)?
 }
 
 #[derive(Serialize)]
@@ -1729,7 +1831,8 @@ fn load_state() -> AppState {
         }
     }
     AppState { store: Mutex::new(store), store_path, history: Mutex::new(History::load(&history_path)), history_path,
-        icons: Mutex::new(icons), prices: Mutex::new(cached), data_dir: data, hotkeys: Mutex::new(Default::default()) }
+        icons: Mutex::new(icons), prices: Mutex::new(cached), saved: Mutex::new(filter_core::saved::Saved::load(&data.join("saved_searches.json"))),
+        data_dir: data, hotkeys: Mutex::new(Default::default()) }
 }
 
 pub fn run() {
@@ -1791,6 +1894,7 @@ pub fn run() {
             }
             start_batch_watcher(app.handle().clone());
             start_whisper_watcher(app.handle().clone());
+            start_live_searches(app.handle().clone());
 
             // Tray icon: the app lives here so hotkeys work while you play.
             use tauri::menu::{Menu, MenuItem};
@@ -1859,7 +1963,7 @@ pub fn run() {
             list_farm_presets,
             apply_farm_preset,
             list_level_presets,
-            get_tiers, get_rule_section, trade_search, trade_bulk, rare_estimate, map_dangers, map_suggest, trade_action, hide_trades_window, copy_text, hide_trade_window, keep_on_screen,
+            get_tiers, get_rule_section, trade_search, trade_bulk, rare_estimate, map_dangers, map_suggest, trade_action, hide_trades_window, saved_list, saved_add, saved_delete, saved_live, send_whisper, copy_text, hide_trade_window, keep_on_screen,
             move_tier_item,
             stack_choices,
             gear_setup,

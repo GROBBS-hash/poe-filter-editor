@@ -653,3 +653,13 @@ input[type=range] { accent-color: var(--gold); }
 .th-btns button { padding: 4px 0; font-size: 12px; }
 .th-btns button.done { opacity: 0.5; }
 .chat-keys { display: grid; grid-template-columns: 110px 1fr auto; gap: 6px 8px; align-items: center; margin-top: 8px; }
+.tw-saved-toggle { display: block; margin-top: 6px; }
+.tw-saved { margin-top: 4px; }
+.tw-saved-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tw-live-on { color: #ff6b6b !important; font-weight: 600; }
+.tw-save { display: flex; gap: 6px; margin: 6px 0; }
+.tw-save input { flex: 1; }
+.th-live .th-item { color: #ff9b9b; }
+.th-live-row { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; margin: 3px 0; }
+.th-live-row button { padding: 2px 8px; font-size: 12px; }
+.th-live-row button.done { opacity: 0.5; }

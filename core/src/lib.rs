@@ -14,6 +14,7 @@ pub mod preview;
 pub mod prices;
 pub mod profiles;
 pub mod rules;
+pub mod saved;
 pub mod search;
 pub mod themes;
 pub mod tiers;

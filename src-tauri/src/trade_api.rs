@@ -92,6 +92,21 @@ fn wait_turn(kind: &'static str) -> Result<(), String> {
     Ok(())
 }
 
+/// For background checks (live searches): is there room for a request of this kind
+/// right now, leaving `spare` requests free under every limit for your own price checks?
+pub fn has_room(kind: &'static str, spare: usize) -> bool {
+    let mut l = limiter().lock().unwrap();
+    let now = Instant::now();
+    if l.blocked_until.get(kind).map(|u| *u > now).unwrap_or(false) { return false; }
+    let rules = l.rules.get(kind).cloned().unwrap_or_else(|| default_rules(kind));
+    let sent = l.sent.entry(kind).or_default();
+    rules.iter().all(|(max, window)| {
+        let recent = sent.iter().filter(|t| now.duration_since(**t) < Duration::from_secs(*window)).count();
+        let allowed = (*max as usize).saturating_sub(1);
+        recent + spare.min(allowed / 2) < allowed
+    })
+}
+
 fn learn(kind: &'static str, resp: &ureq::Response) {
     let mut l = limiter().lock().unwrap();
     if let Some(r) = resp.header("X-Rate-Limit-Ip") {

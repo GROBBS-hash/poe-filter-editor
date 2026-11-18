@@ -36,6 +36,32 @@ function money(c: number, divine: number | null) {
 const needsTrade = (c: Check) => !!c.setup && !c.bulk && (!c.ninja || ["Rare", "Magic", "Normal", "Gem"].includes(c.setup.item.rarity)
   || (c.setup.item.rarity === "Unique" && !c.setup.item.name));
 
+type Saved = { id: number; name: string; live: boolean; setup: Setup };
+
+/** Saved searches: run again, or turn on live (pops up new listings while you play). */
+function SavedPanel({ list, setList, onRun }: { list: Saved[]; setList: (l: Saved[]) => void; onRun: (s: Saved) => void }) {
+  const [err, setErr] = useState("");
+  const call = (cmd: string, args: Record<string, unknown>) => invoke<Saved[]>(cmd, args).then((l) => { setList(l); setErr(""); }).catch((e) => setErr(String(e)));
+  if (list.length === 0) return <div className="muted small tw-saved">No saved searches yet: price check an item, then press Save search.</div>;
+  return (
+    <div className="tw-saved">
+      <div className="muted small">Live searches check the trade site every 90 seconds and pop up new listings.</div>
+      <ul className="tw-list">
+        {list.map((x) => (
+          <li key={x.id}>
+            <span className="tw-saved-name" title={x.setup.filters.filter((f) => f.enabled).map((f) => f.label).join("\n")}>{x.name}</span>
+            <button className="link small" onClick={() => onRun(x)}>Run</button>
+            <button className={`link small ${x.live ? "tw-live-on" : ""}`} onClick={() => call("saved_live", { id: x.id, on: !x.live })}
+              title={x.live ? "Live: on (click to stop)" : "Pop up new listings while you play"}>{x.live ? "● Live" : "Live"}</button>
+            <button className="link small" onClick={() => call("saved_delete", { id: x.id })} title="Delete">×</button>
+          </li>
+        ))}
+      </ul>
+      {err && <div className="qm-warn">{err}</div>}
+    </div>
+  );
+}
+
 /** Ctrl+D on a map: its mods, the ones you can't run in red. */
 function MapCheck({ map }: { map: MapInfo }) {
   const bad = map.mods.filter((m) => m.warn);
@@ -68,6 +94,9 @@ export default function TradeWindow() {
   const [bulk, setBulk] = useState<Bulk | null>(null);
   const [pay, setPay] = useState<"chaos" | "divine">("chaos");
   const [ai, setAi] = useState<[number, number, string, number] | null>(null);
+  const [saved, setSaved] = useState<Saved[]>([]);
+  const [showSaved, setShowSaved] = useState(false);
+  const [saving, setSaving] = useState<string | null>(null);
   const box = useRef<HTMLDivElement | null>(null);
 
   const close = useCallback(() => { setCheck(null); setRes(null); setBulk(null); setAi(null); setErr(""); invoke("hide_trade_window"); }, []);
@@ -88,6 +117,8 @@ export default function TradeWindow() {
     const a = listen<Check>("price-check", (e) => {
       const c = e.payload;
       setCheck(c); setSetup(c.setup); setRes(null); setBulk(null); setAi(null); setErr(c.error ?? ""); setCopied(null); setPay("chaos");
+      setSaving(null); setShowSaved(!c.setup);
+      invoke<Saved[]>("saved_list").then(setSaved).catch(() => {});
       if (c.bulk) runBulk(c.bulk, "chaos");
       else if (c.setup && needsTrade(c)) run(c.setup);
       // A rough second opinion on rares from poeprices.info.
@@ -112,8 +143,20 @@ export default function TradeWindow() {
     return () => ro.disconnect();
   });
 
+  const runSaved = (x: Saved) => {
+    setCheck({ setup: x.setup, ninja: null, league: check?.league ?? "", from_ground: false, error: null });
+    setSetup(x.setup); setBulk(null); setAi(null); setShowSaved(false); run(x.setup);
+  };
+  const savedBlock = (
+    <>
+      <button className="link small tw-saved-toggle" onClick={() => setShowSaved(!showSaved)}>
+        {showSaved ? "Hide saved searches" : `Saved searches (${saved.length})`}{saved.some((x) => x.live) ? " · live on" : ""}</button>
+      {showSaved && <SavedPanel list={saved} setList={setSaved} onRun={runSaved} />}
+    </>
+  );
+
   if (!check) return null;
-  if (!setup) return <div className="qm tw" ref={box}><div className="qm-fail">{err || "Nothing to price."}</div></div>;
+  if (!setup) return <div className="qm tw" ref={box}><div className="qm-fail">{err || "Nothing to price."}</div>{savedBlock}</div>;
 
   const it = setup.item;
   const patch = (i: number, p: Partial<StatFilter>) => setSetup({ ...setup, filters: setup.filters.map((f, j) => (j === i ? { ...f, ...p } : f)) });
@@ -164,8 +207,16 @@ export default function TradeWindow() {
         {it.item_level != null && it.rarity !== "Unique" && setup.category && (
           <label><input type="checkbox" checked={setup.ilvl_min != null} onChange={(e) => setSetup({ ...setup, ilvl_min: e.target.checked ? it.item_level ?? null : null })} /> ilvl {it.item_level}+</label>
         )}
+        <button className="link small" onClick={() => setSaving(saving == null ? itemTitle(it) : null)} title="Keep this search to run again or watch live">Save search</button>
         <button className="tw-search" disabled={busy} onClick={() => run(setup)}>{busy ? "Searching…" : res ? "Search again" : "Search trade"}</button>
       </div>}
+      {saving != null && (
+        <form className="tw-save" onSubmit={(e) => { e.preventDefault();
+          invoke<Saved[]>("saved_add", { name: saving, setup }).then((l) => { setSaved(l); setSaving(null); setShowSaved(true); }).catch((er) => setErr(String(er))); }}>
+          <input className="text" autoFocus value={saving} onChange={(e) => setSaving(e.target.value)} placeholder="Name this search" />
+          <button type="submit">Save</button>
+        </form>
+      )}
 
       {check.from_ground && it.rarity !== "Unique" && setup.filters.length === 0 && ["Rare", "Magic"].includes(it.rarity) && (
         <div className="muted small">Read off the ground, so no stats: pick it up and press Ctrl+D in your inventory for a proper price.</div>
@@ -220,6 +271,7 @@ export default function TradeWindow() {
           <button className="link small" onClick={() => invoke("open_url", { url: res.url })}>Open on the trade site</button>
         </div>
       )}
+      {!check.bulk && savedBlock}
     </div>
   );
 }
