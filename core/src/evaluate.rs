@@ -124,6 +124,8 @@ fn cmp_bool(have: Option<bool>, vals: &[String]) -> Tri {
 fn check(key: &str, op: &str, vals: &[String], c: &Ctx) -> Tri {
     let it = c.item;
     let gear_like = RARITIES.contains(&it.rarity.as_str());
+    // Off the ground we can't see gear details; everything else simply has none.
+    let c = &Ctx { from_screen: c.from_screen && (is_gear(it) || it.item_class.is_empty()), ..c.clone() };
     match key {
         "Class" => if it.item_class.is_empty() { Tri::Unknown } else { cmp_text(&it.item_class, op, vals) },
         "BaseType" => cmp_text(&it.base_type, op, vals),
@@ -294,7 +296,7 @@ pub fn status(segs: &[Segment], item: &Item, area_level: u32, from_screen: bool)
     if item.item_level.is_none() && RARITIES.contains(&item.rarity.as_str()) {
         assumptions.push(format!("item level {area_level}"));
     }
-    if from_screen {
+    if from_screen && is_gear(item) {
         assumptions.push("not corrupted, unidentified".into());
     }
     let ctx = Ctx { item, area_level: Some(area_level), stack: None, from_screen };

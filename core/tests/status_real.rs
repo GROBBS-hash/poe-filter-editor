@@ -31,3 +31,15 @@ fn why_unsure() {
     let s = status(&segs, &parse_item("Item Class: Stackable Currency\nRarity: Currency\nDivine Orb\n").unwrap(), 83, false);
     for u in &s.verdict.uncertain { println!("UNSURE {u}"); }
 }
+
+#[test]
+fn ground_currency_is_certain() {
+    use filter_core::ground::{ground_item, GroundMatch};
+    let segs = parse_filter(&std::fs::read_to_string(SRC).unwrap());
+    let m = GroundMatch { base: "Orb of Regret".into(), stack: None, confidence: 1.0 };
+    let it = ground_item(&segs, &m, Some([0, 0, 0]), 83);
+    let s = status(&segs, &it, 83, true);
+    assert_eq!(s.verdict.visibility, "Show");
+    assert!(s.verdict.uncertain.is_empty(), "{:?}", s.verdict.uncertain);
+    assert!(s.assumptions.is_empty(), "{:?}", s.assumptions);
+}
