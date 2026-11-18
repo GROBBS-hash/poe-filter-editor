@@ -297,3 +297,6 @@ code { background: #000; padding: 1px 5px; border-radius: 4px; color: var(--gold
 .chip.dragging { opacity: .4; }
 .tier-edit { margin-top: 8px; }
 @media (max-width: 640px) { .tiers { grid-template-columns: 1fr; } .tiers-nav { position: static; max-height: none; } }
+.stackbox { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.stackbox input { width: 64px; margin: 0 3px; padding: 2px 4px; background: #120e09; border: 1px solid #3a3022; color: var(--text); border-radius: 4px; }
+.tier-tools { display: flex; gap: 6px; }

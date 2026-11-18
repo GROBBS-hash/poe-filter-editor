@@ -71,6 +71,16 @@ impl Block {
         self.visibility = kw.to_string();
     }
 
+    /// Sets "StackSize >= n" (replacing any StackSize line, or adding one).
+    pub fn set_min_stack(&mut self, n: u32) {
+        let indent: String = self.lines.first().map(|l| l.chars().take_while(|c| *c == ' ' || *c == '\t').collect()).unwrap_or_else(|| "\t".into());
+        let line = format!("{indent}StackSize >= {n}{}", self.newline);
+        match self.lines.iter().position(|l| l.trim_start().starts_with("StackSize")) {
+            Some(i) => self.lines[i] = line,
+            None => self.lines.insert(0, line),
+        }
+    }
+
     /// Replaces the block's look and sound lines with `actions`.
     pub fn replace_style(&mut self, actions: &[String]) {
         const STYLE: [&str; 14] = ["SetFontSize", "SetTextColor", "SetBorderColor", "SetBackgroundColor", "PlayAlertSound",

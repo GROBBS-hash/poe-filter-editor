@@ -13,7 +13,12 @@ pub enum Rule {
     /// Move a base into another of NeverSink's tiers within the same section.
     MoveBase { type_path: Vec<String>, base: String, to_tier: String },
     /// Change one of NeverSink's tiers as a whole: show/hide it, or give it a new look.
-    Tier { type_path: Vec<String>, tier: String, show: Option<bool>, actions: Option<Vec<String>> },
+    Tier {
+        type_path: Vec<String>, tier: String, show: Option<bool>, actions: Option<Vec<String>>,
+        /// New "StackSize >= N" for stack and gold tiers.
+        #[serde(default)]
+        min_stack: Option<u32>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -407,7 +412,7 @@ pub fn apply_with_extra(segs: &mut Vec<Segment>, rules: &[Rule], extra: &str, nl
                 }
                 top.push_str(nl);
             }
-            Rule::Tier { type_path, tier, show, actions } => {
+            Rule::Tier { type_path, tier, show, actions, min_stack } => {
                 let mut found = false;
                 for seg in segs.iter_mut() {
                     let Segment::Block(b) = seg else { continue };
@@ -415,6 +420,7 @@ pub fn apply_with_extra(segs: &mut Vec<Segment>, rules: &[Rule], extra: &str, nl
                     found = true;
                     if let Some(sh) = show { b.set_visibility(*sh); }
                     if let Some(a) = actions { b.replace_style(a); }
+                    if let Some(n) = min_stack { b.set_min_stack(*n); }
                 }
                 if !found {
                     warnings.push(format!("Couldn't change {} {tier}: that tier is gone in this version", type_path.join(" > ")));

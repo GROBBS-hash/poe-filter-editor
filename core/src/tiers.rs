@@ -16,6 +16,8 @@ pub struct TierRow {
     pub bases: Vec<String>,
     /// Extra conditions in plain words, e.g. "stacks of 3+".
     pub note: String,
+    /// "StackSize >= N" tiers (stacks, gold): N, so the app can offer a slider.
+    pub min_stack: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -73,6 +75,13 @@ pub fn tier_name(t: &str) -> String {
     c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default()
 }
 
+fn gold_name(t: &str) -> String {
+    match t {
+        "stack3" => "Huge piles".into(), "stack2" => "Large piles".into(), "stack1" => "Medium piles".into(),
+        "stacklvl1" => "Small piles (levelling only)".into(), "anyother" => "Any other gold".into(), _ => tier_name(t),
+    }
+}
+
 fn note_of(lines: &[String]) -> String {
     let mut out = vec![];
     for l in lines {
@@ -111,7 +120,9 @@ pub fn sections(segs: &[Segment]) -> Vec<Section> {
         // The same tier can appear twice (e.g. a campaign copy); keep the first.
         if found[i].tiers.iter().any(|t| t.tier == tier) { continue; }
         found[i].tiers.push(TierRow {
-            name: tier_name(&tier), tier, visibility: b.visibility.clone(), style: style_of(&b.lines), bases, note: note_of(&b.lines),
+            name: if key == "gold" { gold_name(&tier) } else { tier_name(&tier) },
+            tier, visibility: b.visibility.clone(), style: style_of(&b.lines), bases, note: note_of(&b.lines),
+            min_stack: b.lines.iter().find_map(|l| l.trim().strip_prefix("StackSize >=").and_then(|n| n.trim().parse().ok())),
         });
     }
     let rank = |s: &Section| KNOWN.iter().position(|k| k.0 == s.type_path.join("->")).unwrap_or(usize::MAX);
@@ -161,9 +172,10 @@ mod tests {
     fn tier_rule_hides_and_restyles() {
         let mut segs = parse_filter(&fixture());
         let rules = vec![
-            Rule::Tier { type_path: vec!["currency".into()], tier: "t5alchemy".into(), show: Some(false), actions: None },
+            Rule::Tier { type_path: vec!["currency".into()], tier: "t5alchemy".into(), show: Some(false), actions: None, min_stack: None },
+            Rule::Tier { type_path: vec!["gold".into()], tier: "stack2".into(), show: None, actions: None, min_stack: Some(800) },
             Rule::Tier { type_path: vec!["divination".into()], tier: "t1".into(), show: None,
-                actions: Some(vec!["SetFontSize 45".into(), "SetTextColor 1 2 3 255".into()]) },
+                actions: Some(vec!["SetFontSize 45".into(), "SetTextColor 1 2 3 255".into()]), min_stack: None },
         ];
         let w = apply(&mut segs, &rules, "\r\n");
         assert!(w.is_empty(), "{w:?}");
@@ -175,5 +187,8 @@ mod tests {
         let t1 = div.tiers.iter().find(|t| t.tier == "t1").unwrap();
         assert_eq!(t1.style.text, Some([1, 2, 3, 255]));
         assert_eq!(t1.style.sound, None, "old sound removed");
+        let gold = s.iter().find(|x| x.title == "Gold").unwrap();
+        let large = gold.tiers.iter().find(|t| t.tier == "stack2").unwrap();
+        assert_eq!((large.name.as_str(), large.min_stack), ("Large piles", Some(800)));
     }
 }

@@ -4,7 +4,20 @@ import { ProfileInfo } from "./types";
 import StyleEditor, { CurrentStyle, CustomStyle, Preview, fromCurrent } from "./StyleEditor";
 import { ItemIcon } from "./icons";
 
-type TierRow = { tier: string; name: string; visibility: string; style: CurrentStyle; bases: string[]; note: string };
+type TierRow = { tier: string; name: string; visibility: string; style: CurrentStyle; bases: string[]; note: string; min_stack: number | null };
+
+/** "Stacks of N+": saves when you leave the box or press Enter. */
+function StackBox({ value, onSave }: { value: number; onSave: (n: number) => void }) {
+  const [v, setV] = useState(String(value));
+  useEffect(() => setV(String(value)), [value]);
+  const save = () => { const n = parseInt(v, 10); if (n > 0 && n !== value) onSave(n); else setV(String(value)); };
+  return (
+    <span className="stackbox" title="Smallest stack this tier applies to">
+      stacks of <input type="number" min={1} value={v} onChange={(e) => setV(e.target.value)} onBlur={save}
+        onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()} />+
+    </span>
+  );
+}
 type Section = { type_path: string[]; title: string; group: string; tiers: TierRow[] };
 
 const SHOW_ITEMS = 24;
@@ -20,6 +33,7 @@ export default function Tiers({ profile, onChange }: { profile: ProfileInfo; onC
   const [drag, setDrag] = useState<{ base: string; from: string } | null>(null);
   const [over, setOver] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
+  const [copied, setCopied] = useState<{ style: CustomStyle; from: string } | null>(null);
 
   const load = () => invoke<Section[]>("get_tiers", { id: profile.id }).then((s) => {
     setSections(s);
@@ -43,10 +57,11 @@ export default function Tiers({ profile, onChange }: { profile: ProfileInfo; onC
   const done = async (p: Promise<unknown>, m: string) => {
     try { await p; setMsg(`${m} Press F4 in game.`); onChange(); await load(); } catch (e) { setMsg(String(e)); }
   };
-  const setTier = (t: TierRow, patch: { show?: boolean; style?: CustomStyle; reset?: boolean }) =>
+  const setTier = (t: TierRow, patch: { show?: boolean; style?: CustomStyle; reset?: boolean; minStack?: number }) =>
     done(invoke("set_tier", { id: profile.id, typePath: section!.type_path, tier: t.tier, show: patch.show ?? null,
-      style: patch.style ?? null, reset: !!patch.reset }),
-      patch.reset ? `${t.name} is back to NeverSink's.` : patch.style ? `${t.name} restyled.` : `${t.name} ${patch.show ? "shown" : "hidden"}.`);
+      style: patch.style ?? null, minStack: patch.minStack ?? null, reset: !!patch.reset }),
+      patch.reset ? `${t.name} is back to NeverSink's.` : patch.style ? `${t.name} restyled.`
+        : patch.minStack ? `${t.name} now applies to stacks of ${patch.minStack}+.` : `${t.name} ${patch.show ? "shown" : "hidden"}.`);
   const drop = (t: TierRow) => {
     if (!drag || drag.from === t.tier) return;
     done(invoke("move_tier_item", { id: profile.id, typePath: section!.type_path, base: drag.base, toTier: t.tier }),
@@ -99,12 +114,20 @@ export default function Tiers({ profile, onChange }: { profile: ProfileInfo; onC
                     <label className="tier-name">
                       <input type="checkbox" checked={shown} onChange={(e) => setTier(t, { show: e.target.checked })} />
                       <span>{t.name}</span>
-                      {t.note && <span className="muted small">{t.note}</span>}
+                      {t.note && t.min_stack == null && <span className="muted small">{t.note}</span>}
                     </label>
+                    {t.min_stack != null && <StackBox value={t.min_stack} onSave={(n) => setTier(t, { minStack: n })} />}
                     <button className="tier-look" title="Change this tier's look" onClick={() => setEditing(editing === key ? null : key)}>
                       <Preview s={fromCurrent(t.style, "Currency")} text={t.bases[0] ?? t.name} />
                     </button>
-                    <button className="link small" title="Undo your changes to this tier" onClick={() => setTier(t, { reset: true })}>Reset</button>
+                    <span className="tier-tools">
+                      <button className="link small" title="Copy this tier's look"
+                        onClick={() => { setCopied({ style: fromCurrent(t.style, "Currency"), from: t.name }); setMsg(`Copied the look of ${t.name}. Use Paste on another tier.`); }}>Copy</button>
+                      {copied && copied.from !== t.name && (
+                        <button className="link small" title={`Give this tier the look of ${copied.from}`} onClick={() => setTier(t, { style: copied.style })}>Paste</button>
+                      )}
+                      <button className="link small" title="Undo your changes to this tier" onClick={() => setTier(t, { reset: true })}>Reset</button>
+                    </span>
                   </div>
                   {editing === key && (
                     <div className="qm tier-edit">
