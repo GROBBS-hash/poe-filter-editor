@@ -8,7 +8,7 @@ use filter_core::{
     item::{is_stackable, parse_item, resolve_magic_base, Item},
     prices::{default_settings, price_of, PriceFile, PriceSettings},
     profiles::{build_with_prices, Game, Store},
-    rules::{custom_rule, edited_rule, known_bases, locate, quick_rule, rule_detail, Action, CustomStyle, Location, MatchOpts, Rule, RuleDetail, RuleEdit},
+    rules::{add_rule, custom_rule, edited_rule, known_bases, locate, quick_rule, rule_detail, Action, CustomStyle, Location, MatchOpts, Rule, RuleDetail, RuleEdit},
 };
 use serde::Serialize;
 use std::{
@@ -441,7 +441,7 @@ fn apply_quick_action(
     let id = store.active.clone().ok_or("Set up a profile first")?;
     let rule = quick_rule(&item, action, colour.as_deref(), &opts.unwrap_or_default());
     let label = rule_label(&rule);
-    store.profiles.get_mut(&id).ok_or("Profile not found")?.rules.push(rule);
+    add_rule(&mut store.profiles.get_mut(&id).ok_or("Profile not found")?.rules, rule);
     let warnings = save_and_build(&state, &store, &id)?;
     Ok(ActionResult { label, warnings })
 }
@@ -453,7 +453,7 @@ fn apply_custom_style(state: State<AppState>, item: Item, style: CustomStyle, op
     let id = store.active.clone().ok_or("Set up a profile first")?;
     let rule = custom_rule(&item, &style, &opts.unwrap_or_default());
     let label = rule_label(&rule);
-    store.profiles.get_mut(&id).ok_or("Profile not found")?.rules.push(rule);
+    add_rule(&mut store.profiles.get_mut(&id).ok_or("Profile not found")?.rules, rule);
     let warnings = save_and_build(&state, &store, &id)?;
     Ok(ActionResult { label, warnings })
 }

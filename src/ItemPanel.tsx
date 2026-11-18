@@ -114,13 +114,16 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
     setToast(warning ?? `${message} Press F4 in game to reload.`);
     refresh(picked);
   };
-  const saved = async (call: Promise<{ label: string; warnings: string[] }>) => {
+  const saved = async (call: Promise<{ label: string; warnings: string[] }>, addedNew = false) => {
     try {
       const r = await call;
-      // Keep editing the same rule after a change (its label may have changed).
+      // Keep editing the same rule after a change. A new rule can shift the
+      // list, so find it by name then; a changed rule keeps its place.
       if (replacing) {
         try {
-          const [id, index, detail] = await invoke<[string, number, RuleDetail]>("get_rule", { id: replacing.id, index: replacing.index, label: null });
+          const [id, index, detail] = await invoke<[string, number, RuleDetail]>("get_rule", addedNew
+            ? { id: replacing.id, index: null, label: replacing.detail.label }
+            : { id: replacing.id, index: replacing.index, label: null });
           setReplacing({ id, index, detail });
         } catch { /* keep the old details */ }
       }
@@ -133,8 +136,8 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
     ({ same_rarity: !anyRarity, max_item_level: null, ...extraOpts });
 
   /** Every change goes through here: a new edit, or (when editing a rule) that rule replaced. */
-  const commit = (show: boolean, style: CustomStyle | null, stack: { min_stack?: number; below_stack?: number }) => {
-    if (replacing) {
+  const commit = (show: boolean, style: CustomStyle | null, stack: { min_stack?: number; below_stack?: number }, addNew = false) => {
+    if (replacing && !addNew) {
       const d = replacing.detail;
       const keepStack = stack.min_stack === undefined && stack.below_stack === undefined;
       return saved(invoke("update_rule", { id: replacing.id, index: replacing.index, edit: {
@@ -144,15 +147,17 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
       } }));
     }
     return show && style
-      ? saved(invoke("apply_custom_style", { item: picked.item, style, opts: opts(stack) }))
-      : saved(invoke("apply_quick_action", { item: picked.item, action: "hide", colour: null, opts: opts(stack) }));
+      ? saved(invoke("apply_custom_style", { item: picked.item, style, opts: opts(stack) }), addNew)
+      : saved(invoke("apply_quick_action", { item: picked.item, action: "hide", colour: null, opts: opts(stack) }), addNew);
   };
   const hide = () => commit(false, null, {});
-  const hideBelow = (n: number) => commit(false, null, { below_stack: n });
+  // Stack rules always sit alongside your other rules for this item ("hide the
+  // small piles" + "style the big ones"), so they're added, never swapped in.
+  const hideBelow = (n: number) => commit(false, null, { below_stack: n }, true);
   const saveStyle = (style: CustomStyle) => {
     const minStack = editing ? editing.minStack : 1;
     setEditingRaw(false);
-    commit(true, style, minStack > 1 ? { min_stack: minStack } : {});
+    commit(true, style, minStack > 1 ? { min_stack: minStack } : {}, minStack > 1);
   };
   const openRule = async (label: string) => {
     try {
@@ -315,8 +320,9 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
           <input type="range" min={0} max={steps.length - 1} value={pickIndex}
             onChange={(e) => setStackPick(+e.target.value)} />
           <div className="qm-row">
-            <button className="qm-btn small hide" onClick={() => hideBelow(stackN)} disabled={stackN <= 1}>
-              Hide under {stackN.toLocaleString()}
+            <button className="qm-btn small hide" onClick={() => hideBelow(stackN)} disabled={stackN <= 1}
+              title={`Hide stacks smaller than ${stackN.toLocaleString()}`}>
+              Only show {stackN.toLocaleString()}+
             </button>
             <button className="qm-btn small" onClick={() => setEditing({ minStack: stackN })}>
               Style {stackN.toLocaleString()}+…

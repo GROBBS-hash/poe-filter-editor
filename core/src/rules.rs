@@ -231,6 +231,22 @@ pub fn rule_detail(rule: &Rule) -> Option<RuleDetail> {
     Some(d)
 }
 
+/// Two edits fill the same "slot" when they're about the same item and the
+/// same kind of stack limit (none / N+ / under N / a range). A new edit
+/// replaces an older one in its slot instead of piling up on top of it.
+pub fn same_slot(a: &Rule, b: &Rule) -> bool {
+    let (Some(x), Some(y)) = (rule_detail(a), rule_detail(b)) else { return false };
+    x.item_class == y.item_class && x.base_type == y.base_type && x.rarity == y.rarity
+        && x.min_stack.is_some() == y.min_stack.is_some()
+        && x.below_stack.is_some() == y.below_stack.is_some()
+}
+
+/// Adds an edit, replacing any older edit in the same slot.
+pub fn add_rule(rules: &mut Vec<Rule>, rule: Rule) {
+    rules.retain(|r| !same_slot(r, &rule));
+    rules.push(rule);
+}
+
 /// Rebuilds a saved edit with changes, keeping what it matches.
 pub fn edited_rule(rule: &Rule, edit: &RuleEdit) -> Option<Rule> {
     let d = rule_detail(rule)?;
@@ -409,6 +425,30 @@ mod tests {
         let Rule::Override { conditions, actions, .. } = edited_rule(&r, &e).unwrap() else { panic!() };
         assert!(!conditions.iter().any(|c| c.starts_with("Rarity")));
         assert!(actions.contains(&"SetTextColor 9 9 9 255".to_string()));
+    }
+
+    #[test]
+    fn hide_small_and_style_big_gold_live_together() {
+        let gold = parse_item("Item Class: Gold\nRarity: Currency\nGold\n").unwrap();
+        let style = CustomStyle { font_size: 40, text: [0, 255, 0, 255], border: None, background: [0, 0, 0, 255],
+            beam: None, minimap: None, sound: Sound::Default };
+        let mut rules = Vec::new();
+        add_rule(&mut rules, quick_rule(&gold, Action::Hide, None, &MatchOpts { below_stack: Some(500), ..Default::default() }));
+        add_rule(&mut rules, custom_rule(&gold, &style, &MatchOpts { min_stack: Some(500), ..Default::default() }));
+        assert_eq!(rules.len(), 2, "different slots: both kept");
+        add_rule(&mut rules, quick_rule(&gold, Action::Hide, None, &MatchOpts { below_stack: Some(800), ..Default::default() }));
+        assert_eq!(rules.len(), 2, "same slot: the under-500 hide is replaced by under-800");
+        let labels: Vec<String> = rules.iter().map(|r| rule_detail(r).unwrap().label).collect();
+        assert!(labels.contains(&"Hide: Gold (stacks under 800)".to_string()));
+        assert!(labels.contains(&"Style: Gold (stacks of 500+)".to_string()));
+
+        let mut segs = parse_filter("Show\n    BaseType == \"Gold\"\n    SetFontSize 30\n");
+        apply(&mut segs, &rules, "\n");
+        let segs = parse_filter(&crate::filter::render_filter(&segs));
+        let at = |n: u32| status(&segs, &crate::item::Item { stack_size: Some(n), ..gold.clone() }, Some(70), false).verdict;
+        assert_eq!(at(200).visibility, "Hide");
+        assert_eq!(at(600).visibility, "Hide", "under 800 now hidden");
+        assert_eq!((at(900).visibility.as_str(), at(900).style.text), ("Show", Some([0, 255, 0, 255])));
     }
 
     #[test]
