@@ -20,6 +20,11 @@ pub struct Style {
     pub muted: bool,             // DisableDropSound
     pub minimap: Option<String>, // "Large Red Star"
     pub beam: Option<String>,    // "Red"
+    pub beam_temp: bool,
+    pub sound_id: Option<String>,   // "2" or "ShDivine" (built-in)
+    pub sound_file: Option<String>, // custom sound, as written in the filter
+    pub volume: Option<u32>,
+    pub minimap_parts: Option<(u8, String, String)>, // (size, colour, shape)
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -212,19 +217,30 @@ fn apply_actions(b: &Block, s: &mut Style) -> bool {
             "SetBackgroundColor" => s.background = colour(&v),
             "PlayAlertSound" | "PlayAlertSoundPositional" => {
                 s.sound = v.first().map(|x| format!("Sound {x}"));
+                s.sound_id = v.first().cloned();
+                s.sound_file = None;
+                s.volume = v.get(1).and_then(|x| x.parse().ok());
                 s.muted = false;
             }
             "CustomAlertSound" | "CustomAlertSoundOptional" => {
                 s.sound = v.first().map(|x| x.rsplit(['/', '\\']).next().unwrap_or(x).to_string());
+                s.sound_file = v.first().cloned();
+                s.sound_id = None;
+                s.volume = v.get(1).and_then(|x| x.parse().ok());
                 s.muted = false;
             }
-            "DisableDropSound" => { s.muted = true; s.sound = None; }
+            "DisableDropSound" if v.first().map(|x| !x.eq_ignore_ascii_case("false")).unwrap_or(true) => {
+                s.muted = true; s.sound = None; s.sound_id = None; s.sound_file = None;
+            }
             "EnableDropSound" => s.muted = false,
+            "MinimapIcon" if v.first().map(|x| x == "-1").unwrap_or(false) => { s.minimap = None; s.minimap_parts = None; }
             "MinimapIcon" if v.first().map(|x| x != "-1").unwrap_or(false) => {
+                s.minimap_parts = Some((v[0].parse().unwrap_or(2), v.get(1).cloned().unwrap_or_default(), v.get(2).cloned().unwrap_or_default()));
                 let size = ["Large", "Medium", "Small"].get(v[0].parse::<usize>().unwrap_or(2)).unwrap_or(&"Small");
                 s.minimap = Some(format!("{size} {} {}", v.get(1).cloned().unwrap_or_default(), v.get(2).cloned().unwrap_or_default()).trim().to_string());
             }
-            "PlayEffect" if v.first().map(|x| x != "None").unwrap_or(false) => s.beam = v.first().cloned(),
+            "PlayEffect" if v.first().map(|x| x == "None").unwrap_or(false) => { s.beam = None; s.beam_temp = false; }
+            "PlayEffect" => { s.beam = v.first().cloned(); s.beam_temp = v.get(1).map(|x| x == "Temp").unwrap_or(false); }
             "Continue" => cont = true,
             _ => {}
         }

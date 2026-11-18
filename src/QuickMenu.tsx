@@ -1,14 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Action, COLOURS, Item, RARITY_COLOUR, itemSub, itemTitle } from "./types";
+import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
+import { Item, RARITY_COLOUR, itemSub, itemTitle } from "./types";
+import StyleEditor, { CurrentStyle, CustomStyle, GAME_COLOURS, fromCurrent } from "./StyleEditor";
 
 type Picked = { item: Item; from_screen: boolean; screen_text?: string | null; confidence: number };
-type Style = {
-  font_size?: number | null; text?: number[] | null; border?: number[] | null; background?: number[] | null;
-  sound?: string | null; muted: boolean; minimap?: string | null; beam?: string | null;
-};
+type Style = CurrentStyle & { sound?: string | null; minimap?: string | null };
 type Status = {
   verdict: { visibility: string; style: Style; decided_by: string; by_user_edit: boolean; uncertain: string[] };
   by_stack: { from: number; visibility: string }[];
@@ -39,12 +37,28 @@ export default function QuickMenu() {
   const [failed, setFailed] = useState("");
   const [toast, setToast] = useState("");
   const [anyRarity, setAnyRarity] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const editingRef = useRef(false);
+  editingRef.current = editing;
+  const box = useRef<HTMLDivElement | null>(null);
 
   const close = useCallback(async () => {
     setPicked(null);
     setFailed("");
+    setEditing(false);
     await getCurrentWindow().hide();
   }, []);
+
+  // Fit the window to the menu as it grows (e.g. when the editor opens).
+  useEffect(() => {
+    if (!box.current) return;
+    const ro = new ResizeObserver(() => {
+      const h = Math.ceil(box.current?.getBoundingClientRect().height ?? 300) + 4;
+      getCurrentWindow().setSize(new LogicalSize(300, Math.max(120, h))).catch(() => {});
+    });
+    ro.observe(box.current);
+    return () => ro.disconnect();
+  });
 
   const refresh = useCallback(async (p: Picked) => {
     try {
@@ -63,6 +77,7 @@ export default function QuickMenu() {
       setToast("");
       setStatus(null);
       setAnyRarity(false);
+      setEditing(false);
       refresh(e.payload);
     });
     const b = listen<string>("pick-failed", (e) => {
@@ -71,15 +86,18 @@ export default function QuickMenu() {
       setTimeout(close, 2500);
     });
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
-      if (e.key.toLowerCase() === "h") document.getElementById("qm-hide")?.click();
+      if (e.key === "Escape") { if (editingRef.current) setEditing(false); else close(); }
+      if (e.key.toLowerCase() === "h" && !editingRef.current) document.getElementById("qm-hide")?.click();
     };
+    // Clicking back into the game closes the menu, but not while editing
+    // (the colour picker opens its own window).
+    const onBlur = () => { if (!editingRef.current) close(); };
     window.addEventListener("keydown", onKey);
-    window.addEventListener("blur", close);
+    window.addEventListener("blur", onBlur);
     return () => {
       a.then((f) => f()); b.then((f) => f());
       window.removeEventListener("keydown", onKey);
-      window.removeEventListener("blur", close);
+      window.removeEventListener("blur", onBlur);
     };
   }, [close, refresh]);
 
@@ -90,17 +108,38 @@ export default function QuickMenu() {
     refresh(p);
   };
 
-  const act = async (action: Action, colour?: string) => {
-    if (!picked) return;
+  const saved = async (call: Promise<{ label: string; warnings: string[] }>) => {
     try {
-      const r = await invoke<{ label: string; warnings: string[] }>("apply_quick_action", {
-        item: picked.item, action, colour, opts: { same_rarity: !anyRarity, max_item_level: null },
-      });
+      const r = await call;
       setToast(r.warnings[0] ?? "Saved. Type /itemfilter in chat to reload.");
-      refresh(picked);
+      if (picked) refresh(picked);
     } catch (e) {
       setToast(String(e));
     }
+  };
+  const opts = () => ({ same_rarity: !anyRarity, max_item_level: null });
+  const hide = () => picked && saved(invoke("apply_quick_action", { item: picked.item, action: "hide", colour: null, opts: opts() }));
+  const saveStyle = (style: CustomStyle) => {
+    if (!picked) return;
+    setEditing(false);
+    saved(invoke("apply_custom_style", { item: picked.item, style, opts: opts() }));
+  };
+  /** Current look, so quick buttons only change what they're about. */
+  const current = () => fromCurrent(status?.verdict.visibility === "Hide" ? undefined : status?.verdict.style, picked?.item.rarity ?? "Normal");
+  const louder = () => {
+    const c = current();
+    const sound = c.sound.kind === "Builtin" || c.sound.kind === "Custom" ? { ...c.sound, volume: 300 } : { kind: "Builtin" as const, id: "2", volume: 300 };
+    saveStyle({ ...c, font_size: 45, sound });
+  };
+  const quieter = () => {
+    const c = current();
+    saveStyle({ ...c, font_size: Math.max(18, c.font_size - 10), sound: { kind: "Off" }, beam: null });
+  };
+  const highlight = (name: string) => {
+    const c = current();
+    const rgb = GAME_COLOURS[name].slice(1).match(/../g)!.map((h) => parseInt(h, 16)).concat(255);
+    saveStyle({ ...c, text: rgb, border: rgb, background: [20, 20, 20, 240], font_size: Math.max(c.font_size, 40),
+      beam: { colour: name, temp: false }, minimap: { size: 1, colour: name, shape: c.minimap?.shape ?? "Star" } });
   };
 
   const undo = async () => {
@@ -109,7 +148,7 @@ export default function QuickMenu() {
     if (picked) refresh(picked);
   };
 
-  if (failed) return <div className="qm"><div className="qm-fail">{failed}</div></div>;
+  if (failed) return <div className="qm" ref={box}><div className="qm-fail">{failed}</div></div>;
   if (!picked) return null;
   const { item } = picked;
   const v = status?.verdict;
@@ -119,8 +158,20 @@ export default function QuickMenu() {
   const gf = extra?.game_filter;
   const nameOf = (f: string) => f.replace(/\.filter$/i, "");
 
+  if (editing) {
+    return (
+      <div className="qm" ref={box}>
+        <div className="qm-head">
+          <div className="qm-name" style={{ color: RARITY_COLOUR[item.rarity] ?? "#ddd" }}>{itemTitle(item)}</div>
+          <div className="qm-sub">Customise how it looks in game</div>
+        </div>
+        <StyleEditor start={current()} label={item.base_type} onSave={saveStyle} onCancel={() => setEditing(false)} />
+      </div>
+    );
+  }
+
   return (
-    <div className="qm">
+    <div className="qm" ref={box}>
       {gf && !gf.matches && (
         <div className="qm-warn">
           Your game is using <b>{nameOf(gf.selected ?? "")}</b>, not <b>{nameOf(gf.expected)}</b>.
@@ -181,18 +232,21 @@ export default function QuickMenu() {
       )}
 
       <div className="qm-row">
-        <button id="qm-hide" className="qm-btn hide" onClick={() => act("hide")}>Hide</button>
-        <button className="qm-btn" onClick={() => act("louder")}>Louder</button>
-        <button className="qm-btn" onClick={() => act("quieter")}>Quieter</button>
+        <button id="qm-hide" className="qm-btn hide" onClick={hide}>Hide</button>
+        <button className="qm-btn" onClick={louder} disabled={!status}>Louder</button>
+        <button className="qm-btn" onClick={quieter} disabled={!status}>Quieter</button>
       </div>
 
-      <div className="qm-label">Highlight</div>
+      <div className="qm-label">Quick highlight</div>
       <div className="qm-row">
-        {COLOURS.map((c) => (
-          <button key={c.name} className="qm-swatch" title={c.name} style={{ background: c.hex }}
-            onClick={() => act("highlight", c.name)} />
+        {["Purple", "Yellow", "Cyan", "Red", "Green"].map((c) => (
+          <button key={c} className="qm-swatch" title={c} style={{ background: GAME_COLOURS[c] }}
+            onClick={() => highlight(c)} disabled={!status} />
         ))}
       </div>
+      <button className="qm-custom" onClick={() => setEditing(true)} disabled={!status}>
+        Customise colours, beam, icon & sound…
+      </button>
 
       {isGear && (
         <label className="qm-check">

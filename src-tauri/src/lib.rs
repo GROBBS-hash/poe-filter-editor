@@ -7,7 +7,7 @@ use filter_core::{
     ground::{ground_item, known_names, match_base, LabelColours},
     item::{parse_item, resolve_magic_base, Item},
     profiles::{build, Game, Store},
-    rules::{known_bases, locate, quick_rule, Action, Location, MatchOpts, Rule},
+    rules::{custom_rule, known_bases, locate, quick_rule, Action, CustomStyle, Location, MatchOpts, Rule},
 };
 use serde::Serialize;
 use std::{
@@ -339,6 +339,45 @@ fn apply_quick_action(
     Ok(ActionResult { label, warnings })
 }
 
+/// Saves a full custom look (colours, beam, map icon, sound) for this item.
+#[tauri::command]
+fn apply_custom_style(state: State<AppState>, item: Item, style: CustomStyle, opts: Option<MatchOpts>) -> Result<ActionResult, String> {
+    let mut store = state.store.lock().unwrap();
+    let id = store.active.clone().ok_or("Set up a profile first")?;
+    let rule = custom_rule(&item, &style, &opts.unwrap_or_default());
+    let label = rule_label(&rule);
+    store.profiles.get_mut(&id).ok_or("Profile not found")?.rules.push(rule);
+    let warnings = save_and_build(&state, &store, &id)?;
+    Ok(ActionResult { label, warnings })
+}
+
+fn active_game(state: &AppState) -> Game {
+    let store = state.store.lock().unwrap();
+    store.active.as_ref().and_then(|id| store.profiles.get(id)).map(|p| p.game).unwrap_or(Game::Poe1)
+}
+
+/// Sound files you've put in the game's filter folder (usable as drop sounds).
+#[tauri::command]
+fn list_sounds(state: State<AppState>) -> Vec<String> {
+    let dir = filter_dir(active_game(&state));
+    let mut v: Vec<String> = std::fs::read_dir(dir).into_iter().flatten().filter_map(Result::ok)
+        .map(|e| e.file_name().to_string_lossy().to_string())
+        .filter(|n| { let l = n.to_lowercase(); l.ends_with(".wav") || l.ends_with(".mp3") || l.ends_with(".ogg") })
+        .collect();
+    v.sort_by_key(|n| n.to_lowercase());
+    v
+}
+
+/// A sound file as a data URL so the pop-up can preview it.
+#[tauri::command]
+fn sound_data(state: State<AppState>, file: String) -> Result<String, String> {
+    use base64::Engine;
+    let name = std::path::Path::new(&file).file_name().ok_or("Bad file name")?;
+    let bytes = std::fs::read(filter_dir(active_game(&state)).join(name)).map_err(err)?;
+    let mime = if file.to_lowercase().ends_with(".mp3") { "audio/mpeg" } else if file.to_lowercase().ends_with(".ogg") { "audio/ogg" } else { "audio/wav" };
+    Ok(format!("data:{mime};base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes)))
+}
+
 #[tauri::command]
 fn undo_last(state: State<AppState>) -> Result<Option<String>, String> {
     let mut store = state.store.lock().unwrap();
@@ -473,6 +512,9 @@ pub fn run() {
             fork_profile,
             delete_profile,
             apply_quick_action,
+            apply_custom_style,
+            list_sounds,
+            sound_data,
             undo_last,
             delete_rule,
             rebuild,

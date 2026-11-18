@@ -80,6 +80,91 @@ pub fn quick_rule(item: &Item, action: Action, colour_name: Option<&str>, opts: 
     Rule::Override { label: format!("{verb}: {who}"), show, conditions, actions }
 }
 
+// ---------- full custom look ----------
+
+pub const BEAM_COLOURS: [&str; 11] = ["Red", "Green", "Blue", "Brown", "White", "Yellow", "Cyan", "Grey", "Orange", "Pink", "Purple"];
+pub const ICON_SHAPES: [&str; 12] = ["Circle", "Diamond", "Hexagon", "Square", "Star", "Triangle", "Cross", "Moon", "Raindrop", "Kite", "Pentagon", "UpsideDownHouse"];
+pub const NAMED_SOUNDS: [&str; 10] = ["ShAlchemy", "ShBlessed", "ShChaos", "ShDivine", "ShExalted", "ShFusing", "ShGeneral", "ShMirror", "ShRegal", "ShVaal"];
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Beam { pub colour: String, #[serde(default)] pub temp: bool }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Minimap { pub size: u8, pub colour: String, pub shape: String }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "kind")]
+pub enum Sound {
+    /// The game's normal drop sound.
+    Default,
+    Off,
+    /// "1".."16" or a named one like "ShDivine".
+    Builtin { id: String, volume: u32 },
+    /// A sound file in the game's filter folder.
+    Custom { file: String, volume: u32 },
+}
+
+/// Exactly how an item should look. Every part is explicit, so the editor
+/// starts from the item's current look and you change only what you want.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CustomStyle {
+    pub font_size: u32,
+    pub text: [u8; 4],
+    pub border: Option<[u8; 4]>,
+    pub background: [u8; 4],
+    pub beam: Option<Beam>,
+    pub minimap: Option<Minimap>,
+    pub sound: Sound,
+}
+
+fn rgba(c: [u8; 4]) -> String { format!("{} {} {} {}", c[0], c[1], c[2], c[3]) }
+
+fn pick<'a>(v: &str, list: &[&'a str], fallback: &'a str) -> &'a str {
+    list.iter().find(|x| x.eq_ignore_ascii_case(v)).copied().unwrap_or(fallback)
+}
+
+/// The filter lines for a custom look. Values are checked so a typo can
+/// never produce a filter the game rejects.
+pub fn style_actions(s: &CustomStyle) -> Vec<String> {
+    let mut a = vec![
+        format!("SetFontSize {}", s.font_size.clamp(1, 45)),
+        format!("SetTextColor {}", rgba(s.text)),
+        format!("SetBorderColor {}", rgba(s.border.unwrap_or([0, 0, 0, 0]))),
+        format!("SetBackgroundColor {}", rgba(s.background)),
+    ];
+    match &s.sound {
+        Sound::Default => {}
+        Sound::Off => a.push("DisableDropSound".into()),
+        Sound::Builtin { id, volume } => {
+            let id = match id.parse::<u32>() {
+                Ok(n) => n.clamp(1, 16).to_string(),
+                Err(_) => pick(id, &NAMED_SOUNDS, "ShGeneral").to_string(),
+            };
+            a.push(format!("PlayAlertSound {id} {}", volume.min(&300)));
+        }
+        Sound::Custom { file, volume } => {
+            let clean: String = file.chars().filter(|c| !matches!(c, '"' | '\r' | '\n')).collect();
+            a.push(format!("CustomAlertSound \"{clean}\" {}", volume.min(&300)));
+        }
+    }
+    match &s.minimap {
+        Some(m) => a.push(format!("MinimapIcon {} {} {}", m.size.min(2),
+            pick(&m.colour, &BEAM_COLOURS, "White"), pick(&m.shape, &ICON_SHAPES, "Circle"))),
+        None => a.push("MinimapIcon -1".into()),
+    }
+    match &s.beam {
+        Some(b) => a.push(format!("PlayEffect {}{}", pick(&b.colour, &BEAM_COLOURS, "White"), if b.temp { " Temp" } else { "" })),
+        None => a.push("PlayEffect None".into()),
+    }
+    a
+}
+
+pub fn custom_rule(item: &Item, style: &CustomStyle, opts: &MatchOpts) -> Rule {
+    let Rule::Override { label, conditions, .. } = quick_rule(item, Action::Highlight, None, opts) else { unreachable!() };
+    let who = label.trim_start_matches("Highlight: ").to_string();
+    Rule::Override { label: format!("Style: {who}"), show: true, conditions, actions: style_actions(style) }
+}
+
 /// Every base name NeverSink lists, used to work out magic item bases.
 pub fn known_bases(segs: &[Segment]) -> HashSet<String> {
     segs.iter()
@@ -150,4 +235,50 @@ pub fn apply(segs: &mut Vec<Segment>, rules: &[Rule], nl: &str) -> Vec<String> {
     top.push_str(&format!("{END}{nl}{nl}"));
     segs.insert(0, Segment::Raw(top));
     warnings
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{evaluate::status, filter::parse_filter, item::parse_item};
+
+    #[test]
+    fn custom_look_round_trips_through_the_filter() {
+        let item = parse_item("Item Class: Stackable Currency\nRarity: Currency\nChaos Orb\n").unwrap();
+        let style = CustomStyle {
+            font_size: 40, text: [255, 0, 0, 255], border: Some([0, 255, 0, 255]), background: [0, 0, 0, 230],
+            beam: Some(Beam { colour: "cyan".into(), temp: true }),
+            minimap: Some(Minimap { size: 1, colour: "pink".into(), shape: "moon".into() }),
+            sound: Sound::Builtin { id: "ShDivine".into(), volume: 250 },
+        };
+        let mut segs = parse_filter("Show\n    BaseType == \"Chaos Orb\"\n    SetFontSize 20\n");
+        apply(&mut segs, &[custom_rule(&item, &style, &MatchOpts::default())], "\n");
+        let segs = parse_filter(&crate::filter::render_filter(&segs));
+        let v = status(&segs, &item, Some(83), false).verdict;
+        assert_eq!(v.visibility, "Show");
+        assert_eq!(v.style.font_size, Some(40));
+        assert_eq!(v.style.text, Some([255, 0, 0, 255]));
+        assert_eq!(v.style.beam.as_deref(), Some("Cyan"));
+        assert!(v.style.beam_temp);
+        assert_eq!(v.style.minimap_parts, Some((1, "Pink".into(), "Moon".into())));
+        assert_eq!((v.style.sound_id.as_deref(), v.style.volume), (Some("ShDivine"), Some(250)));
+    }
+
+    #[test]
+    fn silent_no_beam_no_icon() {
+        let style = CustomStyle { font_size: 99, text: [1, 2, 3, 255], border: None, background: [0, 0, 0, 0],
+            beam: None, minimap: None, sound: Sound::Off };
+        let a = style_actions(&style);
+        assert!(a.contains(&"SetFontSize 45".to_string()));
+        assert!(a.contains(&"DisableDropSound".to_string()));
+        assert!(a.contains(&"PlayEffect None".to_string()));
+        assert!(a.contains(&"MinimapIcon -1".to_string()));
+    }
+
+    #[test]
+    fn custom_sound_file_is_sanitised() {
+        let style = CustomStyle { font_size: 30, text: [1, 2, 3, 255], border: None, background: [0, 0, 0, 0],
+            beam: None, minimap: None, sound: Sound::Custom { file: "gold.wav\"\nHide".into(), volume: 900 } };
+        assert!(style_actions(&style).contains(&"CustomAlertSound \"gold.wavHide\" 300".to_string()));
+    }
 }
