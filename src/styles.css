@@ -573,3 +573,15 @@ input[type=range] { accent-color: var(--gold); }
 .se-label .muted { font-weight: normal; }
 .egroup-head { font-weight: 600; }
 .bv-tabs { border-bottom-color: var(--line); }
+
+/* Readability over the game: brighter secondary text, solid panels. */
+:root { --text-2: #d6dae2; --muted: #a9b0bd; }
+.qm { background: #191c22; border-color: #4a5262; }
+.qm-sub, .qm-where, .qm-label, .qm-check, .qm-unsure, .qm-facts, .why-where, .why-more, .qm-link { color: var(--text-2); }
+.qm-label { font-weight: 600; font-size: 12.5px; }
+.qm-where { opacity: .85; }
+.why-text { color: #fff; font-weight: 600; }
+.why-more { opacity: .85; }
+.qm-why { background: #232832; }
+.qm-status { background: #14171c; }
+.bo { background: #191c22; border-color: #4a5262; }

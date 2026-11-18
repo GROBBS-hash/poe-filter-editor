@@ -27,13 +27,19 @@ export function itemFromRule(d: RuleDetail): Item {
 export type Source = { kind: string; label: string; type_path: string[]; tier: string | null; section: string | null; tier_name: string | null };
 const WHO: Record<string, string> = { neversink: "NeverSink", edit: "Your edit", preset: "Preset", price: "Price tier", none: "No rule" };
 
+/** NeverSink's internal section names in plain words ("normalmagic" -> "white & blue"). */
+const PLAIN: Record<string, string> = { leveling: "levelling", normalmagic: "white & blue", "4l": "4-links", "3l": "3-links",
+  "6l": "6-links", "5l": "5-links", rare: "rares", rgb: "R-G-B sockets", exotic: "special", exoticbases: "special bases",
+  general: "general", gear: "gear", tiered: "by item tier", uniques: "uniques", currency: "currency", divination: "divination cards" };
+const plain = (p: string) => PLAIN[p] ?? p.replace(/([a-z])([A-Z])/g, "$1 $2");
+
 /** A clear "why": who decided it, in plain words, which rule, and a button to open that rule in the app. */
 function Why({ v, onEditHere }: { v: Status["verdict"]; onEditHere?: () => void }) {
   const src = v.source ?? { kind: v.by_user_edit ? "edit" : "neversink", label: v.decided_by, type_path: [], tier: null, section: null, tier_name: null };
   const name = src.label.replace(/^(Preset|Hide|Highlight|Louder|Quieter|Style): /, "");
   const headline = src.kind === "neversink" ? v.reason.split(", ")[0] : src.kind === "none" ? "No rule covers it, so the game shows it plainly" : name || v.decided_by;
   const where = src.kind === "neversink"
-    ? (src.section ? `Tiers › ${src.section} › ${src.tier_name ?? src.tier}` : `NeverSink › ${src.type_path.join(" › ")}${src.tier ? ` › ${src.tier}` : ""}`)
+    ? (src.section ? `Tiers › ${src.section} › ${src.tier_name ?? src.tier}` : `NeverSink › ${[...src.type_path, ...(src.tier ? [src.tier] : [])].map(plain).join(" › ")}`)
     : src.kind === "edit" ? "My edits" : src.kind === "preset" ? (src.label.startsWith("Preset: Levelling") ? "Presets › Levelling setup" : "Presets") : src.kind === "price" ? "Prices" : "";
   const canOpen = src.kind !== "none" && (src.kind !== "neversink" || !!src.section);
   return (
