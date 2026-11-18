@@ -225,6 +225,36 @@ pub fn parse(xml: &str) -> Result<Build, String> {
     })
 }
 
+/// Campaign act for an area level (approximate, PoE 1). 11 = maps.
+pub fn act_of(area_level: u32) -> u32 {
+    match area_level {
+        0..=12 => 1, 13..=22 => 2, 23..=32 => 3, 33..=39 => 4, 40..=44 => 5,
+        45..=49 => 6, 50..=54 => 7, 55..=60 => 8, 61..=63 => 9, 64..=67 => 10, _ => 11,
+    }
+}
+
+/// The act a stage's title is for: "Act 2 RF Swap" -> 2, "Start of Maps" -> 11, "Animate Guardian" -> None.
+pub fn stage_act(title: &str) -> Option<u32> {
+    let t = title.to_lowercase();
+    if let Some(i) = t.find("act") {
+        let n: String = t[i + 3..].trim_start().chars().take_while(|c| c.is_ascii_digit()).collect();
+        if let Ok(n) = n.parse() { return Some(n); }
+    }
+    ["map", "endgame", "red ", "yellow", "white map", "t16", "t17"].iter().any(|w| t.contains(w)).then_some(11)
+}
+
+/// The stage to show for where you are: the last one for your act (or earlier),
+/// and in maps the first maps stage (it won't jump ahead to a big-budget setup).
+pub fn stage_for(stages: &[Stage], area_level: u32) -> Option<usize> {
+    let act = act_of(area_level);
+    let acts: Vec<Option<u32>> = stages.iter().map(|s| stage_act(&s.title)).collect();
+    if act >= 11 {
+        return acts.iter().position(|a| *a == Some(11)).or_else(|| acts.iter().rposition(|a| a.is_some()));
+    }
+    acts.iter().enumerate().filter(|(_, a)| a.map(|a| a <= act).unwrap_or(false)).map(|(i, _)| i).last()
+        .or_else(|| acts.iter().position(|a| a.is_some()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -323,6 +353,20 @@ Leather Cap
         assert_eq!(b.stages[1].groups[0].slot, "Helmet");
         // Codes may arrive with line breaks or padding.
         assert!(decode(&format!(" {}\n", encode(XML))).is_ok());
+    }
+
+    #[test]
+    fn follows_your_act() {
+        let titles = ["Act 1", "Act 2 RF Swap", "Act 3", "Act 4 First Lab", "Act 7 Right Before Staff Swap", "Act 7 Staff Swap",
+            "Start of Maps", "End of Early Maps", "Mageblood No Whispers", "Animate Guardian"];
+        let st: Vec<Stage> = titles.iter().map(|t| Stage { title: t.to_string(), tree: None, groups: vec![], gear: vec![] }).collect();
+        let at = |lvl| stage_for(&st, lvl).map(|i| titles[i]);
+        assert_eq!(at(5), Some("Act 1"));
+        assert_eq!(at(18), Some("Act 2 RF Swap"));
+        assert_eq!(at(36), Some("Act 4 First Lab"));
+        assert_eq!(at(47), Some("Act 4 First Lab"), "act 6: nothing newer yet");
+        assert_eq!(at(52), Some("Act 7 Staff Swap"));
+        assert_eq!(at(75), Some("Start of Maps"));
     }
 
     #[test]

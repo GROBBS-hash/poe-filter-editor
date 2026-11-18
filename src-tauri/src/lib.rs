@@ -565,14 +565,14 @@ fn pob_file(state: &AppState) -> PathBuf {
 }
 
 #[derive(serde::Serialize)]
-struct PobState { build: filter_core::pob::Build, stage: usize, link: String }
+struct PobState { build: filter_core::pob::Build, stage: usize, link: String, follow: bool }
 
 fn pob_load(state: &AppState) -> Option<PobState> {
     let code = std::fs::read_to_string(pob_file(state)).ok()?;
     let build = filter_core::pob::parse(&filter_core::pob::decode(&code).ok()?).ok()?;
     let s = state.store.lock().unwrap();
     let stage = s.settings.pob_stage.unwrap_or(build.active).min(build.stages.len().saturating_sub(1));
-    Some(PobState { build, stage, link: s.settings.pob_link.clone() })
+    Some(PobState { build, stage, link: s.settings.pob_link.clone(), follow: s.settings.pob_follow })
 }
 
 /// Imports a PoB link (pobb.in, pastebin, poe.ninja) or a pasted code, and remembers it.
@@ -601,10 +601,39 @@ fn pob_get(state: State<AppState>) -> Option<PobState> {
     pob_load(&state)
 }
 
+/// "Follow my game": move to the stage for your current act. Returns the stage shown.
+#[tauri::command]
+fn pob_follow_now(app: AppHandle, state: State<AppState>) -> Option<usize> {
+    let p = pob_load(&state)?;
+    if !p.follow { return Some(p.stage); }
+    let lvl = area_level(&app)?;
+    let want = filter_core::pob::stage_for(&p.build.stages, lvl)?;
+    if want != p.stage {
+        let mut s = state.store.lock().unwrap();
+        s.settings.pob_stage = Some(want);
+        let _ = s.save(&state.store_path);
+    }
+    Some(want)
+}
+
+#[tauri::command]
+fn pob_set_follow(app: AppHandle, state: State<AppState>, on: bool) -> Result<(), String> {
+    {
+        let mut s = state.store.lock().unwrap();
+        s.settings.pob_follow = on;
+        s.save(&state.store_path).map_err(err)?;
+    }
+    if on { pob_follow_now(app.clone(), state); }
+    let _ = app.emit("pob-stage", ());
+    Ok(())
+}
+
+/// Picking a stage yourself stops following the game.
 #[tauri::command]
 fn pob_set_stage(app: AppHandle, state: State<AppState>, stage: usize) -> Result<(), String> {
     let mut s = state.store.lock().unwrap();
     s.settings.pob_stage = Some(stage);
+    s.settings.pob_follow = false;
     s.save(&state.store_path).map_err(err)?;
     let _ = app.emit("pob-stage", stage);
     Ok(())
@@ -1482,6 +1511,8 @@ pub fn run() {
             pob_import,
             pob_get,
             pob_set_stage,
+            pob_follow_now,
+            pob_set_follow,
             hide_build_window,
             open_rule,
             gear_picks,

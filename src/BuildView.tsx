@@ -9,7 +9,7 @@ export type PobGroup = { label: string; slot: string; enabled: boolean; gems: Po
 export type PobGear = { slot: string; rarity: string; name: string; base: string; lines: string[] };
 export type PobStage = { title: string; tree: { version: string; nodes: number[]; url: string } | null; groups: PobGroup[]; gear: PobGear[] };
 export type PobBuild = { class: string; ascendancy: string; level: number; stages: PobStage[]; active: number };
-export type PobState = { build: PobBuild; stage: number; link: string };
+export type PobState = { build: PobBuild; stage: number; link: string; follow?: boolean };
 
 const RARITY: Record<string, string> = { normal: "#c8c8c8", magic: "#8888ff", rare: "#ffff77", unique: "#af6025", relic: "#82ad6a" };
 const SLOT_ORDER = ["Weapon 1", "Weapon 2", "Helmet", "Body Armour", "Gloves", "Boots", "Amulet", "Ring 1", "Ring 2", "Belt",
@@ -17,9 +17,9 @@ const SLOT_ORDER = ["Weapon 1", "Weapon 2", "Helmet", "Body Armour", "Gloves", "
 const SLOT_NAME: Record<string, string> = { "Weapon 1": "Weapon", "Weapon 2": "Off hand", "Body Armour": "Body" };
 
 /** PoB's look: socket colours and supports a little smaller. */
-function GemPill({ g, main }: { g: PobGem; main: boolean }) {
+function GemPill({ g, main, fresh }: { g: PobGem; main: boolean; fresh?: boolean }) {
   return (
-    <span className={`gem gem-${g.colour} ${g.support ? "sup" : ""} ${main ? "main" : ""} ${g.enabled ? "" : "off"}`}
+    <span className={`gem gem-${g.colour} ${g.support ? "sup" : ""} ${main ? "main" : ""} ${g.enabled ? "" : "off"} ${fresh ? "fresh" : ""}`}
       title={`${g.name} · level ${g.level}${g.quality ? ` · ${g.quality}% quality` : ""}${g.enabled ? "" : " (switched off in PoB)"}`}>
       <span className="gem-dot" />{g.name}
       {(g.level > 1 || g.quality > 0) && <span className="gem-lvl">{g.level}{g.quality ? `/${g.quality}` : ""}</span>}
@@ -43,20 +43,27 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
   });
   const [openItem, setOpenItem] = useState<string | null>(null);
 
-  const load = () => invoke<PobState | null>("pob_get").then(setSt).catch(() => setSt(null));
+  // Follow the game first (moves to your act's stage if that's on), then show.
+  const load = () => invoke("pob_follow_now").catch(() => null)
+    .then(() => invoke<PobState | null>("pob_get")).then(setSt).catch(() => setSt(null));
   useEffect(() => {
     load();
+    const every = window.setInterval(load, 30000);
     const a = listen("pob-stage", () => load());
     const b = listen("build-shown", () => load());
     const c = listen("pob-imported", () => load());
-    return () => { a.then((f) => f()); b.then((f) => f()); c.then((f) => f()); };
+    return () => { window.clearInterval(every); a.then((f) => f()); b.then((f) => f()); c.then((f) => f()); };
   }, []);
   useEffect(() => { try { localStorage.setItem("build.view", view); } catch { /* not kept */ } }, [view]);
 
   if (!st) return <div className="empty">No build yet. Paste your Path of Building link in the app (Levelling → My build).</div>;
   const { build, stage } = st;
   const s = build.stages[stage];
-  const setStage = (i: number) => { setSt({ ...st, stage: i }); invoke("pob_set_stage", { stage: i }); };
+  const setStage = (i: number) => { setSt({ ...st, stage: i, follow: false }); invoke("pob_set_stage", { stage: i }); };
+  const setFollow = (on: boolean) => { setSt({ ...st, follow: on }); invoke("pob_set_follow", { on }).then(load); };
+  // Gems you didn't have in the stage before: what to buy or swap in now.
+  const before = new Set((build.stages[stage - 1]?.groups ?? []).flatMap((g) => g.gems.map((x) => x.name)));
+  const newGems = stage > 0 ? [...new Set(s.groups.flatMap((g) => g.gems.filter((x) => x.enabled).map((x) => x.name)))].filter((n) => !before.has(n)) : [];
   const change = treeChange(build.stages, stage);
   const gear = [...s.gear].sort((a, b) => (SLOT_ORDER.indexOf(a.slot) + 99) % 99 - (SLOT_ORDER.indexOf(b.slot) + 99) % 99);
 
@@ -70,6 +77,9 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
             {build.stages.map((x, i) => <option key={i} value={i}>{x.title}</option>)}
           </select>
           <button className="link" disabled={stage >= build.stages.length - 1} onClick={() => setStage(stage + 1)} title="Next stage">›</button>
+          <label className="bv-follow" title="Pick the stage from the act you're in (from the game's log)">
+            <input type="checkbox" checked={st.follow ?? true} onChange={(e) => setFollow(e.target.checked)} /> follow my game
+          </label>
         </span>
       </div>
       <div className="bv-tabs">
@@ -81,10 +91,13 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
       {view === "gems" && (
         <div className="bv-groups">
           {s.groups.length === 0 && <div className="empty">No gems in this stage.</div>}
+          {newGems.length > 0 && (
+            <div className="bv-newgems"><b>New this stage:</b> {newGems.join(" · ")}</div>
+          )}
           {s.groups.map((g, i) => (
             <div key={i} className={`bv-group ${g.enabled ? "" : "off"}`}>
               {(g.label || g.slot) && <div className="bv-glabel">{g.label}{g.label && g.slot ? " · " : ""}<span className="muted">{g.slot}</span></div>}
-              <div className="bv-gems">{g.gems.map((x, j) => <GemPill key={j} g={x} main={!x.support && j === 0} />)}</div>
+              <div className="bv-gems">{g.gems.map((x, j) => <GemPill key={j} g={x} main={!x.support && j === 0} fresh={newGems.includes(x.name)} />)}</div>
             </div>
           ))}
         </div>

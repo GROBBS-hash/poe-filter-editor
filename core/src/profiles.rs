@@ -65,13 +65,15 @@ pub struct Settings {
     /// Your Path of Building link or code, and the stage you're on.
     pub pob_link: String,
     pub pob_stage: Option<usize>,
+    /// Pick the build stage from where you are in the game (on unless you pick one yourself).
+    pub pob_follow: bool,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self { key_quick_edit: "F2".into(), key_batch: "F3".into(), key_reload: "F4".into(), key_cycle: "F5".into(),
             cycle_enabled: false, fallback_area_level: 83, claude_api_key: String::new(),
-            key_build: "F6".into(), pob_link: String::new(), pob_stage: None }
+            key_build: "F6".into(), pob_link: String::new(), pob_stage: None, pob_follow: true }
     }
 }
 
