@@ -13,3 +13,4 @@ pub mod profiles;
 pub mod rules;
 pub mod search;
 pub mod themes;
+pub mod tiers;

@@ -10,8 +10,9 @@ import Prices from "./Prices";
 import Themes from "./Themes";
 import SettingsPage from "./Settings";
 import Find from "./Find";
+import Tiers from "./Tiers";
 
-type Tab = "find" | "presets" | "edits" | "prices" | "themes" | "batch" | "profiles" | "settings";
+type Tab = "find" | "presets" | "tiers" | "edits" | "prices" | "themes" | "batch" | "profiles" | "settings";
 
 export default function App() {
   const [ov, setOv] = useState<Overview | null>(null);
@@ -56,9 +57,9 @@ export default function App() {
       </header>
 
       <nav className="tabs">
-        {(["find", "presets", "edits", "prices", "themes", "batch", "profiles", "settings"] as Tab[]).map((t) => (
+        {(["find", "presets", "tiers", "edits", "prices", "themes", "batch", "profiles", "settings"] as Tab[]).map((t) => (
           <button key={t} className={tab === t ? "tab on" : "tab"} onClick={() => setTab(t)}>
-            {{ find: "Find", presets: "Presets", edits: "My edits", prices: "Prices", themes: "Themes", batch: "Batch mode", profiles: "Profiles", settings: "Settings" }[t]}
+            {{ find: "Find", presets: "Presets", tiers: "Tiers", edits: "My edits", prices: "Prices", themes: "Themes", batch: "Batch mode", profiles: "Profiles", settings: "Settings" }[t]}
           </button>
         ))}
       </nav>
@@ -68,6 +69,7 @@ export default function App() {
       {tab === "themes" && <Themes profile={active} onChange={refresh} />}
       {tab === "settings" && <SettingsPage />}
       {tab === "find" && <Find onChange={refresh} />}
+      {tab === "tiers" && <Tiers profile={active} onChange={refresh} />}
       {tab === "presets" && <Find key="presets" view="presets" onChange={refresh} />}
       {tab === "batch" && <Batch on={ov.batch_on} onChange={refresh} />}
       {tab === "profiles" && <Profiles ov={ov} active={active} onChange={refresh} onNew={() => setAdding(true)} />}

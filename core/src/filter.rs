@@ -61,6 +61,29 @@ impl Block {
         out
     }
 
+    /// Show / Hide the whole block (keeps the rest of the header line).
+    pub fn set_visibility(&mut self, show: bool) {
+        let kw = if show { "Show" } else { "Hide" };
+        let lead: String = self.header.chars().take_while(|c| c.is_whitespace()).collect();
+        let rest = self.header.trim_start();
+        let rest = rest.strip_prefix(self.visibility.as_str()).unwrap_or(rest);
+        self.header = format!("{lead}{kw}{rest}");
+        self.visibility = kw.to_string();
+    }
+
+    /// Replaces the block's look and sound lines with `actions`.
+    pub fn replace_style(&mut self, actions: &[String]) {
+        const STYLE: [&str; 14] = ["SetFontSize", "SetTextColor", "SetBorderColor", "SetBackgroundColor", "PlayAlertSound",
+            "PlayAlertSoundPositional", "CustomAlertSound", "CustomAlertSoundOptional", "DisableDropSound", "EnableDropSound",
+            "DisableDropSoundIfAlertSound", "EnableDropSoundIfAlertSound", "PlayEffect", "MinimapIcon"];
+        let key = |l: &str| l.trim_start().split_whitespace().next().unwrap_or("").to_string();
+        let indent: String = self.lines.first().map(|l| l.chars().take_while(|c| *c == ' ' || *c == '\t').collect()).unwrap_or_else(|| "\t".into());
+        self.lines.retain(|l| !STYLE.contains(&key(l).as_str()));
+        let at = self.lines.iter().position(|l| key(l) == "Continue").unwrap_or(self.lines.len());
+        let new: Vec<String> = actions.iter().map(|a| format!("{indent}{a}{}", self.newline)).collect();
+        self.lines.splice(at..at, new);
+    }
+
     fn disabled_empty(&self) -> bool {
         self.lines.iter().any(|l| l.contains("(emptied by editor)"))
     }

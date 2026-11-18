@@ -465,9 +465,60 @@ fn rule_label(r: &Rule) -> String {
     match r {
         Rule::Override { label, .. } => label.clone(),
         Rule::MoveBase { type_path, base, to_tier } => {
-            format!("Move {base} to {} {to_tier}", type_path.join(" > "))
+            format!("Tier: {base} moved to {} {}", type_path.join(" > "), filter_core::tiers::tier_name(to_tier))
+        }
+        Rule::Tier { type_path, tier, show, actions } => {
+            let what = match (show, actions) {
+                (Some(false), _) => "hidden",
+                (Some(true), None) => "shown",
+                (_, Some(_)) => "restyled",
+                _ => "changed",
+            };
+            format!("Tier: {} {} {what}", type_path.join(" > "), filter_core::tiers::tier_name(tier))
         }
     }
+}
+
+/// NeverSink's tier lists for a profile, as they'll be in game (your tier edits applied).
+#[tauri::command]
+fn get_tiers(state: State<AppState>, id: String) -> Result<Vec<filter_core::tiers::Section>, String> {
+    let store = state.store.lock().unwrap();
+    let game = store.profiles.get(&id).ok_or("Profile not found")?.game;
+    let prices = state.prices.lock().unwrap();
+    let (text, _) = render_profile(&store, &id, &filter_dir(game), prices.get(&game), None).map_err(err)?;
+    Ok(filter_core::tiers::sections(&parse_filter(&text)))
+}
+
+/// Drag & drop: move an item into another tier of the same section.
+#[tauri::command]
+fn move_tier_item(state: State<AppState>, id: String, type_path: Vec<String>, base: String, to_tier: String) -> Result<Vec<String>, String> {
+    let mut store = state.store.lock().unwrap();
+    remember(&state, &store, &id, &format!("Moved {base} to {}", filter_core::tiers::tier_name(&to_tier)));
+    let p = store.profiles.get_mut(&id).ok_or("Profile not found")?;
+    p.rules.retain(|r| !matches!(r, Rule::MoveBase { type_path: tp, base: b, .. } if *tp == type_path && *b == base));
+    p.rules.push(Rule::MoveBase { type_path, base, to_tier });
+    save_and_build(&state, &store, &id)
+}
+
+/// Show/hide a whole tier, give it a new look, or put it back (reset).
+#[tauri::command]
+fn set_tier(state: State<AppState>, id: String, type_path: Vec<String>, tier: String, show: Option<bool>,
+            style: Option<CustomStyle>, reset: bool) -> Result<Vec<String>, String> {
+    let mut store = state.store.lock().unwrap();
+    remember(&state, &store, &id, &format!("Tier {}", filter_core::tiers::tier_name(&tier)));
+    let p = store.profiles.get_mut(&id).ok_or("Profile not found")?;
+    let same = |r: &Rule| matches!(r, Rule::Tier { type_path: tp, tier: t, .. } if *tp == type_path && *t == tier);
+    let old = p.rules.iter().find(|r| same(r)).cloned();
+    p.rules.retain(|r| !same(r));
+    if reset {
+        // Also undo items dragged into this tier.
+        p.rules.retain(|r| !matches!(r, Rule::MoveBase { type_path: tp, to_tier, .. } if *tp == type_path && *to_tier == tier));
+    } else {
+        let (old_show, old_actions) = match old { Some(Rule::Tier { show, actions, .. }) => (show, actions), _ => (None, None) };
+        p.rules.push(Rule::Tier { type_path, tier, show: show.or(old_show),
+            actions: style.map(|s| filter_core::rules::style_actions(&s)).or(old_actions) });
+    }
+    save_and_build(&state, &store, &id)
 }
 
 #[tauri::command]
@@ -1250,6 +1301,9 @@ pub fn run() {
             list_farm_presets,
             apply_farm_preset,
             list_level_presets,
+            get_tiers,
+            move_tier_item,
+            set_tier,
             apply_level_preset,
             ask,
             get_history,

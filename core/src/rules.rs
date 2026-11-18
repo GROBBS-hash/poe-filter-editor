@@ -12,6 +12,8 @@ pub enum Rule {
     Override { label: String, show: bool, conditions: Vec<String>, actions: Vec<String> },
     /// Move a base into another of NeverSink's tiers within the same section.
     MoveBase { type_path: Vec<String>, base: String, to_tier: String },
+    /// Change one of NeverSink's tiers as a whole: show/hide it, or give it a new look.
+    Tier { type_path: Vec<String>, tier: String, show: Option<bool>, actions: Option<Vec<String>> },
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -404,6 +406,19 @@ pub fn apply_with_extra(segs: &mut Vec<Segment>, rules: &[Rule], extra: &str, nl
                     top.push_str(&format!("    {l}{nl}"));
                 }
                 top.push_str(nl);
+            }
+            Rule::Tier { type_path, tier, show, actions } => {
+                let mut found = false;
+                for seg in segs.iter_mut() {
+                    let Segment::Block(b) = seg else { continue };
+                    if b.type_path != *type_path || b.tier.as_deref() != Some(tier.as_str()) { continue; }
+                    found = true;
+                    if let Some(sh) = show { b.set_visibility(*sh); }
+                    if let Some(a) = actions { b.replace_style(a); }
+                }
+                if !found {
+                    warnings.push(format!("Couldn't change {} {tier}: that tier is gone in this version", type_path.join(" > ")));
+                }
             }
             Rule::MoveBase { type_path, base, to_tier } => {
                 let tp: Vec<&str> = type_path.iter().map(String::as_str).collect();
