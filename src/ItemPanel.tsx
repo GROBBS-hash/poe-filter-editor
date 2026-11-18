@@ -211,6 +211,8 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
   };
 
   const { item } = picked;
+  /** A rule for every item of a type (e.g. every Two Hand Maces), not one base. */
+  const wholeType = !item.base_type;
   const v = status?.verdict;
   const st = v?.style;
   const isGear = GEAR.includes(item.rarity);
@@ -273,7 +275,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
         )}
       </div>
 
-      {(picked.from_screen || replacing) && isGear && (
+      {(picked.from_screen || replacing || !inGame) && isGear && (
         <div className="qm-rarity">
           {GEAR.map((r) => (
             <button key={r} className={item.rarity === r ? "on" : ""} style={{ color: RARITY_COLOUR[r] }}
@@ -282,7 +284,10 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
         </div>
       )}
 
-      {v ? (
+      {wholeType ? (
+        <div className="qm-status"><div className="qm-facts">Changes here apply to <b>every {item.item_class}</b>
+          {anyRarity ? " of every rarity" : ` that is ${item.rarity}`}. Tick "every rarity" below to cover all of them.</div></div>
+      ) : v ? (
         <div className={`qm-status ${shown(v.visibility) ? "is-shown" : "is-hidden"}`}>
           <div className="qm-status-top">
             <span className="qm-pill">{!shown(v.visibility) ? "HIDDEN" : st?.label_hidden ? "ICON ONLY" : v.visibility === "Minimal" ? "SHOWN SMALL" : "SHOWN"}</span>
@@ -321,7 +326,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
         <div className="qm-status"><div className="qm-facts">Checking your filter…</div></div>
       )}
 
-      {extra?.stackable && status && (
+      {!wholeType && extra?.stackable && status && (
         <div className="qm-stack">
           <div className="qm-label">Stack size: <b>{stackN.toLocaleString()}</b>{item.stack_size ? ` (this one: ${item.stack_size.toLocaleString()})` : ""}</div>
           <input type="range" min={0} max={steps.length - 1} value={pickIndex}
@@ -340,19 +345,19 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
 
       <div className="qm-row">
         <button id="qm-hide" className="qm-btn hide" onClick={hide}>Hide</button>
-        <button className="qm-btn" onClick={iconOnly} disabled={!status} title="No label: just the beam and minimap icon">Icon only</button>
-        <button className="qm-btn" onClick={louder} disabled={!status}>Louder</button>
-        <button className="qm-btn" onClick={quieter} disabled={!status}>Quieter</button>
+        <button className="qm-btn" onClick={iconOnly} disabled={!status && !wholeType} title="No label: just the beam and minimap icon">Icon only</button>
+        <button className="qm-btn" onClick={louder} disabled={!status && !wholeType}>Louder</button>
+        <button className="qm-btn" onClick={quieter} disabled={!status && !wholeType}>Quieter</button>
       </div>
 
       <div className="qm-label">Quick highlight</div>
       <div className="qm-row">
         {["Purple", "Yellow", "Cyan", "Red", "Green"].map((c) => (
           <button key={c} className="qm-swatch" title={c} style={{ background: GAME_COLOURS[c] }}
-            onClick={() => highlight(c)} disabled={!status} />
+            onClick={() => highlight(c)} disabled={!status && !wholeType} />
         ))}
       </div>
-      <button className="qm-custom" onClick={() => setEditing(true)} disabled={!status}>
+      <button className="qm-custom" onClick={() => setEditing(true)} disabled={!status && !wholeType}>
         Customise colours, beam, icon & sound…
       </button>
 

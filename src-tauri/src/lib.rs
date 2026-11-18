@@ -6,6 +6,7 @@ use filter_core::{
     area::{find_log, read_area_level, selected_filter},
     ground::{ground_item, known_names, match_base, LabelColours},
     neversink,
+    search::{farm_presets, farm_rules, search, Found, Preset},
     item::{is_stackable, parse_item, resolve_magic_base, Item},
     prices::{default_settings, price_of, PriceFile, PriceSettings},
     profiles::{build_with_prices, Game, Settings, Store},
@@ -870,6 +871,33 @@ fn save_settings(app: AppHandle, state: State<AppState>, settings: Settings) -> 
     store.save(&state.store_path).map_err(err)
 }
 
+/// Search by everyday names ("2h mace", "ammy", "chaos").
+#[tauri::command]
+fn search_items(app: AppHandle, q: String) -> Vec<Found> {
+    let extra: std::collections::BTreeSet<String> = active_filters(&app)
+        .map(|(_, base)| known_bases(&base).into_iter().collect()).unwrap_or_default();
+    search(&q, &extra, 40)
+}
+
+#[tauri::command]
+fn list_farm_presets() -> Vec<Preset> {
+    farm_presets()
+}
+
+/// Makes everything for a league mechanic stand out (replaces an earlier copy).
+#[tauri::command]
+fn apply_farm_preset(state: State<AppState>, id: String, style: CustomStyle) -> Result<Vec<String>, String> {
+    let rules = farm_rules(&id, &style);
+    if rules.is_empty() { return Err("Unknown preset".into()); }
+    let mut store = state.store.lock().unwrap();
+    let pid = store.active.clone().ok_or("Set up a profile first")?;
+    let p = store.profiles.get_mut(&pid).ok_or("Profile not found")?;
+    let labels: Vec<String> = rules.iter().map(rule_label).collect();
+    p.rules.retain(|r| !labels.contains(&rule_label(r)));
+    p.rules.extend(rules);
+    save_and_build(&state, &store, &pid)
+}
+
 #[tauri::command]
 fn set_batch_mode(app: AppHandle, on: bool) {
     if on {
@@ -1003,7 +1031,10 @@ pub fn run() {
             save_theme,
             delete_theme,
             get_settings,
-            save_settings
+            save_settings,
+            search_items,
+            list_farm_presets,
+            apply_farm_preset
         ])
         .run(tauri::generate_context!())
         .expect("error while running the app");

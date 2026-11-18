@@ -213,3 +213,13 @@ code { background: #000; padding: 1px 5px; border-radius: 4px; color: var(--gold
 .rules li.unused .rule-main { opacity: .45; }
 .unused-note { font-size: 12px; color: #e8b46a; padding: 2px 0 4px; }
 .warn-line { font-size: 13px; color: #e8b46a; margin: 6px 0; }
+
+/* find */
+.results { list-style: none; padding: 0; margin: 4px 0 0; max-height: 320px; overflow-y: auto; border: 1px solid #3a3022; border-radius: 8px; }
+.results li { display: flex; justify-content: space-between; gap: 10px; padding: 8px 10px; cursor: pointer; border-bottom: 1px solid #2c241a; }
+.results li:hover { background: #2a2219; }
+.results b { color: var(--gold); font-weight: normal; }
+.find-panel { width: 300px; margin: 10px auto 0; }
+.farm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.farm { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid #3a3022; border-radius: 8px; }
+.farm b { color: #f3e6c4; font-weight: normal; }

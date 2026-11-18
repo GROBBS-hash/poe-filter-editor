@@ -52,10 +52,11 @@ pub fn colour(name: &str) -> (&'static str, &'static str) {
 }
 
 pub fn quick_rule(item: &Item, action: Action, colour_name: Option<&str>, opts: &MatchOpts) -> Rule {
-    let mut conditions = vec![
-        format!("Class == \"{}\"", item.item_class),
-        format!("BaseType == \"{}\"", item.base_type),
-    ];
+    // An empty base means "every item of this type" (e.g. every Two Hand Maces).
+    let mut conditions = vec![format!("Class == \"{}\"", item.item_class)];
+    if !item.base_type.is_empty() {
+        conditions.push(format!("BaseType == \"{}\"", item.base_type));
+    }
     if opts.same_rarity && RARITIES.contains(&item.rarity.as_str()) {
         conditions.push(format!("Rarity = {}", item.rarity));
     }
@@ -68,9 +69,10 @@ pub fn quick_rule(item: &Item, action: Action, colour_name: Option<&str>, opts: 
     if let Some(n) = opts.below_stack.filter(|n| *n > 1) {
         conditions.push(format!("StackSize < {n}"));
     }
-    let mut who = match RARITIES.contains(&item.rarity.as_str()) {
-        true => format!("{} {}", item.rarity, item.base_type),
-        false => item.base_type.clone(),
+    let what = if item.base_type.is_empty() { format!("every {}", item.item_class) } else { item.base_type.clone() };
+    let mut who = match RARITIES.contains(&item.rarity.as_str()) && opts.same_rarity {
+        true => format!("{} {what}", item.rarity),
+        false => what,
     };
     match (opts.min_stack.filter(|n| *n > 1), opts.below_stack.filter(|n| *n > 1)) {
         (Some(a), Some(b)) => who.push_str(&format!(" (stacks {a}–{})", b - 1)),
@@ -230,6 +232,9 @@ fn first_quoted(line: &str) -> Option<String> {
 
 pub fn rule_detail(rule: &Rule) -> Option<RuleDetail> {
     let Rule::Override { label, show, conditions, actions } = rule else { return None };
+    if label.starts_with("Preset:") {
+        return None; // presets cover many items; they're removed, not edited
+    }
     let mut d = RuleDetail {
         label: label.clone(), show: *show, item_class: String::new(), base_type: String::new(),
         rarity: None, min_stack: None, below_stack: None, style: crate::evaluate::style_of(actions),
