@@ -67,30 +67,39 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
   const [over, setOver] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
   const [focusTier, setFocusTier] = useState<string | null>(null);
+  // One of NeverSink's rules that isn't a tier list, opened from "Modify rule".
+  const [extra, setExtra] = useState<Section | null>(null);
+  const extraKey = extra?.type_path.join(">") ?? "";
   // Opened from the quick menu's "Modify rule": show that section and make the tier glow.
   useEffect(() => {
     if (!focus || sections.length === 0) return;
     const k = focus.type_path.join(">");
-    if (!sections.some((s) => s.type_path.join(">") === k)) return;
-    setSel(k); setQ(""); setEditing(null); setFocusTier(focus.tier);
-    const id = window.setTimeout(() => document.querySelector(`[data-tier="${CSS.escape(focus.tier ?? "")}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
-    const off = window.setTimeout(() => setFocusTier(null), 3000);
-    return () => { window.clearTimeout(id); window.clearTimeout(off); };
-  }, [focus, sections]);
+    const glow = () => {
+      setSel(k); setQ(""); setEditing(null); setFocusTier(focus.tier);
+      window.setTimeout(() => document.querySelector(`[data-tier="${CSS.escape(focus.tier ?? "")}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
+      window.setTimeout(() => setFocusTier(null), 3500);
+    };
+    if (sections.some((s) => s.type_path.join(">") === k)) { glow(); return; }
+    invoke<Section | null>("get_rule_section", { id: profile.id, typePath: focus.type_path }).then((s) => {
+      if (s) { setExtra(s); glow(); }
+    }).catch(() => {});
+  }, [focus, sections]); // eslint-disable-line react-hooks/exhaustive-deps
   const [found, setFound] = useState<{ base: string; tier: string } | null>(null);
   const [copied, setCopied] = useState<{ style: CustomStyle; from: string } | null>(null);
 
   const load = () => invoke<Section[]>("get_tiers", { id: profile.id }).then((s) => {
     setSections(s);
-    setSel((cur) => (cur && s.some((x) => x.type_path.join(">") === cur) ? cur : s[0] ? s[0].type_path.join(">") : ""));
+    setSel((cur) => (cur && (cur === extraKey || s.some((x) => x.type_path.join(">") === cur)) ? cur : s[0] ? s[0].type_path.join(">") : ""));
+    if (extra) invoke<Section | null>("get_rule_section", { id: profile.id, typePath: extra.type_path }).then(setExtra).catch(() => {});
   }).catch((e) => setMsg(String(e)));
   useEffect(() => { load(); }, [profile.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const groups = useMemo(() => {
     const g = new Map<string, Section[]>();
+    if (extra) g.set(extra.group, [extra]);
     for (const s of sections) g.set(s.group, [...(g.get(s.group) ?? []), s]);
     return [...g.entries()];
-  }, [sections]);
+  }, [sections, extra]);
 
   // Searching jumps to whichever section holds the item.
   const needle = q.trim().toLowerCase();
@@ -107,7 +116,8 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
     return () => { window.clearTimeout(id); window.clearTimeout(off); };
   }, [found, sel]);
 
-  const section = sections.find((s) => s.type_path.join(">") === sel);
+  const section = sections.find((s) => s.type_path.join(">") === sel) ?? (extra && extraKey === sel ? extra : undefined);
+  const isExtra = !!extra && section === extra;
   const done = async (p: Promise<unknown>, m: string) => {
     try { await p; setMsg(`${m} Press F4 in game.`); onChange(); await load(); } catch (e) { setMsg(String(e)); }
   };
@@ -153,7 +163,7 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
             <div className="tiers-gname">{g}</div>
             {list.map((s) => {
               const k = s.type_path.join(">");
-              return <button key={k} className={`tiers-sec ${sel === k ? "on" : ""}`} onClick={() => { setSel(k); setEditing(null); }}>{s.title}</button>;
+              return <button key={k + (s === extra ? "*" : "")} className={`tiers-sec ${sel === k ? "on" : ""}`} onClick={() => { setSel(k); setEditing(null); }}>{s.title}</button>;
             })}
           </div>
         ))}
@@ -162,7 +172,11 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
       <div className="tiers-main">
         {!section ? <div className="empty">No tier lists found in this filter.</div> : (
           <div className="card">
-            {section.shared_bases && (
+            {isExtra && (
+              <div className="note">This is one of NeverSink's own rules (not a tier list). <b>Untick</b> a row to hide what it
+                catches, <b>click its look</b> to restyle it, <b>Reset</b> to undo your change. Your change survives NeverSink updates.</div>
+            )}
+            {section.shared_bases && !isExtra && (
               <div className="note">Each base sits in several rows here (one per item tier), so dragging is off: use the
                 item tier boxes, ticks and looks instead. Top bases are the most valuable to pick up.</div>
             )}
@@ -184,7 +198,7 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
                     <label className="tier-name">
                       <input type="checkbox" checked={shown} onChange={(e) => setTier(t, { show: e.target.checked })} />
                       <span>{t.name}</span>
-                      {t.note && t.min_stack == null && <span className="muted small">{t.note}</span>}
+                      {t.note && (t.min_stack == null || isExtra) && <span className="muted small">{isExtra ? `Catches: ${t.note}` : t.note}</span>}
                     </label>
                     {t.min_stack != null && <StackBox value={t.min_stack} onSave={(n) => setTier(t, { minStack: n })} />}
                     {t.min_item_tier != null && <StackBox label="item tier" title="Lowest item tier (shown on the label in 3.30) this row applies to"

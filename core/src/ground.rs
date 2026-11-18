@@ -24,6 +24,73 @@ pub struct GroundMatch {
     pub unique: Option<String>,
 }
 
+/// What the game's hover box (item tooltip) told us.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TooltipRead {
+    pub found: GroundMatch,
+    pub item_level: Option<u32>,
+    pub unidentified: bool,
+    /// From the colour of the name at the top: Normal / Magic / Rare / Unique.
+    pub rarity: Option<String>,
+}
+
+/// Rarity from the colour of the item's name in the hover box.
+pub fn rarity_from_colour(c: [u8; 3]) -> &'static str {
+    let (r, g, b) = (c[0] as i32, c[1] as i32, c[2] as i32);
+    if b > r + 30 && b > g { "Magic" }
+    else if r > 170 && g > 160 && b < g - 40 { "Rare" }
+    else if r > g + 40 && g > b { "Unique" }
+    else { "Normal" }
+}
+
+/// Reads the hover box the game shows for a ground item: lines top to bottom,
+/// each with its (text colour, background) when known. The name sits above
+/// "Item Level", so only lines up there count (other labels on screen don't).
+pub fn from_tooltip(lines: &[(String, Option<[u8; 3]>)], known: &HashSet<String>) -> Option<TooltipRead> {
+    let lower: Vec<String> = lines.iter().map(|(t, _)| t.to_lowercase()).collect();
+    let il = lower.iter().position(|l| l.replace(' ', "").starts_with("itemlevel"))?;
+    let item_level = lower[il].chars().filter(|c| c.is_ascii_digit()).collect::<String>().parse().ok();
+    let unidentified = lower.iter().any(|l| l.contains("unidentified"));
+    // Nearest line above "Item Level" that names a base exactly (the header).
+    for i in (il.saturating_sub(14)..il).rev() {
+        let Some(m) = match_base(&lines[i].0, known) else { continue };
+        if m.confidence < 1.0 { continue; }
+        let rarity = lines[i].1.map(|c| rarity_from_colour(c).to_string());
+        // Most of the line should be the name, not a stat that happens to contain one
+        // (magic names are long: "Glimmering Opal Sceptre of Embers", so blue lines may be).
+        if compact(&m.base).len() * 10 < compact(&lines[i].0).len() * 5 && rarity.as_deref() != Some("Magic") { continue; }
+        // An identified unique/rare shows its own name on the line above the base.
+        let mut found = m;
+        if found.unique.is_none() && i > 0 {
+            found.unique = unique_on_label(&format!("{} {}", lines[i - 1].0, lines[i].0), &found.base);
+        }
+        return Some(TooltipRead { found, item_level, unidentified, rarity });
+    }
+    None
+}
+
+/// Puts what the hover box said onto an item read from its label: the box is
+/// bigger and clearer, so its rarity, item level and identified state win.
+pub fn apply_tooltip(item: &mut Item, t: &TooltipRead) {
+    if t.item_level.is_some() { item.item_level = t.item_level; }
+    if let Some(name) = &t.found.unique {
+        item.rarity = "Unique".into();
+        item.name = Some(name.clone());
+        item.unidentified = false;
+        item.sockets = None;
+        return;
+    }
+    let gear = matches!(item.rarity.as_str(), "Normal" | "Magic" | "Rare" | "Unique");
+    if let (true, Some(r)) = (gear, &t.rarity) {
+        if *r != item.rarity {
+            item.rarity = r.clone();
+            if item.rarity != "Normal" && item.rarity != "Magic" { item.sockets = None; }
+            if item.rarity != "Unique" { item.name = None; }
+        }
+        item.unidentified = t.unidentified;
+    }
+}
+
 /// An identified unique shows its name before the base ("BLOOD PRICE REAVER HELMET").
 /// Finds which unique on that base the label names, allowing a slightly garbled read.
 pub fn unique_on_label(text: &str, base: &str) -> Option<String> {
@@ -216,6 +283,35 @@ mod tests {
     fn known() -> HashSet<String> {
         ["Coral Ring", "Ring", "Chaos Orb", "Orb of Alteration", "Leather Belt", "Divine Orb"]
             .iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn reads_the_hover_box() {
+        let mut k = known();
+        k.insert("Serpentine Staff".into());
+        k.insert("Opal Sceptre".into());
+        let line = |t: &str| (t.to_string(), None);
+        let tip = vec![
+            ("SERPENTINE STAFF".to_string(), Some([255, 255, 119])),
+            line("Warstaff"), line("Physical Damage: 56-117"), line("Critical Strike Chance: 7.80%"),
+            line("Item Level: 61"), line("Requires 85 Str, 85 Int"), line("+22% Chance to Block Attack Damage"), line("Unidentified"),
+            line("SERP"), // the half-hidden label elsewhere on screen
+        ];
+        let r = from_tooltip(&tip, &k).unwrap();
+        assert_eq!((r.found.base.as_str(), r.item_level, r.unidentified, r.rarity.as_deref()), ("Serpentine Staff", Some(61), true, Some("Rare")));
+        // No "Item Level" line: not a hover box.
+        assert!(from_tooltip(&tip[..3], &k).is_none());
+        assert_eq!(rarity_from_colour([136, 136, 255]), "Magic");
+        assert_eq!(rarity_from_colour([175, 96, 37]), "Unique");
+        assert_eq!(rarity_from_colour([200, 200, 200]), "Normal");
+        // A magic name is long, but its blue colour says it's the header.
+        let magic = vec![("Glimmering Opal Sceptre of Embers".to_string(), Some([136, 136, 255])), line("Sceptre"), line("Item Level: 70")];
+        let r = from_tooltip(&magic, &k).unwrap();
+        assert_eq!((r.found.base.as_str(), r.rarity.as_deref()), ("Opal Sceptre", Some("Magic")));
+        // The label said Normal with 4 links; the box says Rare.
+        let mut it = Item { base_type: "Opal Sceptre".into(), rarity: "Normal".into(), sockets: Some("R-R-R-R".into()), ..Default::default() };
+        apply_tooltip(&mut it, &TooltipRead { rarity: Some("Rare".into()), ..r });
+        assert_eq!((it.rarity.as_str(), it.sockets.as_deref(), it.item_level, it.unidentified), ("Rare", None, Some(70), false));
     }
 
     #[test]

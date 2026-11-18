@@ -41,19 +41,19 @@ function Why({ v, onEditHere }: { v: Status["verdict"]; onEditHere?: () => void 
   const where = src.kind === "neversink"
     ? (src.section ? `Tiers › ${src.section} › ${src.tier_name ?? src.tier}` : `NeverSink › ${[...src.type_path, ...(src.tier ? [src.tier] : [])].map(plain).join(" › ")}`)
     : src.kind === "edit" ? "My edits" : src.kind === "preset" ? (src.label.startsWith("Preset: Levelling") ? "Presets › Levelling setup" : "Presets") : src.kind === "price" ? "Prices" : "";
-  const canOpen = src.kind !== "none" && (src.kind !== "neversink" || !!src.section);
+  const canOpen = src.kind !== "none" && (src.kind !== "neversink" || src.type_path.length > 0);
+  const hidden = v.visibility === "Hide";
   return (
-    <div className={`qm-why why-${src.kind}`} title={v.reason}>
-      <div className="why-top">
-        <span className="why-badge">{WHO[src.kind] ?? src.kind}</span>
-        <span className="why-text">{headline}</span>
-      </div>
+    <div className={`qm-why why-${src.kind} ${hidden ? "why-hidden" : ""}`} title={v.reason}>
+      <div className="why-label">{src.kind === "none" ? "Why it shows" : hidden ? "Hidden by" : "Shown by"}
+        <span className="why-badge">{WHO[src.kind] ?? src.kind}</span></div>
+      <div className="why-text">{headline}</div>
       {where && <div className="why-where">{where}</div>}
       {src.kind === "neversink" && v.reason.includes(", ") && <div className="why-more">{v.reason.split(", ").slice(1).join(", ")}</div>}
       <div className="why-actions">
+        {canOpen && <button className="why-open" onClick={() => invoke("open_rule", { source: src })}>Modify this rule</button>}
         {onEditHere && <button className="qm-inline" onClick={onEditHere}>Edit here</button>}
-        {canOpen && <button className="qm-inline" onClick={() => invoke("open_rule", { source: src })}>Modify rule ↗</button>}
-        {!canOpen && src.kind === "neversink" && <span className="muted small">Change it from here with the buttons below.</span>}
+        {src.kind === "none" && <span className="muted small">Use the buttons below to add your own rule.</span>}
       </div>
     </div>
   );
@@ -387,6 +387,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
               }}>{item.base_type}</span>
             )}
           </div>
+          <Why v={v} onEditHere={v.by_user_edit && !replacing && v.source?.kind === "edit" ? () => openRule(v.decided_by) : undefined} />
           {shown(v.visibility) && (
             <div className="qm-facts">
               {st?.muted ? "No drop sound" : st?.sound ? `🔊 ${st.sound}` : "Default drop sound"}
@@ -395,7 +396,6 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
             </div>
           )}
           {status!.by_stack.length > 0 && <div className="qm-facts">Stacks: {stackLine(status!.by_stack)}</div>}
-          <Why v={v} onEditHere={v.by_user_edit && !replacing && v.source?.kind === "edit" ? () => openRule(v.decided_by) : undefined} />
           {(v.uncertain.length > 0 || status!.assumptions.length > 0 || extra?.area_level != null) && (
             <div className="qm-unsure" title={[
               extra?.area_level != null ? `Area level ${extra.area_level} (from your game)` : "",

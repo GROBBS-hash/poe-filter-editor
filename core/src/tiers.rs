@@ -177,6 +177,80 @@ pub fn sections(segs: &[Segment]) -> Vec<Section> {
     found
 }
 
+/// Any one of NeverSink's rules (all blocks sharing a `$type` path), even ones that
+/// aren't tier lists, e.g. "levelling › white & blue › 4-links". Each tier is a row
+/// with its conditions in plain words, so "Modify rule" can open it.
+pub fn section_at(segs: &[Segment], type_path: &[String]) -> Option<Section> {
+    let mut tiers: Vec<TierRow> = vec![];
+    for s in segs {
+        let Segment::Block(b) = s else { continue };
+        if b.type_path != type_path { continue; }
+        let Some(tier) = b.tier.clone() else { continue };
+        if tiers.iter().any(|t| t.tier == tier) { continue; }
+        let mut note = conditions(&b.lines);
+        let base_note = note_of(&b.lines);
+        if !base_note.is_empty() { note.push(base_note); }
+        tiers.push(TierRow {
+            name: tier_name(&tier), tier, visibility: b.visibility.clone(), style: style_of(&b.lines),
+            bases: b.base_types(), note: note.join(", "),
+            min_stack: b.lines.iter().find_map(|l| l.trim().strip_prefix("StackSize >=").and_then(|n| n.trim().parse().ok())),
+            min_item_tier: b.lines.iter().find_map(|l| l.trim().strip_prefix("UnidentifiedItemTier >=").and_then(|n| n.trim().parse().ok())),
+        });
+    }
+    if tiers.is_empty() { return None; }
+    let title = section_title(type_path).unwrap_or_else(|| type_path.iter().map(|p| plain_part(p)).collect::<Vec<_>>().join(" › "));
+    Some(Section { type_path: type_path.to_vec(), title, group: "Opened rule".into(), tiers, shared_bases: true })
+}
+
+/// NeverSink's short section names in plain words.
+pub fn plain_part(p: &str) -> String {
+    match p {
+        "leveling" => "Levelling".into(), "normalmagic" => "White & blue".into(), "rare" => "Rares".into(),
+        "4l" => "4-links".into(), "3l" => "3-links".into(), "5l" => "5-links".into(), "6l" => "6-links".into(),
+        "rgb" => "R-G-B sockets".into(), "exotic" => "Special".into(), "general" => "General".into(),
+        "gear" => "Gear".into(), "tiered" => "By item tier".into(), "uniques" => "Uniques".into(),
+        "currency" => "Currency".into(), "divination" => "Divination cards".into(), "decorators" => "Highlights".into(),
+        _ => {
+            let mut c = p.chars();
+            c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default()
+        }
+    }
+}
+
+/// The other conditions of a block in plain words: rarity, links, item classes…
+fn conditions(lines: &[String]) -> Vec<String> {
+    let mut out = vec![];
+    let names = |v: &str| -> Vec<String> { v.split('"').map(str::trim).filter(|x| !x.is_empty() && *x != "==" && *x != "=").map(String::from).collect() };
+    for l in lines {
+        let t = l.trim();
+        let (key, rest) = t.split_once(' ').unwrap_or((t, ""));
+        let rest = rest.trim();
+        match key {
+            "Rarity" => {
+                let r = rest.trim_start_matches(['=', '<', '>', ' ']).split_whitespace().map(|x| x.to_lowercase()).collect::<Vec<_>>();
+                let op = rest.split_whitespace().next().unwrap_or("");
+                out.push(match op { "<=" | "<" | ">=" | ">" => format!("rarity {op} {}", r.join(" ")), _ => r.join(" & ") });
+            }
+            "LinkedSockets" => {
+                let n: String = rest.chars().filter(|c| c.is_ascii_digit()).collect();
+                let more = if rest.starts_with('>') { "+" } else if rest.starts_with('<') { " or fewer" } else { "" };
+                out.push(format!("{n}{more} links"));
+            }
+            "Sockets" | "SocketGroup" => out.push(format!("sockets {}", rest.trim_start_matches(['=', ' ']))),
+            "Class" => {
+                let c = names(rest);
+                out.push(if c.len() <= 3 { c.join(", ") } else { format!("{} item types", c.len()) });
+            }
+            "Corrupted" => out.push(if rest == "True" { "corrupted".into() } else { "not corrupted".into() }),
+            "Identified" => out.push(if rest == "True" { "identified".into() } else { "unidentified".into() }),
+            "Quality" => out.push(format!("quality {rest}")),
+            "DropLevel" => out.push(format!("drop level {rest}")),
+            _ => {}
+        }
+    }
+    out
+}
+
 /// One stack section as offered in the in-game panel.
 #[derive(Debug, Clone, Serialize)]
 pub struct StackChoice {
@@ -201,6 +275,15 @@ pub fn stack_choices(segs: &[Segment], base: &str) -> Vec<StackChoice> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn opens_any_rule() {
+        let f = "Show # $type->leveling->normalmagic->4l $tier->general\n\tLinkedSockets >= 4\n\tRarity Normal Magic\n\tAreaLevel <= 67\n\tSetTextColor 255 255 255 255\n";
+        let segs = crate::filter::parse_filter(f);
+        let tp: Vec<String> = ["leveling", "normalmagic", "4l"].iter().map(|s| s.to_string()).collect();
+        let s = super::section_at(&segs, &tp).unwrap();
+        assert_eq!(s.title, "Levelling › White & blue › 4-links");
+        assert_eq!(s.tiers[0].note, "4+ links, normal & magic, area level <= 67");
+    }
     use super::*;
     use crate::filter::{parse_filter, render_filter};
     use crate::rules::{apply, Rule};

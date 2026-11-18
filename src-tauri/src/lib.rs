@@ -288,7 +288,12 @@ struct Picked {
 
 /// No item text on the clipboard: read the ground label under the mouse instead.
 fn read_from_ground(app: &AppHandle) -> Result<Picked, String> {
-    let read = screen::read_label_under_cursor()?;
+    let (live, base) = active_filters(app).ok_or("Set up a filter first")?;
+    let names = known_names(&known_bases(&base));
+    let accept = |t: &str| match_base(t, &names).is_some();
+    let (read, tip_lines) = screen::read_ground(&accept)?;
+    // The game's hover box: bigger and clearer than the label, and it says the rarity.
+    let tip = filter_core::ground::from_tooltip(&tip_lines, &names);
     // Failed reads are saved next to your filters (ReaderSnapshots) so they can be looked at and fixed.
     let keep = |why: &str| {
         let game = active_game(&app.state::<AppState>());
@@ -296,18 +301,22 @@ fn read_from_ground(app: &AppHandle) -> Result<Picked, String> {
             .map(|p| format!(" (saved what it saw: {})", p.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default()))
             .unwrap_or_default()
     };
-    if read.text.trim().is_empty() {
-        return Err(format!("Couldn't see an item label under your mouse{}", keep("No label found near the mouse")));
-    }
-    let (live, base) = active_filters(app).ok_or("Set up a filter first")?;
-    let names = known_names(&known_bases(&base));
-    let m = match match_base(&read.text, &names) {
-        Some(m) => m,
-        None => return Err(format!("Read \"{}\" but couldn't match it to an item{}", read.text, keep("Read text but no item matched"))),
+    let label = if read.text.trim().is_empty() { None } else { match_base(&read.text, &names) };
+    let m = match (label, &tip) {
+        // Same item both ways: the label knows the stack size and tier.
+        (Some(l), Some(t)) if l.base == t.found.base => l,
+        // They disagree: the label probably ran into its neighbour; trust the box.
+        (_, Some(t)) => { let _ = keep("Label and hover box disagreed"); t.found.clone() }
+        (Some(l), None) => l,
+        (None, None) if read.text.trim().is_empty() =>
+            return Err(format!("Couldn't see an item label under your mouse{}", keep("No label found near the mouse"))),
+        (None, None) => return Err(format!("Read \"{}\" but couldn't match it to an item{}", read.text, keep("Read text but no item matched"))),
     };
     let colours = read.colours.map(|(text, background)| LabelColours { text, background });
-    let item = ground_item(&live, &m, colours, area_level(app).unwrap_or_else(|| fallback_area_level(app)));
-    Ok(Picked { item, from_screen: true, screen_text: Some(read.text), confidence: m.confidence })
+    let mut item = ground_item(&live, &m, colours, area_level(app).unwrap_or_else(|| fallback_area_level(app)));
+    if let Some(t) = &tip { filter_core::ground::apply_tooltip(&mut item, t); }
+    let text = if read.text.trim().is_empty() { m.base.clone() } else { read.text.clone() };
+    Ok(Picked { item, from_screen: true, screen_text: Some(text), confidence: m.confidence })
 }
 
 fn show_overlay(app: &AppHandle, event: &str, payload: impl Serialize + Clone) {
@@ -501,6 +510,16 @@ fn get_tiers(state: State<AppState>, id: String) -> Result<Vec<filter_core::tier
     let prices = state.prices.lock().unwrap();
     let (text, _) = render_profile(&store, &id, &filter_dir(game), prices.get(&game), None).map_err(err)?;
     Ok(filter_core::tiers::sections(&parse_filter(&text)))
+}
+
+/// One of NeverSink's rules that isn't a tier list ("Modify rule" on e.g. white 4-links).
+#[tauri::command]
+fn get_rule_section(state: State<AppState>, id: String, type_path: Vec<String>) -> Result<Option<filter_core::tiers::Section>, String> {
+    let store = state.store.lock().unwrap();
+    let game = store.profiles.get(&id).ok_or("Profile not found")?.game;
+    let prices = state.prices.lock().unwrap();
+    let (text, _) = render_profile(&store, &id, &filter_dir(game), prices.get(&game), None).map_err(err)?;
+    Ok(filter_core::tiers::section_at(&parse_filter(&text), &type_path))
 }
 
 #[derive(serde::Serialize)]
@@ -1504,7 +1523,7 @@ pub fn run() {
             list_farm_presets,
             apply_farm_preset,
             list_level_presets,
-            get_tiers,
+            get_tiers, get_rule_section,
             move_tier_item,
             stack_choices,
             gear_setup,
