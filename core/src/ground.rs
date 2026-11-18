@@ -58,18 +58,28 @@ pub fn rarity_from_colour(c: [u8; 3]) -> &'static str {
     else { "Normal" }
 }
 
+/// The hover box's "Item Level: 61" line (the number may be read as a separate piece,
+/// but the words alone in a sentence, "item level and…", don't count).
+pub fn is_item_level(line: &str) -> bool {
+    let l = line.to_lowercase().replace(' ', "");
+    l.starts_with("itemlevel") && (l.chars().any(|c| c.is_ascii_digit()) || l.ends_with(':'))
+}
+
 /// Reads the hover box the game shows for a ground item: lines top to bottom,
 /// each with its (text colour, background) when known. The name sits above
 /// "Item Level", so only lines up there count (other labels on screen don't).
 pub fn from_tooltip(lines: &[(String, Option<[u8; 3]>)], known: &HashSet<String>) -> Option<TooltipRead> {
     let lower: Vec<String> = lines.iter().map(|(t, _)| t.to_lowercase()).collect();
-    let il = lower.iter().position(|l| l.replace(' ', "").starts_with("itemlevel"))?;
+    let il = lower.iter().position(|l| is_item_level(l))?;
     let item_level = lower[il].chars().filter(|c| c.is_ascii_digit()).collect::<String>().parse().ok();
     let unidentified = lower.iter().any(|l| l.contains("unidentified"));
     // Nearest line above "Item Level" that names a base exactly (the header).
     for i in (il.saturating_sub(14)..il).rev() {
+        // The header can be slightly garbled ("NOBLE CLAM", "SUPERIOR SHARKSKII").
         let Some(m) = match_base(&lines[i].0, known) else { continue };
-        if m.confidence < 1.0 { continue; }
+        // Close reads and cut-off names count; a bare word that's merely part of
+        // one name ("Sceptre", the item type under the name) doesn't.
+        if m.confidence < 0.7 || (m.confidence - 0.75).abs() < 1e-6 { continue; }
         let rarity = lines[i].1.map(|c| rarity_from_colour(c).to_string());
         // Most of the line should be the name, not a stat that happens to contain one
         // (magic names are long: "Glimmering Opal Sceptre of Embers", so blue lines may be).
@@ -222,6 +232,16 @@ pub fn match_base(text: &str, known: &HashSet<String>) -> Option<GroundMatch> {
             return Some(GroundMatch { unique: unique_on_label(text, has[0].clone().as_str()), base: has[0].clone(), stack, tier, superior, confidence: 0.75 });
         }
     }
+    // End of the name cut off or garbled ("SHARKSKII"): close to the start of exactly one name.
+    if t.len() >= 7 {
+        let close: Vec<&String> = known.iter().filter(|b| {
+            let c = compact(b);
+            c.len() > t.len() && c.is_char_boundary(t.len()) && strsim::jaro_winkler(&c[..t.len()], &t) >= 0.93
+        }).collect();
+        if close.len() == 1 {
+            return Some(GroundMatch { unique: unique_on_label(text, close[0].clone().as_str()), base: close[0].clone(), stack, tier, superior, confidence: 0.7 });
+        }
+    }
     // Start of the label cut off ("onic Spirit Shield"): accept it if exactly one name ends that way.
     if t.len() >= 8 {
         let ends: Vec<&String> = known.iter().filter(|b| compact(b).ends_with(&t)).collect();
@@ -317,6 +337,12 @@ mod tests {
     #[test]
     fn part_of_a_label() {
         let mut k = known();
+        k.insert("Sharkskin Tunic".into());
+        k.insert("Noble Claw".into());
+        k.insert("Eagle Claw".into());
+        assert_eq!(match_base("SUPERIOR SHARKSKII", &k).unwrap().base, "Sharkskin Tunic");
+        assert_eq!(match_base("NOBLE CLAM", &k).unwrap().base, "Noble Claw");
+        assert!(is_item_level("ITEM LEVEL: 61") && is_item_level("ITEM LEVEL:") && !is_item_level("item level and"));
         k.insert("Hope".into());
         k.insert("Karui Chopper".into());
         k.insert("Moon Orb".into());

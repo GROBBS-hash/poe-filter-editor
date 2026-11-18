@@ -124,6 +124,27 @@ fn colour_in(raw: &[u8], w: i32, h: i32, r: Bx) -> Option<([u8; 3], [u8; 3])> {
     text_colour(&px)
 }
 
+/// The brightest colours inside a box (the hover box's text is drawn brighter than
+/// its fancy header frame): the average of the brightest tenth.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn bright_colour(raw: &[u8], w: i32, h: i32, r: Bx) -> Option<[u8; 3]> {
+    let (x0, y0) = ((r[0] as i32).max(0), (r[1] as i32).max(0));
+    let (x1, y1) = (((r[0] + r[2]) as i32).min(w), ((r[1] + r[3]) as i32).min(h));
+    let mut px: Vec<[u8; 3]> = Vec::new();
+    for y in y0..y1 {
+        for x in x0..x1 {
+            let i = ((y * w + x) * 4) as usize;
+            px.push([raw[i + 2], raw[i + 1], raw[i]]);
+        }
+    }
+    if px.is_empty() { return None; }
+    px.sort_by_key(|c| std::cmp::Reverse(c[0] as u32 + c[1] as u32 + c[2] as u32));
+    let top = &px[..(px.len() / 10).max(1)];
+    let n = top.len() as u32;
+    let sum = top.iter().fold([0u32; 3], |a, c| [a[0] + c[0] as u32, a[1] + c[1] as u32, a[2] + c[2] as u32]);
+    Some([(sum[0] / n) as u8, (sum[1] / n) as u8, (sum[2] / n) as u8])
+}
+
 #[cfg_attr(not(windows), allow(dead_code))]
 fn far_apart(a: Option<([u8; 3], [u8; 3])>, b: Option<([u8; 3], [u8; 3])>) -> bool {
     match (a, b) {
@@ -246,7 +267,7 @@ fn row_label(merged: &[Piece], cx: f32, cy: f32) -> Option<Piece> {
 /// the mouse, from a little below it up to the box's top, top to bottom.
 #[cfg_attr(not(windows), allow(dead_code))]
 fn tooltip_lines(all: &[Piece], cx: f32, cy: f32) -> TooltipLines {
-    let is_il = |t: &str| t.to_lowercase().replace(' ', "").starts_with("itemlevel");
+    let is_il = |t: &str| filter_core::ground::is_item_level(t);
     let Some(il) = all.iter().filter(|p| is_il(&p.0))
         .min_by(|a, b| dist_to(&a.1, cx, cy).partial_cmp(&dist_to(&b.1, cx, cy)).unwrap_or(std::cmp::Ordering::Equal))
     else { return vec![] };
@@ -270,9 +291,14 @@ fn tooltip_lines(all: &[Piece], cx: f32, cy: f32) -> TooltipLines {
 /// For washed-out pictures (HDR screens): darkest channel, strong contrast curve,
 /// stretched to full range, then flipped to dark text on light.
 #[cfg_attr(not(windows), allow(dead_code))]
-fn boost(raw: &[u8]) -> Vec<u8> {
+fn boost(raw: &[u8]) -> Vec<u8> { boost_with(raw, raw, 2.6) }
+
+/// Like `boost`, but the contrast is set from `sample` (e.g. just the part near the
+/// mouse, so bright labels on a dark scene get the whole range) with curve `power`.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn boost_with(raw: &[u8], sample: &[u8], power: f32) -> Vec<u8> {
     let mut hist = [0u32; 256];
-    for px in raw.chunks_exact(4) { hist[px[0].min(px[1]).min(px[2]) as usize] += 1; }
+    for px in sample.chunks_exact(4) { hist[px[0].min(px[1]).min(px[2]) as usize] += 1; }
     let n: u32 = hist.iter().sum();
     let at = |frac: f32| {
         let mut acc = 0;
@@ -283,7 +309,7 @@ fn boost(raw: &[u8]) -> Vec<u8> {
     let mut out = raw.to_vec();
     for px in out.chunks_exact_mut(4) {
         let v = px[0].min(px[1]).min(px[2]) as f32;
-        let t = ((v - lo) / (hi - lo)).clamp(0.0, 1.0).powf(2.6);
+        let t = ((v - lo) / (hi - lo)).clamp(0.0, 1.0).powf(power);
         let g = 255 - (t * 255.0) as u8;
         px[0] = g; px[1] = g; px[2] = g;
     }
@@ -292,7 +318,7 @@ fn boost(raw: &[u8]) -> Vec<u8> {
 
 #[cfg(windows)]
 mod imp {
-    use super::{boost, colour_in, dist_to, grey, pick_label, pieces, row_label, tooltip_lines, Bx, ScreenRead, TooltipLines};
+    use super::{boost, boost_with, bright_colour, colour_in, dist_to, grey, pick_label, pieces, row_label, tooltip_lines, Bx, ScreenRead, TooltipLines};
     use windows::{
         Graphics::Imaging::{BitmapAlphaMode, BitmapPixelFormat, SoftwareBitmap},
         Media::Ocr::OcrEngine,
@@ -453,7 +479,9 @@ mod imp {
         if !done {
             let w = (max / 3).min(900).min(raw.w);
             let x0 = (mx - w / 2).clamp(0, raw.w - w);
-            for px in [boost(&raw.px), grey(&raw.px, false)] {
+            // Contrast from the area right round the mouse (the label and a bit either side).
+            let near = crop(&raw, mx - 250, 0, 500, raw.h);
+            for px in [boost_with(&raw.px, &near.px, 4.0), boost(&raw.px), grey(&raw.px, false)] {
                 let pic = Pic { px, w: raw.w, h: raw.h };
                 if attempt(&pic, x0, w, 3)? { break; }
             }
@@ -464,7 +492,7 @@ mod imp {
             // Small screens have small text: enlarge when the reader allows it.
             let scale = if big.h < 1300 && big.w * 2 <= max && big.h * 2 <= max { 2 } else { 1 };
             let lines = recognise(&big, 0, big.w, scale).unwrap_or_default();
-            let ps = pieces(lines, &|r: Bx| colour_in(&big.px, big.w, big.h, r));
+            let ps = pieces(lines, &|r: Bx| bright_colour(&big.px, big.w, big.h, r).map(|c| (c, [0, 0, 0])));
             tooltip_lines(&ps, bx as f32, by as f32)
         };
 
@@ -543,6 +571,14 @@ mod tests {
         let lines = super::tooltip_lines(&all, 500.0, 500.0);
         let t: Vec<_> = lines.iter().map(|l| l.0.as_str()).collect();
         assert_eq!(t, ["TYRANT'S SEKHEM", "Sceptre", "Item Level: 70", "Unidentified"]);
+    }
+
+    #[test]
+    fn bright_text_over_frame() {
+        // 90% brown frame, 10% pale-yellow text.
+        let mut raw = Vec::new();
+        for i in 0..100 { let c = if i % 10 == 0 { [119u8, 255, 255] } else { [58, 88, 119] }; raw.extend_from_slice(&[c[0], c[1], c[2], 255]); }
+        assert_eq!(super::bright_colour(&raw, 100, 1, [0.0, 0.0, 100.0, 1.0]), Some([255, 255, 119]));
     }
 
     #[test]

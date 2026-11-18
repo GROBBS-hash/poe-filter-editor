@@ -295,10 +295,12 @@ fn read_from_ground(app: &AppHandle) -> Result<Picked, String> {
     // The game's hover box: bigger and clearer than the label, and it says the rarity.
     let tip = filter_core::ground::from_tooltip(&tip_lines, &names);
     let label = if read.text.trim().is_empty() { None } else { match_base(&read.text, &names) };
-    // Only trust the box if it's about the same item as the label: same base, or
-    // what was read off the label fits the box's name ("SUPERIOR" isn't "Moon Orb").
+    // The box is always about the item under the mouse, while the label read can catch
+    // a neighbour, so a clearly read box wins. A box only guessed at (garbled name)
+    // must agree with what was read off the label.
     let tip = tip.filter(|t| {
-        label.as_ref().map(|l| l.base == t.found.base).unwrap_or(false)
+        t.found.confidence >= 1.0
+            || label.as_ref().map(|l| l.base == t.found.base).unwrap_or(false)
             || filter_core::ground::text_fits(&read.text, &t.header)
     });
     // Failed reads are saved next to your filters (ReaderSnapshots) so they can be looked at and fixed.
