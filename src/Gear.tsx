@@ -58,7 +58,7 @@ export default function Gear() {
   return (
     <>
       <div className="card">
-        <h2>Levelling gear <Tip>Uniques you can wear at your level that help your main skill. Pick your skill gem and the
+        <h2>Your character and skill <Tip>Uniques you can wear at your level that help your main skill. Pick your skill gem and the
           matching stats are ticked for you (spells get cast speed and spell damage, minions get minion stats…); change the ticks
           to taste. Movement speed, life and resistances are always handy. <b>Trade</b> opens the official trade site for it,
           cheapest first. Your level comes from the game's log when you level up.</Tip></h2>

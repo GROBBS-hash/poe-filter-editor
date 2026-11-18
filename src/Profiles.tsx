@@ -61,18 +61,6 @@ export default function Profiles({ ov, active, onChange, onNew }: { ov: Overview
   return (
     <>
       <div className="card">
-        <h2>Save “{active.name}” as a new filter</h2>
-        <p className="muted">Great for going stricter as the league goes on, without touching your league-start filter.</p>
-        <input className="text" placeholder="e.g. Strict 1" value={name} onChange={(e) => setName(e.target.value)} />
-        <label className="check">
-          <input type="checkbox" checked={inherit} onChange={(e) => setInherit(e.target.checked)} />
-          Keep following “{active.name}” (fixes you make there carry over)
-        </label>
-        <button className="primary" disabled={!name.trim()} onClick={fork}>Save as new</button>
-        {msg && <div className="note">{msg}</div>}
-      </div>
-
-      <div className="card">
         <div className="row between">
           <h2>Your filters <Tip><b>Going stricter?</b> Change <b>Built on</b> to e.g. Uber Strict: your edits, tier changes, levelling setup,
             price tiers and theme all carry over. <b>Want both?</b> Save as new first, then change the copy, and switch between them in
@@ -99,6 +87,17 @@ export default function Profiles({ ov, active, onChange, onNew }: { ov: Overview
         </ul>
         {msg && <div className="note">{msg}</div>}
       </div>
+      <div className="card">
+        <h2>Save “{active.name}” as a new filter</h2>
+        <p className="muted">Great for going stricter as the league goes on, without touching your league-start filter.</p>
+        <input className="text" placeholder="e.g. Strict 1" value={name} onChange={(e) => setName(e.target.value)} />
+        <label className="check">
+          <input type="checkbox" checked={inherit} onChange={(e) => setInherit(e.target.checked)} />
+          Keep following “{active.name}” (fixes you make there carry over)
+        </label>
+        <button className="primary" disabled={!name.trim()} onClick={fork}>Save as new</button>
+      </div>
+
     </>
   );
 }

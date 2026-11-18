@@ -138,7 +138,9 @@ export default function Edits({ profile, onChange, focus }: { profile: ProfileIn
   const groups = new Map<string, RuleInfo[]>();
   for (const r of [...profile.rules].reverse()) {
     if (needle && !`${r.label} ${r.detail?.item_class ?? ""}`.toLowerCase().includes(needle)) continue;
-    const key = r.detail ? `${r.detail.item_class}|${r.detail.base_type}` : r.label;
+    // Presets group under their preset ("Levelling (Custom)"), everything else by item.
+    const preset = r.label.match(/^Preset: ([^:]+):/);
+    const key = r.detail ? `${r.detail.item_class}|${r.detail.base_type}` : preset ? `preset|${preset[1]}` : r.label;
     groups.set(key, [...(groups.get(key) ?? []), r]);
   }
   const unused = profile.rules.filter((r) => r.shadowed_by).length;
@@ -165,7 +167,8 @@ export default function Edits({ profile, onChange, focus }: { profile: ProfileIn
           {groups.size === 0 && <div className="empty">Nothing matches “{q}”.</div>}
           {[...groups.entries()].map(([key, rules]) => {
             const d = rules[0].detail;
-            const title = d ? (d.base_type || `Every ${d.item_class}`) : rules[0].label;
+            const preset = !d && rules[0].label.match(/^Preset: ([^:]+):/);
+            const title = d ? (d.base_type || `Every ${d.item_class}`) : preset ? `${preset[1]} preset` : rules[0].label;
             return (
               <div key={key} className="egroup">
                 <div className="egroup-head">
@@ -179,7 +182,7 @@ export default function Edits({ profile, onChange, focus }: { profile: ProfileIn
                       <div className="rule-line">
                         <span className="rule-main">
                           <Look r={r} />
-                          <span className="rule-scope">{scope(r) || (r.detail ? "" : r.label)}</span>
+                          <span className="rule-scope">{scope(r) || (r.detail ? "" : r.label.replace(/^Preset: [^:]+: /, ""))}</span>
                         </span>
                         <span>
                           <button className="link" onClick={() => edit(r.index)}>{open?.index === r.index ? "Close" : "Edit"}</button>

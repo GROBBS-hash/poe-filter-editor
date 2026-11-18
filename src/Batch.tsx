@@ -36,7 +36,7 @@ export default function Batch({ on, onChange }: { on: boolean; onChange: () => v
   return (
     <div className="card">
       <div className="row between">
-        <h2>Batch mode</h2>
+        <h2>Collected items</h2>
         <button className={on ? "primary" : ""} onClick={toggle}>{on ? "Stop collecting" : "Start collecting"}</button>
       </div>
       <p className="muted">{on
