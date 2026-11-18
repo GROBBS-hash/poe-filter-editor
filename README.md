@@ -19,8 +19,9 @@ To make an installer: `npm run tauri build` (the installer lands in `src-tauri/t
 2. In game, open Options > Game > Item Filter and pick **League Start**. Play in **Windowed Fullscreen** so the pop-up can appear over the game.
 3. Hover any item and press **F2**, in your inventory, stash, or **on the ground**. The pop-up shows what your filter does to it right now (shown or hidden, how it looks, its sound, stack rules), then pick Hide, Louder, Quieter or a highlight colour.
    - On the ground, the app reads the label with Windows' built-in text recognition. It guesses the rarity from the label colour; tap a different rarity if it's wrong.
-4. Type `/itemfilter League Start` in chat to reload. Done.
+4. The filter reloads in game by itself after each change. Press **F4** any time to reload it by hand.
 
+- **F4** reloads your filter in game (it types `/itemfilter League Start` into chat for you, only when the game is the window in front).
 - **F3** turns on batch mode: Ctrl+C as many items as you like, then set them all at once in the app.
 - **Undo last** is in the pop-up. Every edit is also listed under *My edits*, where you can remove any of them.
 - **Profiles > Save as new** makes a stricter copy without touching your league-start filter.

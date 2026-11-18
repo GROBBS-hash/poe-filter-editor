@@ -29,7 +29,7 @@ export default function Batch({ on, onChange }: { on: boolean; onChange: () => v
       } catch (err) { setMsg(String(err)); }
     }
     setList([]);
-    setMsg(`Applied ${done} edit${done === 1 ? "" : "s"} — type /itemfilter in game to reload`);
+    setMsg(`Applied ${done} edit${done === 1 ? "" : "s"} — press F4 in game to reload`);
     onChange();
   };
 

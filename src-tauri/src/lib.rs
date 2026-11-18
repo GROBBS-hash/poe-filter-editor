@@ -167,6 +167,61 @@ fn quick_edit(app: AppHandle) {
     });
 }
 
+/// Is Path of Exile the window in front? We only ever type into the game.
+#[cfg(windows)]
+fn game_in_front() -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowTextW};
+    unsafe {
+        let mut buf = [0u16; 256];
+        let n = GetWindowTextW(GetForegroundWindow(), &mut buf).max(0) as usize;
+        String::from_utf16_lossy(&buf[..n]).starts_with("Path of Exile")
+    }
+}
+#[cfg(not(windows))]
+fn game_in_front() -> bool { false }
+
+/// The filter name the game knows ("League Start" for "League Start.filter").
+fn active_filter_name(app: &AppHandle) -> Option<String> {
+    let state = app.state::<AppState>();
+    let store = state.store.lock().unwrap();
+    let p = store.active.as_ref().and_then(|id| store.profiles.get(id))?;
+    Some(p.output_file.trim_end_matches(".filter").to_string())
+}
+
+/// Types "/itemfilter <name>" into the game's chat: one keypress, one command.
+fn reload_in_game(app: &AppHandle, wait_for_focus_ms: u64) -> Result<(), String> {
+    use enigo::{Direction, Enigo, Key, Keyboard, Settings};
+    let name = active_filter_name(app).ok_or("Set up a filter first")?;
+    // Give focus a moment to return to the game (e.g. after the pop-up closes).
+    let mut waited = 0;
+    while !game_in_front() {
+        if waited >= wait_for_focus_ms {
+            return Err("Path of Exile isn't the window in front, so nothing was typed".into());
+        }
+        thread::sleep(Duration::from_millis(50));
+        waited += 50;
+    }
+    let mut e = Enigo::new(&Settings::default()).map_err(err)?;
+    let mut step = || -> enigo::InputResult<()> {
+        e.key(Key::Return, Direction::Click)?;            // open chat
+        thread::sleep(Duration::from_millis(40));
+        e.key(Key::Control, Direction::Press)?;           // clear anything already typed
+        e.key(Key::Unicode('a'), Direction::Click)?;
+        e.key(Key::Control, Direction::Release)?;
+        e.key(Key::Backspace, Direction::Click)?;
+        e.text(&format!("/itemfilter {name}"))?;
+        thread::sleep(Duration::from_millis(30));
+        e.key(Key::Return, Direction::Click)                // send
+    };
+    step().map_err(err)
+}
+
+#[tauri::command]
+fn reload_filter(app: AppHandle) -> Result<(), String> {
+    // Called right after the pop-up hides: wait for the game to be in front.
+    reload_in_game(&app, 1500)
+}
+
 /// While batch mode is on, every item you Ctrl+C in game is sent to the list.
 fn start_batch_watcher(app: AppHandle) {
     thread::spawn(move || {
@@ -440,6 +495,7 @@ fn set_batch_mode(app: AppHandle, on: bool) {
 pub fn run() {
     let f2 = Shortcut::new(None, Code::F2);
     let f3 = Shortcut::new(None, Code::F3);
+    let f4 = Shortcut::new(None, Code::F4);
 
     tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -452,6 +508,13 @@ pub fn run() {
                     }
                     if sc == &f2 {
                         quick_edit(app.clone());
+                    } else if sc == &f4 {
+                        let app = app.clone();
+                        thread::spawn(move || {
+                            if let Err(e) = reload_in_game(&app, 0) {
+                                let _ = app.emit("reload-failed", e);
+                            }
+                        });
                     } else if sc == &f3 {
                         let on = !BATCH_ON.load(Ordering::Relaxed);
                         set_batch_mode(app.clone(), on);
@@ -471,6 +534,7 @@ pub fn run() {
             app.manage(AppState { store: Mutex::new(Store::load(&store_path)), store_path });
             app.global_shortcut().register(f2)?;
             app.global_shortcut().register(f3)?;
+            app.global_shortcut().register(f4)?;
             start_batch_watcher(app.handle().clone());
 
             // Tray icon: the app lives here so hotkeys work while you play.
@@ -481,7 +545,7 @@ pub fn run() {
             let menu = Menu::with_items(app, &[&open, &quit])?;
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
-                .tooltip("PoE Filter Editor (F2 quick edit, F3 batch)")
+                .tooltip("PoE Filter Editor (F2 quick edit, F3 batch, F4 reload filter)")
                 .menu(&menu)
                 .on_menu_event(|app, e| match e.id.as_ref() {
                     "open" => {
@@ -513,6 +577,7 @@ pub fn run() {
             delete_profile,
             apply_quick_action,
             apply_custom_style,
+            reload_filter,
             list_sounds,
             sound_data,
             undo_last,

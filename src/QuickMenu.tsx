@@ -38,6 +38,13 @@ export default function QuickMenu() {
   const [toast, setToast] = useState("");
   const [anyRarity, setAnyRarity] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [autoReload, setAutoReload] = useState(() => {
+    try { return localStorage.getItem("autoReload") !== "off"; } catch { return true; }
+  });
+  const toggleAuto = (on: boolean) => {
+    setAutoReload(on);
+    try { localStorage.setItem("autoReload", on ? "on" : "off"); } catch { /* not saved */ }
+  };
   const editingRef = useRef(false);
   editingRef.current = editing;
   const box = useRef<HTMLDivElement | null>(null);
@@ -108,11 +115,20 @@ export default function QuickMenu() {
     refresh(p);
   };
 
+  /** After a change: either reload it in game straight away, or tell them how. */
+  const afterChange = async (message: string, warning?: string) => {
+    if (autoReload && !warning) {
+      await close();
+      invoke("reload_filter").catch(() => { /* game not in front: F4 reloads later */ });
+      return;
+    }
+    setToast(warning ?? `${message} Press F4 in game to reload.`);
+    if (picked) refresh(picked);
+  };
   const saved = async (call: Promise<{ label: string; warnings: string[] }>) => {
     try {
       const r = await call;
-      setToast(r.warnings[0] ?? "Saved. Type /itemfilter in chat to reload.");
-      if (picked) refresh(picked);
+      await afterChange("Saved.", r.warnings[0]);
     } catch (e) {
       setToast(String(e));
     }
@@ -143,9 +159,9 @@ export default function QuickMenu() {
   };
 
   const undo = async () => {
-    const r = await invoke<string | null>("undo_last").catch((e) => String(e));
-    setToast(r ? `Undone: ${r}` : "Nothing to undo");
-    if (picked) refresh(picked);
+    const r = await invoke<string | null>("undo_last").catch(() => null);
+    if (r) await afterChange(`Undone: ${r}.`);
+    else setToast("Nothing to undo");
   };
 
   if (failed) return <div className="qm" ref={box}><div className="qm-fail">{failed}</div></div>;
@@ -254,6 +270,11 @@ export default function QuickMenu() {
           Apply to every rarity, not just {item.rarity}
         </label>
       )}
+
+      <label className="qm-check">
+        <input type="checkbox" checked={autoReload} onChange={(e) => toggleAuto(e.target.checked)} />
+        Reload the filter in game after each change (F4 does it by hand)
+      </label>
 
       <div className="qm-foot">
         <button className="qm-link" onClick={undo}>Undo last</button>

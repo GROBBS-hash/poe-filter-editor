@@ -21,7 +21,7 @@ export default function Edits({ profile, onChange }: { profile: ProfileInfo; onC
         <h2>Edits in “{profile.name}”</h2>
         <button onClick={rebuild} title="Use after downloading a new NeverSink version">Rebuild</button>
       </div>
-      <p className="muted">In game, select <b>{profile.output_file.replace(".filter", "")}</b> as your filter. After changes, type <code>/itemfilter {profile.output_file.replace(".filter", "")}</code> in chat to reload it.</p>
+      <p className="muted">In game, select <b>{profile.output_file.replace(".filter", "")}</b> as your filter. After changes made here, press <b>F4</b> in game to reload it.</p>
       {profile.rules.length === 0 ? (
         <div className="empty">No edits yet. Hover an item in game and press F2.</div>
       ) : (
