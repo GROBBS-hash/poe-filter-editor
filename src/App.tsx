@@ -25,9 +25,10 @@ export default function App() {
     refresh();
     const a = listen("batch-mode", (e) => { if (e.payload) setTab("batch"); refresh(); });
     const c = listen("active-changed", () => refresh());
+    const d = listen("neversink-updated", () => refresh());
     const onFocus = () => refresh();
     window.addEventListener("focus", onFocus);
-    return () => { a.then((f) => f()); c.then((f) => f()); window.removeEventListener("focus", onFocus); };
+    return () => { a.then((f) => f()); c.then((f) => f()); d.then((f) => f()); window.removeEventListener("focus", onFocus); };
   }, [refresh]);
 
   if (!ov) return <div className="page">{error || "Loading…"}</div>;

@@ -25,6 +25,8 @@ export type ProfileInfo = {
   parent?: string | null;
   rules: { index: number; label: string }[];
   theme?: string | null;
+  strictness?: number | null;
+  base_version?: string | null;
 };
 
 export type Overview = {
@@ -58,3 +60,5 @@ export const itemSub = (i: Item) =>
   [i.name ? i.base_type : null, i.item_class, i.item_level ? `ilvl ${i.item_level}` : null,
    i.map_tier ? `T${i.map_tier}` : null, i.corrupted ? "Corrupted" : null]
     .filter(Boolean).join(" · ");
+
+export const STRICTNESS_NAMES = ["Soft", "Regular", "Semi-Strict", "Strict", "Very Strict", "Uber Strict", "Uber Plus Strict"];

@@ -5,6 +5,7 @@ use filter_core::{
     filter::{parse_filter, Segment},
     area::{find_log, read_area_level, selected_filter},
     ground::{ground_item, known_names, match_base, LabelColours},
+    neversink,
     item::{is_stackable, parse_item, resolve_magic_base, Item},
     prices::{default_settings, price_of, PriceFile, PriceSettings},
     profiles::{build_with_prices, Game, Settings, Store},
@@ -118,16 +119,65 @@ fn rebuild_priced(app: &AppHandle, games: &[Game]) {
     }
 }
 
-/// Hourly price updates in the background.
+/// Hourly price updates, and NeverSink updates every 6 hours, in the background.
 fn start_price_updates(app: AppHandle) {
-    thread::spawn(move || loop {
-        let changed = fetch_prices(&app);
-        if !changed.is_empty() {
-            rebuild_priced(&app, &changed);
-            let _ = app.emit("prices-updated", ());
+    thread::spawn(move || {
+        let mut hour = 0u32;
+        loop {
+            let changed = fetch_prices(&app);
+            if !changed.is_empty() {
+                rebuild_priced(&app, &changed);
+                let _ = app.emit("prices-updated", ());
+            }
+            if hour % 6 == 0 {
+                update_neversink(&app);
+            }
+            hour += 1;
+            thread::sleep(Duration::from_secs(60 * 60));
         }
-        thread::sleep(Duration::from_secs(60 * 60));
     });
+}
+
+fn neversink_path(state: &AppState, game: Game, level: u8) -> PathBuf {
+    state.data_dir.join("neversink").join(game_key(game)).join(neversink::file_name(game, level))
+}
+
+/// Downloads NeverSink's file for a strictness. Returns (path, version, changed).
+fn download_neversink(state: &AppState, game: Game, level: u8) -> Result<(PathBuf, Option<String>, bool), String> {
+    let path = neversink_path(state, game, level);
+    let body = ureq::get(&neversink::url(game, level)).set("User-Agent", "poe-filter-editor")
+        .timeout(Duration::from_secs(60)).call().map_err(|e| format!("Couldn't download NeverSink's filter: {e}"))?
+        .into_string().map_err(err)?;
+    if !neversink::looks_like_neversink(&body) {
+        return Err("The download didn't look like NeverSink's filter".into());
+    }
+    let old = std::fs::read_to_string(&path).ok();
+    let changed = old.as_deref().map(neversink::version_of) != Some(neversink::version_of(&body));
+    if changed || old.is_none() {
+        std::fs::create_dir_all(path.parent().unwrap()).map_err(err)?;
+        std::fs::write(&path, &body).map_err(err)?;
+    }
+    Ok((path, neversink::version_of(&body), changed))
+}
+
+/// Gets new NeverSink versions for every filter built on one, and rebuilds them.
+fn update_neversink(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let used: Vec<(Game, u8)> = {
+        let store = state.store.lock().unwrap();
+        let mut v: Vec<(Game, u8)> = store.profiles.values().filter_map(|p| p.strictness.map(|s| (p.game, s))).collect();
+        v.sort_by_key(|(g, s)| (game_key(*g), *s));
+        v.dedup();
+        v
+    };
+    for (game, level) in used {
+        if let Ok((_, version, true)) = download_neversink(&state, game, level) {
+            let store = state.store.lock().unwrap();
+            let ids: Vec<String> = store.profiles.values().filter(|p| p.game == game && p.strictness == Some(level)).map(|p| p.id.clone()).collect();
+            for id in ids { let _ = save_and_build(&state, &store, &id); }
+            let _ = app.emit("neversink-updated", version.unwrap_or_default());
+        }
+    }
 }
 
 static BATCH_ON: AtomicBool = AtomicBool::new(false);
@@ -368,6 +418,8 @@ struct ProfileInfo {
     parent: Option<String>,
     rules: Vec<RuleInfo>,
     theme: Option<String>,
+    strictness: Option<u8>,
+    base_version: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -400,6 +452,14 @@ fn overview(state: State<AppState>) -> Overview {
                 output_file: p.output_file.clone(),
                 parent: p.parent.clone(),
                 theme: p.theme.clone(),
+                strictness: p.strictness,
+                base_version: {
+                    use std::io::Read;
+                    let mut head = String::new();
+                    std::fs::File::open(filter_dir(p.game).join(&p.base_file)).ok()
+                        .and_then(|f| f.take(4096).read_to_string(&mut head).ok());
+                    neversink::version_of(&head)
+                },
                 rules: p
                     .rules
                     .iter()
@@ -671,6 +731,36 @@ fn list_themes(state: State<AppState>) -> ThemeList {
 }
 
 /// Picks a theme for a filter (None = NeverSink's own look) and rebuilds it.
+/// What a filter is built on: NeverSink at a strictness (downloaded and kept
+/// up to date), or a file of your own (e.g. a FilterBlade download).
+#[tauri::command]
+fn set_base(state: State<AppState>, id: String, strictness: Option<u8>, file_path: Option<String>) -> Result<Vec<String>, String> {
+    let game = state.store.lock().unwrap().profiles.get(&id).ok_or("Profile not found")?.game;
+    let (base_file, level) = match (strictness, file_path) {
+        (Some(level), _) => {
+            let level = level.min(6);
+            let (path, _, _) = download_neversink(&state, game, level)?;
+            (path.display().to_string(), Some(level))
+        }
+        (None, Some(f)) => {
+            let src = Path::new(&f);
+            let dir = filter_dir(game);
+            let name = src.file_name().ok_or("That isn't a file")?.to_string_lossy().to_string();
+            if src.parent() != Some(dir.as_path()) {
+                std::fs::create_dir_all(&dir).map_err(err)?;
+                std::fs::copy(src, dir.join(&name)).map_err(err)?;
+            }
+            (name, None)
+        }
+        _ => return Err("Pick a strictness or a file".into()),
+    };
+    let mut store = state.store.lock().unwrap();
+    let p = store.profiles.get_mut(&id).ok_or("Profile not found")?;
+    p.base_file = base_file;
+    p.strictness = level;
+    save_and_build(&state, &store, &id)
+}
+
 #[tauri::command]
 fn set_profile_theme(state: State<AppState>, id: String, name: Option<String>) -> Result<Vec<String>, String> {
     let mut store = state.store.lock().unwrap();
@@ -865,6 +955,7 @@ pub fn run() {
             item_price,
             list_themes,
             set_profile_theme,
+            set_base,
             save_theme,
             delete_theme,
             get_settings,

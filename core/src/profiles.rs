@@ -26,6 +26,10 @@ pub struct Profile {
     /// Colour theme for NeverSink's labels (None = NeverSink's own look).
     #[serde(default)]
     pub theme: Option<String>,
+    /// Built on NeverSink's own file at this strictness (0 Soft .. 6 Uber Plus),
+    /// downloaded and kept up to date by the app. None = your own file.
+    #[serde(default)]
+    pub strictness: Option<u8>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -81,7 +85,7 @@ impl Store {
         let id = slug(name);
         self.profiles.insert(id.clone(), Profile {
             id: id.clone(), name: name.into(), game, base_file: base_file.into(),
-            output_file: format!("{name}.filter"), parent: None, rules: vec![], prices: None, theme: None,
+            output_file: format!("{name}.filter"), parent: None, rules: vec![], prices: None, theme: None, strictness: None,
         });
         self.active.get_or_insert(id.clone());
         id
