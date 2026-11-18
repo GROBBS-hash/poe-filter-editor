@@ -94,6 +94,7 @@ fn look(size: u32, text: [u8; 4], border: [u8; 4], bg: [u8; 4], beam: &str, icon
         beam: Some(Beam { colour: beam.into(), temp: false }),
         minimap: Some(Minimap { size: icon.0, colour: icon.1.into(), shape: icon.2.into() }),
         sound,
+        label_hidden: false,
     }
 }
 

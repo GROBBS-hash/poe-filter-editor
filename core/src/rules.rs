@@ -133,6 +133,10 @@ pub struct CustomStyle {
     pub beam: Option<Beam>,
     pub minimap: Option<Minimap>,
     pub sound: Sound,
+    /// Icon & beam only: the label is shrunk and see-through, so only the
+    /// minimap icon and beam show.
+    #[serde(default)]
+    pub label_hidden: bool,
 }
 
 fn rgba(c: [u8; 4]) -> String { format!("{} {} {} {}", c[0], c[1], c[2], c[3]) }
@@ -144,12 +148,22 @@ fn pick<'a>(v: &str, list: &[&'a str], fallback: &'a str) -> &'a str {
 /// The filter lines for a custom look. Values are checked so a typo can
 /// never produce a filter the game rejects.
 pub fn style_actions(s: &CustomStyle) -> Vec<String> {
-    let mut a = vec![
-        format!("SetFontSize {}", s.font_size.clamp(1, 45)),
-        format!("SetTextColor {}", rgba(s.text)),
-        format!("SetBorderColor {}", rgba(s.border.unwrap_or([0, 0, 0, 0]))),
-        format!("SetBackgroundColor {}", rgba(s.background)),
-    ];
+    let clear = |c: [u8; 4]| [c[0], c[1], c[2], 0];
+    let mut a = if s.label_hidden {
+        vec![
+            "SetFontSize 1".to_string(),
+            format!("SetTextColor {}", rgba(clear(s.text))),
+            format!("SetBorderColor {}", rgba(clear(s.border.unwrap_or([0, 0, 0, 0])))),
+            format!("SetBackgroundColor {}", rgba(clear(s.background))),
+        ]
+    } else {
+        vec![
+            format!("SetFontSize {}", s.font_size.clamp(1, 45)),
+            format!("SetTextColor {}", rgba(s.text)),
+            format!("SetBorderColor {}", rgba(s.border.unwrap_or([0, 0, 0, 0]))),
+            format!("SetBackgroundColor {}", rgba(s.background)),
+        ]
+    };
     match &s.sound {
         Sound::Default => {}
         Sound::Off => a.push("DisableDropSound".into()),
@@ -360,6 +374,7 @@ mod tests {
             beam: Some(Beam { colour: "cyan".into(), temp: true }),
             minimap: Some(Minimap { size: 1, colour: "pink".into(), shape: "moon".into() }),
             sound: Sound::Builtin { id: "ShDivine".into(), volume: 250 },
+            label_hidden: false,
         };
         let mut segs = parse_filter("Show\n    BaseType == \"Chaos Orb\"\n    SetFontSize 20\n");
         apply(&mut segs, &[custom_rule(&item, &style, &MatchOpts::default())], "\n");
@@ -380,7 +395,7 @@ mod tests {
         let chaos = parse_item("Item Class: Stackable Currency\nRarity: Currency\nChaos Orb\n").unwrap();
         let hide_small = quick_rule(&gold, Action::Hide, None, &MatchOpts { below_stack: Some(500), ..Default::default() });
         let style = CustomStyle { font_size: 45, text: [255, 0, 0, 255], border: None, background: [0, 0, 0, 255],
-            beam: Some(Beam { colour: "Red".into(), temp: false }), minimap: None, sound: Sound::Default };
+            beam: Some(Beam { colour: "Red".into(), temp: false }), minimap: None, sound: Sound::Default, label_hidden: false };
         let big_chaos = custom_rule(&chaos, &style, &MatchOpts { min_stack: Some(3), ..Default::default() });
         let mut segs = parse_filter("Show\n    BaseType == \"Gold\" \"Chaos Orb\"\n    SetFontSize 30\n");
         apply(&mut segs, &[hide_small.clone(), big_chaos.clone()], "\n");
@@ -417,7 +432,7 @@ mod tests {
         // A unique belt style: switch to every rarity and a new colour.
         let belt = parse_item("Item Class: Belts\nRarity: Unique\nHeadhunter\nLeather Belt\n").unwrap();
         let style = CustomStyle { font_size: 40, text: [1, 2, 3, 255], border: None, background: [0, 0, 0, 255],
-            beam: None, minimap: None, sound: Sound::Default };
+            beam: None, minimap: None, sound: Sound::Default, label_hidden: false };
         let r = custom_rule(&belt, &style, &MatchOpts::default());
         assert_eq!(rule_detail(&r).unwrap().rarity.as_deref(), Some("Unique"));
         assert_eq!(rule_detail(&r).unwrap().style.font_size, Some(40));
@@ -431,7 +446,7 @@ mod tests {
     fn hide_small_and_style_big_gold_live_together() {
         let gold = parse_item("Item Class: Gold\nRarity: Currency\nGold\n").unwrap();
         let style = CustomStyle { font_size: 40, text: [0, 255, 0, 255], border: None, background: [0, 0, 0, 255],
-            beam: None, minimap: None, sound: Sound::Default };
+            beam: None, minimap: None, sound: Sound::Default, label_hidden: false };
         let mut rules = Vec::new();
         add_rule(&mut rules, quick_rule(&gold, Action::Hide, None, &MatchOpts { below_stack: Some(500), ..Default::default() }));
         add_rule(&mut rules, custom_rule(&gold, &style, &MatchOpts { min_stack: Some(500), ..Default::default() }));
@@ -452,9 +467,24 @@ mod tests {
     }
 
     #[test]
+    fn icon_and_beam_only() {
+        let style = CustomStyle { font_size: 40, text: [255, 0, 0, 255], border: Some([255, 0, 0, 255]), background: [0, 0, 0, 240],
+            beam: Some(Beam { colour: "Red".into(), temp: false }), minimap: Some(Minimap { size: 0, colour: "Red".into(), shape: "Star".into() }),
+            sound: Sound::Off, label_hidden: true };
+        let a = style_actions(&style);
+        assert!(a.contains(&"SetFontSize 1".to_string()));
+        assert!(a.contains(&"SetTextColor 255 0 0 0".to_string()));
+        assert!(a.contains(&"SetBackgroundColor 0 0 0 0".to_string()));
+        assert!(a.contains(&"PlayEffect Red".to_string()));
+        assert!(a.contains(&"MinimapIcon 0 Red Star".to_string()));
+        let st = crate::evaluate::style_of(&a);
+        assert!(st.label_hidden);
+    }
+
+    #[test]
     fn silent_no_beam_no_icon() {
         let style = CustomStyle { font_size: 99, text: [1, 2, 3, 255], border: None, background: [0, 0, 0, 0],
-            beam: None, minimap: None, sound: Sound::Off };
+            beam: None, minimap: None, sound: Sound::Off, label_hidden: false };
         let a = style_actions(&style);
         assert!(a.contains(&"SetFontSize 45".to_string()));
         assert!(a.contains(&"DisableDropSound".to_string()));
@@ -465,7 +495,7 @@ mod tests {
     #[test]
     fn custom_sound_file_is_sanitised() {
         let style = CustomStyle { font_size: 30, text: [1, 2, 3, 255], border: None, background: [0, 0, 0, 0],
-            beam: None, minimap: None, sound: Sound::Custom { file: "gold.wav\"\nHide".into(), volume: 900 } };
+            beam: None, minimap: None, sound: Sound::Custom { file: "gold.wav\"\nHide".into(), volume: 900 }, label_hidden: false };
         assert!(style_actions(&style).contains(&"CustomAlertSound \"gold.wavHide\" 300".to_string()));
     }
 }

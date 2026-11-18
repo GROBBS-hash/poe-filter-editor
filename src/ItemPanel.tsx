@@ -187,6 +187,12 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
     const sound = c.sound.kind === "Builtin" || c.sound.kind === "Custom" ? { ...c.sound, volume: 300 } : { kind: "Builtin" as const, id: "2", volume: 300 };
     saveStyle({ ...c, font_size: 45, sound });
   };
+  const iconOnly = () => {
+    const c = current();
+    saveStyle({ ...c, label_hidden: true, sound: { kind: "Off" },
+      beam: c.beam ?? { colour: "White", temp: false },
+      minimap: c.minimap ?? { size: 1, colour: "White", shape: "Circle" } });
+  };
   const quieter = () => {
     const c = current();
     saveStyle({ ...c, font_size: Math.max(18, c.font_size - 10), sound: { kind: "Off" }, beam: null });
@@ -279,8 +285,8 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
       {v ? (
         <div className={`qm-status ${shown(v.visibility) ? "is-shown" : "is-hidden"}`}>
           <div className="qm-status-top">
-            <span className="qm-pill">{shown(v.visibility) ? (v.visibility === "Minimal" ? "SHOWN SMALL" : "SHOWN") : "HIDDEN"}</span>
-            {shown(v.visibility) && (
+            <span className="qm-pill">{!shown(v.visibility) ? "HIDDEN" : st?.label_hidden ? "ICON ONLY" : v.visibility === "Minimal" ? "SHOWN SMALL" : "SHOWN"}</span>
+            {shown(v.visibility) && !st?.label_hidden && (
               <span className="qm-preview" style={{
                 color: rgba(st?.text, "#c8c8c8"),
                 borderColor: rgba(st?.border, "transparent"),
@@ -333,6 +339,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
 
       <div className="qm-row">
         <button id="qm-hide" className="qm-btn hide" onClick={hide}>Hide</button>
+        <button className="qm-btn" onClick={iconOnly} disabled={!status} title="No label: just the beam and minimap icon">Icon only</button>
         <button className="qm-btn" onClick={louder} disabled={!status}>Louder</button>
         <button className="qm-btn" onClick={quieter} disabled={!status}>Quieter</button>
       </div>

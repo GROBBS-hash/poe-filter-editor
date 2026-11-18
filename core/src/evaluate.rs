@@ -25,6 +25,8 @@ pub struct Style {
     pub sound_file: Option<String>, // custom sound, as written in the filter
     pub volume: Option<u32>,
     pub minimap_parts: Option<(u8, String, String)>, // (size, colour, shape)
+    /// Label shrunk and see-through: only the icon and beam show.
+    pub label_hidden: bool,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -214,7 +216,13 @@ fn apply_actions(b: &Block, s: &mut Style) -> bool {
 pub fn style_of(lines: &[String]) -> Style {
     let mut s = Style::default();
     apply_action_lines(lines, &mut s);
+    s.label_hidden = label_invisible(&s);
     s
+}
+
+fn label_invisible(s: &Style) -> bool {
+    s.font_size == Some(1) && s.text.map(|t| t[3] == 0).unwrap_or(false)
+        && s.background.map(|b| b[3] == 0).unwrap_or(true)
 }
 
 fn apply_action_lines(lines: &[String], s: &mut Style) -> bool {
@@ -311,6 +319,7 @@ pub fn evaluate(segs: &[Segment], c: &Ctx) -> Verdict {
             }
             Tri::Yes => {
                 let cont = apply_actions(b, &mut style);
+                style.label_hidden = label_invisible(&style);
                 if !cont {
                     let (decided_by, by_user_edit) = describe(b);
                     return Verdict { visibility: b.visibility.clone(), style, decided_by, by_user_edit, uncertain };

@@ -5,7 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 export type CurrentStyle = {
   font_size?: number | null; text?: number[] | null; border?: number[] | null; background?: number[] | null;
   muted: boolean; beam?: string | null; beam_temp?: boolean; sound_id?: string | null; sound_file?: string | null;
-  volume?: number | null; minimap_parts?: [number, string, string] | null;
+  volume?: number | null; minimap_parts?: [number, string, string] | null; label_hidden?: boolean;
 };
 
 type Sound =
@@ -18,6 +18,8 @@ export type CustomStyle = {
   beam: { colour: string; temp: boolean } | null;
   minimap: { size: number; colour: string; shape: string } | null;
   sound: Sound;
+  /** Icon & beam only: the label is shrunk and see-through. */
+  label_hidden: boolean;
 };
 
 export const GAME_COLOURS: Record<string, string> = {
@@ -34,11 +36,15 @@ const RARITY_TEXT: Record<string, number[]> = {
 /** Start the editor from exactly what the filter shows today. */
 export function fromCurrent(st: CurrentStyle | undefined, rarity: string): CustomStyle {
   const p = st?.minimap_parts;
+  const hidden = !!st?.label_hidden;
+  // An icon-only label is stored see-through; give it visible colours to come back to.
+  const solid = (c: number[] | null | undefined, fallback: number[]) => (c ? [c[0], c[1], c[2], hidden ? 255 : c[3] ?? 255] : fallback);
   return {
-    font_size: st?.font_size ?? 32,
-    text: st?.text ?? RARITY_TEXT[rarity] ?? [200, 200, 200, 255],
-    border: st?.border ?? null,
-    background: st?.background ?? [0, 0, 0, 240],
+    label_hidden: hidden,
+    font_size: hidden ? 36 : st?.font_size ?? 32,
+    text: solid(st?.text, RARITY_TEXT[rarity] ?? [200, 200, 200, 255]),
+    border: hidden ? null : st?.border ?? null,
+    background: hidden ? [0, 0, 0, 240] : st?.background ?? [0, 0, 0, 240],
     beam: st?.beam ? { colour: st.beam, temp: !!st.beam_temp } : null,
     minimap: p ? { size: p[0], colour: p[1], shape: p[2] } : null,
     sound: st?.muted ? { kind: "Off" }
@@ -53,6 +59,9 @@ const fromHex = (h: string, a = 255) => [1, 3, 5].map((i) => parseInt(h.slice(i,
 export const css = (c?: number[] | null) => (c ? `rgba(${c[0]},${c[1]},${c[2]},${(c[3] ?? 255) / 255})` : "transparent");
 
 export function Preview({ s, text }: { s: CustomStyle; text: string }) {
+  if (s.label_hidden) {
+    return <span className="se-preview se-ghost">no label · {[s.beam && `${s.beam.colour} beam`, s.minimap && "map icon"].filter(Boolean).join(" + ") || "nothing visible!"}</span>;
+  }
   return (
     <span className="se-preview" style={{
       color: css(s.text), borderColor: css(s.border), background: css(s.background),
@@ -106,6 +115,21 @@ export default function StyleEditor({ start, label, onSave, onCancel }: {
     <div className="se">
       <div className="se-top"><Preview s={s} text={label} /></div>
 
+      <div className="se-row se-mode">
+        <button className={!s.label_hidden ? "on" : ""} onClick={() => set({ label_hidden: false })}>Label shown</button>
+        <button className={s.label_hidden ? "on" : ""} onClick={() => set({
+          label_hidden: true,
+          // Make sure there's something to see.
+          beam: s.beam ?? { colour: "White", temp: false },
+          minimap: s.minimap ?? { size: 1, colour: "White", shape: "Circle" },
+        })}>Icon & beam only</button>
+      </div>
+      {s.label_hidden && (
+        <div className="se-hint">No label on screen; you'll see just the beam and minimap icon below.
+          {!s.beam && !s.minimap && <b> Pick a beam or icon, or you won't see it at all.</b>}</div>
+      )}
+
+      {!s.label_hidden && <>
       <div className="se-row">
         <span>Text</span>
         <input type="color" value={hex(s.text)} onChange={(e) => set({ text: fromHex(e.target.value) })} />
@@ -124,6 +148,7 @@ export default function StyleEditor({ start, label, onSave, onCancel }: {
         <input type="range" min={18} max={45} value={s.font_size} onChange={(e) => set({ font_size: +e.target.value })} />
         <span className="se-num">{s.font_size}</span>
       </div>
+      </>}
 
       <div className="se-label">Beam {s.beam && (
         <label className="se-inline"><input type="checkbox" checked={s.beam.temp}
