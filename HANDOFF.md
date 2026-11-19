@@ -94,9 +94,43 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   "Best strategies" averages per name. OAuth would need GGG to register the app, hence POESESSID (kept local).
   Not tested against the live site: realm for PoE 2 and the exact error shapes.
 
+## Still to check in game (keep this list current)
+Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
+(move them to "Confirmed in game") as he reports back, and add new features here as they land.
+Confirmed in game so far: basic Ctrl+D price check (trade search returned listings).
+
+**Price check (Ctrl+D)**
+- [ ] On a weapon and an armour piece: totals table (life/res/attributes etc.), pDPS/eDPS/total DPS and
+      armour/evasion/ES at 20% quality, "Minimums: exact / −10% / −20%" buttons. Results look sensible.
+- [ ] "Compared with your build (PoB)" box: right slot (both rings for a ring), numbers match the gear, folds away.
+- [ ] Prices shown in chaos and divines with orb icons; bulk "1 div ≈ N items".
+- [ ] Transfigured gem: searches without "Unknown item base type".
+- [ ] Foulborn / mutated unique searches correctly.
+- [ ] Save search, Saved searches list (Run / Live / delete); a live search pops up new listings with a Whisper button.
+
+**Maps**
+- [ ] Ctrl+D on a map: flags the mods on the "Map check" list; "Suggest from my build" picks sensible mods.
+- [ ] Maps page: stash regex highlights the right maps in game; "Find maps like this on trade" opens a working search
+      (the stat-line fragments and trade map filter names were never verified).
+- [ ] "Copy map regex" from the Ctrl+D map window.
+
+**Trade helper**
+- [ ] A trade whisper pops up without stealing focus from the game.
+- [ ] Invite / Trade / Thanks / Kick each type exactly one chat line in game; turns green when the buyer arrives.
+- [ ] Chat hotkeys (e.g. /hideout) work.
+
+**Ground reader (F2)**
+- [ ] 19 Nov fixes: our own pop-ups no longer get read as the item; names missing a letter are still found;
+      the "rarity unsure" note shows on NeverSink tiered gear.
+
+**Wealth page (Endgame → Wealth)**
+- [ ] Connect with account name + POESESSID; error message is clear if the POESESSID is wrong.
+- [ ] Scan whole stash: total, by-tab breakdown and history chart look right; "Worth selling" lists unlisted items.
+- [ ] Earnings session: tick dump tabs, start, overlay shows time / made / per hour, pause, stop & save,
+      "Best strategies" ranks runs.
+
 ## Left to do (agreed order)
-1. **GROBBS to test in game**: trade helper buttons (focus switch + typing), whisper pop-up not stealing focus,
-   chat hotkeys, live search pop-ups. Windows-only code (`focus_game`) couldn't be compiled in the cloud.
+1. **GROBBS to work through "Still to check in game" above**; fix what he reports.
 2. Wealth tracker follow-ups: test with GROBBS's real account; price rares via the trade site (slow) or poeprices;
    PoeStash-style "search every tab" and guild stash; crafting planner (parked).
 3. Price check polish ideas: group resistances "any resistance" (count group), collapse duplicate sellers, show price
