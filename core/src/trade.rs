@@ -291,7 +291,9 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
 /// The search to send to the trade site.
 pub fn query(s: &TradeSetup) -> Value {
     let it = &s.item;
-    let mut q = json!({ "status": { "option": "online" } });
+    // "Instant Buyout and In Person", like the trade site's default: instant buyout
+    // listings are real prices the seller can't refuse.
+    let mut q = json!({ "status": { "option": "available" } });
     let mut foulborn = false;
     if it.rarity == "Unique" {
         // "Foulborn Ghostwrithe" is listed as Ghostwrithe with the Foulborn switch on.
@@ -343,6 +345,8 @@ pub struct Listing {
     pub indexed: String,
     pub whisper: String,
     pub ilvl: Option<u32>,
+    /// Instant buyout (from the seller's merchant tab): buy it from the trade site or in game, no whisper.
+    pub instant: bool,
 }
 
 /// Reads the trade site's fetch answer.
@@ -359,6 +363,7 @@ pub fn listings(fetched: &Value, rates: &HashMap<String, f64>) -> Vec<Listing> {
             indexed: l["indexed"].as_str().unwrap_or("").to_string(),
             whisper: l["whisper"].as_str().unwrap_or("").to_string(),
             ilvl: r["item"]["ilvl"].as_u64().map(|v| v as u32),
+            instant: l.get("fee").is_some() || l["whisper"].as_str().map(str::is_empty).unwrap_or(true),
         })
     }).collect()
 }

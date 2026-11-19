@@ -7,7 +7,7 @@ type Whisper = { time: string; from: string; message: string; item: string | nul
   tab: string | null; left: number | null; top: number | null };
 type LogEvent = ({ kind: "whisper" } & Whisper) | { kind: "joined"; name: string } | { kind: "left"; name: string };
 type Entry = { id: number; w: Whisper; here: boolean; pressed: string[]; at: number };
-type Listing = { amount: number; currency: string; chaos: number | null; account: string; indexed: string; whisper: string; ilvl: number | null };
+type Listing = { amount: number; currency: string; chaos: number | null; account: string; indexed: string; whisper: string; instant?: boolean; ilvl: number | null };
 type Hit = { id: number; search: string; listings: Listing[]; url: string; at: number; sent: number[] };
 
 const BUTTONS: [string, string, string][] = [
@@ -91,7 +91,7 @@ export default function TradesWindow() {
             <div key={i} className="th-live-row">
               <span className="th-price">{+l.amount.toFixed(2)} {l.currency}</span>
               <span className="muted small">{l.account}</span>
-              {l.whisper && <button className={h.sent.includes(i) ? "done" : ""} onClick={() => whisper(h, i)} title="Send the seller the trade whisper in game">Whisper</button>}
+              {l.instant ? <span className="tw-instant">Instant</span> : l.whisper && <button className={h.sent.includes(i) ? "done" : ""} onClick={() => whisper(h, i)} title="Send the seller the trade whisper in game">Whisper</button>}
             </div>
           ))}
           <div className="muted small">{since(h.at, now)} · <button className="link small" onClick={() => invoke("open_url", { url: h.url })}>Open on the trade site</button></div>

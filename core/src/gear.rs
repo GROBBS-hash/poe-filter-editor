@@ -97,7 +97,7 @@ fn score(p: &Pick, skill: &[String]) -> usize {
 /// A pathofexile.com trade search for this unique, in a league ("Standard" if unknown).
 pub fn trade_url(league: &str, name: &str, base: &str) -> String {
     let q = serde_json::json!({
-        "query": { "status": { "option": "online" }, "name": name, "type": base },
+        "query": { "status": { "option": "available" }, "name": name, "type": base },
         "sort": { "price": "asc" }
     });
     let enc = |s: &str| s.bytes().map(|b| match b {

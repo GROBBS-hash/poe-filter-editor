@@ -12,7 +12,7 @@ type MapInfo = { mods: { text: string; warn: string | null }[]; unidentified: bo
 type Check = { setup: Setup | null; ninja: [number, string] | null; league: string; from_ground: boolean; error: string | null; bulk?: string | null; map?: MapInfo | null; divine?: number | null };
 type Offer = { pay: number; pay_currency: string; get: number; get_currency: string; each: number; stock: number; account: string; whisper: string };
 type Bulk = { offers: Offer[]; url: string; divine: number | null };
-type Listing = { amount: number; currency: string; chaos: number | null; account: string; indexed: string; whisper: string; ilvl: number | null };
+type Listing = { amount: number; currency: string; chaos: number | null; account: string; indexed: string; whisper: string; instant?: boolean; ilvl: number | null };
 type Result = { listings: Listing[]; summary: [number, number] | null; total: number; url: string; divine: number | null };
 
 const UNIT: Record<string, string> = { chaos: "c", exalted: "ex", divine: "div" };
@@ -286,7 +286,8 @@ export default function TradeWindow() {
       {res && (
         <div className="tw-res">
           <div className="tw-sum">
-            {res.summary ? <>Around <b>{money(res.summary[1], divine)}</b> <span className="muted small">· cheapest {money(res.summary[0], divine)} · {res.total} listed</span></>
+            {res.summary ? <>Around <b><Price n={res.summary[1]} cur="chaos" /></b> <Other n={res.summary[1]} cur="chaos" divine={divine} />
+              <span className="muted small"> · cheapest {money(res.summary[0], divine)} · {res.total} listed</span></>
               : res.total === 0 ? <>None listed like this. Untick a stat or two.</> : <>{res.total} listed</>}
           </div>
           <ul className="tw-list">
@@ -295,7 +296,8 @@ export default function TradeWindow() {
                 <span className="tw-price"><Price n={l.amount} cur={l.currency} /></span>
                 <span className="muted small"><Other n={l.amount} cur={l.currency} divine={divine} />{l.ilvl ? ` · ilvl ${l.ilvl}` : ""} · {ago(l.indexed)}</span>
                 <span className="tw-seller muted small">{l.account}</span>
-                {l.whisper && <button className="link small" onClick={() => copy(l.whisper, "l" + i)}>
+                {l.instant ? <span className="tw-instant" title="Instant buyout: buy it straight from the trade site or the in-game market, no whisper">Instant</span>
+                  : l.whisper && <button className="link small" onClick={() => copy(l.whisper, "l" + i)}>
                   {copied === "l" + i ? "Copied" : "Whisper"}</button>}
               </li>
             ))}

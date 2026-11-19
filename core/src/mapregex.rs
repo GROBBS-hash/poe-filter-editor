@@ -164,7 +164,7 @@ pub fn trade_query(mods: &[MapModEntry], bad: &[i64], w: &MapWants) -> Value {
         "map_filters": { "filters": map_f },
     });
     if misc.as_object().map(|o| !o.is_empty()).unwrap_or(false) { filters["misc_filters"] = json!({ "filters": misc }); }
-    json!({ "query": { "status": { "option": "online" }, "filters": filters, "stats": stats }, "sort": { "price": "asc" } })
+    json!({ "query": { "status": { "option": "available" }, "filters": filters, "stats": stats }, "sort": { "price": "asc" } })
 }
 
 /// The mods to tick by default: those matching your map check list (None = all known dangers).

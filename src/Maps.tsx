@@ -6,7 +6,7 @@ type MapMod = { id: number; text: string; token: string; scary: number; nightmar
 type Wants = { quantity: number | null; pack_size: number | null; rarity: number | null; more_maps: number | null; more_currency: number | null;
   more_scarabs: number | null; more_cards: number | null; tier_min: number | null; kind: string; corrupted_ok: boolean };
 type ToolState = { mods: MapMod[]; bad: number[]; wants: Wants; source: string };
-type Listing = { amount: number; currency: string; chaos: number | null; account: string; indexed: string; whisper: string };
+type Listing = { amount: number; currency: string; chaos: number | null; account: string; indexed: string; whisper: string; instant?: boolean };
 type Result = { listings: Listing[]; summary: [number, number] | null; total: number; url: string; divine: number | null };
 
 /** The stash search box takes up to 250 characters. */
@@ -113,7 +113,8 @@ export default function Maps() {
               {res.listings.map((l, i) => (
                 <li key={i}><b>{+l.amount.toFixed(2)}</b>{["chaos", "divine"].includes(l.currency) ? <CurrencyIcon id={l.currency} /> : ` ${l.currency}`}
                   <span className="muted small">{l.account}</span>
-                  {l.whisper && <button className="link small" onClick={() => invoke("copy_text", { text: l.whisper })}>Copy whisper</button>}</li>
+                  {l.instant ? <span className="tw-instant">Instant</span>
+                    : l.whisper && <button className="link small" onClick={() => invoke("copy_text", { text: l.whisper })}>Copy whisper</button>}</li>
               ))}
             </ul>
           </div>
