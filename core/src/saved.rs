@@ -77,7 +77,7 @@ mod tests {
 
     fn setup() -> TradeSetup {
         let item = parse_item("Item Class: Rings\nRarity: Rare\nDoom Loop\nRuby Ring\n--------\nItem Level: 84\n--------\n+40 to maximum Life\n").unwrap();
-        TradeSetup { item, filters: vec![], base_only: false, ilvl_min: None, links_min: None, gem_level: None, unknown: vec![], category: None, raw: String::new() }
+        TradeSetup { item, filters: vec![], base_only: false, ilvl_min: None, links_min: None, gem_level: None, unknown: vec![], unknown_kinds: vec![], category: None, raw: String::new() }
     }
 
     #[test]

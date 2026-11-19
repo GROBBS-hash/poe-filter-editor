@@ -6,7 +6,7 @@ import { CurrencyIcon, ItemIcon } from "./icons";
 import { Item, RARITY_COLOUR, itemTitle } from "./types";
 
 type StatFilter = { id: string; label: string; value: number; min: number | null; enabled: boolean; kind: string; tier: number | null; junk?: boolean };
-type Setup = { item: Item; filters: StatFilter[]; base_only: boolean; ilvl_min: number | null; links_min: number | null;
+type Setup = { item: Item; filters: StatFilter[]; unknown_kinds?: string[]; base_only: boolean; ilvl_min: number | null; links_min: number | null;
   gem_level: number | null; unknown: string[]; category: string | null; raw?: string };
 type MapInfo = { mods: { text: string; warn: string | null }[]; unidentified: boolean; tier: number | null; stats: string[] };
 type Check = { setup: Setup | null; ninja: [number, string] | null; league: string; from_ground: boolean; error: string | null; bulk?: string | null; map?: MapInfo | null; divine?: number | null };
@@ -223,7 +223,15 @@ export default function TradeWindow() {
           onClick={() => { const s = { ...setup, base_only: true, filters: setup.filters.map((f) => ({ ...f, enabled: f.kind === "fractured" })) }; setSetup(s); run(s); }}>
           Search {it.base_type} with just its fractured mods</button>
       )}
-      {setup.unknown.length > 0 && <div className="muted small tw-unknown" title={setup.unknown.join("\n")}>{setup.unknown.length} mod{setup.unknown.length > 1 ? "s" : ""} not searchable</div>}
+      {setup.unknown.length > 0 && (
+        <div className="tw-unknown">
+          {setup.unknown.map((u, i) => {
+            const k = setup.unknown_kinds?.[i] ?? "explicit";
+            return <div key={i} className={`tw-label mod-${k} small`} title="The trade site has no search for this mod">
+              {u}{KIND[k] && <span className="tw-kind">{KIND[k]}</span>}<span className="tw-kind">not searchable</span></div>;
+          })}
+        </div>
+      )}
 
       {!check.bulk && <div className="tw-opts">
         {setup.category && it.rarity !== "Unique" && (

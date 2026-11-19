@@ -58,6 +58,9 @@ pub struct TradeSetup {
     pub gem_level: Option<u32>,
     /// Mods the trade site's list doesn't know (shown, not searched).
     pub unknown: Vec<String>,
+    /// Their kinds ("mutated" = Foulborn…), same order, for colouring.
+    #[serde(default)]
+    pub unknown_kinds: Vec<String>,
     /// Trade site category for the item class ("armour.helmet").
     pub category: Option<String>,
     /// The copied item text (for poeprices.info).
@@ -79,7 +82,7 @@ impl StatIndex {
                 let (Some(id), Some(text), Some(kind)) = (e["id"].as_str(), e["text"].as_str(), e["type"].as_str()) else { continue };
                 // Stats with a fixed option list ("Allocates #") are searched differently: skip.
                 if e.get("option").is_some() { continue; }
-                by_text.entry((kind.to_string(), text.to_lowercase())).or_insert_with(|| id.to_string());
+                by_text.entry((kind.to_string(), text.replace('\n', " ").to_lowercase())).or_insert_with(|| id.to_string());
             }
         }
         StatIndex { by_text }
@@ -166,7 +169,17 @@ pub fn mods(text: &str) -> Vec<ModLine> {
         }
         let mut header_kind: Option<String> = None;
         let mut header_tier: Option<u32> = None;
+        // A mod written over two lines: the second starts in lower case ("…in Radius" / "also grant…").
+        let mut joined: Vec<String> = Vec::new();
         for l in sec {
+            let starts_low = l.chars().next().map(|c| c.is_lowercase()).unwrap_or(false);
+            match joined.last_mut() {
+                Some(prev) if starts_low && !prev.starts_with('{') && !prev.starts_with('(') => { prev.push(' '); prev.push_str(l); }
+                _ => joined.push(l.to_string()),
+            }
+        }
+        for l in &joined {
+            let l = l.as_str();
             if l.starts_with('{') {
                 // { Prefix Modifier "Hale" (Tier: 7) — Life }
                 let low = l.to_lowercase();
@@ -251,6 +264,7 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
     let lines = mods(text);
     let mut filters = Vec::new();
     let mut unknown = Vec::new();
+    let mut unknown_kinds = Vec::new();
     let unique = item.rarity == "Unique";
     let foulborn = item.name.as_deref().map(|n| n.starts_with("Foulborn ")).unwrap_or(false);
     let ps = pseudo(&lines);
@@ -264,7 +278,7 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
     for (i, m) in lines.iter().enumerate() {
         // Foulborn uniques' special mods are on the site's "mutated" list.
         let found = if foulborn { index.find(&ModLine { kind: "mutated".into(), ..m.clone() }).or_else(|| index.find(m)) } else { index.find(m) };
-        let Some((id, value)) = found else { unknown.push(m.text.clone()); continue };
+        let Some((id, value)) = found else { unknown.push(m.text.clone()); unknown_kinds.push(m.kind.clone()); continue };
         // Found on the mutated list = a Foulborn mod (shown in its own colour).
         let kind = if id.starts_with("mutated.") { "mutated".to_string() } else { m.kind.clone() };
         let (t, _) = template(&m.text);
@@ -288,7 +302,7 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
         ilvl_min: (gear && nothing_picked && item.rarity != "Unique").then_some(item.item_level).flatten(),
         links_min: (links >= 5).then_some(links),
         gem_level,
-        filters, unknown, item, raw: text.to_string(),
+        filters, unknown, unknown_kinds, item, raw: text.to_string(),
     })
 }
 
@@ -597,6 +611,22 @@ Item Level: 75
         let o = offers(&v);
         assert_eq!((o[0].each, o[0].stock), (180.0, 10));
         assert_eq!(o[0].whisper, "@Bob Hi, I'd like to buy your 2 Divine Orb for my 360 Chaos Orb in Keepers.");
+    }
+
+    #[test]
+    fn foulborn_two_line_mod() {
+        let text = "Item Class: Jewels\nRarity: Unique\nFoulborn The Red Dream\nCrimson Jewel\n--------\nLimited to: 1\nRadius: Large\n--------\nItem Level: 85\n--------\n{ Unique Modifier — Damage, Elemental, Fire, Chaos }\nGain 6(6-10)% of Fire Damage as Extra Chaos Damage\n{ Foulborn Unique Modifier — Life, Elemental, Fire }\nPassives granting Fire Resistance or all Elemental Resistances in Radius\nalso grant increased Maximum Life at 50% of its value\n--------\nWe flow like blood into Chayula's open mouth,\nand spill into the land we have watched forever.\n--------\nPlace into an allocated Jewel Socket on the Passive Skill Tree. Right click to remove from the Socket.\n";
+        let m = mods(text);
+        assert_eq!(m.len(), 2);
+        assert_eq!(m[1].text, "Passives granting Fire Resistance or all Elemental Resistances in Radius also grant increased Maximum Life at 50% of its value");
+        assert_eq!(m[1].kind, "mutated");
+        let idx = StatIndex::from_json(&json!({ "result": [ { "label": "Mutated", "entries": [
+            { "id": "mutated.stat_rd", "text": "Passives granting Fire Resistance or all Elemental Resistances in Radius\nalso grant increased Maximum Life at #% of its value", "type": "mutated" } ] } ] }));
+        let s = setup(text, &idx).unwrap();
+        assert!(s.filters.iter().any(|f| f.id == "mutated.stat_rd" && f.kind == "mutated"));
+        // Not on the list: still kept, marked Foulborn.
+        let s = setup(text, &StatIndex::default()).unwrap();
+        assert_eq!(s.unknown_kinds, ["explicit", "mutated"]);
     }
 
     #[test]

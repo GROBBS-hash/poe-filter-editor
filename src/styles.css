@@ -691,3 +691,4 @@ input[type=range] { accent-color: var(--gold); }
 .tw-label.mod-enchant { color: #b8daf2; }
 .tw-label.mod-implicit { color: #c8c8ff; }
 button.link.tw-fract { display: block; margin: 4px 0; color: #c9b27a; }
+.tw-unknown .tw-label { padding: 3px 8px; opacity: 0.85; }
