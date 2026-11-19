@@ -197,6 +197,11 @@ pub fn statics(data_dir: &Path, poe2: bool) -> Result<filter_core::trade::Static
     Ok(filter_core::trade::StaticIndex::from_json(&*data(data_dir, poe2, "static")?))
 }
 
+/// The trade site's item list (for transfigured gems' search names).
+pub fn item_types(data_dir: &Path, poe2: bool) -> Result<filter_core::trade::ItemTypes, String> {
+    Ok(filter_core::trade::ItemTypes::from_json(&*data(data_dir, poe2, "items")?))
+}
+
 /// Bulk exchange search; returns (search id, answer).
 pub fn exchange(poe2: bool, league: &str, query: &Value) -> Result<(String, Value), String> {
     let url = format!("{}/exchange/{}", api_base(poe2), enc(league));

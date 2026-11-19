@@ -400,6 +400,35 @@ impl StaticIndex {
     pub fn id(&self, name: &str) -> Option<String> { self.by_name.get(&name.to_lowercase()).cloned() }
 }
 
+/// Item names the trade site searches differently from how the game writes them:
+/// transfigured gems ("Scourge Arrow of Menace" = type "Scourge Arrow" + a
+/// discriminator), from api/trade/data/items.
+#[derive(Debug, Default)]
+pub struct ItemTypes { by_text: HashMap<String, (String, String)> }
+
+impl ItemTypes {
+    pub fn from_json(v: &Value) -> ItemTypes {
+        let mut by_text = HashMap::new();
+        for group in v["result"].as_array().into_iter().flatten() {
+            for e in group["entries"].as_array().into_iter().flatten() {
+                if let (Some(t), Some(text), Some(disc)) = (e["type"].as_str(), e["text"].as_str(), e["disc"].as_str()) {
+                    if e.get("name").is_none() { by_text.entry(text.to_lowercase()).or_insert_with(|| (t.to_string(), disc.to_string())); }
+                }
+            }
+        }
+        ItemTypes { by_text }
+    }
+
+    /// Rewrites a search's plain type ("Scourge Arrow of Menace") into the form the
+    /// trade site wants ({option: "Scourge Arrow", discriminator: "alt_x"}).
+    pub fn fix_query(&self, q: &mut Value) {
+        let Some(t) = q["query"]["type"].as_str() else { return };
+        if let Some((ty, disc)) = self.by_text.get(&t.to_lowercase()) {
+            q["query"]["type"] = json!({ "option": ty, "discriminator": disc });
+        }
+    }
+}
+
 /// A bulk exchange search: people selling `want` for `have`.
 pub fn exchange_query(have: &str, want: &str, minimum: Option<u32>) -> Value {
     let mut q = json!({ "status": { "option": "online" }, "have": [have], "want": [want] });
@@ -549,6 +578,20 @@ Item Level: 75
         let o = offers(&v);
         assert_eq!((o[0].each, o[0].stock), (180.0, 10));
         assert_eq!(o[0].whisper, "@Bob Hi, I'd like to buy your 2 Divine Orb for my 360 Chaos Orb in Keepers.");
+    }
+
+    #[test]
+    fn transfigured_gems() {
+        let items = json!({ "result": [{ "label": "Gems", "entries": [
+            { "type": "Scourge Arrow", "text": "Scourge Arrow" },
+            { "type": "Scourge Arrow", "text": "Scourge Arrow of Menace", "disc": "alt_x" } ] }] });
+        let types = ItemTypes::from_json(&items);
+        let mut q = json!({ "query": { "type": "Scourge Arrow of Menace" } });
+        types.fix_query(&mut q);
+        assert_eq!(q["query"]["type"], json!({ "option": "Scourge Arrow", "discriminator": "alt_x" }));
+        let mut q = json!({ "query": { "type": "Scourge Arrow" } });
+        types.fix_query(&mut q);
+        assert_eq!(q["query"]["type"], "Scourge Arrow");
     }
 
     #[test]

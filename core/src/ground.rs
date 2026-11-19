@@ -69,7 +69,8 @@ pub fn rarity_from_colour_sure(c: [u8; 3]) -> Option<&'static str> {
 /// but the words alone in a sentence, "item level and…", don't count).
 pub fn is_item_level(line: &str) -> bool {
     let l = line.to_lowercase().replace(' ', "");
-    l.starts_with("itemlevel") && (l.chars().any(|c| c.is_ascii_digit()) || l.ends_with(':'))
+    // "item level 68+" is a filter rule's wording (our own pop-up), not the game's box.
+    l.starts_with("itemlevel") && !l.contains('+') && (l.chars().any(|c| c.is_ascii_digit()) || l.ends_with(':'))
 }
 
 /// Reads the hover box the game shows for a ground item: lines top to bottom,
@@ -86,7 +87,10 @@ pub fn from_tooltip(lines: &[(String, Option<[u8; 3]>)], known: &HashSet<String>
         let Some(m) = match_base(&lines[i].0, known) else { continue };
         // Close reads and cut-off names count; a bare word that's merely part of
         // one name ("Sceptre", the item type under the name) doesn't.
-        if m.confidence < 0.7 || (m.confidence - 0.75).abs() < 1e-6 { continue; }
+        // But a long read that's nearly the whole name ("HROATSTABBER") is the name with a letter lost.
+        let part = (m.confidence - 0.75).abs() < 1e-6;
+        let nearly_whole = compact(&lines[i].0).len() >= 8 && compact(&lines[i].0).len() * 10 >= compact(&m.base).len() * 8;
+        if m.confidence < 0.7 || (part && !nearly_whole) { continue; }
         let rarity = lines[i].1.and_then(rarity_from_colour_sure).map(String::from);
         // Most of the line should be the name, not a stat that happens to contain one
         // (magic names are long: "Glimmering Opal Sceptre of Embers", so blue lines may be).
@@ -319,6 +323,17 @@ pub fn guess_rarity_links(segs: &[Segment], item: &Item, label: Option<LabelColo
     best.map(|(_, r, s)| (r.to_string(), s.map(String::from))).unwrap_or_else(|| ("Normal".into(), None))
 }
 
+/// True when your filter draws this item the same for more than one rarity, so the
+/// label alone can't say which it is (NeverSink's tiered gear looks alike for white,
+/// blue and yellow items).
+pub fn rarity_ambiguous(segs: &[Segment], item: &Item, label: Option<LabelColours>, area_level: u32) -> bool {
+    let Some(seen) = label else { return true };
+    let d: Vec<i32> = ["Normal", "Magic", "Rare", "Unique"].iter()
+        .map(|r| label_distance(segs, item, seen, area_level, r, None)).collect();
+    let best = *d.iter().min().unwrap_or(&0);
+    d.iter().filter(|x| **x <= best + 300).count() > 1
+}
+
 /// How far the label seen on screen is from how your filter would draw this
 /// item at a given rarity (0 = identical; hidden looks count as very far).
 pub fn label_distance(segs: &[Segment], item: &Item, seen: LabelColours, area_level: u32, rarity: &str, sockets: Option<&str>) -> i32 {
@@ -363,6 +378,31 @@ mod tests {
     }
 
     #[test]
+    fn rarity_unsure_when_filter_looks_alike() {
+        let f = "Show\n\tRarity Normal Magic Rare\n\tSetTextColor 0 240 190 255\n\tSetBackgroundColor 0 75 30 255\n";
+        let segs = parse_filter(f);
+        let it = Item { base_type: "Dragonscale Gauntlets".into(), item_class: "Gloves".into(), rarity: "Normal".into(), ..Default::default() };
+        let seen = LabelColours { text: [0, 240, 190], background: [0, 75, 30] };
+        assert!(rarity_ambiguous(&segs, &it, Some(seen), 70));
+        let f = "Show\n\tRarity Magic\n\tSetTextColor 0 240 190 255\n\tSetBackgroundColor 0 75 30 255\nShow\n\tRarity Normal Rare\n\tSetTextColor 200 200 200 255\n";
+        assert!(!rarity_ambiguous(&parse_filter(f), &it, Some(seen), 70));
+    }
+
+    #[test]
+    fn hover_box_name_missing_a_letter() {
+        // Snapshot read-1795000292: label washed out, hover box read "HROATSTABBER".
+        let mut k = known();
+        k.insert("Throat Stabber".into());
+        let l = |t: &str| (t.to_string(), Some([247u8, 247, 247]));
+        let lines = vec![(String::from("HROATSTABBER"), Some([255u8, 255, 255])), l("CLAW"), l("PHYSICAL DAMA"), l("ITEM LEVEL: 63")];
+        let t = from_tooltip(&lines, &k).unwrap();
+        assert_eq!((t.found.base.as_str(), t.item_level), ("Throat Stabber", Some(63)));
+        // A short piece of a name on its own still doesn't count.
+        let lines = vec![l("CLAW"), l("ITEM LEVEL: 63")];
+        assert!(from_tooltip(&lines, &k).is_none());
+    }
+
+    #[test]
     fn hover_box_rarity_must_fit_the_label() {
         let f = "Show\n\tRarity Unique\n\tSetTextColor 255 0 0 255\n\tSetBackgroundColor 255 255 255 255\n\nShow\n\tRarity Normal\n\tSetTextColor 200 200 200 255\n\tSetBackgroundColor 0 0 0 255\n";
         let segs = parse_filter(f);
@@ -389,6 +429,7 @@ mod tests {
         assert_eq!(match_base("THRdAT STABBE}Ü", &k).unwrap().base, "Throat Stabber");
         assert_eq!(match_base("NOBLE CLAM", &k).unwrap().base, "Noble Claw");
         assert!(is_item_level("ITEM LEVEL: 61") && is_item_level("ITEM LEVEL:") && !is_item_level("item level and"));
+        assert!(!is_item_level("item tier 2+, item level 68+") && !is_item_level("item level 68+"));
         k.insert("Hope".into());
         k.insert("Karui Chopper".into());
         k.insert("Moon Orb".into());

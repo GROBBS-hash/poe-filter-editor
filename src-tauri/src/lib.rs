@@ -300,6 +300,9 @@ struct Picked {
     from_screen: bool,
     screen_text: Option<String>,
     confidence: f32,
+    /// Read off the ground and your filter draws its rarities alike: we can't tell which.
+    #[serde(default)]
+    rarity_unsure: bool,
 }
 
 /// No item text on the clipboard: read the ground label under the mouse instead.
@@ -307,6 +310,14 @@ fn read_from_ground(app: &AppHandle) -> Result<Picked, String> {
     let (live, base) = active_filters(app).ok_or("Set up a filter first")?;
     let names = known_names(&known_bases(&base));
     let accept = |t: &str| match_base(t, &names).is_some();
+    // Our own pop-ups must not be in the picture (their text was being read as a hover box).
+    let mut hid = false;
+    for label in ["overlay", "trade"] {
+        if let Some(w) = app.get_webview_window(label) {
+            if w.is_visible().unwrap_or(false) { let _ = w.hide(); hid = true; }
+        }
+    }
+    if hid { thread::sleep(Duration::from_millis(120)); }
     let (read, tip_lines) = screen::read_ground(&accept)?;
     // The game's hover box: bigger and clearer than the label, and it says the rarity.
     let tip = filter_core::ground::from_tooltip(&tip_lines, &names);
@@ -339,9 +350,15 @@ fn read_from_ground(app: &AppHandle) -> Result<Picked, String> {
     let colours = read.colours.map(|(text, background)| LabelColours { text, background });
     let mut item = ground_item(&live, &m, colours, area_level(app).unwrap_or_else(|| fallback_area_level(app)));
     let area = area_level(app).unwrap_or_else(|| fallback_area_level(app));
-    if let Some(t) = &tip { filter_core::ground::apply_tooltip_checked(&live, &mut item, t, colours, area); }
+    let mut rarity_unsure = filter_core::item::is_gear(&item) && m.unique.is_none()
+        && filter_core::ground::rarity_ambiguous(&live, &item, colours, area);
+    if let Some(t) = &tip {
+        filter_core::ground::apply_tooltip_checked(&live, &mut item, t, colours, area);
+        // The hover box's name colour settles it.
+        if t.rarity.is_some() || t.found.unique.is_some() { rarity_unsure = false; }
+    }
     let text = if read.text.trim().is_empty() { m.base.clone() } else { read.text.clone() };
-    Ok(Picked { item, from_screen: true, screen_text: Some(text), confidence: m.confidence })
+    Ok(Picked { item, from_screen: true, screen_text: Some(text), confidence: m.confidence, rarity_unsure })
 }
 
 /// The screen (x, y, width, height) the point is on, or the first screen.
@@ -414,7 +431,7 @@ fn quick_edit(app: AppHandle) {
         let _ = app.clipboard().write_text(before);
         // Inventory/stash: the game copied the item. Ground: read the label instead.
         let picked = match read_item(&app, &text) {
-            Some(item) => Ok(Picked { item, from_screen: false, screen_text: None, confidence: 1.0 }),
+            Some(item) => Ok(Picked { item, from_screen: false, screen_text: None, confidence: 1.0, rarity_unsure: false }),
             None => read_from_ground(&app),
         };
         match picked {
@@ -549,6 +566,13 @@ fn currency_rates(app: &AppHandle) -> std::collections::HashMap<String, f64> {
     filter_core::trade::rates(|name| f.and_then(|f| price_of(f, None, name, "Currency")))
 }
 
+/// The trade site search for a price window setup (with transfigured gems' search names).
+fn trade_query(app: &AppHandle, poe2: bool, setup: &filter_core::trade::TradeSetup) -> serde_json::Value {
+    let mut q = filter_core::trade::query(setup);
+    if let Ok(types) = trade_api::item_types(&app.state::<AppState>().data_dir, poe2) { types.fix_query(&mut q); }
+    q
+}
+
 /// When you last price checked by hand: live searches wait so yours go first.
 static LAST_MANUAL: Mutex<Option<std::time::Instant>> = Mutex::new(None);
 
@@ -557,7 +581,7 @@ static LAST_MANUAL: Mutex<Option<std::time::Instant>> = Mutex::new(None);
 fn trade_search(app: AppHandle, setup: filter_core::trade::TradeSetup) -> Result<TradeResult, String> {
     *LAST_MANUAL.lock().unwrap() = Some(std::time::Instant::now());
     let (poe2, league) = trade_league(&app);
-    let q = filter_core::trade::query(&setup);
+    let q = trade_query(&app, poe2, &setup);
     let (id, ids, total) = trade_api::search(poe2, &league, &q)?;
     let fetched = trade_api::fetch(poe2, &ids, &id)?;
     let rates = currency_rates(&app);
@@ -622,7 +646,7 @@ fn start_live_searches(app: AppHandle) {
                 if LAST_MANUAL.lock().unwrap().map(|t| t.elapsed() < Duration::from_secs(20)).unwrap_or(false) { break; }
                 if !trade_api::has_room("search", 3) || !trade_api::has_room("fetch", 3) { break; }
                 let (poe2, league) = trade_league(&app);
-                let q = filter_core::trade::query(&setup);
+                let q = trade_query(&app, poe2, &setup);
                 let fresh = match trade_api::search(poe2, &league, &q) {
                     Ok((sid, ids, _)) => {
                         due.insert(id, now + Duration::from_secs(90));

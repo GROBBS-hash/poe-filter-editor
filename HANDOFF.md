@@ -61,6 +61,12 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Their data terms: fine for own/small free tools with credit (shown on the page); ask them before selling or a big release.
   Not verified in game yet: the stat-line fragments (from poe.re's English settings) and the trade map filter names.
 
+- Reader fixes (19 Nov): our own pop-ups are hidden before the screen picture (their "item level 68+" text was read
+  as a hover box → wrong base/rarity); a hover box name missing a letter ("HROATSTABBER") is accepted; `rarity_unsure`
+  on Picked when the filter draws Normal/Magic/Rare alike (NeverSink tiered gear) → note in the F2 panel.
+- Transfigured gems price check: `trade_api::item_types` (api/trade/data/items `disc`) rewrites the search type to
+  {option, discriminator} (was "Unknown item base type").
+
 ## Left to do (agreed order)
 1. **GROBBS to test in game**: trade helper buttons (focus switch + typing), whisper pop-up not stealing focus,
    chat hotkeys, live search pop-ups. Windows-only code (`focus_game`) couldn't be compiled in the cloud.

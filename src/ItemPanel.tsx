@@ -4,7 +4,7 @@ import { Item, RARITY_COLOUR, itemSub, itemTitle } from "./types";
 import StyleEditor, { CurrentStyle, CustomStyle, GAME_COLOURS, fromCurrent } from "./StyleEditor";
 import { ItemIcon } from "./icons";
 
-export type Picked = { item: Item; from_screen: boolean; screen_text?: string | null; confidence: number };
+export type Picked = { item: Item; from_screen: boolean; screen_text?: string | null; confidence: number; rarity_unsure?: boolean };
 
 /** One of your saved edits, as opened for changing. */
 export type RuleDetail = {
@@ -178,7 +178,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
   }, [picked.item]);
 
   const setRarity = (rarity: string) => {
-    const p = { ...picked, item: { ...picked.item, rarity } };
+    const p = { ...picked, rarity_unsure: false, item: { ...picked.item, rarity } };
     setPicked(p);
     refresh(p);
   };
@@ -362,6 +362,10 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
         </div>
       </div>
 
+      {picked.from_screen && picked.rarity_unsure && isGear && (
+        <div className="qm-rarity-note">Your filter shows this as the same colours for every rarity, so the label can't say which it is.
+          Pick the rarity below, or hover the item until its info box shows, then press again.</div>
+      )}
       {(picked.from_screen || replacing || !inGame) && isGear && (
         <div className="qm-rarity">
           {GEAR.map((r) => (

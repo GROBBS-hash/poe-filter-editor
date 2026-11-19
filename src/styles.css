@@ -682,3 +682,4 @@ input[type=range] { accent-color: var(--gold); }
 .map-trade-list { list-style: none; padding: 0; margin: 6px 0; }
 .map-trade-list li { display: flex; gap: 10px; align-items: center; padding: 3px 0; font-size: 13px; }
 .map-wants label.check { justify-content: flex-start; margin: 0; }
+.qm-rarity-note { font-size: 12px; color: #f0c674; background: rgba(240,198,116,0.1); border-radius: 6px; padding: 5px 8px; margin: 4px 0; }
