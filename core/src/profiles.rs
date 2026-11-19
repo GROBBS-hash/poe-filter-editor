@@ -79,6 +79,15 @@ pub struct Settings {
     pub chat_keys: Vec<ChatKey>,
     /// Map regex / trade tool choices.
     pub map_tool: crate::mapregex::MapTool,
+    /// Wealth tracker: your PoE account ("Name#1234") and POESESSID (kept on this PC, only sent to pathofexile.com).
+    pub poe_account: String,
+    pub poesessid: String,
+    /// Tabs an earnings session watches (your dump tabs).
+    pub wealth_tabs: Vec<usize>,
+    /// "Worth selling" from this many chaos.
+    pub wealth_min: f64,
+    /// Minutes between earnings session checks.
+    pub earn_minutes: u32,
 }
 
 /// A hotkey that types one chat command in game.
@@ -94,7 +103,8 @@ impl Default for Settings {
             cycle_enabled: false, fallback_area_level: 83, claude_api_key: String::new(),
             key_build: "F6".into(), pob_link: String::new(), pob_stage: None, pob_follow: true,
             key_price: "Ctrl+D".into(), map_avoid: None,
-            trade_helper: true, thanks_message: "thanks, good luck!".into(), chat_keys: vec![], map_tool: Default::default() }
+            trade_helper: true, thanks_message: "thanks, good luck!".into(), chat_keys: vec![], map_tool: Default::default(),
+            poe_account: String::new(), poesessid: String::new(), wealth_tabs: vec![], wealth_min: 10.0, earn_minutes: 3 }
     }
 }
 

@@ -81,10 +81,24 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   count rules, flask rules, timeless jewel / anointment / heist / sentinel handling, influence + ilvl bracket
   filters, "hidden filters" toggle, roll ranges as min..max for uniques (± % of roll range, exact on perfect rolls).
 
+- Price check "Compared with your build (PoB)" (`core/src/compare.rs`): checked item vs the PoB stage's gear in the
+  same slot (both rings), totals for life(+Str/2)/ES/mana/each res/attributes/speeds/suppress/crit multi/spell dmg,
+  plus mods only one side has. Collapsible (remembered).
+- Wealth page (Endgame → Wealth; `core/src/wealth.rs`, `src-tauri/src/wealth_app.rs`, `src/Wealth.tsx`,
+  `src/EarningsWindow.tsx`, window "earnings"): reads the stash via the session API
+  (character-window/get-stash-items, Cookie POESESSID, realm pc/poe2, rate-limited as kind "stash", learns
+  X-Rate-Limit-Account too). Values with poe.ninja (uniques by name, gems at their cheapest variant, everything else
+  by base; rares/gear skipped). Whole-stash scan → snapshot history (wealth.json, newest 400) + chart + by-tab, and
+  "Worth selling": unlisted items ≥ N chaos. Earnings sessions: tick dump tabs, name a strategy, start → tabs
+  valued now and every N minutes (`start_session_timer`), overlay shows time / made / per hour; pause, stop & save;
+  "Best strategies" averages per name. OAuth would need GGG to register the app, hence POESESSID (kept local).
+  Not tested against the live site: realm for PoE 2 and the exact error shapes.
+
 ## Left to do (agreed order)
 1. **GROBBS to test in game**: trade helper buttons (focus switch + typing), whisper pop-up not stealing focus,
    chat hotkeys, live search pop-ups. Windows-only code (`focus_game`) couldn't be compiled in the cloud.
-2. **Stash value / earnings per hour** (Exilence-style, needs the PoE account OAuth or stash API — research first).
+2. Wealth tracker follow-ups: test with GROBBS's real account; price rares via the trade site (slow) or poeprices;
+   PoeStash-style "search every tab" and guild stash; crafting planner (parked).
 3. Price check polish ideas: group resistances "any resistance" (count group), collapse duplicate sellers, show price
    in divines toggle, currency trend chart; map tier filter when price checking maps.
 4. Deferred earlier: installer + auto-update, batch mode tidy-up, PoE 2 coverage.

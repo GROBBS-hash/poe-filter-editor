@@ -48,6 +48,8 @@ fn default_rules(kind: &str) -> Vec<(u32, u64)> {
     match kind {
         "search" | "exchange" => vec![(4, 10), (12, 60), (40, 300)],
         "poeprices" => vec![(3, 10), (20, 300)],
+        // Your stash on pathofexile.com: slow and steady.
+        "stash" => vec![(8, 10), (30, 60)],
         _ => vec![(8, 4), (12, 10)],
     }
 }
@@ -109,12 +111,15 @@ pub fn has_room(kind: &'static str, spare: usize) -> bool {
 
 fn learn(kind: &'static str, resp: &ureq::Response) {
     let mut l = limiter().lock().unwrap();
-    if let Some(r) = resp.header("X-Rate-Limit-Ip") {
-        let rules = parse_rules(r);
-        if !rules.is_empty() { l.rules.insert(kind, rules); }
+    // Limits per IP and (for your own stash) per account: follow both.
+    let mut rules: Vec<(u32, u64)> = Vec::new();
+    for h in ["X-Rate-Limit-Ip", "X-Rate-Limit-Account"] {
+        if let Some(r) = resp.header(h) { rules.extend(parse_rules(r)); }
     }
+    if !rules.is_empty() { l.rules.insert(kind, rules); }
     // The site's own count: if it says we're at a limit, stop until that window passes.
-    if let (Some(r), Some(s)) = (resp.header("X-Rate-Limit-Ip"), resp.header("X-Rate-Limit-Ip-State")) {
+    for (rh, sh) in [("X-Rate-Limit-Ip", "X-Rate-Limit-Ip-State"), ("X-Rate-Limit-Account", "X-Rate-Limit-Account-State")] {
+    if let (Some(r), Some(s)) = (resp.header(rh), resp.header(sh)) {
         for ((max, window), state) in parse_rules(r).into_iter().zip(s.split(',')) {
             let mut p = state.split(':');
             let used: u32 = p.next().and_then(|x| x.trim().parse().ok()).unwrap_or(0);
@@ -123,6 +128,7 @@ fn learn(kind: &'static str, resp: &ureq::Response) {
             if penalty > 0 { l.blocked_until.insert(kind, Instant::now() + Duration::from_secs(penalty)); }
             else if used >= max { l.blocked_until.insert(kind, Instant::now() + Duration::from_secs(window)); }
         }
+    }
     }
 }
 
@@ -233,4 +239,36 @@ mod tests {
         assert_eq!(super::parse_rules("8:10:60,15:60:300"), vec![(8, 10), (15, 60)]);
         assert!(super::site_url(false, "Standard", "abc").ends_with("/trade/search/Standard/abc"));
     }
+}
+
+// ---------- your stash (wealth tracker) ----------
+
+/// One page of your stash from pathofexile.com, signed in with your POESESSID
+/// (it only ever goes to pathofexile.com). Waits out the rate limit instead of failing,
+/// since a full stash scan is many requests.
+pub fn stash_tab(account: &str, sessid: &str, league: &str, poe2: bool, index: usize, with_tabs: bool) -> Result<Value, String> {
+    let url = format!("https://www.pathofexile.com/character-window/get-stash-items?accountName={}&realm={}&league={}&tabs={}&tabIndex={}",
+        enc(account), if poe2 { "poe2" } else { "pc" }, enc(league), if with_tabs { 1 } else { 0 }, index);
+    let mut tries = 0;
+    loop {
+        tries += 1;
+        let req = ureq::get(&url).set("Cookie", &format!("POESESSID={}", sessid.trim()));
+        match call("stash", req, None) {
+            Ok(v) if v.get("error").is_some() => return Err(stash_error(&v["error"]["message"].as_str().unwrap_or("").to_string())),
+            Ok(v) => return Ok(v),
+            Err(e) if tries < 6 && (e.contains("slow down") || e.contains("limit")) => {
+                let secs: u64 = e.split("in ").last().and_then(|x| x.trim_end_matches('s').parse().ok()).unwrap_or(10);
+                std::thread::sleep(Duration::from_secs(secs.min(90) + 1));
+            }
+            Err(e) => return Err(stash_error(&e)),
+        }
+    }
+}
+
+fn stash_error(e: &str) -> String {
+    if e.contains("403") || e.to_lowercase().contains("forbidden") {
+        "pathofexile.com said no: your POESESSID is wrong or has expired. Log in on pathofexile.com and copy it again.".into()
+    } else if e.contains("404") || e.to_lowercase().contains("not found") {
+        "pathofexile.com couldn't find that account or league: check your account name (with its #1234) and league.".into()
+    } else { e.replace("trade site", "pathofexile.com") }
 }

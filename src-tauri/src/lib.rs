@@ -1,6 +1,7 @@
 // The app (core logic lives in ../core; both are rebuilt by `tauri dev`).
 mod screen;
 mod trade_api;
+mod wealth_app;
 
 use filter_core::{
     evaluate::{status_with_fallback, Status},
@@ -2037,6 +2038,7 @@ pub fn run() {
             start_batch_watcher(app.handle().clone());
             start_whisper_watcher(app.handle().clone());
             start_live_searches(app.handle().clone());
+            wealth_app::start_session_timer(app.handle().clone());
 
             // Tray icon: the app lives here so hotkeys work while you play.
             use tauri::menu::{Menu, MenuItem};
@@ -2105,7 +2107,7 @@ pub fn run() {
             list_farm_presets,
             apply_farm_preset,
             list_level_presets,
-            get_tiers, get_rule_section, trade_search, trade_bulk, rare_estimate, map_dangers, map_suggest, map_tool_get, map_tool_save, map_tool_regex, map_regex_copy, map_tool_trade, trade_action, hide_trades_window, saved_list, saved_add, saved_delete, saved_live, send_whisper, copy_text, hide_trade_window, keep_on_screen,
+            get_tiers, get_rule_section, trade_search, trade_bulk, rare_estimate, map_dangers, map_suggest, map_tool_get, map_tool_save, map_tool_regex, map_regex_copy, map_tool_trade, trade_action, hide_trades_window, wealth_app::wealth_get, wealth_app::wealth_setup, wealth_app::wealth_prefs, wealth_app::wealth_scan, wealth_app::session_start, wealth_app::session_check, wealth_app::session_pause, wealth_app::session_stop, wealth_app::session_delete, wealth_app::earnings_overlay, saved_list, saved_add, saved_delete, saved_live, send_whisper, copy_text, hide_trade_window, keep_on_screen,
             move_tier_item,
             stack_choices,
             gear_setup,

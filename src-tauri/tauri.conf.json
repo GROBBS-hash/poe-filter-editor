@@ -75,6 +75,22 @@
         "visible": false,
         "shadow": false,
         "focus": false
+      },
+      {
+        "label": "earnings",
+        "title": "Earnings",
+        "width": 230,
+        "height": 120,
+        "x": 1500,
+        "y": 90,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "visible": false,
+        "shadow": false,
+        "focus": false
       }
     ],
     "security": {

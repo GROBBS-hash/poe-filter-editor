@@ -6,7 +6,8 @@
     "overlay",
     "build",
     "trade",
-    "trades"
+    "trades",
+    "earnings"
   ],
   "permissions": [
     "core:default",

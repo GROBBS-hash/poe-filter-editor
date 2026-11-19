@@ -20,6 +20,7 @@ pub mod saved;
 pub mod search;
 pub mod themes;
 pub mod tiers;
+pub mod wealth;
 pub mod whispers;
 pub mod trade;
 pub mod trade_rules;
