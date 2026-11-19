@@ -253,9 +253,9 @@ fn pseudo(mods: &[ModLine]) -> Vec<(&'static str, &'static str, f64, Vec<usize>)
     out
 }
 
-/// A slightly lower minimum than the roll, so similar items show up too.
+/// The search minimum starts at the item's own roll (you can lower it in the window).
 fn min_for(v: f64) -> f64 {
-    if v.abs() <= 3.0 { v } else { (v * 0.9).floor() }
+    v
 }
 
 /// Reads a copied item and picks the search: stats that matter ticked, others there to tick.
@@ -587,7 +587,7 @@ Item Level: 75
         let q = query(&s);
         assert_eq!(q["query"]["filters"]["type_filters"]["filters"]["category"]["option"], "armour.boots");
         assert_eq!(q["query"]["stats"][0]["filters"][0]["id"], "explicit.stat_ms");
-        assert_eq!(q["query"]["stats"][0]["filters"][0]["value"]["min"], 27.0);
+        assert_eq!(q["query"]["stats"][0]["filters"][0]["value"]["min"], 30.0);
         assert!(q["query"].get("type").is_none());
     }
 
