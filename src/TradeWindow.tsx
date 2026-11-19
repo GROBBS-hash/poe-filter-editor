@@ -9,7 +9,7 @@ type StatFilter = { id: string; label: string; value: number; min: number | null
 type Setup = { item: Item; filters: StatFilter[]; base_only: boolean; ilvl_min: number | null; links_min: number | null;
   gem_level: number | null; unknown: string[]; category: string | null; raw?: string };
 type MapInfo = { mods: { text: string; warn: string | null }[]; unidentified: boolean; tier: number | null; stats: string[] };
-type Check = { setup: Setup | null; ninja: [number, string] | null; league: string; from_ground: boolean; error: string | null; bulk?: string | null; map?: MapInfo | null };
+type Check = { setup: Setup | null; ninja: [number, string] | null; league: string; from_ground: boolean; error: string | null; bulk?: string | null; map?: MapInfo | null; divine?: number | null };
 type Offer = { pay: number; pay_currency: string; get: number; get_currency: string; each: number; stock: number; account: string; whisper: string };
 type Bulk = { offers: Offer[]; url: string; divine: number | null };
 type Listing = { amount: number; currency: string; chaos: number | null; account: string; indexed: string; whisper: string; ilvl: number | null };
@@ -180,7 +180,7 @@ export default function TradeWindow() {
 
   const it = setup.item;
   const patch = (i: number, p: Partial<StatFilter>) => setSetup({ ...setup, filters: setup.filters.map((f, j) => (j === i ? { ...f, ...p } : f)) });
-  const divine = res?.divine ?? bulk?.divine ?? null;
+  const divine = res?.divine ?? bulk?.divine ?? check?.divine ?? null;
   const copy = (text: string, key: string) => { invoke("copy_text", { text }); setCopied(key); };
   // Mouse wheel on a minimum: 1 at a time (Shift: 10).
   const wheel = (i: number, f: StatFilter, e: React.WheelEvent) => {
@@ -199,7 +199,7 @@ export default function TradeWindow() {
       </div>
 
       {check.ninja && (
-        <div className="tw-ninja">≈ <b>{money(check.ninja[0], divine)}</b>{check.ninja[1] !== "chaos" ? ` ${UNIT[check.ninja[1]] ?? check.ninja[1]}` : ""}
+        <div className="tw-ninja">≈ <b><Price n={check.ninja[0]} cur={check.ninja[1]} /></b> <Other n={check.ninja[0]} cur={check.ninja[1]} divine={divine} />
           <span className="muted small"> poe.ninja{it.rarity === "Unique" && !it.name ? " (best unique on this base)" : ""}</span></div>
       )}
 

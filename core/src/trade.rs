@@ -250,6 +250,7 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
     let mut filters = Vec::new();
     let mut unknown = Vec::new();
     let unique = item.rarity == "Unique";
+    let foulborn = item.name.as_deref().map(|n| n.starts_with("Foulborn ")).unwrap_or(false);
     let ps = pseudo(&lines);
     let covered: Vec<usize> = ps.iter().flat_map(|p| p.3.clone()).collect();
     for (id, label, v, _) in &ps {
@@ -259,7 +260,9 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
     }
     let has_tiers = lines.iter().any(|m| m.tier.is_some());
     for (i, m) in lines.iter().enumerate() {
-        let Some((id, value)) = index.find(m) else { unknown.push(m.text.clone()); continue };
+        // Foulborn uniques' special mods are on the site's "mutated" list.
+        let found = if foulborn { index.find(&ModLine { kind: "mutated".into(), ..m.clone() }).or_else(|| index.find(m)) } else { index.find(m) };
+        let Some((id, value)) = found else { unknown.push(m.text.clone()); continue };
         let (t, _) = template(&m.text);
         let good = if has_tiers { m.tier.map(|t| t <= 2).unwrap_or(false) } else { VALUABLE.iter().any(|k| t.contains(k)) };
         let junk = is_junk(&t);
@@ -289,8 +292,14 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
 pub fn query(s: &TradeSetup) -> Value {
     let it = &s.item;
     let mut q = json!({ "status": { "option": "online" } });
+    let mut foulborn = false;
     if it.rarity == "Unique" {
-        if let Some(n) = &it.name { q["name"] = json!(n); }
+        // "Foulborn Ghostwrithe" is listed as Ghostwrithe with the Foulborn switch on.
+        if let Some(n) = &it.name {
+            let plain = n.strip_prefix("Foulborn ");
+            foulborn = plain.is_some();
+            q["name"] = json!(plain.unwrap_or(n));
+        }
         q["type"] = json!(it.base_type);
     } else if s.base_only || s.category.is_none() {
         q["type"] = json!(it.base_type);
@@ -306,6 +315,7 @@ pub fn query(s: &TradeSetup) -> Value {
     if let Some(n) = s.ilvl_min { misc["ilvl"] = json!({ "min": n }); }
     if it.unidentified && it.rarity != "Unique" { misc["identified"] = json!({ "option": "false" }); }
     if let Some(n) = s.gem_level { misc["gem_level"] = json!({ "min": n }); }
+    if foulborn { misc["mutated"] = json!({ "option": "true" }); }
     if it.item_class.contains("Gem") {
         if let Some(qual) = it.quality { misc["quality"] = json!({ "min": qual }); }
         misc["corrupted"] = json!({ "option": if it.corrupted { "true" } else { "false" } });
@@ -578,6 +588,19 @@ Item Level: 75
         let o = offers(&v);
         assert_eq!((o[0].each, o[0].stock), (180.0, 10));
         assert_eq!(o[0].whisper, "@Bob Hi, I'd like to buy your 2 Divine Orb for my 360 Chaos Orb in Keepers.");
+    }
+
+    #[test]
+    fn foulborn_uniques() {
+        let text = "Item Class: Body Armours\nRarity: Unique\nFoulborn Ghostwrithe\nSilken Vest\n--------\nItem Level: 83\n--------\n+90 to maximum Life\nYour Maximum Energy Shield is Equal to 35% of Your Maximum Life\n";
+        let idx = StatIndex::from_json(&json!({ "result": [
+            { "label": "Explicit", "entries": [ { "id": "explicit.stat_life", "text": "+# to maximum Life", "type": "explicit" } ] },
+            { "label": "Mutated", "entries": [ { "id": "mutated.stat_es", "text": "Your Maximum Energy Shield is Equal to #% of Your Maximum Life", "type": "mutated" } ] } ] }));
+        let s = setup(text, &idx).unwrap();
+        assert!(s.filters.iter().any(|f| f.id == "mutated.stat_es"));
+        let q = query(&s);
+        assert_eq!(q["query"]["name"], "Ghostwrithe");
+        assert_eq!(q["query"]["filters"]["misc_filters"]["filters"]["mutated"]["option"], "true");
     }
 
     #[test]

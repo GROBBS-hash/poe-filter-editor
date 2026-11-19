@@ -467,6 +467,8 @@ struct PriceCheck {
     bulk: Option<String>,
     /// Ctrl+D on a map: its mods, with warnings for the ones you said you can't run.
     map: Option<filter_core::maps::MapInfo>,
+    /// Chaos per divine (poe.ninja), to show prices in both.
+    divine: Option<f64>,
 }
 
 fn trade_league(app: &AppHandle) -> (bool, String) {
@@ -503,13 +505,13 @@ fn price_check(app: AppHandle) {
         let payload = if !text.is_empty() {
             match trade_api::stats(&state.data_dir, poe2) {
                 Ok(index) => match filter_core::trade::setup(&text, &index) {
-                    Some(s) => PriceCheck { ninja: ninja_price(&app, &s.item), setup: Some(s), league, from_ground: false, error: None, bulk: None, map: None },
-                    None => PriceCheck { setup: None, ninja: None, league, from_ground: false, error: Some("That doesn't look like an item".into()), bulk: None, map: None },
+                    Some(s) => PriceCheck { ninja: ninja_price(&app, &s.item), setup: Some(s), league, from_ground: false, error: None, bulk: None, map: None, divine: None },
+                    None => PriceCheck { setup: None, ninja: None, league, from_ground: false, error: Some("That doesn't look like an item".into()), bulk: None, map: None, divine: None },
                 },
                 Err(e) => match filter_core::trade::setup(&text, &Default::default()) {
                     Some(s) => PriceCheck { ninja: ninja_price(&app, &s.item), setup: Some(s), league, from_ground: false,
-                        error: Some(format!("Stat list unavailable, searching by name only ({e})")), bulk: None, map: None },
-                    None => PriceCheck { setup: None, ninja: None, league, from_ground: false, error: Some(e), bulk: None, map: None },
+                        error: Some(format!("Stat list unavailable, searching by name only ({e})")), bulk: None, map: None, divine: None },
+                    None => PriceCheck { setup: None, ninja: None, league, from_ground: false, error: Some(e), bulk: None, map: None, divine: None },
                 },
             }
         } else {
@@ -520,12 +522,13 @@ fn price_check(app: AppHandle) {
                     let category = filter_core::trade::category(&item.item_class).map(String::from);
                     let s = filter_core::trade::TradeSetup { item: item.clone(), filters: vec![], base_only: true, ilvl_min: None,
                         links_min: None, gem_level: None, unknown: vec![], category, raw: String::new() };
-                    PriceCheck { ninja: ninja_price(&app, &item), setup: Some(s), league, from_ground: true, error: None, bulk: None, map: None }
+                    PriceCheck { ninja: ninja_price(&app, &item), setup: Some(s), league, from_ground: true, error: None, bulk: None, map: None, divine: None }
                 }
-                Err(e) => PriceCheck { setup: None, ninja: None, league, from_ground: true, error: Some(e), bulk: None, map: None },
+                Err(e) => PriceCheck { setup: None, ninja: None, league, from_ground: true, error: Some(e), bulk: None, map: None, divine: None },
             }
         };
         let mut payload = payload;
+        payload.divine = currency_rates(&app).get("divine").copied();
         if let Some(it) = payload.setup.as_ref().map(|s| s.item.clone()) {
             if filter_core::maps::is_map(&it.item_class) && !payload.from_ground {
                 let avoid = state.store.lock().unwrap().settings.map_avoid.clone();
