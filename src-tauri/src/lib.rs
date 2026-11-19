@@ -350,7 +350,7 @@ fn read_from_ground(app: &AppHandle) -> Result<Picked, String> {
     let colours = read.colours.map(|(text, background)| LabelColours { text, background });
     let mut item = ground_item(&live, &m, colours, area_level(app).unwrap_or_else(|| fallback_area_level(app)));
     let area = area_level(app).unwrap_or_else(|| fallback_area_level(app));
-    let mut rarity_unsure = filter_core::item::is_gear(&item) && m.unique.is_none()
+    let mut rarity_unsure = filter_core::item::is_gear(&item) && item.rarity != "Unique"
         && filter_core::ground::rarity_ambiguous(&live, &item, colours, area);
     if let Some(t) = &tip {
         filter_core::ground::apply_tooltip_checked(&live, &mut item, t, colours, area);

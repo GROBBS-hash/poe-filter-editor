@@ -275,7 +275,7 @@ pub fn ground_item(segs: &[Segment], m: &GroundMatch, label: Option<LabelColours
         quality: m.superior.then_some(1), ..Default::default() };
     fill_class(&mut item);
     let class = item.item_class.as_str();
-    if let Some(name) = &m.unique {
+    if let Some(name) = m.unique.as_ref().filter(|_| m.tier.is_none()) {
         item.rarity = "Unique".into();
         item.name = Some(name.clone());
         item.unidentified = false;
@@ -314,6 +314,8 @@ pub fn guess_rarity_links(segs: &[Segment], item: &Item, label: Option<LabelColo
     let socket_options: [(Option<&str>, i32); 3] = [(None, 0), (Some("R-R-R"), 2_000), (Some("R-R-R-R"), 2_000)];
     let mut best: Option<(i32, &str, Option<&str>)> = None;
     for r in ["Normal", "Magic", "Rare", "Unique"] {
+        // "(Tier 2)" on the label: only white, blue and yellow gear has an item tier.
+        if r == "Unique" && item.item_tier.is_some() { continue; }
         for (sockets, nudge) in socket_options {
             if sockets.is_some() && !matches!(r, "Normal" | "Magic") { continue; }
             let d = label_distance(segs, item, seen, area_level, r, sockets) + nudge;
@@ -329,6 +331,7 @@ pub fn guess_rarity_links(segs: &[Segment], item: &Item, label: Option<LabelColo
 pub fn rarity_ambiguous(segs: &[Segment], item: &Item, label: Option<LabelColours>, area_level: u32) -> bool {
     let Some(seen) = label else { return true };
     let d: Vec<i32> = ["Normal", "Magic", "Rare", "Unique"].iter()
+        .filter(|r| !(**r == "Unique" && item.item_tier.is_some()))
         .map(|r| label_distance(segs, item, seen, area_level, r, None)).collect();
     let best = *d.iter().min().unwrap_or(&0);
     d.iter().filter(|x| **x <= best + 300).count() > 1
@@ -357,6 +360,11 @@ pub fn label_distance(segs: &[Segment], item: &Item, seen: LabelColours, area_le
 /// reading can be fooled by its frame; a white item's label isn't a unique's).
 pub fn apply_tooltip_checked(segs: &[Segment], item: &mut Item, t: &TooltipRead, label: Option<LabelColours>, area_level: u32) {
     let mut t = t.clone();
+    // An item tier means it isn't a unique, whatever the box's colour reading says.
+    if item.item_tier.is_some() {
+        if t.rarity.as_deref() == Some("Unique") { t.rarity = None; }
+        t.found.unique = None;
+    }
     if let (Some(r), Some(seen)) = (t.rarity.clone(), label) {
         if t.found.unique.is_none() && r != item.rarity {
             let theirs = label_distance(segs, item, seen, area_level, &r, None);
@@ -375,6 +383,18 @@ mod tests {
     fn known() -> HashSet<String> {
         ["Coral Ring", "Ring", "Chaos Orb", "Orb of Alteration", "Leather Belt", "Divine Orb"]
             .iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn tiered_label_is_never_unique() {
+        // The unique rule happens to look exactly like the label; the tiered rule doesn't.
+        let f = "Show\n\tRarity Unique\n\tSetTextColor 220 220 220 255\n\tSetBackgroundColor 10 20 60 255\n\nShow\n\tRarity Normal Magic Rare\n\tSetTextColor 0 240 190 255\n";
+        let segs = parse_filter(f);
+        let mut it = Item { base_type: "Ezomyte Dagger".into(), item_class: "Rune Daggers".into(), rarity: "Normal".into(), ..Default::default() };
+        let seen = LabelColours { text: [220, 220, 220], background: [10, 20, 60] };
+        assert_eq!(guess_rarity(&segs, &it, Some(seen), 70), "Unique");
+        it.item_tier = Some(2);
+        assert_ne!(guess_rarity(&segs, &it, Some(seen), 70), "Unique");
     }
 
     #[test]
