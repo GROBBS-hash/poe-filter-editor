@@ -197,7 +197,9 @@ pub fn mods(text: &str) -> Vec<ModLine> {
                 else if l.ends_with("(mutated)") { "mutated".into() }
                 else { header_kind.clone().unwrap_or_else(|| "explicit".into()) };
             let t = clean(l);
-            if t.is_empty() || !t.chars().any(|c| c.is_ascii_digit()) && !t.contains("Cannot") && !t.contains("Has ") { continue; }
+            // Under a "{ … Modifier }" heading every line is a mod, numbers or not ("…is Lucky while on Low Life").
+            let numberless_ok = header_kind.is_some() || t.contains("Cannot") || t.contains("Has ");
+            if t.is_empty() || !t.chars().any(|c| c.is_ascii_digit()) && !numberless_ok { continue; }
             let (_, values) = template(&t);
             out.push(ModLine { text: t, kind, tier: header_tier, values });
         }
@@ -285,7 +287,9 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
         let good = if has_tiers { m.tier.map(|t| t <= 2).unwrap_or(false) } else { VALUABLE.iter().any(|k| t.contains(k)) };
         let junk = is_junk(&t);
         let enabled = !unique && m.kind != "enchant" && !covered.contains(&i) && good && !junk;
-        filters.push(StatFilter { id, label: m.text.clone(), value, min: Some(min_for(value)), enabled, kind, tier: m.tier, junk });
+        // A mod with no number is just "has it": no minimum.
+        let min = if m.values.is_empty() { None } else { Some(min_for(value)) };
+        filters.push(StatFilter { id, label: m.text.clone(), value, min, enabled, kind, tier: m.tier, junk });
     }
     let links = item.sockets.as_deref().map(crate::item::max_links).unwrap_or(0);
     let gem_level = text.replace('\r', "").split("--------").nth(1)
@@ -627,6 +631,20 @@ Item Level: 75
         // Not on the list: still kept, marked Foulborn.
         let s = setup(text, &StatIndex::default()).unwrap();
         assert_eq!(s.unknown_kinds, ["explicit", "mutated"]);
+    }
+
+    #[test]
+    fn numberless_foulborn_mod() {
+        let text = "Item Class: Rings\nRarity: Unique\nFoulborn Lori's Lantern\nPrismatic Ring\n--------\nItem Level: 83\n--------\n{ Implicit Modifier — Elemental, Resistance }\n+9(8-10)% to all Elemental Resistances\n--------\n{ Unique Modifier }\n31% increased Light Radius\n{ Foulborn Unique Modifier — Life }\nYour Damage with Hits is Lucky while on Low Life\n(You are on Low Life if you have 50% of your Maximum Life or less)\n--------\nBy its light, Lori led her young charges to safety\nand bound up their wounds.\n";
+        let m = mods(text);
+        assert_eq!(m.iter().map(|x| x.text.as_str()).collect::<Vec<_>>(),
+            ["+9% to all Elemental Resistances", "31% increased Light Radius", "Your Damage with Hits is Lucky while on Low Life"]);
+        assert_eq!(m[2].kind, "mutated");
+        let idx = StatIndex::from_json(&json!({ "result": [ { "label": "Mutated", "entries": [
+            { "id": "mutated.stat_lucky", "text": "Your Damage with Hits is Lucky while on Low Life", "type": "mutated" } ] } ] }));
+        let s = setup(text, &idx).unwrap();
+        let f = s.filters.iter().find(|f| f.id == "mutated.stat_lucky").unwrap();
+        assert_eq!(f.min, None);
     }
 
     #[test]
