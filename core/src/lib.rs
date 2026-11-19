@@ -21,3 +21,4 @@ pub mod themes;
 pub mod tiers;
 pub mod whispers;
 pub mod trade;
+pub mod trade_rules;

@@ -16,7 +16,7 @@ type Listing = { amount: number; currency: string; chaos: number | null; account
 type Result = { listings: Listing[]; summary: [number, number] | null; total: number; url: string; divine: number | null };
 
 const UNIT: Record<string, string> = { chaos: "c", exalted: "ex", divine: "div" };
-const KIND: Record<string, string> = { pseudo: "total", implicit: "implicit", crafted: "crafted", enchant: "enchant", fractured: "fractured", mutated: "foulborn" };
+const KIND: Record<string, string> = { pseudo: "total", implicit: "implicit", crafted: "crafted", enchant: "enchant", fractured: "fractured", mutated: "foulborn", property: "" };
 
 /** "3h ago" from the time it was listed. */
 function ago(iso: string) {
@@ -205,6 +205,21 @@ export default function TradeWindow() {
 
       {check.map && <MapCheck map={check.map} />}
 
+      {setup.filters.length > 0 && !check.map && (
+        <div className="tw-range">
+          <span className="muted small">Minimums:</span>
+          {[0, 10, 20].map((p) => (
+            <button key={p} className="link small" title={p ? `Every minimum ${p}% below this item's roll` : "Every minimum at this item's roll"}
+              onClick={() => setSetup({ ...setup, filters: setup.filters.map((f) => {
+                if (f.min == null || f.id.includes("empty")) return f;
+                if (p === 0 || Math.abs(f.value) <= 3) return { ...f, min: f.value };
+                const v = f.value * (1 - p / 100);
+                return { ...f, min: Math.abs(f.value) >= 10 ? Math.floor(v) : Math.floor(v * 10) / 10 };
+              }) })}>
+              {p === 0 ? "exact" : `−${p}%`}</button>
+          ))}
+        </div>
+      )}
       {setup.filters.length > 0 && !check.map && (
         <div className="tw-stats">
           {setup.filters.map((f, i) => (

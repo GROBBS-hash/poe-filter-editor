@@ -88,6 +88,8 @@ impl StatIndex {
         StatIndex { by_text }
     }
     pub fn len(&self) -> usize { self.by_text.len() }
+    /// The trade id of a total ("pseudo") stat by its text, e.g. "+# total maximum Life".
+    pub fn pseudo_id(&self, text: &str) -> Option<String> { self.by_text.get(&("pseudo".to_string(), text.to_lowercase())).cloned() }
     pub fn is_empty(&self) -> bool { self.by_text.is_empty() }
 
     /// The trade id for a mod line, and the value to search with. Tries the
@@ -228,33 +230,6 @@ const VALUABLE: &[&str] = &["to Level of", "Movement Speed", "Spell Damage", "Cr
     "Attack Speed", "Cast Speed", "maximum Energy Shield", "Suppress", "Damage over Time Multiplier", "to Level of all", "Minion",
     "Adds # to # Physical", "Life Regeneration", "Mana Regeneration", "Elemental Damage with Attack"];
 
-/// Life, resistances: what the trade site adds up for you ("pseudo" stats).
-fn pseudo(mods: &[ModLine]) -> Vec<(&'static str, &'static str, f64, Vec<usize>)> {
-    let (mut life, mut ele, mut chaos) = (0.0, 0.0, 0.0);
-    let (mut li, mut ei, mut ci) = (vec![], vec![], vec![]);
-    for (i, m) in mods.iter().enumerate() {
-        if m.kind == "enchant" { continue; }
-        let (t, v) = template(&m.text);
-        let t = t.to_lowercase();
-        let v0 = v.first().copied().unwrap_or(0.0);
-        if t == "+# to maximum life" { life += v0; li.push(i); }
-        if t == "+# to strength" || t == "+# to all attributes" || t.starts_with("+# to strength and ") { life += (v0 / 2.0).floor(); }
-        if t == "+#% to all elemental resistances" { ele += 3.0 * v0; ei.push(i); }
-        else if t.starts_with("+#% to ") && t.ends_with(" resistances") && t.contains(" and ") {
-            let n = ["fire", "cold", "lightning"].iter().filter(|e| t.contains(*e)).count() as f64;
-            ele += n * v0;
-            if t.contains("chaos") { chaos += v0; ci.push(i); }
-            ei.push(i);
-        } else if ["+#% to fire resistance", "+#% to cold resistance", "+#% to lightning resistance"].contains(&t.as_str()) { ele += v0; ei.push(i); }
-        else if t == "+#% to chaos resistance" { chaos += v0; ci.push(i); }
-    }
-    let mut out = vec![];
-    if life > 0.0 { out.push(("pseudo.pseudo_total_life", "+# total maximum Life", life, li)); }
-    if ele > 0.0 { out.push(("pseudo.pseudo_total_elemental_resistance", "+#% total Elemental Resistance", ele, ei)); }
-    if chaos > 0.0 { out.push(("pseudo.pseudo_total_chaos_resistance", "+#% total Chaos Resistance", chaos, ci)); }
-    out
-}
-
 /// The search minimum starts at the item's own roll (you can lower it in the window).
 fn min_for(v: f64) -> f64 {
     v
@@ -269,15 +244,16 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
     let mut unknown_kinds = Vec::new();
     let unique = item.rarity == "Unique";
     let foulborn = item.name.as_deref().map(|n| n.starts_with("Foulborn ")).unwrap_or(false);
-    let ps = pseudo(&lines);
-    let covered: Vec<usize> = ps.iter().flat_map(|p| p.3.clone()).collect();
-    for (id, label, v, _) in &ps {
-        let worth = match *id { "pseudo.pseudo_total_life" => *v >= 40.0, "pseudo.pseudo_total_elemental_resistance" => *v >= 36.0, _ => *v >= 15.0 };
-        filters.push(StatFilter { id: id.to_string(), label: label.replace('#', &format!("{v}")), value: *v, min: Some(min_for(*v)),
-            enabled: worth && !unique, kind: "pseudo".into(), tier: None, junk: false });
-    }
+    // Weapon DPS / armour at 20% quality, then totals (life, resistances…), each replacing the mods it counts.
+    let (props_f, prop_hide) = crate::trade_rules::property_filters(text, &item, &lines);
+    let prop_hide = if unique { vec![] } else { prop_hide };
+    let (totals_f, total_hide) = crate::trade_rules::totals(&lines, &item, index, &prop_hide);
+    let hidden: Vec<usize> = prop_hide.iter().chain(total_hide.iter()).copied().collect();
+    filters.extend(totals_f);
+    filters.extend(props_f);
     let has_tiers = lines.iter().any(|m| m.tier.is_some());
     for (i, m) in lines.iter().enumerate() {
+        if hidden.contains(&i) { continue; }
         // Foulborn uniques' special mods are on the site's "mutated" list.
         let found = if foulborn { index.find(&ModLine { kind: "mutated".into(), ..m.clone() }).or_else(|| index.find(m)) } else { index.find(m) };
         let Some((id, value)) = found else { unknown.push(m.text.clone()); unknown_kinds.push(m.kind.clone()); continue };
@@ -286,11 +262,12 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
         let (t, _) = template(&m.text);
         let good = if has_tiers { m.tier.map(|t| t <= 2).unwrap_or(false) } else { VALUABLE.iter().any(|k| t.contains(k)) };
         let junk = is_junk(&t);
-        let enabled = !unique && m.kind != "enchant" && !covered.contains(&i) && good && !junk;
+        let enabled = !unique && m.kind != "enchant" && good && !junk;
         // A mod with no number is just "has it": no minimum.
         let min = if m.values.is_empty() { None } else { Some(min_for(value)) };
         filters.push(StatFilter { id, label: m.text.clone(), value, min, enabled, kind, tier: m.tier, junk });
     }
+    filters.extend(crate::trade_rules::open_affixes(text, &item, index));
     let links = item.sockets.as_deref().map(crate::item::max_links).unwrap_or(0);
     let gem_level = text.replace('\r', "").split("--------").nth(1)
         .and_then(|s| s.lines().find_map(|l| l.trim().strip_prefix("Level: ")))
@@ -346,8 +323,15 @@ pub fn query(s: &TradeSetup) -> Value {
     }
     if misc.as_object().map(|o| !o.is_empty()).unwrap_or(false) { filters["misc_filters"] = json!({ "filters": misc }); }
     if let Some(n) = s.links_min { filters["socket_filters"] = json!({ "filters": { "links": { "min": n } } }); }
+    // Weapon DPS / defences go in their own filter groups, not the stat list.
+    for f in s.filters.iter().filter(|f| f.enabled) {
+        if let Some((group, key)) = crate::trade_rules::property_query(&f.id) {
+            if filters.get(group).is_none() { filters[group] = json!({ "filters": {} }); }
+            filters[group]["filters"][key] = json!({ "min": f.min.unwrap_or(f.value) });
+        }
+    }
     if filters.as_object().map(|o| !o.is_empty()).unwrap_or(false) { q["filters"] = filters; }
-    let stats: Vec<Value> = s.filters.iter().filter(|f| f.enabled).map(|f| {
+    let stats: Vec<Value> = s.filters.iter().filter(|f| f.enabled && !f.id.starts_with("prop.")).map(|f| {
         let mut v = json!({ "id": f.id });
         if let Some(m) = f.min { v["value"] = json!({ "min": m }); }
         v
@@ -580,8 +564,9 @@ Item Level: 75
     fn picks_what_matters() {
         let s = setup(BOOTS, &index()).unwrap();
         let on: Vec<&str> = s.filters.iter().filter(|f| f.enabled).map(|f| f.id.as_str()).collect();
-        // Life 28 + 10 from strength = 38 (not enough to tick); res 34 (no); T1 movement speed: yes.
-        assert_eq!(on, ["explicit.stat_ms"]);
+        // Life 28 + 10 from strength = 38 (not enough to tick); res 34 (no); T1 movement speed: yes;
+        // evasion-only boots: evasion at 20% quality, ticked.
+        assert_eq!(on, ["prop.ev", "explicit.stat_ms"]);
         let life = s.filters.iter().find(|f| f.id == "pseudo.pseudo_total_life").unwrap();
         assert_eq!(life.value, 38.0);
         let res = s.filters.iter().find(|f| f.id == "pseudo.pseudo_total_elemental_resistance").unwrap();
@@ -591,6 +576,7 @@ Item Level: 75
         let q = query(&s);
         assert_eq!(q["query"]["filters"]["type_filters"]["filters"]["category"]["option"], "armour.boots");
         assert_eq!(q["query"]["stats"][0]["filters"][0]["id"], "explicit.stat_ms");
+        assert!(q["query"]["filters"]["armour_filters"]["filters"]["ev"]["min"].is_number());
         assert_eq!(q["query"]["stats"][0]["filters"][0]["value"]["min"], 30.0);
         assert!(q["query"].get("type").is_none());
     }

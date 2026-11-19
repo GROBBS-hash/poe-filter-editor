@@ -67,6 +67,20 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 - Transfigured gems price check: `trade_api::item_types` (api/trade/data/items `disc`) rewrites the search type to
   {option, discriminator} (was "Unknown item base type").
 
+- Price check, Awakened PoE Trade ideas (MIT; studied SnosMe/awakened-poe-trade, written fresh in
+  `core/src/trade_rules.rs`): totals table (life incl. Str/2, mana incl. Int/2, ele res with x2/x3 multipliers,
+  chaos, Str/Dex/Int, attack/cast/move speed, crit, spell/ele damage) looked up by text in the site's pseudo list;
+  mods a total counts are removed from the list (hybrids that also give something else stay); uniques only get a
+  total when 2+ of their mods add to it. Weapon pDPS/eDPS/total DPS and armour/evasion/ES/ward at 20% quality
+  (ticked: single-defence armour; total DPS when phys+ele; pDPS on axes/swords/bows/warstaves) → armour_filters /
+  weapon_filters, replacing the local mods. "Open prefix/suffix" from the advanced copy's headings (unticked).
+  Price window: "Minimums: exact / −10% / −20%" buttons. Foulborn = name without "Foulborn " + misc mutated,
+  mods looked up as "mutated" first; two-line mods joined; numberless mods kept under headings; minimums start
+  at the item's roll; status "available" (instant buyout + in person).
+- Awakened ideas NOT done yet: roll-quality bar per mod (where in its tier range it rolled), cluster jewel passive
+  count rules, flask rules, timeless jewel / anointment / heist / sentinel handling, influence + ilvl bracket
+  filters, "hidden filters" toggle, roll ranges as min..max for uniques (± % of roll range, exact on perfect rolls).
+
 ## Left to do (agreed order)
 1. **GROBBS to test in game**: trade helper buttons (focus switch + typing), whisper pop-up not stealing focus,
    chat hotkeys, live search pop-ups. Windows-only code (`focus_game`) couldn't be compiled in the cloud.
