@@ -9,7 +9,8 @@ type StatFilter = { id: string; label: string; value: number; min: number | null
 type Setup = { item: Item; filters: StatFilter[]; unknown_kinds?: string[]; base_only: boolean; ilvl_min: number | null; links_min: number | null;
   gem_level: number | null; unknown: string[]; category: string | null; raw?: string };
 type MapInfo = { mods: { text: string; warn: string | null }[]; unidentified: boolean; tier: number | null; stats: string[] };
-type Check = { setup: Setup | null; ninja: [number, string] | null; league: string; from_ground: boolean; error: string | null; bulk?: string | null; map?: MapInfo | null; divine?: number | null };
+type Check = { setup: Setup | null; ninja: [number, string] | null; league: string; from_ground: boolean; error: string | null; bulk?: string | null; map?: MapInfo | null; divine?: number | null; compare?: Comparison[] };
+type Comparison = { slot: string; current: string; rows: { stat: string; now: number; this: number }[]; gain: string[]; lose: string[] };
 type Offer = { pay: number; pay_currency: string; get: number; get_currency: string; each: number; stock: number; account: string; whisper: string };
 type Bulk = { offers: Offer[]; url: string; divine: number | null };
 type Listing = { amount: number; currency: string; chaos: number | null; account: string; indexed: string; whisper: string; instant?: boolean; ilvl: number | null };
@@ -72,6 +73,37 @@ function SavedPanel({ list, setList, onRun }: { list: Saved[]; setList: (l: Save
         ))}
       </ul>
       {err && <div className="qm-warn">{err}</div>}
+    </div>
+  );
+}
+
+/** "Is this an upgrade?": against the gear in the same slot of your PoB build. */
+function CompareBlock({ list }: { list: Comparison[] }) {
+  const [open, setOpen] = useState(() => { try { return localStorage.getItem("tw-compare") !== "0"; } catch { return true; } });
+  const toggle = () => { setOpen(!open); try { localStorage.setItem("tw-compare", open ? "0" : "1"); } catch { /* ignore */ } };
+  return (
+    <div className="tw-cmp">
+      <button className="link small tw-cmp-toggle" onClick={toggle}>{open ? "▾" : "▸"} Compared with your build (PoB)</button>
+      {open && list.map((c) => {
+        const up = c.rows.filter((r) => r.this > r.now).length, down = c.rows.filter((r) => r.this < r.now).length;
+        return (
+          <div key={c.slot} className="tw-cmp-slot">
+            <div className="small"><b>{c.slot}</b> <span className="muted">· now: {c.current}</span>
+              <span className={`tw-cmp-sum ${up > down ? "up" : down > up ? "down" : ""}`}>{up} better · {down} worse</span></div>
+            {c.rows.length > 0 && (
+              <table className="tw-cmp-rows"><tbody>
+                {c.rows.map((r) => {
+                  const d = r.this - r.now;
+                  return <tr key={r.stat}><td>{r.stat}</td><td className="muted">{r.now} → {r.this}</td>
+                    <td className={d > 0 ? "up" : "down"}>{d > 0 ? "+" : ""}{d}</td></tr>;
+                })}
+              </tbody></table>
+            )}
+            {c.gain.length > 0 && <div className="small up">+ Only on this: {c.gain.join(" · ")}</div>}
+            {c.lose.length > 0 && <div className="small down">− You'd lose: {c.lose.join(" · ")}</div>}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -204,6 +236,7 @@ export default function TradeWindow() {
       )}
 
       {check.map && <MapCheck map={check.map} />}
+      {check.compare && check.compare.length > 0 && <CompareBlock list={check.compare} />}
 
       {setup.filters.length > 0 && !check.map && (
         <div className="tw-range">

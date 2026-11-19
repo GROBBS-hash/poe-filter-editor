@@ -469,6 +469,8 @@ struct PriceCheck {
     map: Option<filter_core::maps::MapInfo>,
     /// Chaos per divine (poe.ninja), to show prices in both.
     divine: Option<f64>,
+    /// Against the gear in the same slot of your imported PoB build.
+    compare: Vec<filter_core::compare::Comparison>,
 }
 
 fn trade_league(app: &AppHandle) -> (bool, String) {
@@ -505,13 +507,13 @@ fn price_check(app: AppHandle) {
         let payload = if !text.is_empty() {
             match trade_api::stats(&state.data_dir, poe2) {
                 Ok(index) => match filter_core::trade::setup(&text, &index) {
-                    Some(s) => PriceCheck { ninja: ninja_price(&app, &s.item), setup: Some(s), league, from_ground: false, error: None, bulk: None, map: None, divine: None },
-                    None => PriceCheck { setup: None, ninja: None, league, from_ground: false, error: Some("That doesn't look like an item".into()), bulk: None, map: None, divine: None },
+                    Some(s) => PriceCheck { ninja: ninja_price(&app, &s.item), setup: Some(s), league, from_ground: false, error: None, bulk: None, map: None, divine: None, compare: vec![] },
+                    None => PriceCheck { setup: None, ninja: None, league, from_ground: false, error: Some("That doesn't look like an item".into()), bulk: None, map: None, divine: None, compare: vec![] },
                 },
                 Err(e) => match filter_core::trade::setup(&text, &Default::default()) {
                     Some(s) => PriceCheck { ninja: ninja_price(&app, &s.item), setup: Some(s), league, from_ground: false,
-                        error: Some(format!("Stat list unavailable, searching by name only ({e})")), bulk: None, map: None, divine: None },
-                    None => PriceCheck { setup: None, ninja: None, league, from_ground: false, error: Some(e), bulk: None, map: None, divine: None },
+                        error: Some(format!("Stat list unavailable, searching by name only ({e})")), bulk: None, map: None, divine: None, compare: vec![] },
+                    None => PriceCheck { setup: None, ninja: None, league, from_ground: false, error: Some(e), bulk: None, map: None, divine: None, compare: vec![] },
                 },
             }
         } else {
@@ -522,13 +524,22 @@ fn price_check(app: AppHandle) {
                     let category = filter_core::trade::category(&item.item_class).map(String::from);
                     let s = filter_core::trade::TradeSetup { item: item.clone(), filters: vec![], base_only: true, ilvl_min: None,
                         links_min: None, gem_level: None, unknown: vec![], unknown_kinds: vec![], category, raw: String::new() };
-                    PriceCheck { ninja: ninja_price(&app, &item), setup: Some(s), league, from_ground: true, error: None, bulk: None, map: None, divine: None }
+                    PriceCheck { ninja: ninja_price(&app, &item), setup: Some(s), league, from_ground: true, error: None, bulk: None, map: None, divine: None, compare: vec![] }
                 }
-                Err(e) => PriceCheck { setup: None, ninja: None, league, from_ground: true, error: Some(e), bulk: None, map: None, divine: None },
+                Err(e) => PriceCheck { setup: None, ninja: None, league, from_ground: true, error: Some(e), bulk: None, map: None, divine: None, compare: vec![] },
             }
         };
         let mut payload = payload;
         payload.divine = currency_rates(&app).get("divine").copied();
+        // "Is this an upgrade?" against your PoB build's gear in that slot.
+        if !payload.from_ground {
+            if let (Some(setup), Some(pob)) = (payload.setup.as_ref(), pob_load(&state)) {
+                if let Some(stage) = pob.build.stages.get(pob.stage) {
+                    let lines: Vec<String> = filter_core::trade::mods(&text).into_iter().map(|m| m.text).collect();
+                    payload.compare = filter_core::compare::compare(&lines, &setup.item.item_class, &stage.gear);
+                }
+            }
+        }
         if let Some(it) = payload.setup.as_ref().map(|s| s.item.clone()) {
             if filter_core::maps::is_map(&it.item_class) && !payload.from_ground {
                 let avoid = state.store.lock().unwrap().settings.map_avoid.clone();
