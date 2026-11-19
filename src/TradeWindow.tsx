@@ -16,7 +16,7 @@ type Listing = { amount: number; currency: string; chaos: number | null; account
 type Result = { listings: Listing[]; summary: [number, number] | null; total: number; url: string; divine: number | null };
 
 const UNIT: Record<string, string> = { chaos: "c", exalted: "ex", divine: "div" };
-const KIND: Record<string, string> = { pseudo: "total", implicit: "implicit", crafted: "crafted", enchant: "enchant", fractured: "fractured" };
+const KIND: Record<string, string> = { pseudo: "total", implicit: "implicit", crafted: "crafted", enchant: "enchant", fractured: "fractured", mutated: "foulborn" };
 
 /** "3h ago" from the time it was listed. */
 function ago(iso: string) {
@@ -210,13 +210,18 @@ export default function TradeWindow() {
           {setup.filters.map((f, i) => (
             <label key={f.id + i} className={`tw-stat ${f.enabled ? "on" : ""} ${f.junk ? "junk" : ""}`} title={f.junk ? "Rarely changes the price" : undefined}>
               <input type="checkbox" checked={f.enabled} onChange={(e) => patch(i, { enabled: e.target.checked })} />
-              <span className="tw-label">{f.label}{KIND[f.kind] && <span className="tw-kind">{KIND[f.kind]}</span>}
+              <span className={`tw-label mod-${f.kind}`}>{f.label}{KIND[f.kind] && <span className="tw-kind">{KIND[f.kind]}</span>}
                 {f.tier != null && <span className={`tw-tier ${f.tier <= 2 ? "good" : ""}`}>T{f.tier}</span>}</span>
               <input className="tw-min" type="number" value={f.min ?? ""} placeholder="min" onWheel={(e) => wheel(i, f, e)}
                 onChange={(e) => patch(i, { min: e.target.value === "" ? null : +e.target.value, enabled: true })} />
             </label>
           ))}
         </div>
+      )}
+      {setup.filters.some((f) => f.kind === "fractured") && it.rarity !== "Unique" && setup.category && (
+        <button className="link small tw-fract" title="Search for the same base with these fractured mods, ignoring the rest (crafting bases)"
+          onClick={() => { const s = { ...setup, base_only: true, filters: setup.filters.map((f) => ({ ...f, enabled: f.kind === "fractured" })) }; setSetup(s); run(s); }}>
+          Search {it.base_type} with just its fractured mods</button>
       )}
       {setup.unknown.length > 0 && <div className="muted small tw-unknown" title={setup.unknown.join("\n")}>{setup.unknown.length} mod{setup.unknown.length > 1 ? "s" : ""} not searchable</div>}
 

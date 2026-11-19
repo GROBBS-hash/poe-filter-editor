@@ -171,7 +171,8 @@ pub fn mods(text: &str) -> Vec<ModLine> {
                 // { Prefix Modifier "Hale" (Tier: 7) — Life }
                 let low = l.to_lowercase();
                 header_kind = Some(if low.contains("implicit") { "implicit" } else if low.contains("crafted") { "crafted" }
-                    else if low.contains("enchant") { "enchant" } else if low.contains("fractured") { "fractured" } else { "explicit" }.to_string());
+                    else if low.contains("enchant") { "enchant" } else if low.contains("fractured") { "fractured" }
+                    else if low.contains("foulborn") || low.contains("mutated") { "mutated" } else { "explicit" }.to_string());
                 header_tier = low.find("tier:").or_else(|| low.find("rank:")).and_then(|i| {
                     low[i + 5..].trim_start().chars().take_while(|c| c.is_ascii_digit()).collect::<String>().parse().ok()
                 });
@@ -180,6 +181,7 @@ pub fn mods(text: &str) -> Vec<ModLine> {
             if l.starts_with('(') { continue; } // reminder text
             let kind = if l.ends_with("(implicit)") { "implicit".to_string() } else if l.ends_with("(crafted)") { "crafted".into() }
                 else if l.ends_with("(enchant)") { "enchant".into() } else if l.ends_with("(fractured)") { "fractured".into() }
+                else if l.ends_with("(mutated)") { "mutated".into() }
                 else { header_kind.clone().unwrap_or_else(|| "explicit".into()) };
             let t = clean(l);
             if t.is_empty() || !t.chars().any(|c| c.is_ascii_digit()) && !t.contains("Cannot") && !t.contains("Has ") { continue; }
@@ -263,11 +265,13 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
         // Foulborn uniques' special mods are on the site's "mutated" list.
         let found = if foulborn { index.find(&ModLine { kind: "mutated".into(), ..m.clone() }).or_else(|| index.find(m)) } else { index.find(m) };
         let Some((id, value)) = found else { unknown.push(m.text.clone()); continue };
+        // Found on the mutated list = a Foulborn mod (shown in its own colour).
+        let kind = if id.starts_with("mutated.") { "mutated".to_string() } else { m.kind.clone() };
         let (t, _) = template(&m.text);
         let good = if has_tiers { m.tier.map(|t| t <= 2).unwrap_or(false) } else { VALUABLE.iter().any(|k| t.contains(k)) };
         let junk = is_junk(&t);
         let enabled = !unique && m.kind != "enchant" && !covered.contains(&i) && good && !junk;
-        filters.push(StatFilter { id, label: m.text.clone(), value, min: Some(min_for(value)), enabled, kind: m.kind.clone(), tier: m.tier, junk });
+        filters.push(StatFilter { id, label: m.text.clone(), value, min: Some(min_for(value)), enabled, kind, tier: m.tier, junk });
     }
     let links = item.sockets.as_deref().map(crate::item::max_links).unwrap_or(0);
     let gem_level = text.replace('\r', "").split("--------").nth(1)
@@ -602,7 +606,7 @@ Item Level: 75
             { "label": "Explicit", "entries": [ { "id": "explicit.stat_life", "text": "+# to maximum Life", "type": "explicit" } ] },
             { "label": "Mutated", "entries": [ { "id": "mutated.stat_es", "text": "Your Maximum Energy Shield is Equal to #% of Your Maximum Life", "type": "mutated" } ] } ] }));
         let s = setup(text, &idx).unwrap();
-        assert!(s.filters.iter().any(|f| f.id == "mutated.stat_es"));
+        assert!(s.filters.iter().any(|f| f.id == "mutated.stat_es" && f.kind == "mutated"));
         let q = query(&s);
         assert_eq!(q["query"]["name"], "Ghostwrithe");
         assert_eq!(q["query"]["filters"]["misc_filters"]["filters"]["mutated"]["option"], "true");
