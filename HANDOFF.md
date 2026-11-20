@@ -370,7 +370,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Build window (F6) / My build: "Price" on a gear item, flask or jewel, or a click on a gem, opens the price window for it
       (Duskdawn as Maelström Staff, rares with their mods ready to search). Jewel mods no longer show "Has Alt Variant Two".
 
-- [ ] Price check on gear with resistances: "total Elemental Resistance" and "total to Chaos Resistance" ticked, fire /
+- [x] (Confirmed 21 Nov.) Price check on gear with resistances: "total Elemental Resistance" and "total to Chaos Resistance" ticked, fire /
       cold / lightning totals there to tick, no single resistance mods left in the list.
 
 **Maps**
