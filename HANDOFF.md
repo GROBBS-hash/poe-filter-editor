@@ -408,7 +408,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [x] (Confirmed 21 Nov, matches PoEStash.) Build window (F6) / My build: gold "Buy" opens the trade site in your browser with the item's mods filled in, and
       says how many are for sale ("any 3 of 4 mods" when it had to loosen). Try a rare, a cluster jewel, Watcher's Eye.
 - [ ] Ctrl+D on a cluster jewel in game finds listings (it searched the wrong category before 21 Nov).
-- [ ] Build window (F6) / My build: "Price" on a gear item, flask or jewel, or a click on a gem, opens the price window for it
+- [x] (Confirmed 21 Nov: gems incl. 21/20 and supports.) Build window (F6) / My build: "Price" on a gear item, flask or jewel, or a click on a gem, opens the price window for it
       (Duskdawn as Maelström Staff, rares with their mods ready to search). Jewel mods no longer show "Has Alt Variant Two".
 
 - [x] (Confirmed 21 Nov.) Price check on gear with resistances: "total Elemental Resistance" and "total to Chaos Resistance" ticked, fire /
