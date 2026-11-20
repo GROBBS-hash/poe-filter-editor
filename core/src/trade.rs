@@ -565,8 +565,12 @@ pub fn query(s: &TradeSetup) -> Value {
         }
     }
     if filters.as_object().map(|o| !o.is_empty()).unwrap_or(false) { q["filters"] = filters; }
+    // A fractured mod only has to be fractured when pricing the item as a base (fractured switch on); otherwise any item
+    // with that mod counts, so it's searched as the normal mod (the trade site gives both the same number).
+    let as_base = s.misc.iter().any(|m| m == "fractured_item");
     let stats: Vec<Value> = s.filters.iter().filter(|f| f.enabled && !f.id.starts_with("prop.")).map(|f| {
-        let mut v = stat_json(&f.id);
+        let id = match f.id.strip_prefix("fractured.") { Some(rest) if !as_base => format!("explicit.{rest}"), _ => f.id.clone() };
+        let mut v = stat_json(&id);
         if let (Some(m), None) = (f.min, v.get("value")) { v["value"] = json!({ "min": m }); }
         v
     }).collect();

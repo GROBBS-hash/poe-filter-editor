@@ -525,6 +525,11 @@ mod base_item_tests {
         assert_eq!(q["query"]["filters"]["misc_filters"]["filters"]["hunter_item"]["option"], "true");
         assert_eq!(q["query"]["filters"]["misc_filters"]["filters"]["ilvl"]["min"], 75);
         assert_eq!(q["query"]["stats"][0]["filters"].as_array().unwrap().len(), 1);
+        assert_eq!(q["query"]["stats"][0]["filters"][0]["id"], "fractured.ms", "as a base: must be fractured");
+        // "This item": the same mod on any item, fractured or not.
+        let mut s3 = s.clone();
+        for f in &mut s3.filters { f.enabled = f.id == "fractured.ms"; }
+        assert_eq!(query(&s3)["query"]["stats"][0]["filters"][0]["id"], "explicit.ms");
 
         // Finished items (a crafted mod) and ordinary low-level rares: no base search.
         let crafted = "Item Class: Boots\nRarity: Rare\nX\nTwo-Toned Boots\n--------\nItem Level: 85\n--------\n+40 to maximum Life\n+30% to Fire Resistance (crafted)\n";
