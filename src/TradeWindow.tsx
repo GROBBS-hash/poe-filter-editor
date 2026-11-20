@@ -140,6 +140,20 @@ function Roll({ r, range, tier }: { r: number; range?: string | null; tier: numb
 /** Tier 1 is the best roll a mod can have: green for top tiers through to red for low ones. */
 const tierClass = (t: number) => (t <= 1 ? "t1" : t === 2 ? "t2" : t === 3 ? "t3" : t <= 5 ? "t45" : "t6");
 
+/** The going rate for a bulk item, like Awakened: price fixers list a handful at a silly price to drag the
+ *  number down, so weigh every offer by how many it has in stock and take the middle (a stock-weighted median).
+ *  Offers well under that with little stock are marked as likely fixers. */
+function bulkTypical(offers: Offer[], divine: number | null) {
+  const chaos = (o: Offer) => (o.pay_currency === "divine" && divine ? o.each * divine : o.each);
+  const rows = offers.map((o) => ({ c: chaos(o), stock: Math.max(1, o.stock || 1) })).sort((a, b) => a.c - b.c);
+  const total = rows.reduce((s, r) => s + r.stock, 0);
+  let acc = 0, typical = rows[0]?.c ?? 0;
+  for (const r of rows) { acc += r.stock; if (acc >= total / 2) { typical = r.c; break; } }
+  const medianStock = [...rows].map((r) => r.stock).sort((a, b) => a - b)[Math.floor(rows.length / 2)] ?? 1;
+  const fixer = (o: Offer) => chaos(o) < typical * 0.75 && (o.stock || 1) < Math.max(5, medianStock / 2);
+  return { typical, cheapest: rows[0]?.c ?? 0, fixer };
+}
+
 /** The answer first, big and clear: what this sells for. */
 function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote }: { res: Result | null; bulk: Bulk | null; busy: boolean; err: string;
   divine: number | null; ninja: [number, string] | null; ninjaNote: string }) {
@@ -149,9 +163,11 @@ function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote }: { res: Re
     main = res.summary[1]; label = "on trade now";
     sub = <>cheapest {money(res.summary[0], divine)} · {res.total.toLocaleString()} listed</>;
   } else if (bulk?.offers[0]) {
+    const t = bulkTypical(bulk.offers, divine);
     const o = bulk.offers[0];
-    main = o.pay_currency === "divine" && divine ? o.each * divine : o.each; label = "each, on the exchange";
-    sub = <>{bulk.offers.length} sellers</>;
+    main = t.typical; label = "each, going rate on the exchange";
+    sub = <>cheapest {money(t.cheapest, divine)}{o.stock ? ` (${o.stock} in stock)` : ""} · {bulk.offers.length} sellers
+      {ninjaChaos != null && <> · poe.ninja {money(ninjaChaos, divine)}</>}</>;
   } else if (ninjaChaos != null) {
     main = ninjaChaos; label = `poe.ninja${ninjaNote}`;
   }
@@ -320,6 +336,7 @@ export default function TradeWindow() {
   const mapModCount = setup.filters.filter((x) => !(x.kind === "property" || x.kind === "pseudo")).length;
   const patch = (i: number, p: Partial<StatFilter>) => { if ("min" in p) setPreset(null); return setSetup({ ...setup, filters: setup.filters.map((f, j) => (j === i ? { ...f, ...p } : f)) }); };
   const divine = res?.divine ?? bulk?.divine ?? check?.divine ?? null;
+  const bt = bulk?.offers.length ? bulkTypical(bulk.offers, bulk.divine) : null;
   const copy = (text: string, key: string) => { invoke("copy_text", { text }); setCopied(key); };
   // Mouse wheel on a minimum: 1 at a time (Shift: 10).
   const wheel = (i: number, f: StatFilter, e: React.WheelEvent) => {
@@ -432,8 +449,8 @@ export default function TradeWindow() {
       {check.bulk && (
         <div className="tw-res">
           <div className="tw-sum tw-bulkhead">
-            <span>{bulk?.offers[0] ? <>From <b><Price n={bulk.offers[0].each} cur={bulk.offers[0].pay_currency} /></b> each
-              {" "}<Other n={bulk.offers[0].each} cur={bulk.offers[0].pay_currency} divine={bulk.divine} /></> : busy ? "checking…" : "no offers"}</span>
+            <span>{bulk?.offers[0] && bt ? <>Going rate <b><Price n={bt.typical} cur="chaos" /></b> each
+              {" "}<Other n={bt.typical} cur="chaos" divine={bulk.divine} /></> : busy ? "checking…" : "no offers"}</span>
             <span className="tw-pay">
               {(["chaos", "divine"] as const).map((p) => (
                 <button key={p} className={pay === p ? "on" : ""} onClick={() => { setPay(p); runBulk(check.bulk!, p); }}>
@@ -443,7 +460,7 @@ export default function TradeWindow() {
           </div>
           {bulk?.offers[0] && bulk.divine && (() => {
             // How many you get for one divine / one chaos: the ratio people trade at.
-            const eachChaos = bulk.offers[0].pay_currency === "divine" ? bulk.offers[0].each * bulk.divine : bulk.offers[0].each;
+            const eachChaos = bt?.typical || (bulk.offers[0].pay_currency === "divine" ? bulk.offers[0].each * bulk.divine : bulk.offers[0].each);
             const perDiv = bulk.divine / eachChaos;
             return <div className="tw-ratio muted small">
               1 <CurrencyIcon id="divine" /> ≈ <b>{perDiv >= 10 ? Math.round(perDiv) : +perDiv.toFixed(1)}</b> {it.base_type}
@@ -453,9 +470,9 @@ export default function TradeWindow() {
           })()}
           <ul className="tw-list">
             {bulk?.offers.map((o, i) => (
-              <li key={i}>
+              <li key={i} className={bt?.fixer(o) ? "fixer" : ""} title={bt?.fixer(o) ? "Much cheaper than the going rate with very little stock: often a price fixer" : undefined}>
                 <span className="tw-price"><Price n={o.each} cur={o.pay_currency} /></span>
-                <span className="muted small"><Other n={o.each} cur={o.pay_currency} divine={bulk.divine} />{o.get > 1 ? ` · ${o.pay} for ${o.get}` : ""}</span>
+                <span className="muted small"><Other n={o.each} cur={o.pay_currency} divine={bulk.divine} />{o.get > 1 ? ` · ${o.pay} for ${o.get}` : ""}{bt?.fixer(o) && <span className="tw-fixer">low stock</span>}</span>
                 <span className="tw-seller muted small">{o.stock} in stock · {o.account}</span>
                 {o.whisper && <button className="link small" onClick={() => copy(o.whisper, "b" + i)}>{copied === "b" + i ? "Copied" : "Whisper"}</button>}
               </li>

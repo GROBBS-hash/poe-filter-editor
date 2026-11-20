@@ -456,10 +456,19 @@ pub fn listings(fetched: &Value, rates: &HashMap<String, f64>) -> Vec<Listing> {
 
 /// What the cheapest listings say it's worth: (lowest, typical) in chaos.
 pub fn summary(ls: &[Listing]) -> Option<(f64, f64)> {
-    let mut v: Vec<f64> = ls.iter().filter_map(|l| l.chaos).collect();
+    // Price fixers list a few very cheap copies (often the same seller many times) to drag the price down.
+    // Count each seller once, at their cheapest, then take the middle of the cheapest ten sellers.
+    let mut by_seller: Vec<(&str, f64)> = Vec::new();
+    for l in ls {
+        let Some(c) = l.chaos else { continue };
+        match by_seller.iter_mut().find(|(a, _)| *a == l.account) {
+            Some(s) => if c < s.1 { s.1 = c },
+            None => by_seller.push((&l.account, c)),
+        }
+    }
+    let mut v: Vec<f64> = by_seller.into_iter().map(|(_, c)| c).collect();
     if v.is_empty() { return None; }
     v.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    // Skip the odd too-cheap listing (price fixers): typical = middle of the cheapest ten.
     let first = &v[..v.len().min(10)];
     Some((v[0], first[first.len() / 2]))
 }
@@ -798,5 +807,11 @@ Item Level: 75
         let ls = listings(&f, &r);
         assert_eq!(ls[0].chaos, Some(200.0));
         assert_eq!(summary(&ls), Some((50.0, 200.0)));
+        // One price fixer listing six cheap copies counts once: the typical price comes from the real sellers.
+        let l = |acc: &str, c: f64| Listing { amount: c, currency: "chaos".into(), chaos: Some(c), account: acc.into(), indexed: String::new(),
+            whisper: String::new(), ilvl: None, instant: false };
+        let mut fixed: Vec<Listing> = (0..6).map(|_| l("fixer", 0.1)).collect();
+        fixed.extend([l("a", 3.0), l("b", 3.0), l("c", 4.0), l("d", 5.0)]);
+        assert_eq!(summary(&fixed), Some((0.1, 3.0)));
     }
 }

@@ -225,6 +225,10 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   `::-webkit-scrollbar` rules at the end of styles.css).
 - 21 Nov (4): changing atlas step glides the view (0.4 s, `glide` in AtlasTreeView; straight there with reduced motion) to
   fit everything taken so far incl. the new step; the first view fits the steps taken too. Zoom/drag stop a glide.
+- Price fixers 20 Nov: item listings count each seller once (`summary` in trade.rs, middle of the cheapest ten
+  sellers). Bulk exchange shows a stock-weighted going rate (`bulkTypical` in TradeWindow.tsx), poe.ninja beside it,
+  and marks offers well under it with little stock as "low stock" (likely fixers). His Stacked Deck: 3c, not 1c.
+
 
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
@@ -240,6 +244,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Every Ctrl+D shows a trade price straight away (uniques, corpses, gems too) in the big box at the top.
       (Confirmed 20 Nov for a unique, a unique belt and a gem.)
 - [ ] Fractured item: "Price as base · ilvl 73–74" gives sensible prices (fractured-only search confirmed 20 Nov).
+- [ ] Bulk items (e.g. Stacked Deck) show the going rate (3c), not a price fixer's 1c; fixers marked "low stock".
 - [ ] Related items panel beside the price window: lifeforce, fragments, invitations, boss keys.
 - [ ] New Clean glass look: opens bigger and remembers its size; pages fade in; Wealth tiles look right; nothing broken on other pages.
 - [ ] Unidentified unique (e.g. Karui Sceptre): no false tier 1 / divine sound; the "Could be one of N uniques" list shows in F2 and Ctrl+D.
