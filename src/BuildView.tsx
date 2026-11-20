@@ -24,8 +24,32 @@ const priceGem = (g: PobGem) => invoke("price_build_item", { gem: g }).catch(() 
 
 function PriceButton({ onClick }: { onClick: () => void }) {
   return (
-    <button className="bv-price" title="Price check this on the trade site"
+    <button className="bv-price" title="Price check this item (the price window, like Ctrl+D)"
       onClick={(e) => { e.stopPropagation(); onClick(); }}>Price</button>
+  );
+}
+
+type BuyResult = { total: number; of: number; need: number };
+
+/** "Buy": opens the trade site in your browser, searching for an item with the mods PoB lists. */
+function BuyButton({ it }: { it: PobGear }) {
+  const [state, setState] = useState<"idle" | "busy" | BuyResult | string>("idle");
+  const go = (e: { stopPropagation(): void }) => {
+    e.stopPropagation();
+    setState("busy");
+    invoke<BuyResult | null>("buy_build_item", { text: it.copy }).then((r) => setState(r ?? "No answer from the trade site")).catch((err) => setState(String(err)));
+  };
+  const note = typeof state === "object" && state
+    ? `${state.total} for sale${state.need < state.of ? ` · any ${state.need} of ${state.of} mods` : ""}`
+    : state !== "idle" && state !== "busy" ? state : "";
+  return (
+    <>
+      {note && <span className={`bv-buynote small ${typeof state === "string" ? "bad" : ""}`} title={note}>{note}</span>}
+      <button className="bv-price bv-buy" disabled={state === "busy"}
+        title={"Search the trade site for this item with the mods your build lists (totals for life and resistances,\n" +
+          "10% under PoB's numbers, crafted mods left out) and open it in your browser"}
+        onClick={go}>{state === "busy" ? "Searching…" : "Buy"}</button>
+    </>
   );
 }
 
@@ -110,6 +134,7 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
           <span style={{ color: RARITY[it.rarity] ?? "#ccc" }}>{it.name}</span>
           {it.base !== it.name && <span className="muted small"> {it.base}</span>}
         </span>
+        {it.copy && <BuyButton it={it} />}
         {it.copy && <PriceButton onClick={() => priceItem(it)} />}
       </div>
       {openItem === key && <ul className="bv-lines">{it.lines.map((l, k) => <li key={k}>{l}</li>)}</ul>}
@@ -181,6 +206,7 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
                     <button className="link small bv-onTree" title="Show this jewel's socket on the tree"
                       onClick={(e) => { e.stopPropagation(); setJewelNode(j.node); setView("tree"); }}>on tree</button>
                   )}
+                  {j.item.copy && <BuyButton it={j.item} />}
                   {j.item.copy && <PriceButton onClick={() => priceItem(j.item)} />}
                 </div>
                 {openItem === key && <ul className="bv-lines">{j.item.lines.map((l, k) => <li key={k}>{l}</li>)}</ul>}

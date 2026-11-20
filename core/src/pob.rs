@@ -187,7 +187,8 @@ fn game_copy(rarity: &str, name: &str, base: &str, lines: &[String]) -> String {
             if let Some(v) = l.strip_prefix("Item Level: ") { ilvl = Some(v.trim().to_string()); }
             else if let Some(v) = l.strip_prefix("Sockets: ") { sockets = Some(v.trim().to_string()); }
             else if let Some(v) = l.strip_prefix("Quality: ") { if v.trim() != "0" { props.push(format!("Quality: +{}% (augmented)", v.trim())); } }
-            else if ["Armour: ", "Evasion Rating: ", "Energy Shield: ", "Ward: ", "Limited to: ", "Radius: "].iter().any(|k| l.starts_with(k)) {
+            // Not "Armour: 96" etc.: in PoB those are the base's roll, not the finished item's number.
+            else if ["Limited to: ", "Radius: "].iter().any(|k| l.starts_with(k)) {
                 props.push(l.clone());
             } else if l.ends_with(" Item") && !l.contains(": ") { tail.push(l.clone()); }
             continue;
@@ -196,7 +197,7 @@ fn game_copy(rarity: &str, name: &str, base: &str, lines: &[String]) -> String {
         let t = tidy(l);
         if t.is_empty() { continue; }
         if matches!(t.as_str(), "Corrupted" | "Mirrored" | "Split") || (t.ends_with(" Item") && !t.contains(char::is_numeric)) { tail.push(t); continue; }
-        let tag = if l.contains("{enchant}") { " (enchant)" } else if left > 0 { " (implicit)" } else if l.contains("{crafted}") { " (crafted)" }
+        let tag = if l.contains("{enchant}") || (left > 0 && base.ends_with("Cluster Jewel")) { " (enchant)" } else if left > 0 { " (implicit)" } else if l.contains("{crafted}") { " (crafted)" }
             else if l.contains("{fractured}") { " (fractured)" } else { "" };
         if left > 0 { implicit_left = Some(left - 1); implicits.push(format!("{t}{tag}")); } else { mods.push(format!("{t}{tag}")); }
     }

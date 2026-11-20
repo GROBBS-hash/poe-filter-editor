@@ -178,6 +178,11 @@ const WEAPON_LOCAL: &[&str] = &["adds # to # physical damage", "#% increased phy
     "adds # to # fire damage", "adds # to # cold damage", "adds # to # lightning damage"];
 const DEFENCE_FLAT: &[&str] = &["+# to armour", "+# to evasion rating", "+# to maximum energy shield", "+# to ward"];
 
+/// A local defence mod ("+# to Armour", "#% increased Armour and Energy Shield"…), by its lower-case template.
+pub fn is_local_defence(t: &str) -> bool {
+    [AR_INC, EV_INC, ES_INC, DEFENCE_FLAT, &["#% increased ward"][..]].iter().any(|l| l.contains(&t))
+}
+
 fn sum_inc(mods: &[ModLine], list: &[&str]) -> f64 {
     mods.iter().filter(|m| m.kind != "enchant").map(|m| {
         let (t, v) = template(&m.text);
@@ -368,4 +373,62 @@ pub fn map_props(text: &str, item: &Item) -> Vec<StatFilter> {
     }).count();
     if mods >= 8 { out.push(StatFilter { kind: "pseudo".into(), ..f("pseudo.pseudo_number_of_affix_mods", format!("{mods} mods"), mods as f64, true) }); }
     out
+}
+
+#[cfg(test)]
+mod buy_tests {
+    use crate::trade::{buy_mod_count, buy_query, buy_setup, setup, StatIndex};
+    use serde_json::json;
+
+    #[test]
+    fn buy_like_your_build() {
+        let idx = StatIndex::from_json(&json!({ "result": [ { "label": "Explicit", "entries": [
+            { "id": "explicit.life", "text": "+# to maximum Life", "type": "explicit" },
+            { "id": "explicit.fire", "text": "+#% to Fire Resistance", "type": "explicit" },
+            { "id": "explicit.cold", "text": "+#% to Cold Resistance", "type": "explicit" },
+            { "id": "explicit.ms", "text": "#% increased Movement Speed", "type": "explicit" },
+            { "id": "explicit.spell", "text": "+# to Level of all Spell Skill Gems", "type": "explicit" },
+            { "id": "explicit.dex", "text": "+# to Dexterity", "type": "explicit" } ] } ] }));
+        // As PoB's boots would be written for the price window: life, two resistances, speed, a crafted mod.
+        let text = "Item Class: Boots\nRarity: Rare\nEndgame Feet\nTwo-Toned Boots\n--------\nItem Level: 1\n--------\n\
+            +80 to maximum Life\n+40% to Fire Resistance\n+30% to Cold Resistance\n30% increased Movement Speed\n+18 to Dexterity (crafted)\n";
+        let s = buy_setup(setup(text, &idx).unwrap());
+        let on: Vec<(&str, Option<f64>)> = s.filters.iter().filter(|f| f.enabled).map(|f| (f.id.as_str(), f.min)).collect();
+        // Totals for life and elemental resistance (single mods folded in), speed at 90%, no crafted Dexterity.
+        assert!(on.contains(&("pseudo.pseudo_total_life", Some(72.0))), "{on:?}");
+        assert!(on.contains(&("pseudo.pseudo_total_elemental_resistance", Some(63.0))), "{on:?}");
+        assert!(on.contains(&("explicit.ms", Some(27.0))), "{on:?}");
+        assert!(!on.iter().any(|(id, _)| *id == "explicit.dex" || *id == "pseudo.pseudo_total_resistance"), "{on:?}");
+        assert!(!s.base_only && s.ilvl_min.is_none());
+        let q = buy_query(&s, 0);
+        assert_eq!(q["query"]["stats"][0]["type"], "and");
+        assert_eq!(q["query"]["filters"]["type_filters"]["filters"]["category"]["option"], "armour.boots");
+        assert_eq!(buy_mod_count(&s), 1);
+    }
+
+    #[test]
+    fn buy_relaxed_and_cluster() {
+        let idx = StatIndex::from_json(&json!({ "result": [ { "label": "Explicit", "entries": [
+            { "id": "explicit.a", "text": "#% increased Spell Damage", "type": "explicit" },
+            { "id": "explicit.b", "text": "#% increased Cast Speed", "type": "explicit" },
+            { "id": "explicit.c", "text": "+# to Level of all Spell Skill Gems", "type": "explicit" },
+            { "id": "explicit.d", "text": "+# to Maximum Power Charges", "type": "explicit" } ] },
+            { "label": "Enchant", "entries": [ { "id": "enchant.passives", "text": "Adds # Passive Skills", "type": "enchant" } ] } ] }));
+        let staff = "Item Class: Staves\nRarity: Rare\nGhoul Spell\nImperial Staff\n--------\nItem Level: 84\n--------\n\
+            147% increased Spell Damage\n43% increased Cast Speed\n+2 to Level of all Spell Skill Gems\n+1 to Maximum Power Charges\n";
+        let s = buy_setup(setup(staff, &idx).unwrap());
+        assert_eq!(buy_mod_count(&s), 4);
+        let q = buy_query(&s, 1);
+        assert_eq!(q["query"]["stats"][1]["type"], "count");
+        assert_eq!(q["query"]["stats"][1]["value"]["min"], 3);
+        // Cluster jewel: the passive count is an enchant, ticked and exact.
+        let cluster = "Item Class: Jewels\nRarity: Rare\nEagle Glisten\nLarge Cluster Jewel\n--------\nItem Level: 1\n--------\n\
+            Adds 8 Passive Skills (enchant)\n--------\n12% increased Spell Damage\n";
+        let s = buy_setup(setup(cluster, &idx).unwrap());
+        let q = buy_query(&s, 0);
+        let f = q["query"]["stats"][0]["filters"].as_array().unwrap().iter().find(|v| v["id"] == "enchant.passives").cloned().unwrap();
+        assert_eq!((f["value"]["min"].as_f64(), f["value"]["max"].as_f64()), (Some(8.0), Some(8.0)));
+        // Cluster jewels are their own category on the trade site.
+        assert_eq!(q["query"]["filters"]["type_filters"]["filters"]["category"]["option"], "jewel.cluster");
+    }
 }

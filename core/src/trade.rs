@@ -115,6 +115,10 @@ impl StatIndex {
         let (t, vals) = template(&m.text);
         let value = if vals.len() == 2 && t.to_lowercase().contains("# to #") { (vals[0] + vals[1]) / 2.0 } else { vals.first().copied().unwrap_or(0.0) };
         let kinds = [m.kind.as_str(), "explicit"];
+        // Some are listed word for word, numbers and all ("1 Added Passive Skill is Overshock"): no value to search.
+        for k in kinds {
+            if let Some(id) = self.by_text.get(&(k.to_string(), m.text.to_lowercase())) { return Some((id.clone(), f64::NAN)); }
+        }
         for k in kinds {
             if let Some(id) = self.by_text.get(&(k.to_string(), t.to_lowercase())) { return Some((id.clone(), value)); }
             // The site writes a leading "+" for flat mods; the item sometimes doesn't, and vice versa.
@@ -325,8 +329,10 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
         let junk = is_junk(&t);
         // Maps: price by tier and rarity; mods are there to tick, never ticked for you.
         let enabled = !unique && !is_map(&item) && m.kind != "enchant" && good && !junk && !counted.contains(&i);
-        // A mod with no number is just "has it": no minimum.
-        let min = if m.values.is_empty() { None } else { Some(min_for(value)) };
+        // A mod with no number (or listed word for word, value NaN) is just "has it": no minimum.
+        let whole = value.is_nan();
+        let value = if whole { 0.0 } else { value };
+        let min = if m.values.is_empty() || whole { None } else { Some(min_for(value)) };
         filters.push(StatFilter { id, label: m.text.clone(), value, min, enabled, kind, tier: m.tier, junk, roll: m.roll, range: m.range.clone(), affix: m.affix.clone() });
     }
     if is_map(&item) { filters.splice(0..0, crate::trade_rules::map_props(text, &item)); }
@@ -353,7 +359,7 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
     let nothing_picked = !filters.iter().any(|f| f.enabled);
     let gear = category(&item.item_class).is_some();
     Some(TradeSetup {
-        category: category(&item.item_class).map(String::from),
+        category: category(&item.item_class).map(|c| if item.base_type.ends_with("Cluster Jewel") { "jewel.cluster" } else { c }).map(String::from),
         base_only: !matches!(item.rarity.as_str(), "Rare" | "Magic") || !gear || nothing_picked,
         ilvl_min: (gear && nothing_picked && item.rarity != "Unique").then_some(item.item_level).flatten(),
         ilvl_max: (gear && nothing_picked && item.rarity != "Unique").then_some(item.item_level).flatten().and_then(|l| ilvl_band(l).1),
@@ -624,6 +630,71 @@ pub fn poeprices(v: &Value) -> Option<(f64, f64, String, f64)> {
     if v["error"].as_i64().unwrap_or(0) != 0 { return None; }
     Some((v["min"].as_f64()?, v["max"].as_f64()?, v["currency"].as_str().unwrap_or("chaos").to_string(),
         v["pred_confidence_score"].as_f64().unwrap_or(0.0)))
+}
+
+// ---------- "Buy" from your PoB build ----------
+
+/// A search for an item like the one in your build: every mod PoB lists ticked (totals for life,
+/// resistances and attributes instead of their single mods), minimums 10% under the build's numbers
+/// so near-misses show too. Crafted mods are left out (you can craft them), and so are junk mods.
+/// Uniques are searched by name; Watcher's Eye style "while affected by" mods are ticked too.
+pub fn buy_setup(mut s: TradeSetup) -> TradeSetup {
+    let unique = s.item.rarity == "Unique";
+    let jewel = s.item.item_class.contains("Jewel");
+    let loose = |v: f64| if v.abs() <= 5.0 { v } else { (v * 0.9).floor() };
+    let armour = s.category.as_deref().is_some_and(|c| c.starts_with("armour."));
+    for f in &mut s.filters {
+        // Armour pieces: PoB's "+113 to Armour" / "133% increased Armour and Energy Shield" are rarely rolled
+        // exactly like that; left for you to tick on the site.
+        let local_defence = armour && crate::trade_rules::is_local_defence(&template(&f.label).0.to_lowercase());
+        f.enabled = if unique {
+            f.label.contains("while affected by")
+        } else {
+            match f.kind.as_str() {
+                // Totals, but not "open prefix" or the any-resistance one (the elemental and chaos totals cover it).
+                "pseudo" => !f.id.contains("empty") && f.id != "pseudo.pseudo_total_resistance",
+                // Defences in a PoB item are base rolls, not the item's real numbers.
+                "property" => false,
+                "crafted" => false,
+                // Cluster jewels: "Adds 8 Passive Skills" and what the small passives grant matter.
+                "enchant" => jewel,
+                _ => !f.junk && !local_defence,
+            }
+        };
+        if f.enabled && !f.label.contains("Passive Skills") { f.min = f.min.map(loose); }
+    }
+    s.base_only = unique || s.category.is_none();
+    s.ilvl_min = None;
+    s.ilvl_max = None;
+    s.links_min = None;
+    s
+}
+
+/// The search for `buy_setup`. `spare` > 0 lets that many of the single mods be missing (a "count" group),
+/// for when every mod at once finds nothing. Totals stay required. Cluster jewels' passive count is exact.
+pub fn buy_query(s: &TradeSetup, spare: usize) -> Value {
+    let mut q = query(s);
+    let exact: Vec<&str> = s.filters.iter().filter(|f| f.enabled && f.label.contains("Passive Skills") && f.kind == "enchant")
+        .map(|f| f.id.as_str()).collect();
+    let totals: Vec<&str> = s.filters.iter().filter(|f| f.enabled && f.kind == "pseudo").map(|f| f.id.as_str()).collect();
+    let Some(list) = q["query"]["stats"][0]["filters"].as_array().cloned() else { return q };
+    let list: Vec<Value> = list.into_iter().map(|mut v| {
+        if exact.contains(&v["id"].as_str().unwrap_or("")) && !v["value"]["min"].is_null() { let m = v["value"]["min"].clone(); v["value"]["max"] = m; }
+        v
+    }).collect();
+    let (must, rest): (Vec<Value>, Vec<Value>) = list.into_iter().partition(|v| totals.contains(&v["id"].as_str().unwrap_or("")));
+    q["query"]["stats"] = if spare == 0 || rest.len() <= spare {
+        json!([{ "type": "and", "filters": must.into_iter().chain(rest).collect::<Vec<_>>() }])
+    } else {
+        let n = rest.len() - spare;
+        json!([{ "type": "and", "filters": must }, { "type": "count", "filters": rest, "value": { "min": n } }])
+    };
+    q
+}
+
+/// How many single mods the "Buy" search asks for (to say "any 4 of these 5").
+pub fn buy_mod_count(s: &TradeSetup) -> usize {
+    s.filters.iter().filter(|f| f.enabled && f.kind != "pseudo" && !f.id.starts_with("prop.")).count()
 }
 
 #[cfg(test)]

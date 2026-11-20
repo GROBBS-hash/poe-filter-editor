@@ -539,7 +539,7 @@ fn price_check(app: AppHandle) {
             match read_from_ground(&app) {
                 Ok(p) => {
                     let item = p.item;
-                    let category = filter_core::trade::category(&item.item_class).map(String::from);
+                    let category = filter_core::trade::category(&item.item_class).map(|c| if item.base_type.ends_with("Cluster Jewel") { "jewel.cluster" } else { c }).map(String::from);
                     let s = filter_core::trade::TradeSetup { item: item.clone(), filters: vec![], base_only: true, ilvl_min: None, ilvl_max: None,
                         links_min: None, gem_level: None, unknown: vec![], unknown_kinds: vec![], category, raw: String::new() };
                     PriceCheck { ninja: ninja_price(&app, &item), setup: Some(s), league, from_ground: true, error: None, bulk: None, map: None, divine: None, compare: vec![], instant_all: false }
@@ -579,6 +579,38 @@ fn price_build_item(app: AppHandle, text: Option<String>, gem: Option<filter_cor
         // It's your own build's item: no "compared with your build" box.
         show_price(&app, payload, &text, false);
     });
+}
+
+#[derive(Serialize)]
+struct BuyResult {
+    /// For sale right now.
+    total: u64,
+    /// Single mods asked for, and how many each listing must have (less than `of` when relaxed).
+    of: usize,
+    need: usize,
+}
+
+/// "Buy" on an item in your build: a trade search with every mod PoB lists, opened in your browser.
+/// Nothing for sale with all of them: tries again letting one mod (then two) be missing.
+#[tauri::command(async)]
+fn buy_build_item(app: AppHandle, text: String) -> Result<BuyResult, String> {
+    let (poe2, league) = trade_league(&app);
+    let index = trade_api::stats(&app.state::<AppState>().data_dir, poe2).unwrap_or_default();
+    let setup = filter_core::trade::buy_setup(filter_core::trade::setup(&text, &index).ok_or("Couldn't read that item")?);
+    let of = filter_core::trade::buy_mod_count(&setup);
+    let types = trade_api::item_types(&app.state::<AppState>().data_dir, poe2).ok();
+    let mut found = None;
+    for spare in 0..=2usize {
+        if spare > 0 && (of < 3 + 2 * (spare - 1)) { break; }
+        let mut q = filter_core::trade::buy_query(&setup, spare);
+        if let Some(t) = &types { t.fix_query(&mut q); }
+        let (id, _, total) = trade_api::search(poe2, &league, &q)?;
+        found = Some((id, total, spare));
+        if total > 0 { break; }
+    }
+    let (id, total, spare) = found.ok_or("Couldn't search the trade site")?;
+    open_url(trade_api::site_url(poe2, &league, &id))?;
+    Ok(BuyResult { total, of, need: of.saturating_sub(spare) })
 }
 
 /// Fills in the rest (divine rate, build comparison, map check, bulk) and shows the price window.
@@ -2290,7 +2322,7 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            price_build_item, overview,
+            price_build_item, buy_build_item, overview,
             create_profile,
             list_filters,
             set_active,

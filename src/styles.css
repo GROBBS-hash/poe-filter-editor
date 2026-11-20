@@ -1262,9 +1262,16 @@ body.main ::-webkit-scrollbar-thumb:hover { background: #4a5566; }
 .bv-item .bv-price { margin-left: 8px; flex: none; font-size: 11px; padding: 2px 10px; border-radius: 10px; cursor: pointer;
   background: rgba(212, 175, 55, 0.12); color: #e6c65c; border: 1px solid rgba(212, 175, 55, 0.35); opacity: 0.55; transition: opacity .15s, background .15s; }
 .bv-item .bv-onTree + .bv-price { margin-left: 8px; }
-.bv-item .bv-iname + .bv-price { margin-left: auto; }
+.bv-item .bv-iname + .bv-price, .bv-item .bv-iname + .bv-buynote, .bv-item .bv-iname + .bv-buy { margin-left: auto; }
+.bv-item .bv-buynote { margin-left: 8px; color: var(--muted, #9aa); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40%; }
+.bv-item .bv-buynote.bad { color: #e08070; }
+.bv-item .bv-onTree + .bv-buynote { margin-left: 8px; }
 li:hover > .bv-item .bv-price { opacity: 1; }
 .bv-item .bv-price:hover { background: rgba(212, 175, 55, 0.25); }
+/* Buy is the main one: filled gold, always visible. */
+.bv-item .bv-buy { opacity: 1; background: rgba(212, 175, 55, 0.85); color: #1a1408; border-color: transparent; font-weight: 600; }
+.bv-item .bv-buy:hover { background: rgba(232, 195, 75, 1); }
+.bv-item .bv-buy:disabled { opacity: .6; cursor: default; }
 .gem { cursor: pointer; }
 .bv-iname { display: flex; flex-direction: column; }
 .bv-jewelchips { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-top: 8px; }

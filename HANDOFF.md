@@ -300,6 +300,17 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   PoB bookkeeping ("Has Alt Variant Two", "Intangibility"); Watcher's Eye keeps every alt variant's mod. Dev check:
   `POB_COPY=1 cargo run -p filter-core --example pobdump -- <pob.txt>` (all 30-odd items of his build read back).
 
+- **Buy from your build** 21 Nov (what he asked for: PoB's mods -> trade site in one click): gold "Buy" on each item / jewel
+  in F6 and My build. `trade::buy_setup` ticks every mod (totals for life / ele / chaos res / attributes instead of
+  single mods, minimums 10% under PoB's numbers if > 5, crafted and junk mods off, armour pieces' local defence mods
+  off because PoB's are base rolls, cluster enchants on with the passive count exact; uniques by name, Watcher's Eye
+  "while affected by" mods ticked). Command `buy_build_item` searches, and when nothing is for sale retries with a
+  "count" group (any N-1, then N-2 of the single mods; totals stay required), then opens the search in the browser and
+  shows "N for sale · any 3 of 4 mods". Live 21 Nov on his build: helmet 391, boots 5, ring 8 (3 of 4), cobalt 21,
+  large clusters 13 and 20. Found on the way: cluster jewels are category `jewel.cluster` (Ctrl+D searched jewel.base:
+  nothing), and notables like "1 Added Passive Skill is Overshock" are matched word for word (`StatIndex::find`).
+  Dev check: `POB_STAGE="Endgame" POB_BUY=<data dir>/trade_stats_poe1.json cargo run -p filter-core --example pobdump -- <pob.txt>`.
+
 - Any resistance 21 Nov: items with 2+ resistance mods get an unticked Totals row "+N% total Resistance (any, chaos too)"
   (`ANY_RES` rule in trade_rules.rs, trade id pseudo.pseudo_total_resistance) for searches that don't mind which element.
 
@@ -351,6 +362,9 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
       show with prices at the bottom of the window.
 - [ ] Save search, Saved searches list (Run / Live / delete); a live search pops up new listings with a Whisper button.
 
+- [ ] Build window (F6) / My build: gold "Buy" opens the trade site in your browser with the item's mods filled in, and
+      says how many are for sale ("any 3 of 4 mods" when it had to loosen). Try a rare, a cluster jewel, Watcher's Eye.
+- [ ] Ctrl+D on a cluster jewel in game finds listings (it searched the wrong category before 21 Nov).
 - [ ] Build window (F6) / My build: "Price" on a gear item, flask or jewel, or a click on a gem, opens the price window for it
       (Duskdawn as Maelström Staff, rares with their mods ready to search). Jewel mods no longer show "Has Alt Variant Two".
 
