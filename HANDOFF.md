@@ -284,7 +284,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
       "Only sellers with at least N in stock" works; repeat item listings show "× N".
 - [ ] Related items panel beside the price window: lifeforce, fragments, invitations, boss keys.
 - [x] Wealth "By tab" works (confirmed 20 Nov).
-- [x] Maps: a mod ticked on the Maps page shows in red on Ctrl+D (confirmed 20 Nov). Still check: the stash search hides it. Settings → Map check opens the Maps page.
+- [x] Maps: a mod ticked on the Maps page shows in red on Ctrl+D and the stash search hides those maps (confirmed 20 Nov).
 - [ ] Menu icons: each page has its own colour tile (Find blue, Tiers coral, Wealth gold…), page title matches.
 - [ ] New Clean glass look: opens bigger and remembers its size; pages fade in; Wealth tiles look right; nothing broken on other pages.
 - [ ] Unidentified unique (e.g. Karui Sceptre): no false tier 1 / divine sound; the "Could be one of N uniques" list shows in F2 and Ctrl+D.
