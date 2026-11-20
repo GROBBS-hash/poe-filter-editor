@@ -175,6 +175,9 @@ export default function MapTiers({ profileId, onChange, onOpen, focus }: { profi
           const all = s.tiers.every(shown), none = !s.tiers.some(shown);
           // Originator maps share NeverSink's "influenced" rules but get their own row ("maps>influenced>zana").
           const zana = s.tiers.every((t) => t.tier.startsWith("zana"));
+          // Rows shown band by band with a "plain map" example: Originator and citadel (conqueror) maps.
+          const citadel = s.type_path[1] === "implicitmod";
+          const bands = zana || citadel;
           const rk = s.type_path.join(">") + (zana ? ">zana" : "");
           const sk = "s:" + rk;
           return (
@@ -186,27 +189,30 @@ export default function MapTiers({ profileId, onChange, onOpen, focus }: { profi
                     onChange={(e) => change(s.type_path, s.tiers.map((r) => r.tier), { show: e.target.checked }, `${s.title} ${e.target.checked ? "shown" : "hidden"}.`)} />
                   <span>{s.title}</span>
                 </label>
-                {!zana && <LookButton className="tier-look" title={`Change the look of every rule in ${s.title}`} onClick={() => setEditing(editing === sk ? null : sk)}>
+                {!bands && <LookButton className="tier-look" title={`Change the look of every rule in ${s.title}`} onClick={() => setEditing(editing === sk ? null : sk)}>
                   <Preview s={fromCurrent(s.tiers[0].style, "Maps")} text="Map" /></LookButton>}
                 <span className="tier-tools">
                   <button className="link small" onClick={() => onOpen(s)}>Open</button>
                 </span>
               </div>
-              {!zana && <div className="muted small mt-special-rules">{s.tiers.map((r) => r.name).join(" · ")}</div>}
+              {!bands && <div className="muted small mt-special-rules">{s.tiers.map((r) => r.name).join(" · ")}</div>}
               {zana && <p className="mt-what mt-special-rules">Maps from the Originator's memories. Their label only says
                 "Map (Tier N)"; NeverSink gives them this look instead of the plain tier look. Click a look to change it.</p>}
-              {zana && s.tiers.map((r) => {
+              {citadel && <p className="mt-what mt-special-rules">Maps with a conqueror's citadel ("Map contains Drox's Citadel",
+                Veritania's, Baran's, Al-Hezmin's). NeverSink ships this rule switched off; the app switches it on so they stand out.
+                Click a look to change it.</p>}
+              {bands && s.tiers.map((r) => {
                 // Example: this rule's look ("with") next to the plain map look of a tier it covers ("without").
-                const t = r.tier === "zanamap" ? 16 : 10;
+                const t = r.tier === "zanamap" || r.tier === "t1" ? 16 : 10;
                 const plain = data.tiers.find((x) => x.map_tier === t);
                 const text = `Map (Tier ${t})`;
-                const ek = "z:" + r.tier;
+                const ek = "z:" + rk + ":" + r.tier;
                 return (
                   <div key={r.tier} className={`mt-zana ${shown(r) ? "" : "off"}`}>
                     <span className="mt-zana-name">{r.name}</span>
                     <span className="mt-demo">
                       <span className="mt-demo-one"><LookButton title={`Change the look of ${r.name}`} onClick={() => setEditing(editing === ek ? null : ek)}>
-                        <Preview s={fromCurrent(r.style, "Maps")} text={text} /></LookButton><span className="muted small">Originator</span></span>
+                        <Preview s={fromCurrent(r.style, "Maps")} text={text} /></LookButton><span className="muted small">{citadel ? "Citadel" : "Originator"}</span></span>
                       {plain && <span className="mt-demo-one"><Preview s={fromCurrent(plain.style, "Maps")} text={text} /><span className="muted small">plain map</span></span>}
                     </span>
                     {editing === ek && (

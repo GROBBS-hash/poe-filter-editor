@@ -306,11 +306,13 @@ pub fn ground_item(segs: &[Segment], m: &GroundMatch, label: Option<LabelColours
         item.rarity = "Normal".into();
         // Originator (Zana memory) maps say only "Map (Tier 16)" on the label, but the filter draws them in
         // their own colours: when the label looks like that rule and not like the plain map rule, it's one.
+        // The same for citadel (conqueror) maps: "Map contains Drox's Citadel" is an implicit, not on the label.
         if let (Some(seen), false) = (label, item.blighted) {
-            let zana = Item { zana_memory: true, ..item.clone() };
-            let dz = label_distance(segs, &zana, seen, area_level, "Normal", None);
             let dp = label_distance(segs, &item, seen, area_level, "Normal", None);
-            if dz < 3 * 40 * 40 && dz * 3 < dp { item.zana_memory = true; }
+            let kinds = [Item { zana_memory: true, ..item.clone() }, Item { has_implicit: true, ..item.clone() }];
+            let best = kinds.into_iter().map(|k| (label_distance(segs, &k, seen, area_level, "Normal", None), k))
+                .min_by_key(|(d, _)| *d);
+            if let Some((d, k)) = best { if d < 3 * 40 * 40 && d * 3 < dp { item = k; } }
         }
         if label.is_some() { item.rarity = guess_rarity(segs, &item, label, area_level); }
         return item;
@@ -508,6 +510,58 @@ Originator's Memories
 ").unwrap();
         assert!(it.zana_memory);
         assert!(crate::evaluate::status(&segs, &it, Some(83), false).verdict.decided_by.contains("zanamap"));
+    }
+
+    #[test]
+    fn citadel_maps() {
+        let f = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/poe1-semistrict.filter")).unwrap();
+        let mut segs = parse_filter(&f);
+        // NeverSink ships these commented out; the app switches them on.
+        assert_eq!(crate::filter::enable_commented(&mut segs, &["maps", "implicitmod"]), 2);
+        let m = crate::tiers::map_tiers(&segs);
+        let c = m.special.iter().find(|s| s.title.starts_with("Citadel")).expect("citadel row");
+        assert_eq!(c.tiers.len(), 2);
+        // His Ctrl+C of a T16 map with Drox's Citadel (advanced copy).
+        let text = "Item Class: Maps
+Rarity: Rare
+Pain Bearings
+Map (Tier 16)
+--------
+Atlas Drops: +61% (augmented)
+--------
+Item Level: 83
+--------
+Monster Level: 83
+--------
+{ Implicit Modifier }
+Map contains Drox's Citadel(...) — Unscalable Value
+--------
+{ Prefix Modifier \"Enthralled\" (Tier: 1) }
+Unique Bosses are Possessed
+--------
+Corrupted
+";
+        let it = crate::item::parse_item(text).unwrap();
+        assert!(it.has_implicit);
+        let by = crate::evaluate::status(&segs, &it, Some(83), false).verdict.decided_by;
+        assert!(by.contains("implicitmod"), "{by}");
+        // Plain copy: "(implicit)" on the line.
+        assert!(crate::item::parse_item("Item Class: Maps
+Rarity: Normal
+Map (Tier 10)
+--------
+Map Tier: 10
+--------
+Map contains Baran's Citadel (implicit)
+").unwrap().has_implicit);
+        // Off the ground: the label in NeverSink's citadel look (purple on pale lilac).
+        let k = known_names(&crate::rules::known_bases(&segs));
+        let it = ground_item(&segs, &match_base("MAP (TIER 16)", &k).unwrap(), Some(LabelColours { text: [145, 30, 220], background: [235, 220, 245] }), 83);
+        assert!(it.has_implicit && !it.zana_memory, "{it:?}");
+        let by = crate::evaluate::status(&segs, &it, Some(83), true).verdict.decided_by;
+        assert!(by.contains("implicitmod"), "{by}");
+        // Rebuilding twice doesn't switch anything else on.
+        assert_eq!(crate::filter::enable_commented(&mut segs, &["maps", "implicitmod"]), 0);
     }
 
     #[test]

@@ -36,6 +36,9 @@ pub struct Item {
     /// "Shaper", "Elder", "Crusader"… from the copied text's "Shaper Item" lines.
     #[serde(default)]
     pub influences: Vec<String>,
+    /// Has an implicit mod (maps: "Map contains Drox's Citadel"), NeverSink's `HasImplicitMod`.
+    #[serde(default)]
+    pub has_implicit: bool,
 }
 
 /// Map names carry their special kind: "Blighted Map (Tier 3)", "Blight-ravaged Map (Tier 16)".
@@ -120,6 +123,8 @@ pub fn parse_item(text: &str) -> Option<Item> {
             item.influences.push(inf.to_string());
         } else if line.contains("Originator's Memories") || *line == "Originator Item" || line.starts_with("Contains memories of") {
             item.zana_memory = true;
+        } else if line.starts_with("{ Implicit Modifier") || line.ends_with("(implicit)") {
+            item.has_implicit = true;
         } else if *line == "Corrupted" {
             item.corrupted = true;
         } else if *line == "Mirrored" {

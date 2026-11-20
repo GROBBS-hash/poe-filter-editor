@@ -133,6 +133,44 @@ fn block_keyword(t: &str) -> Option<&'static str> {
     })
 }
 
+/// Switches on NeverSink's commented-out blocks of one `$type` (e.g. `maps->implicitmod`, which he ships
+/// as "#Show" lines), in place, so they work like his other rules. Returns how many were switched on.
+pub fn enable_commented(segs: &mut Vec<Segment>, type_path: &[&str]) -> usize {
+    let mut count = 0;
+    let mut i = 0;
+    while i < segs.len() {
+        let Segment::Raw(raw) = &segs[i] else { i += 1; continue };
+        let mut out = String::with_capacity(raw.len());
+        let mut inside = false;
+        let mut changed = false;
+        for line in raw.split_inclusive('\n') {
+            let t = line.trim_start();
+            let uncommented = t.strip_prefix('#');
+            let header = uncommented.filter(|u| block_keyword(u).is_some()).map(|u| parse_tag(u.trim_end()).0);
+            if let Some(path) = header {
+                inside = path.iter().map(String::as_str).eq(type_path.iter().copied());
+                if inside { out.push_str(uncommented.unwrap()); count += 1; changed = true; continue; }
+            } else if inside {
+                // The block's own lines are "#\tCondition": anything else (a blank line, a "#---" note) ends it.
+                match uncommented {
+                    Some(u) if u.starts_with(['\t', ' ']) && !u.trim().is_empty() => { out.push_str(u); continue; }
+                    _ => inside = false,
+                }
+            }
+            out.push_str(line);
+        }
+        if changed {
+            let parsed = parse_filter(&out);
+            let n = parsed.len();
+            segs.splice(i..=i, parsed);
+            i += n;
+        } else {
+            i += 1;
+        }
+    }
+    count
+}
+
 pub fn parse_filter(text: &str) -> Vec<Segment> {
     let newline = if text.contains("\r\n") { "\r\n" } else { "\n" }.to_string();
     let mut segs = Vec::new();

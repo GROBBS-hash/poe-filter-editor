@@ -211,6 +211,8 @@ fn check(key: &str, op: &str, vals: &[String], c: &Ctx) -> Tri {
         // Maps whose kind we know from their name (label or copied text).
         "BlightedMap" if it.map_kind_known || !c.from_screen => cmp_bool(Some(it.blighted), vals),
         "UberBlightedMap" if it.map_kind_known || !c.from_screen => cmp_bool(Some(it.uber_blighted), vals),
+        // Maps' implicits (the conqueror citadels): known from the copied text, or from the label's look.
+        "HasImplicitMod" if it.item_class == "Maps" && (it.map_kind_known || !c.from_screen) => cmp_bool(Some(it.has_implicit), vals),
         "ZanaMemory" if it.map_kind_known || !c.from_screen => cmp_bool(Some(it.zana_memory), vals),
         "HasInfluence" if !it.influences.is_empty() => {
             let any = vals.iter().any(|v| it.influences.iter().any(|i| i.eq_ignore_ascii_case(v)));

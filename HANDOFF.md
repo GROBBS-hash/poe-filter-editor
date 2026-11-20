@@ -376,6 +376,14 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
       filter's look for a Zana map vs a plain map (`label_distance`) and sets `zana_memory` when the Zana look fits
       far better. `map_tiers` splits NeverSink's `maps->influenced` rules into "Originator maps" (zanamap, zanamaplow)
       and the other influenced maps. Ctrl+C: "Originator's Memories" / "Originator Item" lines (guessed, unverified).
+- [ ] Citadel (conqueror) maps ("Map contains Drox's Citadel" implicit): purple look in game (NeverSink's own rule, which
+      he ships commented out), F2 / Ctrl+C show "maps › implicitmod", "Modify this rule" opens the new "Citadel
+      (conqueror) maps" row in Map tiers step 4 (looks clickable, with "plain map" examples; untick hides them).
+      How: `filter::enable_commented` switches on NeverSink's `#Show … $type->maps->implicitmod` blocks in place on every
+      build (`rules::apply_with_extra`), so tier edits on them work and survive updates. `Item.has_implicit` from the
+      copy ("{ Implicit Modifier }" or "(implicit)"); evaluate checks `HasImplicitMod` on maps from it; ground maps use
+      the label colours like Originator maps. Lower-tier citadel and lower-tier Originator maps share NeverSink's
+      colours exactly, so on the ground those read as Originator (same look in game; Ctrl+C tells them apart).
 
 **Clickable looks (everywhere, 20 Nov)**
 - [ ] Every label preview has a gold outline and "✎ edit look" on hover; clicking opens the look editor for that rule:

@@ -411,6 +411,8 @@ pub fn apply(segs: &mut Vec<Segment>, rules: &[Rule], nl: &str) -> Vec<String> {
 /// own edits and before the base filter.
 pub fn apply_with_extra(segs: &mut Vec<Segment>, rules: &[Rule], extra: &str, nl: &str) -> Vec<String> {
     let mut warnings = Vec::new();
+    // NeverSink ships his citadel (conqueror) map rules switched off; the app switches them on so those maps stand out.
+    crate::filter::enable_commented(segs, &["maps", "implicitmod"]);
     let mut top = format!("{START}{nl}# Edits made with the live editor. Rebuilt automatically; edit in the app.{nl}{nl}");
     for rule in rules.iter().rev() {
         match rule {

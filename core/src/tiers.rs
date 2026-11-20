@@ -347,7 +347,7 @@ fn map_kind(p: &str) -> String {
         "specialmods" => "Maps with special mods (8 mods, rare boss mods)".into(),
         "enchanted" => "Enchanted maps".into(),
         "corruptedimplicit" => "Maps with corrupted implicits".into(),
-        "implicitmod" => "Maps with implicits".into(),
+        "implicitmod" => "Citadel (conqueror) maps".into(),
         _ => plain_part(p),
     }
 }
@@ -368,6 +368,10 @@ pub fn map_tiers(segs: &[Segment]) -> MapTiers {
         let Some(mut s) = section_at(segs, p) else { continue };
         s.title = map_kind(&p[1..].join("->"));
         s.group = "Maps".into();
+        // NeverSink's generic tier names say little here: name them by what they catch.
+        if p[1] == "implicitmod" {
+            for t in s.tiers.iter_mut() { t.name = if t.tier == "t1" { "Citadel maps, tier 14+".into() } else { "Citadel maps, lower tiers".into() }; }
+        }
         // Originator (Zana memory) maps get their own row: they look very different from other influenced maps.
         let (zana, rest): (Vec<TierRow>, Vec<TierRow>) = s.tiers.iter().cloned().partition(|t| t.tier.starts_with("zana"));
         if !zana.is_empty() {

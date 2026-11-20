@@ -36,9 +36,11 @@ fn f2_hide_then_rebuild_and_undo() {
     assert!(out.starts_with(START));
     assert!(out.contains("Hide # Hide: Magic Coral Ring\r\n    Class == \"Rings\"\r\n    BaseType == \"Coral Ring\"\r\n    Rarity = Magic"));
     assert_eq!(fs::read(dir.join("NeverSink.filter")).unwrap(), base_before, "base file must never change");
-    // Everything below our section is NeverSink's file untouched:
+    // Everything below our section is NeverSink's file untouched, except his citadel map rules switched on:
     let after_ours = &out[out.find(END).unwrap() + END.len() + 4..];
-    assert_eq!(after_ours.as_bytes(), &base_before[..]);
+    let mut expected = parse_filter(&String::from_utf8_lossy(&base_before));
+    assert_eq!(enable_commented(&mut expected, &["maps", "implicitmod"]), 2);
+    assert_eq!(after_ours, render_filter(&expected));
 
     // Undo = drop the last rule and rebuild; a backup of the previous version is kept.
     store.profiles.get_mut(&id).unwrap().rules.pop();
