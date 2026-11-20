@@ -326,7 +326,9 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   request each, at most 8, stopping early if the trade site's limit is near; lists "Untick <stat> · N for sale", most first;
   click = untick + search. Preview: "Trade: nothing found" mode mocks it.
 - Build gems 21 Nov: PoB lists 21/20 gems; level > 20 or quality > 20 is now searched as corrupted (`gem_copy`), no fake
-  "Item Level: 1". Live: Lightning Tendrils of Eccentricity 21/20 uncorrupted 0, corrupted 13.
+  "Item Level: 1". Live: Lightning Tendrils of Eccentricity 21/20 uncorrupted 0, corrupted 13. (Confirmed in game.)
+  Support gems get " Support" on the end (PoB's "Arcane Surge" = trade "Arcane Surge Support"; was "Unknown item base type").
+  "Open on the trade site" now shows after every search, also when nothing is listed.
 - Prefix / suffix limits 21 Nov: `trade_rules::affix_limits` reads implicits like the Cogwork Ring's "-1 Prefix Modifier
   allowed" / "+1 Suffix Modifier allowed" (jewels 2/2, other rares 3/3); open-slot rows and the "Prefixes · up to N on this
   item" headings use it (`TradeSetup.affix_max`). His Dragon Turn: 2/4, so 1 free prefix + 1 free suffix (was "2 free prefixes").

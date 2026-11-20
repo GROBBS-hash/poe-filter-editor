@@ -217,7 +217,9 @@ pub fn gem_copy(g: &Gem) -> String {
     let q = if g.quality > 0 { format!("\nQuality: +{}% (augmented)", g.quality) } else { String::new() };
     // Past level 20 or 20% quality only happens by corrupting (PoB guides often list 21/20): search it as corrupted.
     let corrupted = if g.level > 20 || g.quality > 20 { "--------\nCorrupted\n" } else { "" };
-    format!("Item Class: {class}\nRarity: Gem\n{}\n--------\nLevel: {}{q}\n{corrupted}", g.name, g.level)
+    // PoB writes supports without the word the game (and trade site) ends their name with: "Arcane Surge" -> "Arcane Surge Support".
+    let name = if g.support && !g.name.ends_with(" Support") { format!("{} Support", g.name) } else { g.name.clone() };
+    format!("Item Class: {class}\nRarity: Gem\n{name}\n--------\nLevel: {}{q}\n{corrupted}", g.level)
 }
 
 /// "(60-80)% increased Spell Damage" at 0.5 -> "70% increased Spell Damage".
@@ -575,5 +577,8 @@ Adds 10 to 20 Lightning Damage to Spells
         let s = crate::trade::setup(&gem_copy(&g21), &Default::default()).unwrap();
         assert_eq!((s.gem_level, s.item.corrupted, s.item.item_level), (Some(21), true, None));
         assert_eq!(crate::trade::query(&s)["query"]["filters"]["misc_filters"]["filters"]["corrupted"]["option"], "true");
+        // Supports: PoB's "Arcane Surge" is the trade site's "Arcane Surge Support".
+        let sup = Gem { name: "Arcane Surge".into(), level: 20, quality: 20, enabled: true, support: true, colour: "b".into() };
+        assert_eq!(crate::trade::setup(&gem_copy(&sup), &Default::default()).unwrap().item.base_type, "Arcane Surge Support");
     }
 }

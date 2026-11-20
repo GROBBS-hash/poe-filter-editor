@@ -671,9 +671,9 @@ export default function TradeWindow() {
               </div>
             ))}
           </div>
-          <button className="link small" onClick={() => invoke("open_url", { url: res.url })}>Open on the trade site</button>
         </div>
       )}
+      {res && res.url && <button className="link small tw-open-site" onClick={() => invoke("open_url", { url: res.url })}>Open on the trade site</button>}
       {!check.bulk && savedBlock}
       {reporting == null ? (
         <button className="link small tw-report-toggle" onClick={() => { setReporting(""); setReported(""); }}
