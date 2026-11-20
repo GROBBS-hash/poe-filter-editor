@@ -366,7 +366,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Roll bars and "T3 range 6–11" numbers look right; tier badges coloured. (Roll bars confirmed 20 Nov.)
 - [ ] Every Ctrl+D shows a trade price straight away (uniques, corpses, gems too) in the big box at the top.
       (Confirmed 20 Nov for a unique, a unique belt and a gem.)
-- [ ] A search with nothing listed: "Which stat to untick?" lists what each stat left out would find; clicking one searches.
+- [x] (Confirmed 21 Nov.) A search with nothing listed: "Which stat to untick?" lists what each stat left out would find; clicking one searches.
 - [ ] Cogwork Ring: "Prefixes · up to 2", "Suffixes · up to 4", open prefix / suffix counts right.
 - [ ] "This item / As a base" tabs (Awakened-style): "As a base" shows on fractured / influenced / synthesised items, magic jewels, cluster
       jewels and unfinished gear of item level 82+, says why, and the prices look like Awakened's base search. Not on
