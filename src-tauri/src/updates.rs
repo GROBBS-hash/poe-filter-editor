@@ -49,6 +49,8 @@ pub fn update_status() -> Option<UpdateInfo> { READY.lock().unwrap().as_ref().ma
 #[tauri::command]
 pub fn update_install(app: AppHandle) -> Result<(), String> {
     let Some((u, bytes)) = READY.lock().unwrap().take() else { return Err("No update downloaded".into()) };
+    // He just clicked in the window: the new version comes back in front.
+    crate::win_place::beat(&app);
     u.install(bytes).map_err(err)?;
     app.restart();
 }

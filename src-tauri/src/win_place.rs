@@ -43,6 +43,10 @@ fn with_places<T>(app: &AppHandle, f: impl FnOnce(&mut HashMap<String, Place>) -
 
 /// Moved or resized by hand: remember it.
 pub fn on_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
+    if let tauri::WindowEvent::Focused(focused) = event {
+        if window.label() == "main" { beat_as(window.app_handle(), Some(*focused)); }
+        return;
+    }
     if !matches!(event, tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_)) { return; }
     let label = window.label().to_string();
     if !PLACED.contains(&label.as_str()) { return; }
@@ -93,31 +97,48 @@ pub fn show_over_game(app: &AppHandle, w: &tauri::WebviewWindow) {
     if front { focus_game(); }
 }
 
-/// The main window when the editor starts. The dev build restarts itself whenever new code arrives, and each
-/// restart used to pop the editor up in the middle of the screen while he was playing. So: started within
-/// 30 minutes of the last run (a restart), it comes back the way it was, quietly: minimised to the taskbar
-/// without taking focus, or still in the tray if he'd closed it. A normal start opens it as usual.
-/// A small heartbeat file ("alive.txt": time and shown/hidden) is how a restart is told from a start.
+/// The main window when the editor starts. Restarts (a dev rebuild, or "Restart to update") used to pop the
+/// editor up in the middle of the screen while he was playing or working on something else. So: started within
+/// 30 minutes of the last run (a restart), it comes back the way it was: in front if it was the window he was
+/// using, quietly minimised to the taskbar (no focus) if it was open behind other things, still in the tray if
+/// he'd closed it. A normal start opens it as usual.
+/// A small heartbeat file ("alive.txt": time and front/shown/hidden) is how a restart is told from a start.
 pub fn start_main(app: &AppHandle) {
     let Some(w) = app.get_webview_window("main") else { return };
-    let file = app.state::<AppState>().data_dir.join("alive.txt");
-    let now = || std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    let file = alive_path(app);
     let last = std::fs::read_to_string(&file).unwrap_or_default();
     let mut parts = last.split_whitespace();
     let at: u64 = parts.next().and_then(|t| t.parse().ok()).unwrap_or(0);
-    let shown = parts.next() != Some("hidden");
+    let state = parts.next().unwrap_or("shown");
     // A rebuild can take minutes (it ran over 45s on 21 Nov and the editor popped up mid-game): anything within
     // half an hour of the last run counts as a restart. A start after a longer break opens as usual.
-    match (now().saturating_sub(at) < 30 * 60, shown) {
-        (false, _) => { let _ = w.show(); let _ = w.set_focus(); }
-        (true, true) => show_minimised_quietly(&w),
-        (true, false) => {}
+    match (unix_now().saturating_sub(at) < 30 * 60, state) {
+        (false, _) | (true, "front") => { let _ = w.show(); let _ = w.set_focus(); }
+        (true, "hidden") => {}
+        (true, _) => show_minimised_quietly(&w),
     }
+    let app = app.clone();
     thread::spawn(move || loop {
-        let state = if w.is_visible().unwrap_or(false) { "shown" } else { "hidden" };
-        let _ = std::fs::write(&file, format!("{} {state}", now()));
+        beat(&app);
         thread::sleep(Duration::from_secs(10));
     });
+}
+
+fn alive_path(app: &AppHandle) -> PathBuf { app.state::<AppState>().data_dir.join("alive.txt") }
+fn unix_now() -> u64 { std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0) }
+
+/// Writes the heartbeat now: "front" when the main window is the one he's using, "shown" when it's open behind
+/// other windows or minimised, "hidden" when it's in the tray. Also called when the main window gains or loses
+/// focus, and just before "Restart to update", so a restart sees how things really were.
+pub fn beat(app: &AppHandle) { beat_as(app, None) }
+
+/// focused: what a focus event just said (asking the window right then can still give the old answer).
+fn beat_as(app: &AppHandle, focused: Option<bool>) {
+    let Some(w) = app.get_webview_window("main") else { return };
+    let state = if !w.is_visible().unwrap_or(false) { "hidden" }
+        else if focused.unwrap_or_else(|| w.is_focused().unwrap_or(false)) && !w.is_minimized().unwrap_or(false) { "front" }
+        else { "shown" };
+    let _ = std::fs::write(alive_path(app), format!("{} {state}", unix_now()));
 }
 
 #[cfg(windows)]

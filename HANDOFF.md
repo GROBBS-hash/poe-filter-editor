@@ -284,6 +284,8 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   restart → minimised to the taskbar without focus (`SW_SHOWMINNOACTIVE`), or stays in the tray if it was hidden;
   otherwise it opens as before. Checked on his PC: after a restart the window was minimised and not in front.
   Tray "Open editor" un-minimises too.
+  0.2.2: the heartbeat also says "front" (main window focused; written on every focus change and just before
+  "Restart to update"): a restart then comes back in front, as he asked. Open behind other windows: quiet as before.
 
 - 21 Nov (0.2.1): Wealth "Count rares in my worth" (`WealthStore.skip_rares`, `wealth_count_rares`; `add_rares` puts
   rares in or out of the last snapshot, last_items and sessions, but always in "Worth selling"). Gear checklist in
@@ -484,6 +486,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 **Installer (21 Nov, release 0.2.0)**
 - [x] (21 Nov: installed, "everything's there".) Still check: hotkeys work in game with the installed editor.
 - [ ] When 0.2.1 is out: "Version 0.2.1 is ready · Restart to update" shows at the top; clicking it updates and reopens.
+- [ ] 0.2.2: restart (update) while using the editor: it comes back in front; while it was behind other windows: stays on the taskbar.
 - [ ] 0.2.1: Wealth "Count rares in my worth" tick box: unticked, the total drops by the rares at once; ticked, back.
 - [ ] 0.2.1: Gear checklist (F6 Gear / Jewels tabs and My build): tick items you have, "Have N of M", "hide what I
       have"; a tick in F6 shows on My build too, and stays ticked in other stages using the same item.
