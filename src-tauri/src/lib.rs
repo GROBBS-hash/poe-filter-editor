@@ -486,6 +486,8 @@ struct PriceCheck {
     compare: Vec<filter_core::compare::Comparison>,
     /// Search the trade site straight away for every item (Settings), not only uniques/bulk/unidentified.
     instant_all: bool,
+    /// poe.ninja's last 7 days for this item (the line under the price).
+    trend: Option<filter_core::prices::Trend>,
 }
 
 
@@ -542,9 +544,9 @@ fn price_check(app: AppHandle) {
                     let category = filter_core::trade::category(&item.item_class).map(|c| if item.base_type.ends_with("Cluster Jewel") { "jewel.cluster" } else { c }).map(String::from);
                     let s = filter_core::trade::TradeSetup { item: item.clone(), filters: vec![], base_only: true, ilvl_min: None, ilvl_max: None,
                         links_min: None, gem_level: None, unknown: vec![], unknown_kinds: vec![], category, raw: String::new(), misc: vec![], base: String::new(), base_item: None, affix_max: None };
-                    PriceCheck { ninja: ninja_price(&app, &item), setup: Some(s), league, from_ground: true, error: None, bulk: None, map: None, divine: None, compare: vec![], instant_all: false }
+                    PriceCheck { ninja: ninja_price(&app, &item), setup: Some(s), league, from_ground: true, error: None, bulk: None, map: None, divine: None, compare: vec![], instant_all: false, trend: None }
                 }
-                Err(e) => PriceCheck { setup: None, ninja: None, league, from_ground: true, error: Some(e), bulk: None, map: None, divine: None, compare: vec![], instant_all: false },
+                Err(e) => PriceCheck { setup: None, ninja: None, league, from_ground: true, error: Some(e), bulk: None, map: None, divine: None, compare: vec![], instant_all: false, trend: None },
             }
         };
         show_price(&app, payload, &text, true);
@@ -556,15 +558,15 @@ fn text_payload(app: &AppHandle, text: &str) -> PriceCheck {
     let (poe2, league) = trade_league(app);
     let state = app.state::<AppState>();
     let none = |league: String, error: String| PriceCheck { setup: None, ninja: None, league, from_ground: false, error: Some(error), bulk: None,
-        map: None, divine: None, compare: vec![], instant_all: false };
+        map: None, divine: None, compare: vec![], instant_all: false, trend: None };
     match trade_api::stats(&state.data_dir, poe2) {
         Ok(index) => match filter_core::trade::setup(text, &index) {
-            Some(s) => PriceCheck { ninja: ninja_price(app, &s.item), setup: Some(s), league, from_ground: false, error: None, bulk: None, map: None, divine: None, compare: vec![], instant_all: false },
+            Some(s) => PriceCheck { ninja: ninja_price(app, &s.item), setup: Some(s), league, from_ground: false, error: None, bulk: None, map: None, divine: None, compare: vec![], instant_all: false, trend: None },
             None => none(league, "That doesn't look like an item".into()),
         },
         Err(e) => match filter_core::trade::setup(text, &Default::default()) {
             Some(s) => PriceCheck { ninja: ninja_price(app, &s.item), setup: Some(s), league, from_ground: false,
-                error: Some(format!("Stat list unavailable, searching by name only ({e})")), bulk: None, map: None, divine: None, compare: vec![], instant_all: false },
+                error: Some(format!("Stat list unavailable, searching by name only ({e})")), bulk: None, map: None, divine: None, compare: vec![], instant_all: false, trend: None },
             None => none(league, e),
         },
     }
@@ -611,6 +613,11 @@ fn show_price(app: &AppHandle, payload: PriceCheck, text: &str, compare: bool) {
     let text = text.to_string();
     let mut payload = payload;
     payload.divine = currency_rates(app).get("divine").copied();
+    if let Some(it) = payload.setup.as_ref().map(|s| &s.item) {
+        let game = active_game(&state);
+        payload.trend = state.prices.lock().unwrap().get(&game)
+            .and_then(|f| filter_core::prices::trend_of(f, it.name.as_deref(), &it.base_type, &it.rarity));
+    }
     payload.instant_all = state.store.lock().unwrap().settings.price_instant_all;
     // "Is this an upgrade?" against your PoB build's gear in that slot.
     if !state.store.lock().unwrap().settings.price_rolls {

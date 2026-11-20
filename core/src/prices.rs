@@ -16,6 +16,18 @@ pub struct PriceItem {
     pub variant: Option<String>,
     #[serde(default)]
     pub listings: Option<u32>,
+    /// poe.ninja's last 7 days: % change each day from a week ago (oldest first), and the total change.
+    #[serde(default)]
+    pub trend: Option<Vec<f64>>,
+    #[serde(default)]
+    pub change: Option<f64>,
+}
+
+/// An item's price trend for the price window: the week's line and its total % change.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Trend {
+    pub points: Vec<f64>,
+    pub change: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -227,6 +239,15 @@ pub fn price_of(file: &PriceFile, name: Option<&str>, base: &str, rarity: &str) 
     file.items.iter().filter(|i| i.name == base && !i.cat.starts_with("Unique") && i.cat != "SkillGem").map(|i| i.value).reduce(f64::max)
 }
 
+/// The week's trend for the same item `price_of` prices (uniques by name, others by base; not gems, which are kept at
+/// their cheapest version). The dearest listing wins, like the price.
+pub fn trend_of(file: &PriceFile, name: Option<&str>, base: &str, rarity: &str) -> Option<Trend> {
+    let pick = |i: &&PriceItem| if rarity == "Unique" { name.is_some_and(|n| i.name == n) && i.cat.starts_with("Unique") }
+        else { i.name == base && !i.cat.starts_with("Unique") && i.cat != "SkillGem" };
+    let it = file.items.iter().filter(pick).max_by(|a, b| a.value.total_cmp(&b.value))?;
+    Some(Trend { points: it.trend.clone()?, change: it.change? })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234,7 +255,7 @@ mod tests {
 
     fn file() -> PriceFile {
         let it = |name: &str, base: &str, cat: &str, value: f64| PriceItem {
-            name: name.into(), base: base.into(), cat: cat.into(), value, variant: None, listings: Some(10) };
+            name: name.into(), base: base.into(), cat: cat.into(), value, variant: None, listings: Some(10), trend: None, change: None };
         PriceFile {
             game: "poe1".into(), league: "Covens".into(), league_name: None, updated: "now".into(), unit: "chaos".into(),
             items: vec![
@@ -294,5 +315,24 @@ mod tests {
     #[test]
     fn off_means_nothing_written() {
         assert!(price_blocks(&default_settings("chaos"), &file(), "\n").is_empty());
+    }
+}
+
+#[cfg(test)]
+mod trend_tests {
+    use super::*;
+
+    #[test]
+    fn week_trend_for_the_priced_item() {
+        let it = |name: &str, cat: &str, value: f64, trend: Option<Vec<f64>>| PriceItem {
+            name: name.into(), base: name.into(), cat: cat.into(), value, variant: None, listings: Some(10),
+            change: trend.as_ref().and_then(|t| t.last().copied()), trend };
+        let f = PriceFile { game: "poe1".into(), league: "Covens".into(), league_name: None, updated: String::new(), unit: "chaos".into(),
+            items: vec![it("Accelerating Catalyst", "Currency", 0.49, Some(vec![0.0, -43.1, -61.9, -76.0, -72.9, -84.4, -60.9])),
+                it("Arcane Surge Support", "SkillGem", 1.0, Some(vec![0.0, 5.0])), it("Chaos Orb", "Currency", 1.0, None)] };
+        let t = trend_of(&f, None, "Accelerating Catalyst", "Currency").unwrap();
+        assert_eq!((t.points.len(), t.change), (7, -60.9));
+        assert!(trend_of(&f, None, "Chaos Orb", "Currency").is_none(), "no line in the file: nothing shown");
+        assert!(trend_of(&f, None, "Arcane Surge Support", "Gem").is_none(), "gems are kept at their cheapest version");
     }
 }

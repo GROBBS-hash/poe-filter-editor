@@ -133,7 +133,7 @@ mod tests {
 
     fn file() -> PriceFile {
         let it = |name: &str, cat: &str, value: f64| PriceItem {
-            name: name.into(), base: name.into(), cat: cat.into(), value, variant: None, listings: Some(10) };
+            name: name.into(), base: name.into(), cat: cat.into(), value, variant: None, listings: Some(10), trend: None, change: None };
         PriceFile {
             game: "poe1".into(), league: "Covens".into(), league_name: None, updated: "now".into(), unit: "chaos".into(),
             items: vec![
@@ -183,7 +183,7 @@ mod tests {
     #[test]
     fn families_and_mechanic_mixes() {
         let mut f = file();
-        let it = |name: &str, cat: &str, value: f64| PriceItem { name: name.into(), base: name.into(), cat: cat.into(), value, variant: None, listings: Some(10) };
+        let it = |name: &str, cat: &str, value: f64| PriceItem { name: name.into(), base: name.into(), cat: cat.into(), value, variant: None, listings: Some(10), trend: None, change: None };
         f.items.extend([it("Maven's Chisel of Avarice", "Currency", 183.0), it("Maven's Chisel of Threads", "Currency", 9.0),
             it("Bestiary Thread", "Thread", 1.6), it("Abyss Thread", "Thread", 4.8), it("Legion Thread", "Thread", 3.6),
             it("Wild Crystallised Lifeforce", "Currency", 0.02), it("Sacred Crystallised Lifeforce", "Currency", 16.0),

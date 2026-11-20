@@ -329,6 +329,10 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   "Item Level: 1". Live: Lightning Tendrils of Eccentricity 21/20 uncorrupted 0, corrupted 13. (Confirmed in game.)
   Support gems get " Support" on the end (PoB's "Arcane Surge" = trade "Arcane Surge Support"; was "Unknown item base type").
   "Open on the trade site" now shows after every search, also when nothing is listed.
+- Price trend 21 Nov (next price-check extra): tools/fetch_prices.py keeps poe.ninja's 7-day sparkline per item (`trend`: %
+  change each day from a week ago, `change`: the week's total; exchange "sparkline", stash "sparkLine"). `prices::trend_of`
+  (same item as price_of, not gems) -> `PriceCheck.trend` -> "This week ▲/▼ N%" line under the price box (`TrendLine`).
+  Shows once the price job has run with the new script (GitHub Actions on push / hourly).
 - Tiers menu 21 Nov (he asked): item pictures before every section (`SECTION_ICON` in Tiers.tsx: game icons by name, GGG's
   CDN art for flasks / gold / cards, "×3" / "×6" badges on stacks; else the section's first item). Transmutation and
   augmentation stacks are no longer listed. New group "Before maps" (`tiers::LEVELLING`): campaign currency (+ stacks),
@@ -421,6 +425,8 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 
 - [x] (Confirmed 21 Nov.) Price check on gear with resistances: "total Elemental Resistance" and "total to Chaos Resistance" ticked, fire /
       cold / lightning totals there to tick, no single resistance mods left in the list.
+
+- [ ] Price window: "This week" line with ▲/▼ % under the price for currency, cards, uniques… (after the price file updates).
 
 **Tiers menu (21 Nov)**
 - [ ] Pictures next to every section; Transmutation / Augmentation stacks gone.
@@ -531,8 +537,8 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 1. **GROBBS to work through "Still to check in game" above**; fix what he reports.
 2. Wealth tracker follow-ups: test with GROBBS's real account; price rares via the trade site (slow) or poeprices;
    PoeStash-style "search every tab" and guild stash; crafting planner (parked).
-3. Price check polish ideas (any resistance done 21 Nov; same seller + price already shows once with "× N"): show price
-   in divines toggle, currency trend chart; map tier filter when price checking maps.
+3. Price check polish ideas (any resistance, trend line done 21 Nov; same seller + price already shows once with "× N";
+   prices already in chaos and divines; maps already search by tier).
 4. Deferred earlier: installer + auto-update, batch mode tidy-up, PoE 2 coverage.
 
 ## Known caveats

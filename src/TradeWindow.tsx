@@ -13,7 +13,9 @@ type Setup = { item: Item; filters: StatFilter[]; unknown_kinds?: string[]; base
   /** Awakened-style "search as a base": why it's a crafting base, which mods to keep, item level, influences. */
   base_item?: { why: string[]; ids: string[]; ilvl_min: number | null; misc: string[] } | null };
 type MapInfo = { mods: { text: string; warn: string | null }[]; unidentified: boolean; tier: number | null; stats: string[] };
-type Check = { setup: Setup | null; ninja: [number, string] | null; league: string; from_ground: boolean; error: string | null; bulk?: string | null; map?: MapInfo | null; divine?: number | null; compare?: Comparison[]; instant_all?: boolean };
+type Check = { setup: Setup | null; ninja: [number, string] | null; league: string; from_ground: boolean; error: string | null; bulk?: string | null; map?: MapInfo | null; divine?: number | null; compare?: Comparison[]; instant_all?: boolean;
+  /** poe.ninja's last 7 days: % change each day from a week ago (oldest first), and the total. */
+  trend?: { points: number[]; change: number } | null };
 type Comparison = { slot: string; current: string; rows: { stat: string; now: number; this: number }[]; gain: string[]; lose: string[] };
 type Offer = { pay: number; pay_currency: string; get: number; get_currency: string; each: number; stock: number; account: string; whisper: string };
 type Bulk = { offers: Offer[]; url: string; divine: number | null };
@@ -215,6 +217,27 @@ function MarketRatio({ c, divine }: { c: number; divine: number | null }) {
 }
 
 /** The answer first, big and clear: what this sells for. */
+/** poe.ninja's price over the last 7 days: a small line and the week's change (green up, red down). */
+function TrendLine({ t }: { t: { points: number[]; change: number } }) {
+  const pts = t.points;
+  const lo = Math.min(...pts), hi = Math.max(...pts), span = hi - lo || 1;
+  const W = 120, H = 26;
+  const xy = pts.map((v, i) => [(i / (pts.length - 1)) * W, H - 3 - ((v - lo) / span) * (H - 6)]);
+  const d = xy.map(([x, y], i) => (i ? "L" : "M") + x.toFixed(1) + " " + y.toFixed(1)).join(" ");
+  const up = t.change > 0.5, down = t.change < -0.5;
+  const word = up ? "up" : down ? "down" : "steady";
+  return (
+    <div className={`tw-trend ${up ? "up" : down ? "down" : "flat"}`} title={"poe.ninja's price over the last 7 days, day by day"}>
+      <span className="tw-trend-label">This week</span>
+      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
+        <path d={d} fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+        <circle cx={xy[xy.length - 1][0]} cy={xy[xy.length - 1][1]} r="2.6" fill="currentColor" />
+      </svg>
+      <span className="tw-trend-pct">{up ? "▲" : down ? "▼" : ""} {Math.abs(t.change).toFixed(0)}% {word}</span>
+    </div>
+  );
+}
+
 function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote, waiting, stack, name }: { res: Result | null; bulk: Bulk | null; busy: boolean; err: string; waiting?: string | null; stack?: number; name?: string;
   divine: number | null; ninja: [number, string] | null; ninjaNote: string }) {
   const ninjaChaos = ninja ? (ninja[1] === "divine" && divine ? ninja[0] * divine : ninja[1] === "chaos" ? ninja[0] : null) : null;
@@ -476,6 +499,7 @@ export default function TradeWindow() {
       <PriceHero res={res} bulk={check.bulk ? bulk : null} busy={busy} err={err} divine={divine}
         waiting={!res && !busy && !check.bulk ? (searched ? "Filters changed: move onto Search again" : "Pick the stats, then move your mouse onto Search") : null}
         ninja={check.ninja} ninjaNote={it.rarity === "Unique" && !it.name ? " (best ground unique on this base)" : ""} stack={it.stack_size ?? undefined} name={it.base_type} />
+      {check.trend && <TrendLine t={check.trend} />}
       {err && <div className="qm-warn">{err}</div>}
       {res && res.total === 0 && searched === searchKey(setup) && (setup.filters.some((f) => f.enabled) || (setup.base_only && setup.category) || setup.ilvl_min) && (
         <UntickHelp state={untick} onAsk={() => { setUntick("busy");

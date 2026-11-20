@@ -68,6 +68,17 @@ def num(x):
         return None
 
 
+def trend(spark):
+    """poe.ninja's last-7-days line: % change each day from a week ago, and the total change. Kept only when
+    there's a line to draw (the app shows it in the price window)."""
+    data = [num(x) for x in ((spark or {}).get("data") or [])]
+    data = [x for x in data if x is not None]
+    if len(data) < 2:
+        return {}
+    change = num((spark or {}).get("totalChange"))
+    return {"trend": [round(x, 1) for x in data], "change": round(change if change is not None else data[-1], 1)}
+
+
 def exchange(game, league, typ):
     """Exchange overview. Lines carry an id and a value in the 'primary'
     currency; names come from core.items. Converted to the game's unit."""
@@ -100,7 +111,7 @@ def exchange(game, league, typ):
         name = names.get(str(line.get("id"))) or line.get("name")
         if value is None or not name:
             continue
-        out.append({"name": name, "base": name, "cat": typ, "value": round(value * factor, 4)})
+        out.append({"name": name, "base": name, "cat": typ, "value": round(value * factor, 4), **trend(line.get("sparkline"))})
     return out, core
 
 
@@ -131,7 +142,7 @@ def stash_items(game, league, typ):
         if value is None or not name:
             continue
         out.append({"name": name, "base": line.get("baseType") or name, "cat": typ, "value": round(value, 4),
-                    "variant": line.get("variant"), "listings": line.get("listingCount")})
+                    "variant": line.get("variant"), "listings": line.get("listingCount"), **trend(line.get("sparkLine"))})
     if typ == "SkillGem":
         # Thousands of level/quality versions: keep each gem's cheapest (what a stash scan counts), so the file stays small.
         cheapest = {}

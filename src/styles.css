@@ -1321,3 +1321,14 @@ li:hover > .bv-item .bv-price { opacity: 1; }
 .tiers-ico img { width: 22px; height: 22px; object-fit: contain; }
 .tiers-ico-badge { position: absolute; right: -6px; bottom: -4px; font-size: 9px; font-weight: 700; line-height: 1; padding: 1px 3px;
   border-radius: 4px; background: #1a1d24; color: var(--gold, #e6c65c); border: 1px solid rgba(212,175,55,0.5); }
+
+/* Price window: poe.ninja's price over the last 7 days. */
+.tw-trend { display: flex; align-items: center; gap: 10px; margin: 6px 0 2px; padding: 4px 10px; border-radius: 8px;
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); font-size: 12px; }
+.tw-trend-label { color: var(--text-2, #9aa); }
+.tw-trend svg { flex: none; }
+.tw-trend-pct { margin-left: auto; font-weight: 700; white-space: nowrap; }
+.tw-trend.up { color: #7fd17f; }
+.tw-trend.down { color: #e0806a; }
+.tw-trend.flat { color: #b9b4a6; }
+.tw-trend .tw-trend-label { color: var(--text-2, #9aa); }
