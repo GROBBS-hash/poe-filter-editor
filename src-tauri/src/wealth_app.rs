@@ -4,7 +4,13 @@
 //! overlay showing chaos / divines per hour.
 
 use super::*;
-use filter_core::wealth::{self, ScanProfile, Session, Snapshot, Tab, Valued, WealthStore};
+use filter_core::wealth::{self, Rare, RarePrice, ScanProfile, Session, Snapshot, Tab, Valued, WealthStore};
+
+/// A rare's trade price counts for a week; "Price rares" looks again after two days.
+const RARE_KEEP: u64 = 7 * 86400;
+const RARE_STALE: u64 = 2 * 86400;
+/// At most this many rares per "Price rares" click (about 2 trade requests each).
+const RARE_BATCH: usize = 40;
 
 fn store_path(state: &AppState) -> PathBuf { state.data_dir.join("wealth.json") }
 
@@ -51,7 +57,8 @@ fn value(app: &AppHandle, items: &serde_json::Value, tab: &str) -> Vec<Valued> {
 fn divine(app: &AppHandle) -> Option<f64> { currency_rates(app).get("divine").copied() }
 
 /// Reads and values these tabs (all when None), telling the page how far along it is.
-fn scan(app: &AppHandle, only: Option<&[usize]>) -> Result<Vec<Valued>, String> {
+/// Rares count at the trade price "Price rares" last found for them (if it's under a week old).
+fn scan(app: &AppHandle, only: Option<&[usize]>) -> Result<(Vec<Valued>, Vec<Rare>), String> {
     let (account, sessid, league, poe2) = who(app)?;
     let state = app.state::<AppState>();
     let mut tabs = with_store(&state, |s| s.tabs.clone());
@@ -63,13 +70,21 @@ fn scan(app: &AppHandle, only: Option<&[usize]>) -> Result<Vec<Valued>, String> 
     }
     let pick: Vec<Tab> = tabs.into_iter().filter(|t| only.map(|o| o.contains(&t.index)).unwrap_or(true)).collect();
     let mut out = Vec::new();
+    let mut rares = Vec::new();
     for (n, t) in pick.iter().enumerate() {
         let _ = app.emit("wealth-progress", (n, pick.len(), t.name.clone()));
         let v = trade_api::stash_tab(&account, &sessid, &league, poe2, t.index, false)?;
         out.extend(value(app, &v, &t.name));
+        rares.extend(wealth::rares_in_tab(&v["items"], &t.name));
     }
     let _ = app.emit("wealth-progress", (pick.len(), pick.len(), String::new()));
-    Ok(out)
+    let t = now();
+    with_store(&state, |s| for r in &rares {
+        if let Some(p) = s.rare_prices.get(&r.id).filter(|p| p.chaos > 0.0 && t.saturating_sub(p.time) < RARE_KEEP) {
+            out.push(wealth::rare_valued(r, p.chaos));
+        }
+    });
+    Ok((out, rares))
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -89,6 +104,10 @@ pub struct WealthView {
     strategies: Vec<(String, usize, f64, f64)>,
     profiles: Vec<ScanProfile>,
     active: Option<String>,
+    /// Rares in the last scan, how many have a trade price, and how many need (re)pricing.
+    rares: usize,
+    rares_priced: usize,
+    rares_todo: usize,
     divine: Option<f64>,
     now: u64,
 }
@@ -98,7 +117,12 @@ fn view(app: &AppHandle) -> WealthView {
     let s = state.store.lock().unwrap().settings.clone();
     let (_, league) = trade_league(app);
     let st = with_store(&state, |w| w.clone());
+    let t = now();
+    let fresh = |r: &Rare, age: u64| st.rare_prices.get(&r.id).filter(|p| t.saturating_sub(p.time) < age);
+    let rares_priced = st.rares.iter().filter(|r| fresh(r, RARE_KEEP).is_some_and(|p| p.chaos > 0.0)).count();
+    let rares_todo = st.rares.iter().filter(|r| fresh(r, RARE_STALE).is_none()).count();
     WealthView {
+        rares: st.rares.len(), rares_priced, rares_todo,
         account: s.poe_account, has_sessid: !s.poesessid.trim().is_empty(), league,
         tracked: s.wealth_tabs, min: s.wealth_min, minutes: s.earn_minutes.max(1),
         strategies: wealth::by_strategy(&st.sessions),
@@ -156,7 +180,7 @@ pub async fn wealth_scan(app: AppHandle) -> Result<WealthView, String> {
             (p.map(|p| p.name.clone()).unwrap_or_default(), p.map(|p| p.tabs.clone()))
         });
         if tabs.as_ref().is_some_and(|t| t.is_empty()) { return Err(format!("Tick some tabs for \"{name}\" first")); }
-        let valued = scan(&app, tabs.as_deref())?;
+        let (valued, rares) = scan(&app, tabs.as_deref())?;
         let (_, league) = trade_league(&app);
         let min = state.store.lock().unwrap().settings.wealth_min;
         let mut snap = wealth::snapshot(now(), &league, divine(&app), &valued);
@@ -164,9 +188,89 @@ pub async fn wealth_scan(app: AppHandle) -> Result<WealthView, String> {
         let mut items = valued.clone();
         items.sort_by(|a, b| b.value.total_cmp(&a.value));
         items.truncate(3000);
-        with_store(&state, |s| { s.add_snapshot(snap); s.missed = wealth::missed(&valued, min); s.last_items = items; });
+        let t = now();
+        with_store(&state, |s| {
+            s.add_snapshot(snap); s.missed = wealth::missed(&valued, min); s.last_items = items;
+            // Forget prices of rares that are gone (sold, vendored) once they're old.
+            s.rare_prices.retain(|id, p| t.saturating_sub(p.time) < RARE_KEEP || rares.iter().any(|r| &r.id == id));
+            s.rares = rares;
+        });
         Ok(view(&app))
     }).await.map_err(err)?
+}
+
+/// Prices the last scan's rares on the trade site the way Ctrl+D would (its usual stats ticked, the middle
+/// of the cheapest sellers). Slow on purpose: waits for room under the trade site's limit, leaving some for
+/// your own price checks, and pauses while you price check by hand. Up to RARE_BATCH rares per click; then
+/// adds them to the last scan's total, "By tab" and "Worth selling".
+#[tauri::command]
+pub async fn wealth_price_rares(app: AppHandle) -> Result<WealthView, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        let (poe2, league) = trade_league(&app);
+        let index = trade_api::stats(&state.data_dir, poe2)?;
+        let rates = currency_rates(&app);
+        let t = now();
+        let todo: Vec<Rare> = with_store(&state, |s| s.rares.iter()
+            .filter(|r| s.rare_prices.get(&r.id).map(|p| t.saturating_sub(p.time) >= RARE_STALE).unwrap_or(true))
+            .take(RARE_BATCH).cloned().collect());
+        let n = todo.len();
+        let mut failed = None;
+        let mut done = 0;
+        for (i, r) in todo.iter().enumerate() {
+            let _ = app.emit("wealth-progress", (i, n, format!("Pricing {}", r.name)));
+            // Hand price checks go first; then wait for room under the limit (at most ~2 minutes per rare).
+            for _ in 0..60 {
+                let manual = LAST_MANUAL.lock().unwrap().map(|t| t.elapsed() < Duration::from_secs(20)).unwrap_or(false);
+                if !manual && trade_api::has_room("search", 2) && trade_api::has_room("fetch", 2) { break; }
+                thread::sleep(Duration::from_secs(2));
+            }
+            let Some(setup) = filter_core::trade::setup(&r.text, &index) else { continue };
+            let q = trade_query(&app, poe2, &setup);
+            let found = trade_api::search(poe2, &league, &q).and_then(|(id, ids, total)|
+                trade_api::fetch(poe2, &ids, &id).map(|f| (filter_core::trade::listings(&f, &rates), total)));
+            match found {
+                Ok((ls, total)) => {
+                    let chaos = filter_core::trade::summary(&ls).map(|s| s.1).unwrap_or(0.0);
+                    with_store(&state, |s| { s.rare_prices.insert(r.id.clone(), RarePrice { chaos, time: now(), found: total }); });
+                    done += 1;
+                }
+                Err(e) => { failed = Some(e); break; }
+            }
+        }
+        let _ = app.emit("wealth-progress", (n, n, String::new()));
+        let min = state.store.lock().unwrap().settings.wealth_min;
+        with_store(&state, |s| add_rares(s, min));
+        match failed {
+            // Nothing priced this time: say why. Otherwise keep what we got (click again for the rest).
+            Some(e) if done == 0 => Err(e),
+            _ => Ok(view(&app)),
+        }
+    }).await.map_err(err)?
+}
+
+/// Puts the rares' trade prices into the last scan: its total and tabs, "By tab" and "Worth selling".
+fn add_rares(s: &mut WealthStore, min: f64) {
+    let t = now();
+    let old: Vec<Valued> = s.last_items.iter().filter(|v| v.rare).cloned().collect();
+    s.last_items.retain(|v| !v.rare);
+    let new: Vec<Valued> = s.rares.iter().filter_map(|r| s.rare_prices.get(&r.id)
+        .filter(|p| p.chaos > 0.0 && t.saturating_sub(p.time) < RARE_KEEP).map(|p| wealth::rare_valued(r, p.chaos))).collect();
+    s.last_items.extend(new.iter().cloned());
+    s.last_items.sort_by(|a, b| b.value.total_cmp(&a.value));
+    s.last_items.truncate(3000);
+    s.missed = wealth::missed(&s.last_items, min);
+    if let Some(last) = s.snapshots.last_mut() {
+        for (v, sign) in old.iter().map(|v| (v, -1.0)).chain(new.iter().map(|v| (v, 1.0))) {
+            last.total += sign * v.value;
+            match last.tabs.iter_mut().find(|x| x.0 == v.tab) {
+                Some(x) => x.1 += sign * v.value,
+                None => last.tabs.push((v.tab.clone(), sign * v.value)),
+            }
+        }
+        last.tabs.retain(|x| x.1 > 0.005);
+        last.tabs.sort_by(|a, b| b.1.total_cmp(&a.1));
+    }
 }
 
 
@@ -223,7 +327,7 @@ pub async fn session_start(app: AppHandle, name: String) -> Result<WealthView, S
         let state = app.state::<AppState>();
         let tabs = state.store.lock().unwrap().settings.wealth_tabs.clone();
         if tabs.is_empty() { return Err("Tick the tabs your loot goes into (your dump tabs) first".into()); }
-        let total: f64 = scan(&app, Some(&tabs))?.iter().map(|v| v.value).sum();
+        let total: f64 = scan(&app, Some(&tabs))?.0.iter().map(|v| v.value).sum();
         let (_, league) = trade_league(&app);
         let name = if name.trim().is_empty() { "Unnamed strategy".to_string() } else { name.trim().to_string() };
         with_store(&state, |s| {
@@ -246,7 +350,7 @@ fn check_session(app: &AppHandle) -> Result<(), String> {
     let state = app.state::<AppState>();
     let Some(cur) = with_store(&state, |s| s.current.clone()) else { return Ok(()) };
     if cur.paused_at.is_some() { return Ok(()); }
-    let total: f64 = scan(app, Some(&cur.tabs))?.iter().map(|v| v.value).sum();
+    let total: f64 = scan(app, Some(&cur.tabs))?.0.iter().map(|v| v.value).sum();
     with_store(&state, |s| if let Some(c) = s.current.as_mut() { c.last_value = total; });
     notify(app);
     Ok(())

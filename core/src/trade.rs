@@ -80,7 +80,7 @@ pub struct TradeSetup {
     pub unknown_kinds: Vec<String>,
     /// Trade site category for the item class ("armour.helmet").
     pub category: Option<String>,
-    /// The copied item text (for poeprices.info).
+    /// The copied item text.
     #[serde(default)]
     pub raw: String,
     /// Extra "yes" switches for the search's misc filters ("shaper_item", "synthesised_item"…).
@@ -822,15 +822,6 @@ pub fn offers(v: &Value) -> Vec<Offer> {
     }).collect();
     out.sort_by(|a, b| a.each.partial_cmp(&b.each).unwrap_or(std::cmp::Ordering::Equal));
     out
-}
-
-// ---------- poeprices.info (rough price for rares) ----------
-
-/// poeprices.info's estimate: (min, max, currency, confidence %).
-pub fn poeprices(v: &Value) -> Option<(f64, f64, String, f64)> {
-    if v["error"].as_i64().unwrap_or(0) != 0 { return None; }
-    Some((v["min"].as_f64()?, v["max"].as_f64()?, v["currency"].as_str().unwrap_or("chaos").to_string(),
-        v["pred_confidence_score"].as_f64().unwrap_or(0.0)))
 }
 
 // ---------- "Buy" from your PoB build ----------

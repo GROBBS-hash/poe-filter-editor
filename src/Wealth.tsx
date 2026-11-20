@@ -6,13 +6,14 @@ import { CurrencyIcon } from "./icons";
 
 export type Tab = { index: number; name: string; kind: string; colour: string };
 export type Snapshot = { time: number; league: string; total: number; divine: number | null; tabs: [string, number][]; profile?: string };
-export type Valued = { tab: string; name: string; stack: number; value: number; x: number; y: number; listed: boolean; icon: string; places?: number };
+export type Valued = { tab: string; name: string; stack: number; value: number; x: number; y: number; listed: boolean; icon: string; places?: number; rare?: boolean };
 export type ScanProfile = { name: string; tabs: number[] };
 export type Session = { name: string; league: string; tabs: number[]; start: number; end: number | null; start_value: number; last_value: number;
   paused: number; paused_at: number | null };
 export type WealthView = { account: string; has_sessid: boolean; league: string; tabs: Tab[]; tracked: number[]; min: number; minutes: number;
   snapshots: Snapshot[]; missed: Valued[]; sessions: Session[]; current: Session | null; strategies: [string, number, number, number][];
-  divine: number | null; now: number; profiles?: ScanProfile[]; active?: string | null; last_items?: Valued[] };
+  divine: number | null; now: number; profiles?: ScanProfile[]; active?: string | null; last_items?: Valued[];
+  rares?: number; rares_priced?: number; rares_todo?: number };
 
 /** Seconds a session has run (pauses taken out). */
 export function seconds(s: Session, now: number) {
@@ -103,6 +104,7 @@ function ByTab({ tabs, items, divine }: { tabs: [string, number][]; items: Value
                 <tr key={i}>
                   <td>{m.icon && <img src={m.icon} alt="" width={24} height={24} />}</td>
                   <td>{m.name}{m.stack > 1 ? ` ×${m.stack}` : ""}{m.places > 1 && <span className="muted small"> in {m.places} places</span>}
+                    {m.rare && <RareTag />}
                     {m.stack > 1 && <div className="muted small">{+(m.value / m.stack).toFixed(2)}c each</div>}</td>
                   <td className="muted small">{m.listed ? <span className="w-listed">listed</span> : m.places === 1 ? `${m.x + 1},${m.y + 1}` : ""}</td>
                   <td><Worth c={m.value} divine={divine} /></td>
@@ -114,6 +116,11 @@ function ByTab({ tabs, items, divine }: { tabs: [string, number][]; items: Value
       )}
     </div>
   );
+}
+
+/** A rare priced from similar items on the trade site: a rough guess. */
+function RareTag() {
+  return <span className="w-rare" title="Priced from similar rares for sale on the trade site (a rough guess)">rare · trade guess</span>;
 }
 
 /** Scan profiles, like WealthyExile: named sets of tabs ("Dump tabs", "Currency"), or the whole stash. */
@@ -271,13 +278,27 @@ export default function Wealth() {
           <Profiles v={v} setV={setV} setErr={setErr} busy={!!busy} />
           {last ? (
             <div className="w-total">
-              <div className="muted small">Scanned {new Date(last.time * 1000).toLocaleString()} · counts what poe.ninja prices (currency, uniques, cards, maps, fragments, gems…), not rares.</div>
+              <div className="muted small">Scanned {new Date(last.time * 1000).toLocaleString()} · counts what poe.ninja prices (currency, uniques, cards, maps, fragments, gems…)
+                {(v.rares ?? 0) > 0 ? `, plus ${v.rares_priced ?? 0} of your ${v.rares} rares priced on the trade site` : ", not rares"}.</div>
             </div>
           ) : <p className="muted">Scan your stash to see what it's worth.</p>}
           <div className="row">
             <button className="primary" disabled={!!busy} onClick={() => run("scan", "wealth_scan")}>{busy === "scan" ? "Scanning…" : v.active ? `Scan ${v.active}` : "Scan whole stash"}</button>
             {progress && busy === "scan" && <span className="muted small">Tab {progress[0]} of {progress[1]} {progress[2] && `· ${progress[2]}`}</span>}
           </div>
+          {(v.rares ?? 0) > 0 && (
+            <div className="row">
+              <button disabled={!!busy || (v.rares_todo ?? 0) === 0} onClick={() => run("rares", "wealth_price_rares")}
+                title="Searches the trade site for each rare, like Ctrl+D does, and counts the going price">
+                {busy === "rares" ? "Pricing rares…" : (v.rares_todo ?? 0) === 0 ? "Rares priced"
+                  : `Price ${Math.min(40, v.rares_todo ?? 0)} rare${(v.rares_todo ?? 0) === 1 ? "" : "s"}`}</button>
+              {busy === "rares" && progress
+                ? <span className="muted small">{Math.min(progress[0] + 1, progress[1])} of {progress[1]} {progress[2] && `· ${progress[2]}`}</span>
+                : <span className="muted small">{v.rares_priced ?? 0} of {v.rares} rares priced{(v.rares_todo ?? 0) > 40 ? " · 40 at a time" : ""}.
+                  About 10 a minute (the trade site's limit); your own Ctrl+D checks still go first.</span>}
+            </div>
+          )}
+          {busy === "rares" && progress && <div className="w-bar"><div style={{ width: `${(progress[0] / Math.max(1, progress[1])) * 100}%` }} /></div>}
           {busy === "scan" && progress && <div className="w-bar"><div style={{ width: `${(progress[0] / Math.max(1, progress[1])) * 100}%` }} /></div>}
           <p className="muted small">pathofexile.com only allows so many requests a minute, so a big stash takes a few minutes. The app waits its turn.</p>
           <History snaps={mine} divine={v.divine} />
@@ -298,6 +319,7 @@ export default function Wealth() {
                 <tr key={i}>
                   <td>{m.icon && <img src={m.icon} alt="" width={24} height={24} />}</td>
                   <td>{m.name}{m.stack > 1 ? ` ×${m.stack}` : ""}{(m.places ?? 1) > 1 && <span className="muted small"> in {m.places} places</span>}
+                    {m.rare && <RareTag />}
                     {m.stack > 1 && <div className="muted small">{+(m.value / m.stack).toFixed(2)}c each</div>}</td>
                   <td className="muted small">{m.tab}{(m.places ?? 1) === 1 ? ` · ${m.x + 1},${m.y + 1}` : ""}</td>
                   <td><Worth c={m.value} divine={v.divine} /></td>

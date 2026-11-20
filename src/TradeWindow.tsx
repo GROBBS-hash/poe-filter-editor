@@ -362,7 +362,6 @@ export default function TradeWindow() {
   const [minStock, setMinStock] = useState(false);
   // Likely price fixers are hidden until you ask to see them.
   const [showFixers, setShowFixers] = useState(false);
-  const [ai, setAi] = useState<[number, number, string, number] | null>(null);
   const [saved, setSaved] = useState<Saved[]>([]);
   const [showSaved, setShowSaved] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
@@ -379,7 +378,7 @@ export default function TradeWindow() {
   useEffect(() => { if (res && setup && searched && searchKey(setup) !== searched) setRes(null); }, [setup, res, searched]);
   const box = useRef<HTMLDivElement | null>(null);
 
-  const close = useCallback(() => { setCheck(null); setRes(null); setBulk(null); setAi(null); setErr(""); invoke("hide_trade_window"); }, []);
+  const close = useCallback(() => { setCheck(null); setRes(null); setBulk(null); setErr(""); invoke("hide_trade_window"); }, []);
 
   const runBulk = useCallback(async (want: string, p: "chaos" | "divine", minimum: number | null = null) => {
     setBusy(true); setErr(""); setBulk(null);
@@ -404,7 +403,7 @@ export default function TradeWindow() {
   useEffect(() => {
     const a = listen<Check>("price-check", (e) => {
       const c = e.payload;
-      setCheck(c); setSetup(c.setup); setRes(null); setSearched(null); setBulk(null); setAi(null); setErr(c.error ?? ""); setCopied(null); setPay("chaos"); setMinStock(false); setShowFixers(false);
+      setCheck(c); setSetup(c.setup); setRes(null); setSearched(null); setBulk(null); setErr(c.error ?? ""); setCopied(null); setPay("chaos"); setMinStock(false); setShowFixers(false);
       setSaving(null); setShowSaved(!c.setup); setPreset(null); setMapMods(false); setReporting(null); setReported(""); setAsBase(false); setOwnSetup(null); setUntick(null); window.scrollTo(0, 0);
       invoke<Saved[]>("saved_list").then(setSaved).catch(() => {});
       if (c.bulk) {
@@ -414,9 +413,6 @@ export default function TradeWindow() {
         setPay(p); runBulk(c.bulk, p);
       }
       else if (c.setup && needsTrade(c)) run(c.setup);
-      // A rough second opinion on rares from poeprices.info.
-      if (c.setup?.item.rarity === "Rare" && c.setup.raw && !c.setup.item.unidentified)
-        invoke<[number, number, string, number] | null>("rare_estimate", { text: c.setup.raw }).then(setAi).catch(() => {});
     });
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
     const onBlur = () => close();
@@ -442,7 +438,7 @@ export default function TradeWindow() {
 
   const runSaved = (x: Saved) => {
     setCheck({ setup: x.setup, ninja: null, league: check?.league ?? "", from_ground: false, error: null });
-    setSetup(x.setup); setBulk(null); setAi(null); setShowSaved(false); run(x.setup);
+    setSetup(x.setup); setBulk(null); setShowSaved(false); run(x.setup);
   };
   const savedBlock = (
     <>
@@ -627,11 +623,6 @@ export default function TradeWindow() {
       {check.from_ground && it.rarity !== "Unique" && setup.filters.length === 0 && ["Rare", "Magic"].includes(it.rarity) && (
         <div className="muted small">Read off the ground, so no stats: pick it up and press Ctrl+D in your inventory for a proper price.</div>
       )}
-      {ai && (
-        <div className="tw-ai" title="poeprices.info's machine-learning estimate from the item's mods">
-          AI estimate <b>{+ai[0].toFixed(1)}–{+ai[1].toFixed(1)} {UNIT[ai[2]] ?? ai[2]}</b>
-          <span className="muted small"> · {Math.round(ai[3])}% sure · poeprices.info</span></div>
-      )}
       {check.bulk && (
         <div className="tw-res">
           <div className="tw-sum tw-bulkhead">
@@ -706,7 +697,7 @@ export default function TradeWindow() {
           {reported ? "✓ Saved: mention it to Claude in chat" : "Something's wrong?"}</button>
       ) : (
         <form className="tw-report" onSubmit={(e) => { e.preventDefault();
-          invoke<string>("report_problem", { note: reporting, data: { check, setup, res, bulk, err, ai } })
+          invoke<string>("report_problem", { note: reporting, data: { check, setup, res, bulk, err } })
             .then(() => { setReporting(null); setReported("ok"); }).catch((er) => setErr(String(er))); }}>
           <textarea className="text" autoFocus rows={2} value={reporting} onChange={(e) => setReporting(e.target.value)}
             placeholder="What looks wrong? e.g. price too high, wrong mod ticked" />

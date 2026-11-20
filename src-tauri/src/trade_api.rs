@@ -221,17 +221,6 @@ pub fn exchange_url(poe2: bool, league: &str, id: &str) -> String {
     else { format!("https://www.pathofexile.com/trade/exchange/{league}/{id}") }
 }
 
-/// poeprices.info's rough price for a rare, from its copied text.
-pub fn poeprices(league: &str, item_text: &str) -> Result<Value, String> {
-    use base64::Engine;
-    let b64 = base64::engine::general_purpose::STANDARD.encode(item_text.replace('\r', ""));
-    let url = format!("https://www.poeprices.info/api?l={}&i={}&s=poe-filter-editor", enc(league), enc(&b64));
-    wait_turn("poeprices")?;
-    ureq::get(&url).set("User-Agent", UA).timeout(Duration::from_secs(15)).call()
-        .map_err(|e| format!("poeprices.info didn't answer: {e}"))?
-        .into_json::<Value>().map_err(|e| e.to_string())
-}
-
 #[cfg(test)]
 mod tests {
     #[test]

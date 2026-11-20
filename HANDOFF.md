@@ -33,8 +33,8 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 - Price check (Ctrl+D) — `core/src/trade.rs` (tested offline), `src-tauri/src/trade_api.rs`, `src/TradeWindow.tsx`:
   advanced copy (Ctrl+Alt+C) with mod tiers; stats that matter ticked (T1–T2 mods, total life/res pseudos), junk mods
   dimmed and never ticked; mouse-wheel minimums; white/unidentified items search the base at that ilvl+; poe.ninja price
-  instantly; trade site search with listings (price, ilvl, age, seller, Whisper copies the message); poeprices.info AI
-  estimate for identified rares; bulk exchange rates for currency/scarabs/etc. (pay in chaos or divines); follows the
+  instantly; trade site search with listings (price, ilvl, age, seller, Whisper copies the message); (the poeprices.info AI
+  estimate was removed 21 Nov 2026: the site is gone, its domain is for sale); bulk exchange rates for currency/scarabs/etc. (pay in chaos or divines); follows the
   trade site's rate-limit headers and says how long to wait instead of getting timed out; window placed on the side of
   the mouse with more room and kept on screen (both pop-ups). Confirmed working in game (search returned listings).
 
@@ -250,6 +250,17 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Implicit, Prefixes / Suffixes ("up to 3 on an item", jewels 2), Open slots. (P/S badges tried first; he found them unclear.)
   Bulk fixers: judged against poe.ninja's price when it has one (`bulkTypical(…, market)`), hidden by default with a
   "show" link; our going rate is only shown when poe.ninja has no price.
+
+- Wealth rares 21 Nov: tested live on his account first (stash API fine; limit 30/min, 100/30 min). A scan now keeps
+  his identified rare gear and jewels (`wealth::rares_in_tab`, `WealthStore.rares`) with Ctrl+C-style text built from
+  the stash JSON (`wealth::item_text`: mods come as `{description, flags}`). "Price N rares" (`wealth_price_rares`)
+  runs each through the price check's usual search (`trade::setup` + `query`) and keeps the middle of the cheapest
+  sellers (`trade::summary`) per item id in `WealthStore.rare_prices`: 40 per click, waits for room under the trade
+  limit and while he price checks by hand (`LAST_MANUAL`). Prices count for 7 days, re-priced after 2. They're added to
+  the last scan's total, tabs, "By tab" and "Worth selling" (`add_rares`), marked "rare · trade guess"; later scans and
+  earnings sessions use the cached prices. Live check, his TENDY tab: Woe Buckle ≈ 1 div, Maelström chest ≈ 100c,
+  most 1–10c, one ring with nothing like it listed = 0. Rares with nothing worth ticking price as "any rare of that
+  base". Dev tool: `cargo run -p filter-core --example rarequeries -- tab.json trade_stats_poe1.json`.
 
 - Wealth "By tab" card 20 Nov: a scan keeps every priced item (`WealthStore.last_items`, top 3000 by value); the card shows
   a chip per tab (worth + bar), and the picked tab's items grouped by name, most valuable first, listed ones marked.
@@ -534,6 +545,8 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 **Wealth page (Endgame → Wealth)**
 - [x] Connected with account name + POESESSID (20 Nov). Still check: clear message if the POESESSID is wrong.
 - [ ] Scan whole stash: total, by-tab breakdown and history chart look right; "Worth selling" lists unlisted items.
+- [ ] 21 Nov: after a scan, "Price N rares" prices his rares (about 10 a minute, progress shown); the total goes up,
+      rares show "rare · trade guess" in By tab / Worth selling, and the prices look sensible next to Ctrl+D.
 - [x] Scan profiles: made one, scanned it, own total and history (confirmed 20 Nov). Still check: switching back to Whole stash.
 - [x] "Worth selling" adds up stacks; threads and gems now priced (confirmed 20 Nov: 50 Blight threads = 133c).
 - [ ] Earnings session: tick dump tabs, start, overlay shows time / made / per hour, pause, stop & save,
@@ -541,7 +554,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 
 ## Left to do (agreed order)
 1. **GROBBS to work through "Still to check in game" above**; fix what he reports.
-2. Wealth tracker follow-ups: test with GROBBS's real account; price rares via the trade site (slow) or poeprices;
+2. Wealth tracker follow-ups (real account tested and rares priced via the trade site, 21 Nov):
    PoeStash-style "search every tab" and guild stash; crafting planner (parked).
 3. Price check polish ideas (any resistance, trend line done 21 Nov; same seller + price already shows once with "× N";
    prices already in chaos and divines; maps already search by tier).

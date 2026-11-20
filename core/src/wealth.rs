@@ -64,6 +64,9 @@ pub struct Valued {
     /// "Worth selling" adds up the same item from several stacks / slots: how many places it's in.
     #[serde(default)]
     pub places: u32,
+    /// A rare priced from similar listings on the trade site (a rough guess, not poe.ninja).
+    #[serde(default)]
+    pub rare: bool,
 }
 
 pub fn value_item(item: &Value, tab: &str, lookup: Lookup) -> Option<Valued> {
@@ -85,8 +88,121 @@ pub fn value_item(item: &Value, tab: &str, lookup: Lookup) -> Option<Valued> {
         x: item["x"].as_u64().unwrap_or(0) as u32, y: item["y"].as_u64().unwrap_or(0) as u32,
         // A price note on the item, or on the whole tab (a tab named "~price 5 chaos" prices everything in it).
         listed: [item["note"].as_str().unwrap_or(""), tab].iter().any(|n| n.starts_with("~price") || n.starts_with("~b/o")),
-        icon: item["icon"].as_str().unwrap_or("").to_string(), places: 1,
+        icon: item["icon"].as_str().unwrap_or("").to_string(), places: 1, rare: false,
     })
+}
+
+/// A rare in the stash, kept so "Price rares" can look it up on the trade site later.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Rare {
+    /// The stash API's item id (stays the same while the item exists).
+    pub id: String,
+    pub tab: String,
+    pub name: String,
+    /// The item as Ctrl+C would copy it, for the price check's search.
+    pub text: String,
+    pub icon: String,
+    pub x: u32,
+    pub y: u32,
+    pub listed: bool,
+}
+
+/// What the trade site said a rare is worth.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct RarePrice {
+    /// Chaos (0 = nothing like it listed).
+    pub chaos: f64,
+    /// Unix seconds.
+    pub time: u64,
+    /// How many similar items were for sale.
+    pub found: u64,
+}
+
+/// Identified rare gear and jewels in a tab (unidentified ones can't be searched by their mods).
+pub fn rares_in_tab(items: &Value, tab: &str) -> Vec<Rare> {
+    items.as_array().into_iter().flatten().filter(|it| {
+        it["frameType"].as_u64() == Some(2) && it["identified"].as_bool() != Some(false) && is_gear(it) && it["id"].is_string()
+    }).map(|it| Rare {
+        id: it["id"].as_str().unwrap_or("").to_string(),
+        tab: tab.to_string(),
+        name: format!("{} {}", clean(it["name"].as_str().unwrap_or("")), clean(it["typeLine"].as_str().unwrap_or(""))).trim().to_string(),
+        text: item_text(it),
+        icon: it["icon"].as_str().unwrap_or("").to_string(),
+        x: it["x"].as_u64().unwrap_or(0) as u32, y: it["y"].as_u64().unwrap_or(0) as u32,
+        listed: [it["note"].as_str().unwrap_or(""), tab].iter().any(|n| n.starts_with("~price") || n.starts_with("~b/o")),
+    }).collect()
+}
+
+/// A rare as a stash entry, at the price the trade site gave it.
+pub fn rare_valued(r: &Rare, chaos: f64) -> Valued {
+    Valued { tab: r.tab.clone(), name: r.name.clone(), stack: 1, value: chaos, x: r.x, y: r.y, listed: r.listed,
+        icon: r.icon.clone(), places: 1, rare: true }
+}
+
+/// The stash API's item as the game's Ctrl+C text (enough for the price check to read it).
+pub fn item_text(it: &Value) -> String {
+    const SEP: &str = "--------";
+    let mut out: Vec<String> = Vec::new();
+    let base = clean(it["baseType"].as_str().or(it["typeLine"].as_str()).unwrap_or(""));
+    if let Some(c) = crate::item::base_classes().get(&base) { out.push(format!("Item Class: {c}")); }
+    let rarity = match it["frameType"].as_u64() { Some(0) => "Normal", Some(1) => "Magic", Some(3) => "Unique", _ => "Rare" };
+    out.push(format!("Rarity: {rarity}"));
+    let name = clean(it["name"].as_str().unwrap_or(""));
+    if !name.is_empty() { out.push(name); }
+    out.push(clean(it["typeLine"].as_str().unwrap_or("")));
+    let prop = |p: &Value| -> String {
+        let mut n = p["name"].as_str().unwrap_or("").to_string();
+        let vals: Vec<String> = p["values"].as_array().into_iter().flatten().filter_map(|v| v[0].as_str().map(String::from)).collect();
+        if n.contains("{0}") {
+            for (i, v) in vals.iter().enumerate() { n = n.replace(&format!("{{{i}}}"), v); }
+            n
+        } else if vals.is_empty() { n } else { format!("{n}: {}", vals.join(", ")) }
+    };
+    let props: Vec<String> = it["properties"].as_array().into_iter().flatten().map(prop).filter(|p| !p.is_empty()).collect();
+    if !props.is_empty() { out.push(SEP.into()); out.extend(props); }
+    let reqs: Vec<String> = it["requirements"].as_array().into_iter().flatten().map(prop).collect();
+    if !reqs.is_empty() { out.push(SEP.into()); out.push("Requirements:".into()); out.extend(reqs); }
+    if let Some(socks) = it["sockets"].as_array().filter(|s| !s.is_empty()) {
+        let mut s = String::new();
+        let mut group = None;
+        for k in socks {
+            let g = k["group"].as_u64();
+            if group.is_some() { s.push(if g == group { '-' } else { ' ' }); }
+            s.push_str(k["sColour"].as_str().unwrap_or("W"));
+            group = g;
+        }
+        out.push(SEP.into());
+        out.push(format!("Sockets: {s}"));
+    }
+    out.push(SEP.into());
+    out.push(format!("Item Level: {}", it["ilvl"].as_u64().unwrap_or(0)));
+    // Mods come as plain strings, or as { description, flags: { crafted, fractured } }.
+    let line = |m: &Value, tag: Option<&str>| -> Option<String> {
+        let (d, f) = match m { Value::String(s) => (s.clone(), &Value::Null), _ => (m["description"].as_str()?.to_string(), &m["flags"]) };
+        let tag = tag.or(if f["crafted"].as_bool() == Some(true) { Some("crafted") } else if f["fractured"].as_bool() == Some(true) { Some("fractured") } else { None });
+        Some(d.lines().map(|l| match tag { Some(t) => format!("{l} ({t})"), None => l.to_string() }).collect::<Vec<_>>().join("
+"))
+    };
+    let section = |out: &mut Vec<String>, lines: Vec<String>| if !lines.is_empty() { out.push(SEP.into()); out.extend(lines); };
+    let list = |k: &str, tag: Option<&str>| -> Vec<String> { it[k].as_array().into_iter().flatten().filter_map(|m| line(m, tag)).collect() };
+    section(&mut out, list("enchantMods", Some("enchant")));
+    section(&mut out, list("implicitMods", Some("implicit")));
+    let mut ex = list("fracturedMods", Some("fractured"));
+    ex.extend(list("explicitMods", None));
+    ex.extend(list("craftedMods", Some("crafted")));
+    section(&mut out, ex);
+    let mut tail = Vec::new();
+    for (k, n) in [("shaper", "Shaper"), ("elder", "Elder"), ("crusader", "Crusader"), ("redeemer", "Redeemer"), ("hunter", "Hunter"), ("warlord", "Warlord")] {
+        if it["influences"][k].as_bool() == Some(true) { tail.push(format!("{n} Item")); }
+    }
+    if it["searing"].as_bool() == Some(true) { tail.push("Searing Exarch Item".into()); }
+    if it["tangled"].as_bool() == Some(true) { tail.push("Eater of Worlds Item".into()); }
+    if it["fractured"].as_bool() == Some(true) { tail.push("Fractured Item".into()); }
+    if it["synthesised"].as_bool() == Some(true) { tail.push("Synthesised Item".into()); }
+    section(&mut out, tail);
+    if it["corrupted"].as_bool() == Some(true) { out.push(SEP.into()); out.push("Corrupted".into()); }
+    out.join("
+")
 }
 
 /// Normal/magic/rare gear and jewels (worth what the trade site says, not poe.ninja).
@@ -208,6 +324,9 @@ pub struct WealthStore {
     /// Named sets of tabs to scan (like WealthyExile's profiles), and the one in use (None = whole stash).
     pub profiles: Vec<ScanProfile>,
     pub active: Option<String>,
+    /// Rares from the last scan, and what the trade site said they're worth (by item id).
+    pub rares: Vec<Rare>,
+    pub rare_prices: std::collections::BTreeMap<String, RarePrice>,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
@@ -282,9 +401,43 @@ mod tests {
 
 
     #[test]
+    fn rares_become_item_text() {
+        // Shape from his real stash (21 Nov): mods as { description, flags }.
+        let items = json!([{ "id": "abc", "frameType": 2, "identified": true, "name": "Cataclysm Trail", "typeLine": "Paladin Boots",
+            "baseType": "Paladin Boots", "ilvl": 86, "x": 2, "y": 3, "searing": true, "tangled": true,
+            "properties": [ { "name": "Quality", "values": [["+20%", 1]] }, { "name": "Armour", "values": [["298", 1]] } ],
+            "requirements": [ { "name": "Level", "values": [["84", 0]] } ],
+            "sockets": [ { "group": 0, "sColour": "W" }, { "group": 0, "sColour": "G" }, { "group": 1, "sColour": "W" } ],
+            "implicitMods": [ { "description": "5% increased Movement Speed" } ],
+            "explicitMods": [ { "description": "+35% to Chaos Resistance" }, "15% increased Movement Speed",
+                { "description": "60% chance to Avoid Bleeding", "flags": { "crafted": true } } ] },
+            { "id": "u", "frameType": 2, "identified": false, "typeLine": "Paladin Boots", "baseType": "Paladin Boots", "ilvl": 86 },
+            { "id": "m", "frameType": 2, "identified": true, "name": "Grim Path", "typeLine": "Strand Map", "baseType": "Strand Map", "ilvl": 83,
+              "properties": [ { "name": "Map Tier", "values": [["16", 0]] } ] }]);
+        let r = rares_in_tab(&items, "TENDY");
+        assert_eq!(r.len(), 1, "unidentified rares and rare maps aren't searched this way");
+        assert_eq!((r[0].id.as_str(), r[0].name.as_str()), ("abc", "Cataclysm Trail Paladin Boots"));
+        let t = &r[0].text;
+        assert!(t.starts_with("Item Class: Boots
+Rarity: Rare
+Cataclysm Trail
+Paladin Boots
+--------
+Quality: +20%
+Armour: 298"), "{t}");
+        assert!(t.contains("Sockets: W-G W") && t.contains("Item Level: 86") && t.contains("5% increased Movement Speed (implicit)"), "{t}");
+        assert!(t.contains("60% chance to Avoid Bleeding (crafted)") && t.ends_with("Searing Exarch Item
+Eater of Worlds Item"), "{t}");
+        let s = crate::trade::setup(t, &Default::default()).expect("the price check reads it");
+        assert_eq!((s.item.rarity.as_str(), s.item.base_type.as_str(), s.category.as_deref()), ("Rare", "Paladin Boots", Some("armour.boots")));
+        let v = rare_valued(&r[0], 40.0);
+        assert!(v.rare && !v.listed && v.value == 40.0);
+    }
+
+    #[test]
     fn worth_selling_adds_up_stacks() {
         let it = |tab: &str, stack: u32, value: f64| Valued { tab: tab.into(), name: "Blighted Thread".into(), stack, value, x: 0, y: 0,
-            listed: false, icon: String::new(), places: 1 };
+            listed: false, icon: String::new(), places: 1, rare: false };
         // 3 + 7 threads at 1.2c each: neither stack reaches 10c, together they do.
         let v = vec![it("Dump 1", 3, 3.6), it("Dump 2", 7, 8.4), it("Dump 2", 0, 0.0)];
         let m = missed(&v, 10.0);
