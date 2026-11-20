@@ -5,7 +5,10 @@ import { createRoot } from "react-dom/client";
 import ItemPanel from "./ItemPanel";
 import "./styles.css";
 
-const state = new URLSearchParams(location.search).get("state") ?? "hide";
+const params = new URLSearchParams(location.search);
+const state = params.get("state") ?? "hide";
+// ?editor=1: the panel as the main window shows it (Find / Tiers), not over the game.
+const editor = params.get("editor") === "1";
 const style = { font_size: 40, text: [255, 255, 255, 255], border: null, background: [0, 0, 0, 200], beam: null, muted: false, label_hidden: state === "icon" };
 const reply = {
   stackable: true, area_level: 83, game_filter: null,
@@ -24,5 +27,5 @@ mockIPC((cmd) => {
 document.body.className = "overlay";
 const item = { item_class: "Stackable Currency", rarity: "Normal", name: null, base_type: "Orb of Unmaking", stack_size: 3, corrupted: false, mirrored: false, unidentified: false };
 createRoot(document.getElementById("root")!).render(
-  <div style={{ width: 400, margin: 16 }} className="qm"><ItemPanel start={{ item: item as never, from_screen: true, screen_text: "ORB OF UNMAKING", confidence: 1 }} inGame={true} onClose={() => {}} /></div>,
+  <div style={{ width: editor ? 900 : 400, margin: 16 }} className={editor ? "" : "qm"}><ItemPanel start={{ item: item as never, from_screen: !editor, screen_text: "ORB OF UNMAKING", confidence: 1 }} inGame={!editor} onClose={() => {}} /></div>,
 );

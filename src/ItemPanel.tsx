@@ -357,7 +357,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
   }
 
   return (
-    <div className="qm-panel">
+    <div className={`qm-panel ${inGame ? "" : "qm-sheet"}`}>
       {replacing && (
         <div className="qm-editing">
           Editing your rule: <b>{replacing.detail.label}</b>. Buttons below change this rule.
@@ -506,12 +506,14 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
       </button>
 
       {/* Less-used settings, folded away (remembered): stack sizes, when it applies, every rarity, auto reload. */}
-      <button className="qm-more-toggle" onClick={() => toggleMore(!more)}>
+      {/* In the editor window there's room: everything shows, these sit in the right-hand column (.qm-sheet). */}
+      {inGame && <button className="qm-more-toggle" onClick={() => toggleMore(!more)}>
         {more ? "▾" : "▸"} More options
         {!more && <span className="muted small"> · {[extra?.stackable && "stack sizes", "when it applies", isGear && "every rarity", inGame && "auto reload"].filter(Boolean).join(" · ")}</span>}
-      </button>
-      {more && (
+      </button>}
+      {(more || !inGame) && (
         <div className="qm-more">
+          {!inGame && <div className="qm-side-title">Stack sizes and when it applies</div>}
       {!wholeType && extra?.stackable && status && (
         <div className="qm-stack">
           <div className="qm-label">Stack size: <b>{stackN.toLocaleString()}</b>{item.stack_size ? ` (this one: ${item.stack_size.toLocaleString()})` : ""}</div>

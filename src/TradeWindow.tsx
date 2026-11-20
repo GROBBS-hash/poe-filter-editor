@@ -191,7 +191,7 @@ function MarketRatio({ c, divine }: { c: number; divine: number | null }) {
 }
 
 /** The answer first, big and clear: what this sells for. */
-function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote, waiting }: { res: Result | null; bulk: Bulk | null; busy: boolean; err: string; waiting?: string | null;
+function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote, waiting, stack }: { res: Result | null; bulk: Bulk | null; busy: boolean; err: string; waiting?: string | null; stack?: number;
   divine: number | null; ninja: [number, string] | null; ninjaNote: string }) {
   const ninjaChaos = ninja ? (ninja[1] === "divine" && divine ? ninja[0] * divine : ninja[1] === "chaos" ? ninja[0] : null) : null;
   let main: number | null = null, label = "", sub: React.ReactNode = null;
@@ -218,6 +218,11 @@ function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote, waiting }: 
           <span className="tw-hero-side">
             <span className="tw-hero-label">{label}</span>
             {divine && <span className="muted">{showDiv ? <>= <Price n={main} cur="chaos" /></> : main / divine >= 0.01 ? <>= <Price n={main / divine} cur="divine" /></> : null}</span>}
+            {stack != null && stack > 1 && (
+              // What the whole stack you hovered is worth (e.g. 732 lifeforce).
+              <span className="tw-hero-stack">Your {stack.toLocaleString()} ≈ <b>{divine && main * stack >= divine ? <Price n={(main * stack) / divine} cur="divine" /> : <Price n={main * stack} cur="chaos" />}</b>
+                {divine && main * stack >= divine ? <> = <Price n={main * stack} cur="chaos" /></> : null}</span>
+            )}
           </span>
         </div>
       ) : (
@@ -426,7 +431,7 @@ export default function TradeWindow() {
 
       <PriceHero res={res} bulk={check.bulk ? bulk : null} busy={busy} err={err} divine={divine}
         waiting={!res && !busy && !check.bulk ? (searched ? "Filters changed: move onto Search again" : "Pick the stats, then move your mouse onto Search") : null}
-        ninja={check.ninja} ninjaNote={it.rarity === "Unique" && !it.name ? " (best ground unique on this base)" : ""} />
+        ninja={check.ninja} ninjaNote={it.rarity === "Unique" && !it.name ? " (best ground unique on this base)" : ""} stack={it.stack_size ?? undefined} />
       {err && <div className="qm-warn">{err}</div>}
       {it.rarity === "Unique" && !it.name && it.base_type && <BaseUniques base={it.base_type} divine={divine} />}
 
