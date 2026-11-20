@@ -533,7 +533,10 @@ fn price_check(app: AppHandle) {
         let mut payload = payload;
         payload.divine = currency_rates(&app).get("divine").copied();
         // "Is this an upgrade?" against your PoB build's gear in that slot.
-        if !payload.from_ground {
+        if !state.store.lock().unwrap().settings.price_rolls {
+            if let Some(s) = payload.setup.as_mut() { for f in &mut s.filters { f.roll = None; } }
+        }
+        if !payload.from_ground && state.store.lock().unwrap().settings.price_compare {
             if let (Some(setup), Some(pob)) = (payload.setup.as_ref(), pob_load(&state)) {
                 if let Some(stage) = pob.build.stages.get(pob.stage) {
                     let lines: Vec<String> = filter_core::trade::mods(&text).into_iter().map(|m| m.text).collect();
@@ -592,7 +595,7 @@ fn trade_query(app: &AppHandle, poe2: bool, setup: &filter_core::trade::TradeSet
 static LAST_MANUAL: Mutex<Option<std::time::Instant>> = Mutex::new(None);
 
 /// Runs the price search on the trade site (from the price window).
-#[tauri::command]
+#[tauri::command(async)]
 fn trade_search(app: AppHandle, setup: filter_core::trade::TradeSetup) -> Result<TradeResult, String> {
     *LAST_MANUAL.lock().unwrap() = Some(std::time::Instant::now());
     let (poe2, league) = trade_league(&app);
@@ -702,7 +705,7 @@ async fn send_whisper(text: String) -> Result<(), String> {
 struct BulkResult { offers: Vec<filter_core::trade::Offer>, url: String, divine: Option<f64> }
 
 /// Bulk rates: people selling `want` (a trade id like "divine") for `pay` ("chaos"/"divine").
-#[tauri::command]
+#[tauri::command(async)]
 fn trade_bulk(app: AppHandle, want: String, pay: String) -> Result<BulkResult, String> {
     let (poe2, league) = trade_league(&app);
     let (id, v) = trade_api::exchange(poe2, &league, &filter_core::trade::exchange_query(&pay, &want, None))?;
@@ -713,7 +716,7 @@ fn trade_bulk(app: AppHandle, want: String, pay: String) -> Result<BulkResult, S
 }
 
 /// poeprices.info's rough price for a rare: (min, max, currency, confidence %).
-#[tauri::command]
+#[tauri::command(async)]
 fn rare_estimate(app: AppHandle, text: String) -> Result<Option<(f64, f64, String, f64)>, String> {
     let (_, league) = trade_league(&app);
     Ok(filter_core::trade::poeprices(&trade_api::poeprices(&league, &text)?))

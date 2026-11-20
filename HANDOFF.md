@@ -86,6 +86,12 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   plus mods only one side has. Collapsible (remembered). 20 Nov: PoB gear keeps only the selected variant's lines and
   rolls "(60-80)" ranges at PoB's {range} (`roll_ranges` in pob.rs); window re-laid out (section headings, "yours /
   this" table with ▲▼, one mod per line folding after four, verdict badge, highlighted minimum preset).
+- Price window, 20 Nov (2): "Search trade did nothing" was the window capped at 900px with results below the edge;
+  now capped at screen height, the page scrolls (`body.overlay.scroll`) and results scroll into view.
+  trade_search / trade_bulk / rare_estimate are `#[tauri::command(async)]` (they used to block the main thread).
+  Roll bars: `roll_of` in trade.rs reads the advanced copy's "(25-29)" → `StatFilter.roll` 0..1 (within the tier
+  for rares, the whole range for uniques), shown as low / mid / high roll. Settings → Price check: `price_compare`
+  and `price_rolls` (both on by default).
 - Wealth page (Endgame → Wealth; `core/src/wealth.rs`, `src-tauri/src/wealth_app.rs`, `src/Wealth.tsx`,
   `src/EarningsWindow.tsx`, window "earnings"): reads the stash via the session API
   (character-window/get-stash-items, Cookie POESESSID, realm pc/poe2, rate-limited as kind "stash", learns
@@ -104,7 +110,10 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 
 **Price check (Ctrl+D)**
 - [ ] "min: exact / −10% / −20%" buttons change the results, and the picked one stays highlighted.
-- [ ] New layout of the price window (20 Nov) is easier to read; your gear's mods show real numbers, not "(60-80)".
+- [ ] Your gear's mods in the build box show real numbers, not "(60-80)". (New layout: he said it looks tidier.)
+- [ ] "Search trade" on a tall window (e.g. Duskdawn): prices appear and the window scrolls to them.
+- [ ] Roll bars (low / mid / high roll) on rare and unique mods look right.
+- [ ] Settings → Price check: turning off the build comparison / roll bars hides them.
 - [ ] Prices shown in chaos and divines with orb icons; bulk "1 div ≈ N items".
 - [ ] Transfigured gem: searches without "Unknown item base type".
 - [ ] Foulborn / mutated unique searches correctly.

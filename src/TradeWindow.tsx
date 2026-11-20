@@ -5,7 +5,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { CurrencyIcon, ItemIcon } from "./icons";
 import { Item, RARITY_COLOUR, itemTitle } from "./types";
 
-type StatFilter = { id: string; label: string; value: number; min: number | null; enabled: boolean; kind: string; tier: number | null; junk?: boolean };
+type StatFilter = { id: string; label: string; value: number; min: number | null; enabled: boolean; kind: string; tier: number | null; junk?: boolean; roll?: number | null };
 type Setup = { item: Item; filters: StatFilter[]; unknown_kinds?: string[]; base_only: boolean; ilvl_min: number | null; links_min: number | null;
   gem_level: number | null; unknown: string[]; category: string | null; raw?: string };
 type MapInfo = { mods: { text: string; warn: string | null }[]; unidentified: boolean; tier: number | null; stats: string[] };
@@ -118,6 +118,18 @@ function CompareBlock({ list }: { list: Comparison[] }) {
   );
 }
 
+/** How high a mod rolled: a small bar from its lowest to its highest roll. */
+function Roll({ r, tier }: { r: number; tier: number | null }) {
+  const pct = Math.round(r * 100);
+  const cls = pct >= 80 ? "hi" : pct >= 40 ? "mid" : "lo";
+  const word = pct >= 80 ? "high roll" : pct >= 40 ? "mid roll" : "low roll";
+  return (
+    <span className={`tw-roll ${cls}`} title={`${pct}% of the way from the lowest to the highest roll${tier != null ? " for this tier" : ""}`}>
+      <span className="tw-roll-bar"><span style={{ width: `${Math.max(4, pct)}%` }} /></span>{word}
+    </span>
+  );
+}
+
 /** "4 better · 1 worse" as a coloured badge. */
 function Verdict({ up, down }: { up: number; down: number }) {
   const cls = up > down ? "up" : down > up ? "down" : "";
@@ -181,6 +193,12 @@ export default function TradeWindow() {
   const [saving, setSaving] = useState<string | null>(null);
   const [preset, setPreset] = useState<number | null>(0);
   const box = useRef<HTMLDivElement | null>(null);
+  const resBox = useRef<HTMLDivElement | null>(null);
+  // When prices arrive, bring them into view (the window may be scrolled or at full height).
+  useEffect(() => {
+    const t = setTimeout(() => resBox.current?.scrollIntoView({ block: "start", behavior: "smooth" }), 120);
+    return () => clearTimeout(t);
+  }, [res]);
 
   const close = useCallback(() => { setCheck(null); setRes(null); setBulk(null); setAi(null); setErr(""); invoke("hide_trade_window"); }, []);
 
@@ -200,7 +218,7 @@ export default function TradeWindow() {
     const a = listen<Check>("price-check", (e) => {
       const c = e.payload;
       setCheck(c); setSetup(c.setup); setRes(null); setBulk(null); setAi(null); setErr(c.error ?? ""); setCopied(null); setPay("chaos");
-      setSaving(null); setShowSaved(!c.setup); setPreset(null);
+      setSaving(null); setShowSaved(!c.setup); setPreset(null); window.scrollTo(0, 0);
       invoke<Saved[]>("saved_list").then(setSaved).catch(() => {});
       if (c.bulk) runBulk(c.bulk, "chaos");
       else if (c.setup && needsTrade(c)) run(c.setup);
@@ -220,7 +238,9 @@ export default function TradeWindow() {
     if (!box.current) return;
     const ro = new ResizeObserver(() => {
       const h = Math.ceil(box.current?.getBoundingClientRect().height ?? 300) + 4;
-      getCurrentWindow().setSize(new LogicalSize(380, Math.max(100, Math.min(900, h)))).then(() => invoke("keep_on_screen")).catch(() => {});
+      // As tall as the screen allows; past that the window scrolls.
+      const cap = Math.max(400, (window.screen.availHeight || 900) - 40);
+      getCurrentWindow().setSize(new LogicalSize(380, Math.max(100, Math.min(cap, h)))).then(() => invoke("keep_on_screen")).catch(() => {});
     });
     ro.observe(box.current);
     return () => ro.disconnect();
@@ -293,7 +313,8 @@ export default function TradeWindow() {
             <label key={f.id + i} className={`tw-stat ${f.enabled ? "on" : ""} ${f.junk ? "junk" : ""}`} title={f.junk ? "Rarely changes the price" : undefined}>
               <input type="checkbox" checked={f.enabled} onChange={(e) => patch(i, { enabled: e.target.checked })} />
               <span className={`tw-label mod-${f.kind}`}>{f.label}{KIND[f.kind] && <span className="tw-kind">{KIND[f.kind]}</span>}
-                {f.tier != null && <span className={`tw-tier ${f.tier <= 2 ? "good" : ""}`}>T{f.tier}</span>}</span>
+                {f.tier != null && <span className={`tw-tier ${f.tier <= 2 ? "good" : ""}`}>T{f.tier}</span>}
+                {f.roll != null && <Roll r={f.roll} tier={f.tier} />}</span>
               <input className="tw-min" type="number" value={f.min ?? ""} placeholder="min" onWheel={(e) => wheel(i, f, e)}
                 onChange={(e) => patch(i, { min: e.target.value === "" ? null : +e.target.value, enabled: true })} />
             </label>
@@ -379,7 +400,7 @@ export default function TradeWindow() {
       {err && <div className="qm-warn">{err}</div>}
 
       {res && (
-        <div className="tw-res">
+        <div className="tw-res" ref={resBox}>
           <div className="tw-sec tw-res-sec">Prices on trade</div>
           <div className="tw-sum">
             {res.summary ? <>Around <b><Price n={res.summary[1]} cur="chaos" /></b> <Other n={res.summary[1]} cur="chaos" divine={divine} />

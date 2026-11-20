@@ -5,6 +5,7 @@ type Settings = {
   key_quick_edit: string; key_batch: string; key_reload: string; key_cycle: string; key_build: string; key_price?: string;
   cycle_enabled: boolean; fallback_area_level: number; claude_api_key: string; map_avoid?: string[] | null;
   trade_helper?: boolean; thanks_message?: string; chat_keys?: { key: string; command: string }[];
+  price_compare?: boolean; price_rolls?: boolean;
 };
 const CHAT_IDEAS = ["/hideout", "/kingsmarch", "/menagerie", "/delve", "/exit", "/invite", "/kick", "/afk"];
 type Suggestion = { name: string; why: string };
@@ -96,6 +97,15 @@ export default function SettingsPage() {
             <span>Switch to your next filter (e.g. League Start → Strict 1 → Strict 2) and load it</span></label>
           <KeyBox value={s.key_cycle} disabled={!s.cycle_enabled} onChange={(k) => set({ key_cycle: k })} />
         </div>
+      </div>
+
+      <div className="card">
+        <h2>Price check</h2>
+        <p className="muted small">What the price window shows besides the price.</p>
+        <label className="check"><input type="checkbox" checked={s.price_compare ?? true} onChange={(e) => set({ price_compare: e.target.checked })} />
+          <span>Compare the item with your build's gear (needs a PoB link on the Build page)</span></label>
+        <label className="check"><input type="checkbox" checked={s.price_rolls ?? true} onChange={(e) => set({ price_rolls: e.target.checked })} />
+          <span>Show how well each mod rolled (a bar from the lowest to the highest roll)</span></label>
       </div>
 
       <div className="card">

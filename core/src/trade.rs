@@ -18,6 +18,8 @@ pub struct ModLine {
     /// From the advanced copy: tier 1 is the best roll of that mod.
     pub tier: Option<u32>,
     pub values: Vec<f64>,
+    /// Where the roll sits in its range, 0 (lowest) to 1 (highest), from the advanced copy's "(30-39)".
+    pub roll: Option<f64>,
 }
 
 /// One stat to search on, with a tick box and a minimum.
@@ -34,6 +36,9 @@ pub struct StatFilter {
     /// Rarely affects the price (accuracy, thorns, light radius…): never ticked for you.
     #[serde(default)]
     pub junk: bool,
+    /// Where the roll sits in its range (0 lowest, 1 highest), when the copy showed one.
+    #[serde(default)]
+    pub roll: Option<f64>,
 }
 
 /// Mods that almost never change what an item sells for.
@@ -134,6 +139,33 @@ pub fn template(line: &str) -> (String, Vec<f64>) {
     (out, vals)
 }
 
+/// The "(25-29)" ranges on an advanced-copy line, in order.
+fn ranges(line: &str) -> Vec<(f64, f64)> {
+    let mut out = Vec::new();
+    let mut rest = line;
+    while let Some(i) = rest.find('(') {
+        let Some(j) = rest[i..].find(')').map(|j| i + j) else { break };
+        let inner = &rest[i + 1..j];
+        // "-" splits the two ends; a leading "-" belongs to the number ("(-15--5)").
+        if let Some((k, _)) = inner.char_indices().skip(1).find(|(_, c)| *c == '-') {
+            if let (Ok(a), Ok(b)) = (inner[..k].trim().parse::<f64>(), inner[k + 1..].trim().parse::<f64>()) { out.push((a, b)); }
+        }
+        rest = &rest[j + 1..];
+    }
+    out
+}
+
+/// How high the line rolled, 0 (lowest) to 1 (highest), averaged over its numbers.
+/// None when the copy shows no ranges or every number is fixed.
+fn roll_of(line: &str, values: &[f64]) -> Option<f64> {
+    let r = ranges(line);
+    if r.is_empty() || r.len() != values.len() { return None; }
+    let spots: Vec<f64> = r.iter().zip(values).filter(|((a, b), _)| a != b)
+        .map(|((a, b), v)| ((v.abs() - a.abs()) / (b.abs() - a.abs())).clamp(0.0, 1.0)).collect();
+    if spots.is_empty() { return None; }
+    Some(spots.iter().sum::<f64>() / spots.len() as f64)
+}
+
 /// Removes roll ranges "(25-29)" and tags like "(augmented)" from an advanced-copy line.
 fn clean(line: &str) -> String {
     let mut out = String::new();
@@ -203,7 +235,8 @@ pub fn mods(text: &str) -> Vec<ModLine> {
             let numberless_ok = header_kind.is_some() || t.contains("Cannot") || t.contains("Has ");
             if t.is_empty() || !t.chars().any(|c| c.is_ascii_digit()) && !numberless_ok { continue; }
             let (_, values) = template(&t);
-            out.push(ModLine { text: t, kind, tier: header_tier, values });
+            let roll = roll_of(l, &values);
+            out.push(ModLine { text: t, kind, tier: header_tier, values, roll });
         }
     }
     out
@@ -265,7 +298,7 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
         let enabled = !unique && m.kind != "enchant" && good && !junk;
         // A mod with no number is just "has it": no minimum.
         let min = if m.values.is_empty() { None } else { Some(min_for(value)) };
-        filters.push(StatFilter { id, label: m.text.clone(), value, min, enabled, kind, tier: m.tier, junk });
+        filters.push(StatFilter { id, label: m.text.clone(), value, min, enabled, kind, tier: m.tier, junk, roll: m.roll });
     }
     filters.extend(crate::trade_rules::open_affixes(text, &item, index));
     let links = item.sockets.as_deref().map(crate::item::max_links).unwrap_or(0);
@@ -555,9 +588,10 @@ Item Level: 75
     fn reads_advanced_copy() {
         let m = mods(BOOTS);
         assert_eq!(m.len(), 5);
-        assert_eq!(m[0], ModLine { text: "+8% to Cold Resistance".into(), kind: "implicit".into(), tier: None, values: vec![8.0] });
+        assert_eq!(m[0], ModLine { text: "+8% to Cold Resistance".into(), kind: "implicit".into(), tier: None, values: vec![8.0], roll: None });
         assert_eq!((m[1].text.as_str(), m[1].tier, m[1].values[0]), ("+28 to maximum Life", Some(7), 28.0));
         assert_eq!(m[3].tier, Some(1));
+        assert!(m[1].roll.is_some(), "life has a range: {:?}", m[1]);
     }
 
     #[test]
@@ -664,6 +698,12 @@ Item Level: 75
     fn templates_and_listings() {
         assert_eq!(template("Adds 10 to 20 Physical Damage"), ("Adds # to # Physical Damage".into(), vec![10.0, 20.0]));
         assert_eq!(clean("+28(25-29) to maximum Life"), "+28 to maximum Life");
+        assert_eq!(roll_of("+28(25-29) to maximum Life", &[28.0]), Some(0.75));
+        assert_eq!(roll_of("Adds 8(8-12) to 25(18-25) Fire Damage", &[8.0, 25.0]), Some(0.5));
+        assert_eq!(roll_of("+1 to Level of all Spell Skill Gems", &[1.0]), None);
+        assert_eq!(roll_of("+25(25-25)% Chance to Block", &[25.0]), None);
+        // Negative ranges: further from zero counts as higher.
+        assert_eq!(roll_of("-10(-15--5)% to Chaos Resistance", &[-10.0]), Some(0.5));
         assert_eq!(clean("+10% to Cold Resistance (implicit)"), "+10% to Cold Resistance");
         let r = rates(|n| (n == "Divine Orb").then_some(200.0));
         let f = json!({ "result": [

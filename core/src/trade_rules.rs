@@ -102,7 +102,7 @@ pub fn totals(mods: &[ModLine], item: &Item, index: &StatIndex, skip: &[usize]) 
         out.push(StatFilter {
             id, label: rule.text.replace('#', &total.to_string()), value: total, min: Some(total),
             enabled: !unique && rule.tick_at.map(|t| total >= t).unwrap_or(false),
-            kind: "pseudo".into(), tier: None, junk: false,
+            kind: "pseudo".into(), tier: None, junk: false, roll: None,
         });
         if !unique { hide.extend(used.iter().filter(|(_, keep)| !keep).map(|(i, _)| *i)); }
     }
@@ -186,7 +186,7 @@ pub fn property_filters(text: &str, item: &Item, mods: &[ModLine]) -> (Vec<StatF
     let mut out = Vec::new();
     let mut replaced: Vec<&str> = Vec::new();
     let f = |id: &str, label: String, v: f64, on: bool| StatFilter {
-        id: id.into(), label, value: v, min: Some(v), enabled: on && !unique, kind: "property".into(), tier: None, junk: false };
+        id: id.into(), label, value: v, min: Some(v), enabled: on && !unique, kind: "property".into(), tier: None, junk: false, roll: None };
     // Armour: each defence at 20% quality; ticked when the base has only one kind.
     let defences = [p.armour, p.evasion, p.es, p.ward].iter().filter(|x| x.is_some()).count();
     for (val, id, name, inc) in [(p.armour, "prop.ar", "Armour", AR_INC), (p.evasion, "prop.ev", "Evasion Rating", EV_INC),
@@ -244,7 +244,7 @@ pub fn open_affixes(text: &str, item: &Item, index: &StatIndex) -> Vec<StatFilte
         if n == 0 { continue; }
         let Some(id) = index.pseudo_id(text_id) else { continue };
         out.push(StatFilter { id, label: format!("Open {label} ({n} free)"), value: n as f64, min: Some(1.0), enabled: false,
-            kind: "pseudo".into(), tier: None, junk: false });
+            kind: "pseudo".into(), tier: None, junk: false, roll: None });
     }
     out
 }

@@ -10,4 +10,5 @@ import "./styles.css";
 
 const label = getCurrentWindow().label;
 document.body.classList.add(label === "overlay" || label === "build" || label === "trade" || label === "trades" || label === "earnings" ? "overlay" : "main");
+if (label === "trade") document.body.classList.add("scroll");
 createRoot(document.getElementById("root")!).render(label === "overlay" ? <QuickMenu /> : label === "build" ? <BuildOverlay /> : label === "trade" ? <TradeWindow /> : label === "trades" ? <TradesWindow /> : label === "earnings" ? <EarningsWindow /> : <App />);
