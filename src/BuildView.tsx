@@ -73,7 +73,45 @@ function treeChange(stages: PobStage[], i: number) {
   return { total: cur.length, added, removed };
 }
 
+/** Gear checklist: the build's items you already have, ticked by hand. Kept in this PC's app storage, shared by the
+ *  F6 window and My build (a tick in one shows in the other). One key per item: slot, name and base, so the same item
+ *  stays ticked in every stage that uses it. */
+const HAVE_KEY = "build.have";
+const haveKey = (it: PobGear) => `${it.slot}|${it.name}|${it.base}`;
+function readHave(): Set<string> {
+  try { return new Set(JSON.parse(localStorage.getItem(HAVE_KEY) || "[]")); } catch { return new Set(); }
+}
+function useHave() {
+  const [have, setHave] = useState<Set<string>>(readHave);
+  useEffect(() => {
+    const on = (e: StorageEvent) => { if (e.key === HAVE_KEY) setHave(readHave()); };
+    window.addEventListener("storage", on);
+    return () => window.removeEventListener("storage", on);
+  }, []);
+  const toggle = (k: string) => {
+    const next = new Set(readHave());
+    if (next.has(k)) next.delete(k); else next.add(k);
+    try { localStorage.setItem(HAVE_KEY, JSON.stringify([...next])); } catch { /* not kept */ }
+    setHave(next);
+  };
+  return [have, toggle] as const;
+}
+
+/** "Have 4 of 11 · hide what I have" over the gear and jewel lists. */
+function HaveBar({ n, of, hide, setHide }: { n: number; of: number; hide: boolean; setHide: (b: boolean) => void }) {
+  if (of === 0) return null;
+  return (
+    <li className="bv-havebar small">
+      <span><b>Have {n} of {of}</b>{n === of ? " · all done" : <span className="muted"> · tick items as you get them</span>}</span>
+      <label><input type="checkbox" checked={hide} onChange={(e) => setHide(e.target.checked)} /> hide what I have</label>
+    </li>
+  );
+}
+
 export default function BuildView({ compact = false }: { compact?: boolean }) {
+  const [have, toggleHave] = useHave();
+  const [hideHave, setHideHave] = useState(() => { try { return localStorage.getItem("build.hideHave") === "1"; } catch { return false; } });
+  useEffect(() => { try { localStorage.setItem("build.hideHave", hideHave ? "1" : "0"); } catch { /* not kept */ } }, [hideHave]);
   const [st, setSt] = useState<PobState | null>(null);
   // A jewel picked in the list (shown on the tree) or on the tree (opened in the list).
   const [jewelNode, setJewelNode] = useState<number | null>(null);
@@ -125,9 +163,15 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
   const flasks = sorted.filter((g) => g.slot.startsWith("Flask"));
   const jewels = s.jewels ?? [];
   const jewelWhere = (j: PobJewel) => j.node != null ? "Tree socket" : j.item.slot.replace(" Abyssal Socket ", " · abyssal socket ");
+  const haveBox = (it: PobGear) => (
+    <input type="checkbox" className="bv-have" checked={have.has(haveKey(it))} title="I have this"
+      onClick={(e) => e.stopPropagation()} onChange={() => toggleHave(haveKey(it))} />
+  );
+  const shown = (it: PobGear) => !(hideHave && have.has(haveKey(it)));
   const itemRow = (it: PobGear, key: string, where: string) => (
-    <li key={key} onClick={() => setOpenItem(openItem === key ? null : key)}>
+    <li key={key} className={have.has(haveKey(it)) ? "got" : ""} onClick={() => setOpenItem(openItem === key ? null : key)}>
       <div className="bv-item">
+        {haveBox(it)}
         <span className="bv-slot muted small">{where}</span>
         <ItemIcon name={it.rarity === "unique" ? it.name : null} base={it.base} size={26} />
         <span className="bv-iname">
@@ -181,20 +225,25 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
       {view === "gear" && (
         <ul className="bv-gear">
           {gear.length === 0 && <div className="empty">No gear set for this stage.</div>}
-          {gear.map((it) => itemRow(it, it.slot, SLOT_NAME[it.slot] ?? it.slot))}
-          {flasks.length > 0 && <li className="bv-subhead">Flasks</li>}
-          {flasks.map((it) => itemRow(it, it.slot, it.slot))}
+          <HaveBar n={sorted.filter((it) => have.has(haveKey(it))).length} of={sorted.length} hide={hideHave} setHide={setHideHave} />
+          {gear.filter(shown).map((it) => itemRow(it, it.slot, SLOT_NAME[it.slot] ?? it.slot))}
+          {flasks.filter(shown).length > 0 && <li className="bv-subhead">Flasks</li>}
+          {flasks.filter(shown).map((it) => itemRow(it, it.slot, it.slot))}
         </ul>
       )}
 
       {view === "jewels" && (
         <ul className="bv-gear bv-jewels">
           {jewels.length === 0 && <div className="empty">No jewels in this stage.</div>}
+          <HaveBar n={jewels.filter((j) => have.has(haveKey(j.item))).length} of={jewels.length} hide={hideHave} setHide={setHideHave} />
           {jewels.map((j, i) => {
             const key = "j" + (j.node ?? j.item.slot);
+            if (!shown(j.item)) return null;
             return (
-              <li key={i} onClick={() => setOpenItem(openItem === key ? null : key)} className={j.node != null && j.node === jewelNode ? "hl" : ""}>
+              <li key={i} onClick={() => setOpenItem(openItem === key ? null : key)}
+                className={`${j.node != null && j.node === jewelNode ? "hl" : ""} ${have.has(haveKey(j.item)) ? "got" : ""}`}>
                 <div className="bv-item">
+                  {haveBox(j.item)}
                   <span className="bv-slot muted small">{jewelWhere(j)}</span>
                   <ItemIcon name={j.item.rarity === "unique" ? j.item.name : null} base={j.item.base} size={26} />
                   <span className="bv-iname">

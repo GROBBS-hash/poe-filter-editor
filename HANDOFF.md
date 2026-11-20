@@ -285,6 +285,11 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   otherwise it opens as before. Checked on his PC: after a restart the window was minimised and not in front.
   Tray "Open editor" un-minimises too.
 
+- 21 Nov (0.2.1): Wealth "Count rares in my worth" (`WealthStore.skip_rares`, `wealth_count_rares`; `add_rares` puts
+  rares in or out of the last snapshot, last_items and sessions, but always in "Worth selling"). Gear checklist in
+  `BuildView.tsx` (F6 + My build): a tick per item, key `slot|name|base`, in localStorage `build.have` (shared by both
+  windows via the storage event), "Have N of M" bar with "hide what I have" (`build.hideHave`).
+
 - Find in stash 21 Nov (Wealth page, PoeStash-style "search every tab"): each scan keeps every item of the tabs it
   read, socketed gems too (`wealth::found_in_tab` → `Found`: tab index + name, spot, kind, ilvl, mods text from
   `item_text`, price note, scan value), replacing those tabs' old entries, in its own file `stash_index.json`
@@ -477,9 +482,11 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Price window: "This week" line with ▲/▼ % under the price for currency, cards, uniques… (after the price file updates).
 
 **Installer (21 Nov, release 0.2.0)**
-- [ ] Close the Start editor window, install from the 0.2.0 release page: the editor starts, settings and edits are
-      all still there, hotkeys work in game.
+- [x] (21 Nov: installed, "everything's there".) Still check: hotkeys work in game with the installed editor.
 - [ ] When 0.2.1 is out: "Version 0.2.1 is ready · Restart to update" shows at the top; clicking it updates and reopens.
+- [ ] 0.2.1: Wealth "Count rares in my worth" tick box: unticked, the total drops by the rares at once; ticked, back.
+- [ ] 0.2.1: Gear checklist (F6 Gear / Jewels tabs and My build): tick items you have, "Have N of M", "hide what I
+      have"; a tick in F6 shows on My build too, and stays ticked in other stages using the same item.
 
 **Editor restarts (21 Nov)**
 - [ ] When the editor restarts by itself (new version pulled) while you play, it stays on the taskbar instead of

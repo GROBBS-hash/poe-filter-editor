@@ -1339,3 +1339,9 @@ li:hover > .bv-item .bv-price { opacity: 1; }
 .update-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 0 0 14px; padding: 10px 14px;
   border: 1px solid rgba(255,214,102,.35); border-radius: 10px; background: rgba(255,214,102,.08); }
 .update-bar > span:first-child { flex: 1; }
+/* Gear checklist (build window + My build) */
+.bv-have { width: 17px; height: 17px; flex: none; accent-color: #62cf80; cursor: pointer; }
+.bv-gear li.got .bv-iname { opacity: .55; }
+.bv-gear li.got .bv-iname > span:first-child { text-decoration: line-through; text-decoration-color: rgba(255,255,255,.35); }
+.bv-havebar { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 4px 2px 8px; list-style: none; }
+.bv-havebar label { display: flex; align-items: center; gap: 6px; color: var(--text-2); cursor: pointer; }
