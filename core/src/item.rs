@@ -124,7 +124,8 @@ pub fn parse_item(text: &str) -> Option<Item> {
             item.corrupted = true;
         } else if *line == "Mirrored" {
             item.mirrored = true;
-        } else if *line == "Unidentified" {
+        } else if *line == "Unidentified" || line.starts_with("Unidentified (") {
+            // "Unidentified (Tier 4)" on newer unidentified items.
             item.unidentified = true;
         }
     }

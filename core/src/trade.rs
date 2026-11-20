@@ -533,25 +533,37 @@ impl StaticIndex {
 /// transfigured gems ("Scourge Arrow of Menace" = type "Scourge Arrow" + a
 /// discriminator), from api/trade/data/items.
 #[derive(Debug, Default)]
-pub struct ItemTypes { by_text: HashMap<String, (String, String)> }
+pub struct ItemTypes { by_text: HashMap<String, (String, String)>, /// Every base type the trade site knows (lower case), to tell a base from extra words in front of it.
+    bases: std::collections::HashSet<String> }
 
 impl ItemTypes {
     pub fn from_json(v: &Value) -> ItemTypes {
         let mut by_text = HashMap::new();
+        let mut bases = std::collections::HashSet::new();
         for group in v["result"].as_array().into_iter().flatten() {
             for e in group["entries"].as_array().into_iter().flatten() {
+                if e.get("name").is_none() { if let Some(t) = e["type"].as_str() { bases.insert(t.to_lowercase()); } }
                 if let (Some(t), Some(text), Some(disc)) = (e["type"].as_str(), e["text"].as_str(), e["disc"].as_str()) {
                     if e.get("name").is_none() { by_text.entry(text.to_lowercase()).or_insert_with(|| (t.to_string(), disc.to_string())); }
                 }
             }
         }
-        ItemTypes { by_text }
+        ItemTypes { by_text, bases }
     }
 
     /// Rewrites a search's plain type ("Scourge Arrow of Menace") into the form the
     /// trade site wants ({option: "Scourge Arrow", discriminator: "alt_x"}).
     pub fn fix_query(&self, q: &mut Value) {
-        let Some(t) = q["query"]["type"].as_str() else { return };
+        let Some(t) = q["query"]["type"].as_str().map(str::to_string) else { return };
+        // "Fated Composite Ring" (unidentified, with a word in front): drop leading words until it's a base the site knows.
+        let mut t = t;
+        if !self.bases.is_empty() && !self.bases.contains(&t.to_lowercase()) && !self.by_text.contains_key(&t.to_lowercase()) {
+            let words: Vec<&str> = t.split_whitespace().collect();
+            if let Some(i) = (1..words.len()).find(|i| self.bases.contains(&words[*i..].join(" ").to_lowercase())) {
+                t = words[i..].join(" ");
+                q["query"]["type"] = json!(t);
+            }
+        }
         if let Some((ty, disc)) = self.by_text.get(&t.to_lowercase()) {
             q["query"]["type"] = json!({ "option": ty, "discriminator": disc });
         }
@@ -738,6 +750,20 @@ Item Level: 75
         let m = mods(BOOTS);
         assert_eq!(m.iter().find(|l| l.text.contains("Movement Speed")).unwrap().affix.as_deref(), Some("prefix"));
         assert_eq!(m.iter().find(|l| l.text.contains("Strength")).unwrap().affix.as_deref(), Some("suffix"));
+    }
+
+    #[test]
+    fn fated_unidentified_ring() {
+        let t = "Item Class: Rings\nRarity: Rare\nFated Composite Ring\n--------\nItem Level: 85\n--------\n{ Implicit Modifier }\n+3 Prefix Modifiers allowed\n--------\nUnidentified (Tier 4)\n";
+        let s = setup(t, &index()).unwrap();
+        assert!(s.item.unidentified, "Unidentified (Tier 4) counts as unidentified");
+        let types = ItemTypes::from_json(&json!({ "result": [ { "entries": [ { "type": "Composite Ring", "text": "Composite Ring" } ] } ] }));
+        let mut q = json!({ "query": { "type": "Fated Composite Ring" } });
+        types.fix_query(&mut q);
+        assert_eq!(q["query"]["type"], "Composite Ring");
+        let mut known = json!({ "query": { "type": "Composite Ring" } });
+        types.fix_query(&mut known);
+        assert_eq!(known["query"]["type"], "Composite Ring");
     }
     #[test]
     fn plain_copy_and_unique() {
