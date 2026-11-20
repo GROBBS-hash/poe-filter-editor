@@ -131,6 +131,10 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   beasts and gems, so they counted as 0. Added to tools/fetch_prices.py (gems cut to each gem's cheapest version).
   Scarabs are gone this league (Covens; threads replaced them). New groups are scan-only (`Group::of` → None) and
   gems are skipped by `price_of` (cheapest version would undersell). Items in a tab named "~price …" count as listed.
+- Unique price tiers 20 Nov: Replica and Foulborn uniques don't drop as plain ground uniques, so they no longer set a
+  base's value (`drops_on_ground` in prices.rs). Mixed bases (cheapest unique below tier 1, e.g. Headhunter + Wurm's
+  Molt on Leather Belt) go no higher than tier 2: no divine sound for every Leather Belt. "Could be one of N uniques"
+  list (`BaseUniques.tsx`, command `base_uniques`) in the F2 pop-up and Ctrl+D for uniques without a name.
 
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
@@ -145,6 +149,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Roll bars and "T3 range 6–11" numbers look right; tier badges coloured. (Roll bars confirmed 20 Nov.)
 - [ ] Every Ctrl+D shows a trade price straight away (uniques, corpses, gems too) in the big box at the top.
       (Confirmed 20 Nov for a unique, a unique belt and a gem.)
+- [ ] Unidentified unique (e.g. Karui Sceptre): no false tier 1 / divine sound; the "Could be one of N uniques" list shows in F2 and Ctrl+D.
 - [ ] Jewel "Open prefix/suffix" never says more than 2 free; reduced-mod rolls (curse effect) show the right high/low.
 - [ ] Rare/magic map: priced by tier + drop bonuses (Atlas Drops, Rarity, Pack Size, More Currency…), shown as
       tick boxes; the price looks sensible next to Awakened's. (Tier-only price confirmed 20 Nov.)

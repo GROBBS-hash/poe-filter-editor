@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { CurrencyIcon, ItemIcon } from "./icons";
+import BaseUniques from "./BaseUniques";
 import { Item, RARITY_COLOUR, itemTitle } from "./types";
 
 type StatFilter = { id: string; label: string; value: number; min: number | null; enabled: boolean; kind: string; tier: number | null; junk?: boolean; roll?: number | null; range?: string | null };
@@ -326,8 +327,9 @@ export default function TradeWindow() {
       </div>
 
       <PriceHero res={res} bulk={check.bulk ? bulk : null} busy={busy} err={err} divine={divine}
-        ninja={check.ninja} ninjaNote={it.rarity === "Unique" && !it.name ? " (best unique on this base)" : ""} />
+        ninja={check.ninja} ninjaNote={it.rarity === "Unique" && !it.name ? " (best ground unique on this base)" : ""} />
       {err && <div className="qm-warn">{err}</div>}
+      {it.rarity === "Unique" && !it.name && it.base_type && <BaseUniques base={it.base_type} divine={divine} />}
 
       {check.map && <MapCheck map={check.map} />}
       {check.compare && check.compare.length > 0 && <CompareBlock list={check.compare} />}

@@ -1730,6 +1730,14 @@ fn refresh_prices(app: AppHandle) -> bool {
     !changed.is_empty()
 }
 
+/// Every unique that drops on this base, with poe.ninja prices (for unidentified / ground-read uniques).
+#[tauri::command]
+fn base_uniques(state: State<AppState>, base: String) -> Vec<(String, f64)> {
+    let game = active_game(&state);
+    let prices = state.prices.lock().unwrap();
+    prices.get(&game).map(|f| filter_core::prices::uniques_on_base(f, &base)).unwrap_or_default()
+}
+
 /// What poe.ninja says this item is worth (for the pop-up).
 #[tauri::command]
 fn item_price(state: State<AppState>, item: Item) -> Option<(f64, String)> {
@@ -2128,7 +2136,7 @@ pub fn run() {
             get_price_settings,
             set_price_settings,
             refresh_prices,
-            item_price,
+            item_price, base_uniques,
             list_themes,
             set_profile_theme,
             set_base,

@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Item, RARITY_COLOUR, itemSub, itemTitle } from "./types";
 import StyleEditor, { CurrentStyle, CustomStyle, GAME_COLOURS, fromCurrent } from "./StyleEditor";
 import { ItemIcon } from "./icons";
+import BaseUniques from "./BaseUniques";
 
 export type Picked = { item: Item; from_screen: boolean; screen_text?: string | null; confidence: number; rarity_unsure?: boolean };
 
@@ -353,7 +354,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
           <div className="qm-price">
             ≈ {price[0] >= 100 ? Math.round(price[0]).toLocaleString() : +price[0].toFixed(price[0] < 1 ? 2 : 1)}
             {({ chaos: "c", exalted: "ex", divine: "div" } as Record<string, string>)[price[1]] ?? price[1]}
-            <span> on poe.ninja{item.rarity === "Unique" && !item.name ? " (best unique on this base)" : ""}</span>
+            <span> on poe.ninja{item.rarity === "Unique" && !item.name ? " (best ground unique on this base)" : ""}</span>
           </div>
         )}
         {picked.from_screen && (
@@ -361,6 +362,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
         )}
         </div>
       </div>
+      {item.rarity === "Unique" && !item.name && item.base_type && <BaseUniques base={item.base_type} />}
 
       {picked.from_screen && picked.rarity_unsure && isGear && (
         <div className="qm-rarity-note">Your filter shows this as the same colours for every rarity, so the label can't say which it is.

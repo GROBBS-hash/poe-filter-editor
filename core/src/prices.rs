@@ -123,11 +123,40 @@ pub fn default_settings(unit: &str) -> PriceSettings {
     }
 }
 
+/// Replica uniques only come from Heist, and Foulborn ones from their league mechanic: neither drops as a
+/// plain unique on the ground, so their prices mustn't decide how loud a base's ground drops are.
+pub fn drops_on_ground(name: &str) -> bool {
+    !name.starts_with("Replica ") && !name.starts_with("Foulborn ")
+}
+
+/// Every unique that drops on this base, with its price, most valuable first (for "what could this be?").
+pub fn uniques_on_base(file: &PriceFile, base: &str) -> Vec<(String, f64)> {
+    let mut out: Vec<(String, f64)> = Vec::new();
+    for it in file.items.iter().filter(|i| i.cat.starts_with("Unique") && i.base == base && drops_on_ground(&i.name)) {
+        match out.iter_mut().find(|(n, _)| *n == it.name) {
+            Some(e) => if it.value > e.1 { e.1 = it.value },
+            None => out.push((it.name.clone(), it.value)),
+        }
+    }
+    out.sort_by(|a, b| b.1.total_cmp(&a.1));
+    out
+}
+
+/// The cheapest ground-drop unique on each base that has more than one unique.
+fn cheapest_unique_by_base(file: &PriceFile) -> BTreeMap<String, f64> {
+    let mut by: BTreeMap<String, Vec<(&str, f64)>> = BTreeMap::new();
+    for it in file.items.iter().filter(|i| i.cat.starts_with("Unique") && drops_on_ground(&i.name)) {
+        by.entry(it.base.clone()).or_default().push((&it.name, it.value));
+    }
+    by.into_iter().filter(|(_, l)| l.iter().any(|(n, _)| *n != l[0].0))
+        .map(|(b, l)| (b, l.iter().map(|x| x.1).fold(f64::INFINITY, f64::min))).collect()
+}
+
 /// Value of each base type in a group. Uniques sharing a base take the most
 /// valuable one, so hiding or downgrading a base never loses a good unique.
 pub fn values_by_base(file: &PriceFile, group: Group) -> BTreeMap<String, f64> {
     let mut m: BTreeMap<String, f64> = BTreeMap::new();
-    for it in file.items.iter().filter(|i| Group::of(&i.cat) == Some(group)) {
+    for it in file.items.iter().filter(|i| Group::of(&i.cat) == Some(group) && (group != Group::Uniques || drops_on_ground(&i.name))) {
         let key = if group == Group::Uniques { it.base.clone() } else { it.name.clone() };
         let e = m.entry(key).or_insert(0.0);
         if it.value > *e { *e = it.value; }
@@ -154,10 +183,16 @@ pub fn price_blocks(settings: &PriceSettings, file: &PriceFile, nl: &str) -> Str
         let values = values_by_base(file, g.group);
         let mut tiers = g.tiers.clone();
         tiers.sort_by(|a, b| b.min.partial_cmp(&a.min).unwrap_or(std::cmp::Ordering::Equal));
-        let mut upper = f64::INFINITY;
+        // Uniques: a base where one unique is worth a lot and another next to nothing (often a boss-only drop
+        // next to a common one) goes no higher than tier 2, so it doesn't play the top tier's sound every time.
+        let cheapest = if g.group == Group::Uniques { cheapest_unique_by_base(file) } else { BTreeMap::new() };
+        let tier_of = |base: &str, v: f64| -> Option<usize> {
+            let i = tiers.iter().position(|t| v >= t.min)?;
+            let mixed = cheapest.get(base).is_some_and(|c| *c < tiers[0].min);
+            Some(if i == 0 && mixed && tiers.len() > 1 { 1 } else { i })
+        };
         for (i, t) in tiers.iter().enumerate() {
-            let names: Vec<&String> = values.iter().filter(|(_, v)| **v >= t.min && **v < upper).map(|(k, _)| k).collect();
-            upper = t.min;
+            let names: Vec<&String> = values.iter().filter(|(k, v)| tier_of(k, **v) == Some(i)).map(|(k, _)| k).collect();
             if names.is_empty() { continue; }
             out.push_str(&format!("Show # Price tier {}: {} worth {}{u}+{nl}", i + 1, g.group.title(), t.min));
             for c in g.group.conditions() { out.push_str(&format!("    {c}{nl}")); }
@@ -206,6 +241,9 @@ mod tests {
                 it("Headhunter", "Leather Belt", "UniqueAccessory", 29584.0),
                 it("Wurm's Molt", "Leather Belt", "UniqueAccessory", 1.0),
                 it("Goldrim", "Leather Cap", "UniqueArmour", 1.0),
+                it("Mageblood", "Heavy Belt", "UniqueAccessory", 20000.0),
+                it("Replica Maata's Teaching", "Karui Sceptre", "UniqueWeapon", 125.0),
+                it("Maata's Teaching", "Karui Sceptre", "UniqueWeapon", 9.0),
                 it("Kaom's Heart", "Glorious Plate", "UniqueArmour", 30.0),
                 it("The Doctor", "The Doctor", "DivinationCard", 900.0),
                 it("Rain of Chaos", "Rain of Chaos", "DivinationCard", 0.3),
@@ -230,9 +268,13 @@ mod tests {
         s.groups.iter_mut().find(|g| g.group == Group::Uniques).unwrap().hide_below = Some(5.0);
         let blocks = price_blocks(&s, &file(), "\n");
         assert!(blocks.contains("Price tier 1: Uniques worth 100c+"));
-        // Leather Belt (Headhunter) is tier 1, never hidden; Leather Cap is hidden.
-        let t1 = blocks.split("Show # Price tier 1: Uniques").nth(1).unwrap().split("\n\n").next().unwrap();
-        assert!(t1.contains("\"Leather Belt\"") && !t1.contains("Leather Cap"));
+        // Heavy Belt (only Mageblood) is tier 1. Leather Belt (Headhunter, but also 1c Wurm's Molt) goes no higher
+        // than tier 2. Karui Sceptre: the 125c Replica never drops on the ground, so it's priced by Maata's Teaching (9c).
+        let block = |n: &str| blocks.split(&format!("Show # Price tier {n}: Uniques")).nth(1).unwrap_or("").split("\n\n").next().unwrap().to_string();
+        assert!(block("1").contains("\"Heavy Belt\"") && !block("1").contains("Leather Belt") && !block("1").contains("Karui"));
+        assert!(block("2").contains("\"Leather Belt\""));
+        assert!(block("3").contains("\"Karui Sceptre\""));
+        assert_eq!(uniques_on_base(&file(), "Karui Sceptre"), vec![("Maata's Teaching".to_string(), 9.0)]);
         let hide = blocks.split("Hide # Price: Uniques").nth(1).unwrap().split("\n\n").next().unwrap();
         assert!(hide.contains("\"Leather Cap\"") && !hide.contains("Leather Belt"));
 
