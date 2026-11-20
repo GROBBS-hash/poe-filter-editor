@@ -559,7 +559,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 **Wealth page (Endgame → Wealth)**
 - [x] Connected with account name + POESESSID (20 Nov). Still check: clear message if the POESESSID is wrong.
 - [ ] Scan whole stash: total, by-tab breakdown and history chart look right; "Worth selling" lists unlisted items.
-- [ ] 21 Nov: after a scan, "Price N rares" prices his rares (about 10 a minute, progress shown); the total goes up,
+- [x] (Confirmed 21 Nov.) After a scan, "Price N rares" prices his rares (about 10 a minute, progress shown); the total goes up,
       rares show "rare · trade guess" in By tab / Worth selling, and the prices look sensible next to Ctrl+D.
 - [x] Scan profiles: made one, scanned it, own total and history (confirmed 20 Nov). Still check: switching back to Whole stash.
 - [x] "Worth selling" adds up stacks; threads and gems now priced (confirmed 20 Nov: 50 Blight threads = 133c).
