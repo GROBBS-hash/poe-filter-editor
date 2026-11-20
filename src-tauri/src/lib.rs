@@ -747,9 +747,10 @@ struct BulkResult { offers: Vec<filter_core::trade::Offer>, url: String, divine:
 
 /// Bulk rates: people selling `want` (a trade id like "divine") for `pay` ("chaos"/"divine").
 #[tauri::command(async)]
-fn trade_bulk(app: AppHandle, want: String, pay: String) -> Result<BulkResult, String> {
+/// `minimum`: only sellers with at least this many in stock (Awakened's stock filter: your stack size).
+fn trade_bulk(app: AppHandle, want: String, pay: String, minimum: Option<u32>) -> Result<BulkResult, String> {
     let (poe2, league) = trade_league(&app);
-    let (id, v) = trade_api::exchange(poe2, &league, &filter_core::trade::exchange_query(&pay, &want, None))?;
+    let (id, v) = trade_api::exchange(poe2, &league, &filter_core::trade::exchange_query(&pay, &want, minimum.filter(|m| *m > 1)))?;
     let state = app.state::<AppState>();
     let game = active_game(&state);
     let divine = state.prices.lock().unwrap().get(&game).and_then(|f| price_of(f, None, "Divine Orb", "Currency"));

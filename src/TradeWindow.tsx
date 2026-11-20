@@ -164,6 +164,18 @@ function bulkTypical(offers: Offer[], divine: number | null) {
   return { typical, cheapest: rows[0]?.c ?? 0, fixer };
 }
 
+/** Awakened's "market ratio" row: poe.ninja's price, placed among the offers so you can see who's under or over it. */
+function MarketRatio({ c, divine }: { c: number; divine: number | null }) {
+  return (
+    <li className="tw-ratio-row" title="poe.ninja's price, from real trades on the in-game Currency Exchange">
+      <span className="tw-price"><Price n={c} cur="chaos" /></span>
+      <span className="small">{divine && c / divine >= 0.01 ? <Other n={c} cur="chaos" divine={divine} /> : null}</span>
+      <span className="small">market price (poe.ninja)</span>
+      <span />
+    </li>
+  );
+}
+
 /** The answer first, big and clear: what this sells for. */
 function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote, waiting }: { res: Result | null; bulk: Bulk | null; busy: boolean; err: string; waiting?: string | null;
   divine: number | null; ninja: [number, string] | null; ninjaNote: string }) {
@@ -173,11 +185,13 @@ function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote, waiting }: 
     main = res.summary[1]; label = "on trade now";
     sub = <>cheapest {money(res.summary[0], divine)} · {res.total.toLocaleString()} listed</>;
   } else if (bulk?.offers[0]) {
+    // Like Awakened: the headline is poe.ninja's price (from real in-game Currency Exchange trades, which price
+    // fixers can't move); our stock-weighted going rate only when poe.ninja doesn't have the item.
     const t = bulkTypical(bulk.offers, divine);
     const o = bulk.offers[0];
-    main = t.typical; label = "each, going rate on the exchange";
-    sub = <>cheapest {money(t.cheapest, divine)}{o.stock ? ` (${o.stock} in stock)` : ""} · {bulk.offers.length} sellers
-      {ninjaChaos != null && <> · poe.ninja {money(ninjaChaos, divine)}</>}</>;
+    main = ninjaChaos ?? t.typical; label = ninjaChaos != null ? "each · poe.ninja, from the currency exchange" : "each, going rate on the exchange";
+    sub = <>cheapest listed {money(t.cheapest, divine)}{o.stock ? ` (${o.stock} in stock)` : ""}
+      {ninjaChaos != null && <> · going rate {money(t.typical, divine)}</>} · {bulk.offers.length} sellers</>;
   } else if (ninjaChaos != null) {
     main = ninjaChaos; label = `poe.ninja${ninjaNote}`;
   }
@@ -262,6 +276,8 @@ export default function TradeWindow() {
   const [copied, setCopied] = useState<string | null>(null);
   const [bulk, setBulk] = useState<Bulk | null>(null);
   const [pay, setPay] = useState<"chaos" | "divine">("chaos");
+  // Awakened's stock filter: only sellers with at least as many as your stack (off by default).
+  const [minStock, setMinStock] = useState(false);
   const [ai, setAi] = useState<[number, number, string, number] | null>(null);
   const [saved, setSaved] = useState<Saved[]>([]);
   const [showSaved, setShowSaved] = useState(false);
@@ -278,9 +294,9 @@ export default function TradeWindow() {
 
   const close = useCallback(() => { setCheck(null); setRes(null); setBulk(null); setAi(null); setErr(""); invoke("hide_trade_window"); }, []);
 
-  const runBulk = useCallback(async (want: string, p: "chaos" | "divine") => {
+  const runBulk = useCallback(async (want: string, p: "chaos" | "divine", minimum: number | null = null) => {
     setBusy(true); setErr(""); setBulk(null);
-    try { setBulk(await invoke<Bulk>("trade_bulk", { want, pay: p })); } catch (e) { setErr(String(e)); }
+    try { setBulk(await invoke<Bulk>("trade_bulk", { want, pay: p, minimum })); } catch (e) { setErr(String(e)); }
     setBusy(false);
   }, []);
 
@@ -293,7 +309,7 @@ export default function TradeWindow() {
   useEffect(() => {
     const a = listen<Check>("price-check", (e) => {
       const c = e.payload;
-      setCheck(c); setSetup(c.setup); setRes(null); setSearched(null); setBulk(null); setAi(null); setErr(c.error ?? ""); setCopied(null); setPay("chaos");
+      setCheck(c); setSetup(c.setup); setRes(null); setSearched(null); setBulk(null); setAi(null); setErr(c.error ?? ""); setCopied(null); setPay("chaos"); setMinStock(false);
       setSaving(null); setShowSaved(!c.setup); setPreset(null); setMapMods(false); setReporting(null); setReported(""); window.scrollTo(0, 0);
       invoke<Saved[]>("saved_list").then(setSaved).catch(() => {});
       if (c.bulk) runBulk(c.bulk, "chaos");
@@ -350,6 +366,16 @@ export default function TradeWindow() {
   const patch = (i: number, p: Partial<StatFilter>) => { if ("min" in p) setPreset(null); return setSetup({ ...setup, filters: setup.filters.map((f, j) => (j === i ? { ...f, ...p } : f)) }); };
   const divine = res?.divine ?? bulk?.divine ?? check?.divine ?? null;
   const bt = bulk?.offers.length ? bulkTypical(bulk.offers, bulk.divine) : null;
+  const stack = it.stack_size ?? 1;
+  const ninjaC = check.ninja ? (check.ninja[1] === "divine" && divine ? check.ninja[0] * divine : check.ninja[1] === "chaos" ? check.ninja[0] : null) : null;
+  // Where poe.ninja's price sits among the offers (Awakened's "market ratio" row).
+  const ratioAt = bulk && ninjaC != null ? (() => { const i = bulk.offers.findIndex((o) => (o.pay_currency === "divine" && bulk.divine ? o.each * bulk.divine : o.each) >= ninjaC); return i === -1 ? bulk.offers.length : i; })() : -1;
+  // Item listings: the same seller at the same price several times in a row shows once, with "× N" (like Awakened).
+  const collapsed = (res?.listings ?? []).reduce<{ l: Listing; n: number; i: number }[]>((acc, l, i) => {
+    const last = acc[acc.length - 1];
+    if (last && last.l.account === l.account && last.l.amount === l.amount && last.l.currency === l.currency) last.n += 1; else acc.push({ l, n: 1, i });
+    return acc;
+  }, []);
   const copy = (text: string, key: string) => { invoke("copy_text", { text }); setCopied(key); };
   // Mouse wheel on a minimum: 1 at a time (Shift: 10).
   const wheel = (i: number, f: StatFilter, e: React.WheelEvent) => {
@@ -473,11 +499,17 @@ export default function TradeWindow() {
               {" "}<Other n={bt.typical} cur="chaos" divine={bulk.divine} /></> : busy ? "checking…" : "no offers"}</span>
             <span className="tw-pay">
               {(["chaos", "divine"] as const).map((p) => (
-                <button key={p} className={pay === p ? "on" : ""} onClick={() => { setPay(p); runBulk(check.bulk!, p); }}>
+                <button key={p} className={pay === p ? "on" : ""} onClick={() => { setPay(p); runBulk(check.bulk!, p, minStock ? stack : null); }}>
                   pay in <CurrencyIcon id={p} /></button>
               ))}
             </span>
           </div>
+          {stack > 1 && (
+            <label className="tw-minstock" title="Like Awakened's stock filter: hides sellers who can't take your whole stack">
+              <input type="checkbox" checked={minStock} onChange={(e) => { setMinStock(e.target.checked); runBulk(check.bulk!, pay, e.target.checked ? stack : null); }} />
+              Only sellers with at least {stack} in stock
+            </label>
+          )}
           {bulk?.offers[0] && bulk.divine && (() => {
             // How many you get for one divine / one chaos: the ratio people trade at.
             const eachChaos = bt?.typical || (bulk.offers[0].pay_currency === "divine" ? bulk.offers[0].each * bulk.divine : bulk.offers[0].each);
@@ -489,14 +521,23 @@ export default function TradeWindow() {
             </div>;
           })()}
           <ul className="tw-list">
-            {bulk?.offers.map((o, i) => (
-              <li key={i} className={bt?.fixer(o) ? "fixer" : ""} title={bt?.fixer(o) ? "Much cheaper than the going rate with very little stock: often a price fixer" : undefined}>
-                <span className="tw-price"><Price n={o.each} cur={o.pay_currency} /></span>
-                <span className="muted small"><Other n={o.each} cur={o.pay_currency} divine={bulk.divine} />{o.get > 1 ? ` · ${o.pay} for ${o.get}` : ""}{bt?.fixer(o) && <span className="tw-fixer">low stock</span>}</span>
-                <span className="tw-seller muted small">{o.stock} in stock · {o.account}</span>
-                {o.whisper && <button className="link small" onClick={() => copy(o.whisper, "b" + i)}>{copied === "b" + i ? "Copied" : "Whisper"}</button>}
-              </li>
-            ))}
+            {bulk?.offers.map((o, i) => {
+              // Like Awakened's "fulfill": how many trades of this offer's size the seller can actually fill.
+              const fills = o.get > 0 ? Math.floor(o.stock / o.get) : o.stock;
+              return (
+                <React.Fragment key={i}>
+                  {i === ratioAt && ninjaC != null && <MarketRatio c={ninjaC} divine={bulk.divine} />}
+                  <li className={bt?.fixer(o) ? "fixer" : ""} title={bt?.fixer(o) ? "Much cheaper than the going rate with very little stock: often a price fixer" : undefined}>
+                    <span className="tw-price"><Price n={o.each} cur={o.pay_currency} /></span>
+                    <span className="muted small"><Other n={o.each} cur={o.pay_currency} divine={bulk.divine} />{o.get > 1 ? ` · ${o.pay} for ${o.get}` : ""}{bt?.fixer(o) && <span className="tw-fixer">low stock</span>}</span>
+                    <span className="tw-seller muted small" title={`${o.stock} in stock: fills ${fills} trade${fills === 1 ? "" : "s"} of ${o.get}`}>
+                      {o.stock < o.get && <span className="tw-warn-ico">⚠ </span>}{o.stock} in stock{o.get > 1 ? ` · fills ${fills}` : ""} · {o.account}</span>
+                    {o.whisper && <button className="link small" onClick={() => copy(o.whisper, "b" + i)}>{copied === "b" + i ? "Copied" : "Whisper"}</button>}
+                  </li>
+                </React.Fragment>
+              );
+            })}
+            {bulk && ratioAt === bulk.offers.length && ninjaC != null && <MarketRatio c={ninjaC} divine={bulk.divine} />}
           </ul>
           {bulk && <button className="link small" onClick={() => invoke("open_url", { url: bulk.url })}>Open on the trade site</button>}
         </div>
@@ -506,10 +547,11 @@ export default function TradeWindow() {
           <div className="tw-sec tw-res-sec">Cheapest listed</div>
           <div className="tw-table">
             <div className="tw-th"><span>Price</span><span>{res.listings.some((l) => l.ilvl) ? "ilvl" : ""}</span><span>Listed</span><span>Seller</span><span /></div>
-            {res.listings.map((l, i) => (
+            {collapsed.map(({ l, n, i }) => (
               <div key={i} className="tw-tr">
                 <span className="tw-price"><Price n={l.amount} cur={l.currency} />
-                  {l.chaos != null && !["chaos", "divine"].includes(l.currency) && <span className="tw-eq">{money(l.chaos, divine)}</span>}</span>
+                  {l.chaos != null && !["chaos", "divine"].includes(l.currency) && <span className="tw-eq">{money(l.chaos, divine)}</span>}
+                  {n > 1 && <span className="tw-times" title={`The same seller lists ${n} of these at this price`}>× {n}</span>}</span>
                 <span className="muted">{l.ilvl || ""}</span>
                 <span className="muted">{ago(l.indexed)}</span>
                 <span className="tw-seller muted">{l.account}</span>

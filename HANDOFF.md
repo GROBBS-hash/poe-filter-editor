@@ -235,6 +235,12 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   filter afterwards clears the prices until you search again (`searchKey`). Settings → Price check →
   "Search every item straight away" (`price_instant_all`, off by default) brings back the old behaviour.
 
+- Bulk pricing matched to Awakened 20 Nov (read in its TradeBulk.vue / pathofexile-bulk.ts / TradeListing.vue): the
+  headline is poe.ninja's price (in-game Currency Exchange) when it has the item, else our going rate; a gold "market
+  price (poe.ninja)" row sits among the offers at that price; "Only sellers with at least <stack> in stock" sends the
+  exchange `minimum` (off by default, like Awakened); "fills N" / ⚠ per offer. Item listings: same seller + same price
+  in a row shows once with "× N". The preview mocks `trade_bulk` with his deck offers.
+
 
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
@@ -251,7 +257,8 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
       (Confirmed 20 Nov for a unique, a unique belt and a gem.)
 - [ ] Fractured item: "Price as base · ilvl 73–74" gives sensible prices (fractured-only search confirmed 20 Nov).
 - [ ] Rares wait for Search: move the mouse onto Search to search; changing a stat clears the prices. Uniques/currency still instant.
-- [ ] Bulk items (e.g. Stacked Deck) show the going rate (3c), not a price fixer's 1c; fixers marked "low stock".
+- [ ] Bulk items (e.g. Stacked Deck): big price = poe.ninja (about 3c), market-price row in the list, fixers marked "low stock",
+      "Only sellers with at least N in stock" works; repeat item listings show "× N".
 - [ ] Related items panel beside the price window: lifeforce, fragments, invitations, boss keys.
 - [ ] New Clean glass look: opens bigger and remembers its size; pages fade in; Wealth tiles look right; nothing broken on other pages.
 - [ ] Unidentified unique (e.g. Karui Sceptre): no false tier 1 / divine sound; the "Could be one of N uniques" list shows in F2 and Ctrl+D.

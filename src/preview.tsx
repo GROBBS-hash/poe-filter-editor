@@ -85,7 +85,14 @@ mockIPC(async (cmd, args) => {
   }
   if (cmd === "get_icons") return icons;
   if (cmd === "related_items") return related((args as Json).name);
-  if (cmd === "trade_bulk") throw "Bulk exchange isn't mocked in the preview";
+  if (cmd === "trade_bulk") {
+    // Offers shaped like his Stacked Deck check: two price fixers with tiny stock, the real market at 3c.
+    const min = ((args as Json)?.minimum as number | null) ?? 0;
+    const o = (each: number, stock: number, account: string) => ({ pay: each, pay_currency: "chaos", get: 1, get_currency: "x", each, stock, account, whisper: "@x hi" });
+    const offers = [o(1, 7, "Simi"), o(1, 3, "Klei"), o(2, 1, "Plasi"), o(3, 12, "Life"), o(3, 20, "Tat"), o(3, 41, "Nox"), o(3, 42, "Wu"), o(3, 3, "Necro")]
+      .filter((x) => x.stock >= min);
+    return { offers, url: "https://www.pathofexile.com/trade/exchange", divine: 217 };
+  }
   if (cmd === "saved_list") return [];
   return null;
 }, { shouldMockEvents: true });
