@@ -27,7 +27,10 @@ const mapHidden = new Set<string>(["maps_d_t1", "maps_d_t2"]);
 const mapStyle = (b: string) => ({ font_size: 45, muted: false, text: b === "d" ? [255, 255, 255, 255] : [0, 0, 0, 255],
   background: b === "d" ? [20, 20, 0, 255] : b === "c" ? [235, 235, 120, 255] : [235, 235, 235, 255], border: b === "a" ? [255, 0, 0, 255] : null,
   beam: b === "d" ? "White" : "Yellow", minimap_parts: [b === "d" ? 2 : 1, b === "d" ? "White" : "Red", "Square"] });
+const extrasOff = new Set<string>();
 const mapTiers = () => ({
+  extras: [["upgrade", "Upgrade borders", "A red border on maps above the tier you're running now, so upgrades stand out."], ["bands", "Tier group borders", "A dark border on red maps and a light one on lower maps."], ["implicit", "Implicit borders", "A gold border on maps with implicit mods (e.g. from the atlas)."]]
+    .map(([key, title, what]) => ({ key, title, what, tiers: [key], on: !extrasOff.has(key) })),
   tiers: Array.from({ length: 16 }, (_, i) => { const t = i + 1; const b = t >= 14 ? "a" : t >= 11 ? "b" : t >= 6 ? "c" : "d"; const tier = `maps_${b}_t${t}`;
     return { map_tier: t, band: b, tier, name: `Maps ${b} t${t}`, visibility: mapHidden.has(tier) ? "Hide" : "Show", style: mapStyle(b), bases: [], note: "", min_stack: null }; }),
   special: [["influenced", "Influenced maps (Shaper, Elder, Conquerors, Zana)", 4], ["blighted", "Blighted maps", 3], ["nightmare", "Valdo's, nightmare & guardian maps", 3]]
@@ -76,7 +79,7 @@ mockIPC((cmd, args) => {
   if (cmd === "build_tree_opt") return [true, "P"];
   if (cmd === "get_tiers") return [];
   if (cmd === "get_map_tiers") return mapTiers();
-  if (cmd === "set_tiers") { const a = args as { tiers: string[]; show: boolean | null }; for (const t of a.tiers) { if (a.show === false) mapHidden.add(t); else if (a.show) mapHidden.delete(t); } return []; }
+  if (cmd === "set_tiers") { const a = args as { tiers: string[]; show: boolean | null; clearStyle?: boolean; reset?: boolean }; for (const t of a.tiers) { if (a.clearStyle) extrasOff.add(t); else if (a.reset) extrasOff.delete(t); } for (const t of a.tiers) { if (a.show === false) mapHidden.add(t); else if (a.show) mapHidden.delete(t); } return []; }
   return null;
 }, { shouldMockEvents: true });
 

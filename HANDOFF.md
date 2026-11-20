@@ -167,6 +167,15 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   and the special kinds (`maps->influenced/blighted/nightmare/vaaltemple/specialmods/enchanted`) with a tick and "Open".
   All saved as normal Tier rules, so they survive NeverSink updates. Searching "map" on the Tiers page offers it.
   Not done: rarity-specific map hiding (e.g. only hide white maps), which would need an Override block.
+  20 Nov (2), after GROBBS found it confusing: panel is now four numbered steps, each with a one-line "what this does
+  in game" (1 which tiers show, 2 how each group looks, 3 extra borders, 4 special maps). "Extra borders" =
+  NeverSink's Continue decorators (`deco_mapup_*` upgrade border, `deco_zone*` group borders, `decor_implicit`,
+  `deco_corruptedmod`) as on/off switches (`MapTiers.extras`; off = Tier rule with an empty look via
+  `set_tiers(clear_style)`, on = reset). NeverSink's map rule names are plain words everywhere (`map_rule_name` in
+  tiers.rs: "Tier 16 maps", "Upgrade border: tier 13+ maps while you run lower", "Valdo's maps"…), and
+  "Modify this rule" on a map opens the Map tiers panel instead of the raw "Maps" rule list.
+  FilterBlade's map section couldn't be read (its page only renders in a browser), so wording follows NeverSink's own
+  section names in the filter.
 - Ground reader 20 Nov: a label stacked right under another (grey "MAP (TIER 4)" under a dark "SPINY ROUND SHIELD")
   was joined into one text and picked the shield. Stacked lines now also need the same background colour
   (`other_label` in screen.rs). The game's hover highlight wasn't used: the little squares at the end of labels in his
@@ -233,6 +242,8 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 **Map tiers (Tiers → Map tiers, new 20 Nov)**
 - [ ] "Show maps from tier N" hides lower white maps on the floor after F4; special maps (blighted etc.) still show.
 - [ ] Band look (e.g. make tier 14–16 bigger) shows in game; Reset puts it back.
+- [ ] The panel makes sense now (numbered steps with plain explanations); F2 → "Modify this rule" on a map opens it.
+- [ ] Unticking "Upgrade borders" drops the red border on higher-tier maps; ticking puts it back.
 
 **Build window (F6, new look 20 Nov)**
 - [ ] Opens bigger and easier to read; the tree fills the window.

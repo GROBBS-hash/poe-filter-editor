@@ -75,6 +75,7 @@ const KNOWN: &[(&str, &str, &str)] = &[
 
 /// "t2divine" -> "Tier 2 (divine)", "exhide" -> "Hidden extras".
 pub fn tier_name(t: &str) -> String {
+    if let Some(n) = map_rule_name(t) { return n; }
     // "t5r1": item tier 5 and up, on the best (rank 1) bases.
     if let Some(rest) = t.strip_prefix('t') {
         if let Some((a, b)) = rest.split_once('r') {
@@ -289,6 +290,41 @@ pub struct MapTierRow {
 pub struct MapTiers {
     pub tiers: Vec<MapTierRow>,
     pub special: Vec<Section>,
+    /// Border highlights NeverSink adds on top (upgrades, implicits…): each can be switched off.
+    pub extras: Vec<MapExtra>,
+}
+
+/// One of NeverSink's map highlights that only add a border and let the tier rules decide the rest.
+#[derive(Debug, Clone, Serialize)]
+pub struct MapExtra {
+    pub key: String,
+    pub title: String,
+    /// What it does in game, in one line.
+    pub what: String,
+    pub tiers: Vec<String>,
+    /// Still draws something (not switched off).
+    pub on: bool,
+}
+
+/// NeverSink's map rule names in plain words ("maps_a_t16" → "Tier 16 maps").
+fn map_rule_name(t: &str) -> Option<String> {
+    if let Some((_, n)) = map_tier_of(t) { return Some(format!("Tier {n} maps")); }
+    if let Some(n) = t.strip_prefix("deco_mapup_t") { return Some(format!("Upgrade border: tier {n}+ maps while you run lower")); }
+    if let Some(n) = t.strip_prefix("deco_zone").and_then(|r| r.strip_suffix("general")) {
+        return Some(match n { "1" => "Border: tier 14–16 maps", "2" => "Border: tier 11–13 maps", "3" => "Border: tier 6–10 maps", _ => "Border: tier 1–5 maps" }.into());
+    }
+    Some(match t {
+        "decor_implicit" => "Gold border: maps with implicit mods",
+        "deco_corruptedmod" => "Gold border: maps with corrupted mods",
+        "zanamap" => "Zana / Originator maps (best)", "zanamaplow" => "Zana / Originator maps (others)",
+        "zanacorrupthider" => "Corrupted Zana maps (hidden)",
+        "infelder" => "Shaper / Elder influenced maps", "infconquerors" => "Conqueror influenced maps",
+        "valdomaps" => "Valdo's maps", "nightmaremaps" => "Nightmare maps", "shaperguardianmaps" => "Shaper guardian maps",
+        "exoticmod1" => "Maps with the best special mods", "exoticmod2" => "Maps with good special mods", "mod8" => "Maps with 8 mods",
+        "uber" => "Blight-ravaged maps",
+        "corruptedmaphider" => "Corrupted white/blue maps", "mirroredmaphider" => "Mirrored white/blue maps",
+        _ => return None,
+    }.into())
 }
 
 /// "maps_a_t16" → ("a", 16).
@@ -328,7 +364,27 @@ pub fn map_tiers(segs: &[Segment]) -> MapTiers {
         s.group = "Maps".into();
         s
     })).collect();
-    MapTiers { tiers, special }
+    // Highlights: blocks under "maps" that aren't tier rules, grouped by what they do.
+    let groups: [(&str, &str, &str, fn(&str) -> bool); 4] = [
+        ("upgrade", "Upgrade borders", "A red border on maps above the tier you're running now, so upgrades stand out.", |t| t.starts_with("deco_mapup_")),
+        ("bands", "Tier group borders", "A dark border on red maps and a light one on lower maps.", |t| t.starts_with("deco_zone")),
+        ("implicit", "Implicit borders", "A gold border on maps with implicit mods (e.g. from the atlas).", |t| t == "decor_implicit"),
+        ("corrupted", "Corrupted mod borders", "A gold border on maps with corrupted mods.", |t| t == "deco_corruptedmod"),
+    ];
+    let mut extras = vec![];
+    for (key, title, what, test) in groups {
+        let mut names = vec![];
+        let mut on = false;
+        for s in segs {
+            let Segment::Block(b) = s else { continue };
+            let Some(t) = b.tier.as_deref() else { continue };
+            if b.type_path != maps || !test(t) || names.iter().any(|n| n == t) { continue; }
+            names.push(t.to_string());
+            on |= b.lines.iter().any(|l| { let l = l.trim_start(); l.starts_with("Set") || l.starts_with("Play") || l.starts_with("MinimapIcon") });
+        }
+        if !names.is_empty() { extras.push(MapExtra { key: key.into(), title: title.into(), what: what.into(), tiers: names, on }); }
+    }
+    MapTiers { tiers, special, extras }
 }
 
 #[cfg(test)]
@@ -341,6 +397,16 @@ mod tests {
         assert_eq!(m.tiers[15].band, "a");
         assert_eq!(m.tiers[0].band, "d");
         assert!(m.special.iter().any(|s| s.title == "Blighted maps"));
+        assert_eq!(m.tiers[15].row.name, "Tier 16 maps");
+        assert_eq!(m.extras.iter().map(|e| e.key.as_str()).collect::<Vec<_>>(), ["upgrade", "bands", "implicit", "corrupted"]);
+        assert!(m.extras.iter().all(|e| e.on));
+        // Switching the upgrade borders off empties their look but keeps them as pass-through rules.
+        let up = m.extras[0].tiers.clone();
+        let mut off = crate::filter::parse_filter(&fixture());
+        let rules: Vec<Rule> = up.iter().map(|t| Rule::Tier { type_path: vec!["maps".into()], tier: t.clone(), show: None, actions: Some(vec![]), min_stack: None, min_item_tier: None }).collect();
+        apply(&mut off, &rules, "
+");
+        assert!(!super::map_tiers(&off).extras[0].on);
         // Hiding tiers 1-3 survives as tier rules.
         let mut segs = segs;
         let rules: Vec<Rule> = m.tiers.iter().filter(|t| t.map_tier < 4).map(|t| Rule::Tier {

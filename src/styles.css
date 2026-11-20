@@ -1037,3 +1037,9 @@ button:focus-visible, select:focus-visible, .text:focus-visible, input:focus-vis
 .seg button.on { background: var(--gold-bg); color: var(--gold); }
 .ao .bo-body { padding: 8px 10px; }
 .ao .tv-tools { flex-wrap: wrap; }
+.map-tiers .mt-intro { margin: -4px 0 4px; }
+.map-tiers .mt-what { font-size: 12.5px; color: var(--muted); margin: -2px 0 8px; }
+.map-tiers .mt-h { color: var(--text); font-size: 14px; }
+.map-tiers .mt-extra .tier-head { flex-wrap: wrap; }
+.map-tiers .mt-extra-what { flex: 1 1 260px; }
+.map-tiers .mt-special .tier-name .muted { white-space: normal; }

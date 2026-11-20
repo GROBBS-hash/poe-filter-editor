@@ -1420,11 +1420,19 @@ fn move_tier_item(state: State<AppState>, id: String, type_path: Vec<String>, ba
 /// Changes several tiers of one section at once (the map panel: "hide tiers 1-5", one look for a band).
 #[tauri::command]
 fn set_tiers(state: State<AppState>, id: String, type_path: Vec<String>, tiers: Vec<String>, show: Option<bool>,
-             style: Option<CustomStyle>, reset: bool) -> Result<Vec<String>, String> {
+             style: Option<CustomStyle>, reset: bool, clear_style: Option<bool>) -> Result<Vec<String>, String> {
     let mut store = state.store.lock().unwrap();
     remember(&state, &store, &id, &format!("{} tiers", tiers.len()));
     let p = store.profiles.get_mut(&id).ok_or("Profile not found")?;
-    for t in &tiers { tier_edit(&mut p.rules, &type_path, t, show, style.as_ref(), None, None, reset); }
+    for t in &tiers {
+        tier_edit(&mut p.rules, &type_path, t, show, style.as_ref(), None, None, reset);
+        // A highlight switched off: no look of its own, the tier rules decide.
+        if clear_style == Some(true) {
+            if let Some(Rule::Tier { actions, .. }) = p.rules.iter_mut().rev().find(|r| matches!(r, Rule::Tier { type_path: tp, tier, .. } if *tp == type_path && tier == t)) {
+                *actions = Some(vec![]);
+            }
+        }
+    }
     save_and_build(&state, &store, &id)
 }
 

@@ -6,9 +6,10 @@ import StyleEditor, { CurrentStyle, Preview, fromCurrent } from "./StyleEditor";
 type Row = { tier: string; name: string; visibility: string; style: CurrentStyle; note: string; bases: string[]; min_stack: number | null; min_item_tier?: number | null };
 type MapRow = Row & { map_tier: number; band: string };
 export type MapSection = { type_path: string[]; title: string; group: string; tiers: Row[]; shared_bases?: boolean };
-type MapData = { tiers: MapRow[]; special: MapSection[] };
+type MapExtra = { key: string; title: string; what: string; tiers: string[]; on: boolean };
+type MapData = { tiers: MapRow[]; special: MapSection[]; extras?: MapExtra[] };
 
-const BAND_NAMES: Record<string, string> = { a: "high reds", b: "low reds", c: "yellows", d: "whites" };
+const BAND_NAMES: Record<string, string> = { a: "red maps, top", b: "red maps", c: "yellow maps", d: "white maps" };
 const MAPS = ["maps"];
 
 /** Like FilterBlade's map options: from which tier maps show on the floor, a look per band of tiers
@@ -24,11 +25,11 @@ export default function MapTiers({ profileId, onChange, onOpen }: { profileId: s
   const load = () => invoke<MapData>("get_map_tiers", { id: profileId }).then(setData).catch((e) => setMsg(String(e)));
   useEffect(() => { load(); }, [profileId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const change = async (typePath: string[], tiers: string[], patch: { show?: boolean; style?: unknown; reset?: boolean }, m: string) => {
+  const change = async (typePath: string[], tiers: string[], patch: { show?: boolean; style?: unknown; reset?: boolean; clear?: boolean }, m: string) => {
     if (tiers.length === 0) return;
     setBusy(true);
     try {
-      await invoke("set_tiers", { id: profileId, typePath, tiers, show: patch.show ?? null, style: patch.style ?? null, reset: !!patch.reset });
+      await invoke("set_tiers", { id: profileId, typePath, tiers, show: patch.show ?? null, style: patch.style ?? null, reset: !!patch.reset, clearStyle: !!patch.clear });
       setMsg(`${m} Press F4 in game.`); onChange(); await load();
     } catch (e) { setMsg(String(e)); }
     setBusy(false);
@@ -61,11 +62,12 @@ export default function MapTiers({ profileId, onChange, onOpen }: { profileId: s
 
   return (
     <div className="card map-tiers">
-      <h2>Maps on the floor <Tip>Pick the <b>lowest map tier</b> you still want to see; lower ones are hidden. Or click single
-        tiers below to show/hide them. Each <b>band</b> (whites, yellows, reds) has one look: click it to change how big and
-        bright those maps are. <b>Special maps</b> (blighted, influenced, Valdo…) are handled first by NeverSink, so they keep
-        showing even when their tier is hidden, unless you untick them. Your changes survive NeverSink updates.</Tip></h2>
+      <h2>Maps on the floor <Tip>Everything here changes NeverSink's map rules for this filter and survives NeverSink updates.
+        Press <b>F4</b> in game after a change to see it.</Tip></h2>
+      <p className="muted small mt-intro">Which maps show on the ground and how they look. Press F4 in game after a change.</p>
 
+      <h3 className="mt-h">1 · Which tiers show</h3>
+      <p className="mt-what">Maps below the tier you pick are hidden on the ground. Special maps (section 4) still show.</p>
       <div className="mt-from">
         <span>Show maps from</span>
         <select value={from > 16 ? "" : from} disabled={busy} onChange={(e) => setFrom(parseInt(e.target.value, 10))}>
@@ -76,6 +78,7 @@ export default function MapTiers({ profileId, onChange, onOpen }: { profileId: s
         <span className="muted small">{from <= 1 ? "Every tier shows." : from > 16 ? "" : `Tiers 1–${from - 1} are hidden.`}</span>
       </div>
 
+      <p className="mt-what">Or click a tier to hide or show just that one (crossed out = hidden).</p>
       <div className="mt-strip" role="group" aria-label="Map tiers">
         {data.tiers.map((t) => (
           <button key={t.tier} className={`mt-chip band-${t.band} ${shown(t) ? "on" : "off"}`} disabled={busy}
@@ -86,7 +89,8 @@ export default function MapTiers({ profileId, onChange, onOpen }: { profileId: s
         ))}
       </div>
 
-      <h3 className="mt-h">Look per band</h3>
+      <h3 className="mt-h">2 · How each group looks</h3>
+      <p className="mt-what">Click a label to change its size, colours, beam, map icon and sound for every tier in that group. The tick hides or shows the whole group.</p>
       {bands.map((b) => {
         const rows = bandRows(b);
         const all = rows.every(shown), none = !rows.some(shown);
@@ -119,8 +123,26 @@ export default function MapTiers({ profileId, onChange, onOpen }: { profileId: s
         );
       })}
 
+      {(data.extras ?? []).length > 0 && <>
+        <h3 className="mt-h">3 · Extra borders</h3>
+        <p className="mt-what">NeverSink adds these borders on top of the looks above. Untick one to drop that border; the map itself still shows.</p>
+        {(data.extras ?? []).map((x) => (
+          <div key={x.key} className={"tier mt-extra " + (x.on ? "" : "off")}>
+            <div className="tier-head">
+              <label className="tier-name">
+                <input type="checkbox" checked={x.on} disabled={busy}
+                  onChange={(e) => change(MAPS, x.tiers, e.target.checked ? { reset: true } : { clear: true }, `${x.title} ${e.target.checked ? "back on" : "off"}.`)} />
+                <span>{x.title}</span>
+              </label>
+              <span className="muted small mt-extra-what">{x.what}</span>
+            </div>
+          </div>
+        ))}
+      </>}
+
       {data.special.length > 0 && <>
-        <h3 className="mt-h">Special maps <span className="muted small">(checked before the tiers above)</span></h3>
+        <h3 className="mt-h">4 · Special maps</h3>
+        <p className="mt-what">NeverSink shows these before the tier rules, so they show even when their tier is hidden. Untick a kind to hide it; Open shows its separate rules.</p>
         {data.special.map((s) => {
           const all = s.tiers.every(shown), none = !s.tiers.some(shown);
           return (
@@ -131,7 +153,7 @@ export default function MapTiers({ profileId, onChange, onOpen }: { profileId: s
                     ref={(el) => { if (el) el.indeterminate = !all && !none; }}
                     onChange={(e) => change(s.type_path, s.tiers.map((r) => r.tier), { show: e.target.checked }, `${s.title} ${e.target.checked ? "shown" : "hidden"}.`)} />
                   <span>{s.title}</span>
-                  <span className="muted small">{s.tiers.length} rule{s.tiers.length === 1 ? "" : "s"}</span>
+                  <span className="muted small">{s.tiers.map((r) => r.name).join(" · ")}</span>
                 </label>
                 <span className="tier-look"><Preview s={fromCurrent(s.tiers[0].style, "Maps")} text="Map" /></span>
                 <span className="tier-tools">

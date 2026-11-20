@@ -76,6 +76,8 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
   // Opened from the quick menu's "Modify rule": show that section and make the tier glow.
   useEffect(() => {
     if (!focus || sections.length === 0) return;
+    // NeverSink's plain map tier rule: the Map tiers panel explains it far better than its raw rows.
+    if (focus.type_path.length === 1 && focus.type_path[0] === "maps") { setSel(MAPS_KEY); setQ(""); setEditing(null); return; }
     const k = focus.type_path.join(">");
     const glow = () => {
       setSel(k); setQ(""); setEditing(null); setFocusTier(focus.tier);
