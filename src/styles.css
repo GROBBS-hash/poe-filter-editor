@@ -1251,3 +1251,32 @@ body.main ::-webkit-scrollbar-thumb:hover { background: #4a5566; }
 .qm-side-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 2px 0 8px; }
 @media (max-width: 760px) { .qm-panel.qm-sheet { grid-template-columns: 1fr; } .qm-panel.qm-sheet > .qm-more { grid-column: 1; grid-row: auto; border-left: 0; padding-left: 0; } }
 .tw-hero-stack { font-size: 14px; color: var(--text); margin-top: 2px; } .tw-hero-stack b { color: var(--gold); }
+
+/* Build window: jewels (tree sockets + abyss), flasks heading, jewel rings on the tree. */
+.bv-subhead { cursor: default !important; padding: 12px 2px 4px; font-size: 12px; font-weight: 650; color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; }
+.bv-jewels > li.hl { background: rgba(220,178,90,.08); }
+.bv-notables { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+.bv-notable { font-size: 11.5px; padding: 1px 7px; border-radius: 10px; background: rgba(157,184,255,.12); color: #b8ccff; }
+.bv-item .bv-onTree { margin-left: auto; flex: none; }
+.bv-iname { display: flex; flex-direction: column; }
+.bv-jewelchips { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-top: 8px; }
+.bv-jchip { padding: 2px 8px; border-radius: 10px; font-size: 12px; background: var(--raised); border: 1px solid var(--line); }
+.bv-jchip.on { border-color: var(--gold); }
+.tv-jewel circle:first-child { fill: none; stroke-width: 14; opacity: .85; }
+.tv-jewel.hl circle:first-child { stroke-width: 26; opacity: 1; filter: drop-shadow(0 0 40px #e6c36a); }
+.tv-jewel { cursor: pointer; }
+.tv-jtip { margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.tv-jewel circle.hit { fill: transparent; stroke: none; }
+/* Price box design 2: "your stack" and "each" tiles, and the "N items = 1 divine" line. */
+.tw-tiles2 { display: grid; grid-template-columns: 1.3fr 1fr; gap: 8px; }
+.tw-tile2 { background: rgba(0,0,0,.22); border: 1px solid rgba(255,255,255,.06); border-radius: 9px; padding: 8px 10px; }
+.tw-tile2.hi { background: rgba(240,200,90,.1); border-color: rgba(240,200,90,.35); }
+.tw-tile2-lab { font-size: 10.5px; font-weight: 700; letter-spacing: .07em; color: var(--muted); }
+.tw-tile2.hi .tw-tile2-lab { color: #c9a95a; }
+.tw-tile2-val { font-size: 20px; font-weight: 800; margin-top: 2px; white-space: nowrap; }
+.tw-tile2.hi .tw-tile2-val { font-size: 26px; color: var(--gold); }
+.tw-tile2-val .cur-icon { width: 22px !important; height: 22px !important; vertical-align: -4px; }
+.tw-tile2.hi .tw-tile2-val .cur-icon { width: 26px !important; height: 26px !important; vertical-align: -5px; }
+.tw-tile2-sub { font-size: 12.5px; color: var(--muted); margin-top: 1px; }
+.tw-perdiv { margin-top: 8px; font-size: 13.5px; color: var(--text-2); }
+.tw-perdiv b { color: #fff; }

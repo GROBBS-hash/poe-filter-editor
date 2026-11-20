@@ -191,7 +191,7 @@ function MarketRatio({ c, divine }: { c: number; divine: number | null }) {
 }
 
 /** The answer first, big and clear: what this sells for. */
-function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote, waiting, stack }: { res: Result | null; bulk: Bulk | null; busy: boolean; err: string; waiting?: string | null; stack?: number;
+function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote, waiting, stack, name }: { res: Result | null; bulk: Bulk | null; busy: boolean; err: string; waiting?: string | null; stack?: number; name?: string;
   divine: number | null; ninja: [number, string] | null; ninjaNote: string }) {
   const ninjaChaos = ninja ? (ninja[1] === "divine" && divine ? ninja[0] * divine : ninja[1] === "chaos" ? ninja[0] : null) : null;
   let main: number | null = null, label = "", sub: React.ReactNode = null, source = "";
@@ -210,24 +210,38 @@ function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote, waiting, st
   } else if (ninjaChaos != null) {
     main = ninjaChaos; label = `poe.ninja${ninjaNote}`;
   }
-  // With a stack (e.g. 732 lifeforce) the big number is what your whole stack is worth; the price each goes small.
+  // With a stack (e.g. 732 lifeforce): two tiles, "your 732" (bright) and "each". The ratio line ("11,880 Wild
+  // Crystallised Lifeforce = 1 [divine]") is for bulk items: how they're traded.
   const many = stack != null && stack > 1 && main != null;
   const big = main != null ? (many ? main * stack! : main) : null;
   const showDiv = big != null && divine && big >= divine;
+  // Chaos, or divines once it's worth one, always with the orb picture.
+  const amount = (c: number) => (divine && c >= divine ? <Price n={c / divine} cur="divine" /> : <Price n={c} cur="chaos" />);
+  const perDiv = bulk && main && divine ? divine / main : null;
   return (
     <div className={`tw-hero ${main == null ? "empty" : ""}`}>
-      {main != null && big != null ? (
+      {main != null && big != null && many ? (
+        <div className="tw-tiles2" title={source || undefined}>
+          <div className="tw-tile2 hi"><div className="tw-tile2-lab">YOUR {stack!.toLocaleString()}</div><div className="tw-tile2-val">{amount(big)}</div>
+            {divine && big < divine && big / divine >= 0.01 && <div className="tw-tile2-sub">= <Price n={big / divine} cur="divine" /></div>}</div>
+          <div className="tw-tile2"><div className="tw-tile2-lab">EACH</div><div className="tw-tile2-val">{amount(main)}</div></div>
+        </div>
+      ) : main != null && big != null ? (
         <div className="tw-hero-main">
           <span className="tw-hero-price" title={source || undefined}>{showDiv ? <Price n={big / divine!} cur="divine" /> : <Price n={big} cur="chaos" />}</span>
           <span className="tw-hero-side">
-            <span className="tw-hero-label">{many ? `your ${stack!.toLocaleString()}` : label}</span>
+            <span className="tw-hero-label">{label}</span>
             {divine && <span className="muted">{showDiv ? <>= <Price n={big} cur="chaos" /></> : big / divine >= 0.01 ? <>= <Price n={big / divine} cur="divine" /></> : null}</span>}
-            {many && <span className="muted small">{money(main, divine)} each</span>}
           </span>
         </div>
       ) : (
         <div className="tw-hero-main"><span className="tw-hero-label">
           {busy ? "Checking the trade site…" : res && res.total === 0 ? "None listed like this: untick a stat or two" : res ? `${res.total} listed, none priced` : err ? "No trade price" : waiting ?? "No price yet"}</span></div>
+      )}
+      {perDiv != null && name && (
+        <div className="tw-perdiv">{perDiv >= 1
+          ? <><b>{perDiv >= 10 ? Math.round(perDiv).toLocaleString() : +perDiv.toFixed(1)}</b> {name} = 1 <CurrencyIcon id="divine" /></>
+          : <>1 {name} = <b>{+(1 / perDiv).toFixed(1)}</b> <CurrencyIcon id="divine" /></>}</div>
       )}
       <div className="tw-hero-foot muted small">
         {sub}
@@ -431,7 +445,7 @@ export default function TradeWindow() {
 
       <PriceHero res={res} bulk={check.bulk ? bulk : null} busy={busy} err={err} divine={divine}
         waiting={!res && !busy && !check.bulk ? (searched ? "Filters changed: move onto Search again" : "Pick the stats, then move your mouse onto Search") : null}
-        ninja={check.ninja} ninjaNote={it.rarity === "Unique" && !it.name ? " (best ground unique on this base)" : ""} stack={it.stack_size ?? undefined} />
+        ninja={check.ninja} ninjaNote={it.rarity === "Unique" && !it.name ? " (best ground unique on this base)" : ""} stack={it.stack_size ?? undefined} name={it.base_type} />
       {err && <div className="qm-warn">{err}</div>}
       {it.rarity === "Unique" && !it.name && it.base_type && <BaseUniques base={it.base_type} divine={divine} />}
 
@@ -556,16 +570,6 @@ export default function TradeWindow() {
               Only sellers with at least {stack} in stock
             </label>
           )}
-          {bulk?.offers[0] && bulk.divine && (() => {
-            // How many you get for one divine / one chaos: the ratio people trade at.
-            const eachChaos = ninjaC || bt?.typical || (bulk.offers[0].pay_currency === "divine" ? bulk.offers[0].each * bulk.divine : bulk.offers[0].each);
-            const perDiv = bulk.divine / eachChaos;
-            return <div className="tw-ratio muted small">
-              1 <CurrencyIcon id="divine" /> ≈ <b>{perDiv >= 10 ? Math.round(perDiv) : +perDiv.toFixed(1)}</b> {it.base_type}
-              {eachChaos < 1 && <> · 1 <CurrencyIcon id="chaos" /> ≈ <b>{+(1 / eachChaos).toFixed(1)}</b></>}
-              {" "}· 1 <CurrencyIcon id="divine" /> = <Price n={bulk.divine} cur="chaos" />
-            </div>;
-          })()}
           <ul className="tw-list">
             {bulk?.offers.map((o, i) => {
               // Like Awakened's "fulfill": how many trades of this offer's size the seller can actually fill.

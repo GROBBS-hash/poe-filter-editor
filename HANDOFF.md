@@ -293,6 +293,9 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   preview-qm.html?editor=1 shows that version. Price box: "Your 732 ≈ …" = the hovered stack's worth (`stack` prop on
   PriceHero, from the item's stack size).
 
+- Price box design 2 (he picked it from five mockups, 20 Nov): with a stack, two tiles "YOUR N" (gold, big) and "EACH",
+  both with orb icons; bulk items get "N <item> = 1 [divine]" under them (replaces the old "1 div ≈ …" line lower down).
+
 
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
@@ -322,7 +325,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [x] F2: Show / Hide / Minimap work; Show brings items back with NeverSink's look (confirmed 20 Nov), "More options" fold works (design may change).
 - [ ] F2 card: chips and "Change this look" button; no NeverSink jargon box.
 - [ ] Main window item panel (Find): one sheet, two columns, nothing folded.
-- [ ] Price check on a stack (e.g. 732 lifeforce): the big number is the whole stack's worth ("your 732"), price each small.
+- [ ] Price check on a stack: "YOUR 732" and "EACH" tiles with orb icons; bulk items show "N items = 1 divine".
 - [ ] Menu icons: each page has its own colour tile (Find blue, Tiers coral, Wealth gold…), page title matches.
 - [ ] New Clean glass look: opens bigger and remembers its size; pages fade in; Wealth tiles look right; nothing broken on other pages.
 - [ ] Unidentified unique (e.g. Karui Sceptre): no false tier 1 / divine sound; the "Could be one of N uniques" list shows in F2 and Ctrl+D.
