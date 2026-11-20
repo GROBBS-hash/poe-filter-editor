@@ -252,7 +252,10 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
       } catch (e) { setToast(String(e)); }
       return;
     }
-    return commit(true, fromCurrent(undefined, picked.item.rarity), {});
+    // Hidden by NeverSink (e.g. single orbs in a low tier): its hiding rule still has its own look, so show it with
+    // that look rather than a plain one.
+    const look = v?.style && (v.style.text || v.style.background || v.style.border) ? v.style : undefined;
+    return commit(true, fromCurrent(look, picked.item.rarity), {});
   };
   // Stack rules always sit alongside your other rules for this item ("hide the
   // small piles" + "style the big ones"), so they're added, never swapped in.

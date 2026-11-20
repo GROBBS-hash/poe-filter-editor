@@ -281,6 +281,9 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   stack sizes/tiers, When, every rarity and auto reload sit under "More options" (remembered, localStorage qm-more).
   Rarity choices only for gear and maps (not currency/fragments/cards/gems/corpses).
 
+- F2 Show on an item NeverSink hides (e.g. single Orb of Unmaking, $tier->t5alchemy is a Hide block in his Red-Maps)
+  now uses that hiding block's own look (it keeps its colours), not a plain default look.
+
 
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
