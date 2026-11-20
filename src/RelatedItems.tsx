@@ -75,7 +75,7 @@ export default function RelatedItems({ name, divine, onData }: { name: string; d
       {r.drops.length > 0 && (
         <>
           <div className="bu-title">{r.group.some((p) => p.name.includes(" Piece of ")) ? "Combines into"
-            : r.group.some((p) => p.name.includes("Lifeforce")) ? "Harvest can make" : "Drops"}</div>
+            : name === "Ancient Orb" ? "Can reroll a unique into" : "Drops"}</div>
           <ul>{drops.map((p) => <Row key={p.name} p={p} divine={divine} />)}</ul>
           {r.drops.length > 10 && <button className="link small" onClick={() => setAll(!all)}>{all ? "Show fewer" : `Show all ${r.drops.length}`}</button>}
         </>

@@ -55,10 +55,46 @@ fn priced(file: &PriceFile, name: &str, count: u32, me: bool) -> Priced {
     Priced { name: name.to_string(), value: price(file, name), count, me }
 }
 
+/// poe.ninja categories whose items are siblings of one kind (all threads, all fossils…).
+const FAMILY_CATS: &[&str] = &["Thread", "DeliriumOrb", "Fossil", "Resonator", "Omen", "Oil", "Runegraft", "AllflameEmber", "Astrolabe"];
+
+/// The other items of the same kind, dearest first (at most 12, always including this one), or None.
+fn family(file: &PriceFile, name: &str) -> Option<Vec<Priced>> {
+    let me = file.items.iter().find(|i| i.name == name)?;
+    let same = |i: &crate::prices::PriceItem| if name.ends_with(" Catalyst") { i.name.ends_with(" Catalyst") } else { i.cat == me.cat };
+    if !(name.ends_with(" Catalyst") || FAMILY_CATS.contains(&me.cat.as_str())) { return None; }
+    let mut all: Vec<Priced> = Vec::new();
+    for i in file.items.iter().filter(|i| same(i)) {
+        if !all.iter().any(|p| p.name == i.name) { all.push(priced(file, &i.name, 1, i.name == name)); }
+    }
+    all.sort_by(|a, b| b.value.unwrap_or(-1.0).total_cmp(&a.value.unwrap_or(-1.0)));
+    if all.len() > 12 {
+        let mine = all.iter().position(|p| p.me);
+        let mut top: Vec<Priced> = all.iter().take(11).cloned().collect();
+        if let Some(i) = mine.filter(|i| *i >= 11) { top.push(all[i].clone()) } else { top.push(all[11].clone()) }
+        all = top;
+    }
+    (all.len() > 1).then_some(all)
+}
+
+/// A group whose names share a word ("… Oil", "… Crystallised Lifeforce") is one kind of item; one that mixes
+/// whatever a league mechanic drops (Ancient Orb, Astragali, Voidborn Reliquary Key…) isn't shown as "goes with".
+fn one_kind(names: &[String]) -> bool {
+    let words = |n: &str| n.split(|c: char| !c.is_alphanumeric() && c != '\'').filter(|w| w.len() >= 3 && !["the", "The"].contains(w))
+        .map(str::to_string).collect::<Vec<_>>();
+    let first = words(&names[0]);
+    first.iter().any(|w| names[1..].iter().all(|n| words(n).contains(w)))
+}
+
 /// Related items for one item name, or None when we know nothing about it.
 pub fn related(file: &PriceFile, name: &str) -> Option<Related> {
     let d = data();
     let mut r = Related { own: price(file, name), ..Default::default() };
+    // Threads, fossils, catalysts…: the others of the same kind, and nothing else.
+    if let Some(f) = family(file, name) {
+        r.group = f;
+        return Some(r);
+    }
     if let Some(rc) = d.recipes.iter().find(|rc| rc.item == name) {
         r.made_from = Some(priced(file, &rc.part, rc.count, false));
     }
@@ -68,10 +104,15 @@ pub fn related(file: &PriceFile, name: &str) -> Option<Related> {
     if let Some(g) = d.groups.iter().find(|g| g.group.iter().any(|n| n == name)) {
         // A recipe pair (Crescent Splinter + Maven's Writ) is already shown as made-from / makes.
         let skip = |n: &str| r.made_from.as_ref().is_some_and(|p| p.name == n) || r.makes.as_ref().is_some_and(|p| p.name == n);
-        r.group = g.group.iter().filter(|n| !skip(n)).map(|n| priced(file, n, 1, n == name)).collect();
-        if r.group.len() == 1 && !g.set { r.group.clear() }
+        let kind = !g.set && g.group.len() > 1 && one_kind(&g.group);
+        // Sets (Shaper fragments…) and one-kind groups (oils, lifeforce) list their members; league-mechanic mixes don't.
+        if g.set || kind {
+            r.group = g.group.iter().filter(|n| !skip(n)).map(|n| priced(file, n, 1, n == name)).collect();
+            if r.group.len() == 1 && !g.set { r.group.clear() }
+        }
         r.set = g.set;
-        r.drops = g.drops.iter().map(|n| priced(file, n, 1, false)).collect();
+        // A one-kind group's "drops" are that mechanic's general loot (Harvest's for lifeforce), not this item's.
+        if !kind { r.drops = g.drops.iter().map(|n| priced(file, n, 1, false)).collect(); }
         r.drops.sort_by(|a, b| b.value.unwrap_or(-1.0).total_cmp(&a.value.unwrap_or(-1.0)));
     }
     if r.made_from.is_none() && r.makes.is_none() && r.group.is_empty() && r.drops.is_empty() { None } else { Some(r) }
@@ -129,5 +170,24 @@ mod tests {
         let s = related(&file(), "Crescent Splinter").unwrap();
         assert_eq!(s.makes.unwrap().name, "The Maven's Writ");
         assert!(related(&file(), "Chaos Orb").is_none());
+    }
+
+    #[test]
+    fn families_and_mechanic_mixes() {
+        let mut f = file();
+        let it = |name: &str, cat: &str, value: f64| PriceItem { name: name.into(), base: name.into(), cat: cat.into(), value, variant: None, listings: Some(10) };
+        f.items.extend([it("Bestiary Thread", "Thread", 1.6), it("Abyss Thread", "Thread", 4.8), it("Legion Thread", "Thread", 3.6),
+            it("Wild Crystallised Lifeforce", "Currency", 0.02), it("Sacred Crystallised Lifeforce", "Currency", 16.0),
+            it("Ancient Orb", "Currency", 13.0), it("Astragali", "Currency", 0.1), it("Headhunter", "UniqueAccessory", 48000.0)]);
+        // Threads: only other threads, dearest first.
+        let t = related(&f, "Bestiary Thread").unwrap();
+        assert_eq!(t.group.iter().map(|p| p.name.as_str()).collect::<Vec<_>>(), ["Abyss Thread", "Legion Thread", "Bestiary Thread"]);
+        assert!(t.drops.is_empty());
+        // Lifeforce: the four kinds, but not Harvest's general loot.
+        let l = related(&f, "Wild Crystallised Lifeforce").unwrap();
+        assert!(l.group.iter().any(|p| p.name == "Sacred Crystallised Lifeforce") && l.drops.is_empty());
+        // Ancient Orb: what it rerolls into, not the rest of Expedition's currency.
+        let a = related(&f, "Ancient Orb").unwrap();
+        assert!(a.group.is_empty() && a.drops.iter().any(|p| p.name == "Headhunter"));
     }
 }

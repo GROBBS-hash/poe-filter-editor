@@ -153,7 +153,12 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   item-drop.json (MIT), rebuilt with `node tools/build_related_items.mjs`; core `related.rs`, command
   `related_items`, `src/RelatedItems.tsx`. Preview page has "Fragment: …" examples using the real price file.
   20 Nov: merged into main; the panel now sits beside the price window (`.tw-wrap` / `.tw-side`, window widens to fit),
-  e.g. lifeforce shows all four types + "Harvest can make". Price text and orb icons in the window are a bit bigger.
+  e.g. lifeforce shows its four types.
+  Families (`family` in related.rs): threads, delirium orbs, fossils, resonators, omens, oils, runegrafts, embers,
+  astrolabes (poe.ninja category) and catalysts show the rest of their kind, dearest first (max 12). Awakened's
+  non-set groups only show when their names share a word (`one_kind`), and then without the mechanic's loot; mixed
+  league-mechanic groups (Expedition: Ancient Orb + Astragali + keys) show only drops ("Can reroll a unique into").
+  The preview page's mock of `related_items` is a rough JS copy; trust the Rust tests.
 
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
