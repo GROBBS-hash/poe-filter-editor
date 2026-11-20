@@ -135,6 +135,9 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   base's value (`drops_on_ground` in prices.rs). Mixed bases (cheapest unique below tier 1, e.g. Headhunter + Wurm's
   Molt on Leather Belt) go no higher than tier 2: no divine sound for every Leather Belt. "Could be one of N uniques"
   list (`BaseUniques.tsx`, command `base_uniques`) in the F2 pop-up and Ctrl+D for uniques without a name.
+- Fractured items 20 Nov: fractured mods keep their own row even when a total or the 20%-quality defence counts
+  them (unticked then). "Fractured item" box searches base + ilvl+ + only fractured mods (Awakened-style). `StatIndex::find`
+  now falls back to "… (Local)" stats (e.g. local % ES on armour). Live: his Fossilised Spirit Shield → 6 listed.
 
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
@@ -149,6 +152,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Roll bars and "T3 range 6–11" numbers look right; tier badges coloured. (Roll bars confirmed 20 Nov.)
 - [ ] Every Ctrl+D shows a trade price straight away (uniques, corpses, gems too) in the big box at the top.
       (Confirmed 20 Nov for a unique, a unique belt and a gem.)
+- [ ] Fractured item: "Search <base> ilvl N+ with only its fractured mods" gives sensible prices.
 - [ ] Unidentified unique (e.g. Karui Sceptre): no false tier 1 / divine sound; the "Could be one of N uniques" list shows in F2 and Ctrl+D.
 - [ ] Jewel "Open prefix/suffix" never says more than 2 free; reduced-mod rolls (curse effect) show the right high/low.
 - [ ] Rare/magic map: priced by tier + drop bonuses (Atlas Drops, Rarity, Pack Size, More Currency…), shown as

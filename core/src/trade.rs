@@ -112,6 +112,8 @@ impl StatIndex {
             // The site writes a leading "+" for flat mods; the item sometimes doesn't, and vice versa.
             let alt = if let Some(x) = t.strip_prefix('+') { x.to_string() } else { format!("+{t}") };
             if let Some(id) = self.by_text.get(&(k.to_string(), alt.to_lowercase())) { return Some((id.clone(), value)); }
+            // Armour and weapon mods that only affect the item itself are listed as "… (Local)".
+            if let Some(id) = self.by_text.get(&(k.to_string(), format!("{} (local)", t.to_lowercase()))) { return Some((id.clone(), value)); }
             if t.contains("reduced") {
                 let inc = t.replace("reduced", "increased");
                 if let Some(id) = self.by_text.get(&(k.to_string(), inc.to_lowercase())) { return Some((id.clone(), -value)); }
@@ -294,7 +296,10 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
     let (props_f, prop_hide) = crate::trade_rules::property_filters(text, &item, &lines);
     let prop_hide = if unique { vec![] } else { prop_hide };
     let (totals_f, total_hide) = crate::trade_rules::totals(&lines, &item, index, &prop_hide);
-    let hidden: Vec<usize> = prop_hide.iter().chain(total_hide.iter()).copied().collect();
+    // Fractured mods always keep their own row (for "fractured only" searches on crafting bases), even when a total
+    // or the defence at 20% quality counts them too; those rows start unticked so nothing is counted twice.
+    let counted: Vec<usize> = prop_hide.iter().chain(total_hide.iter()).copied().collect();
+    let hidden: Vec<usize> = counted.iter().copied().filter(|i| lines[*i].kind != "fractured").collect();
     filters.extend(totals_f);
     filters.extend(props_f);
     let has_tiers = lines.iter().any(|m| m.tier.is_some());
@@ -309,7 +314,7 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
         let good = if has_tiers { m.tier.map(|t| t <= 2).unwrap_or(false) } else { VALUABLE.iter().any(|k| t.contains(k)) };
         let junk = is_junk(&t);
         // Maps: price by tier and rarity; mods are there to tick, never ticked for you.
-        let enabled = !unique && !is_map(&item) && m.kind != "enchant" && good && !junk;
+        let enabled = !unique && !is_map(&item) && m.kind != "enchant" && good && !junk && !counted.contains(&i);
         // A mod with no number is just "has it": no minimum.
         let min = if m.values.is_empty() { None } else { Some(min_for(value)) };
         filters.push(StatFilter { id, label: m.text.clone(), value, min, enabled, kind, tier: m.tier, junk, roll: m.roll, range: m.range.clone() });
@@ -666,6 +671,19 @@ Item Level: 75
         assert_eq!(q["query"]["stats"][0]["filters"][0]["id"], "pseudo.pseudo_map_more_currency_drops");
     }
 
+
+    #[test]
+    fn fractured_mods_keep_their_row() {
+        let t = concat!("Item Class: Shields\nRarity: Rare\nVictory Charm\nFossilised Spirit Shield\n--------\nChance to Block: 22%\nEnergy Shield: 65 (augmented)\n",
+            "--------\nItem Level: 73\n--------\n",
+            "{ Fractured Prefix Modifier \"Chosen\" (Tier: 1) — Life, Defences, Energy Shield }\n27(24-28)% increased Energy Shield\n+19(19-22) to maximum Life\n",
+            "{ Prefix Modifier \"Sanguine\" (Tier: 9) — Life }\n+25(25-39) to maximum Life\n",
+            "{ Suffix Modifier \"of the Volcano\" (Tier: 3) — Elemental, Fire, Resistance }\n+41(36-41)% to Fire Resistance\n--------\nFractured Item\n");
+        let s = setup(t, &index()).unwrap();
+        let fr: Vec<&StatFilter> = s.filters.iter().filter(|f| f.kind == "fractured").collect();
+        assert!(fr.iter().any(|f| f.label == "+19 to maximum Life"), "{:?}", s.filters);
+        assert!(fr.iter().all(|f| !f.enabled), "counted in the life total, so not ticked twice");
+    }
     #[test]
     fn plain_copy_and_unique() {
         let t = "Item Class: Helmets\nRarity: Unique\nGoldrim\nLeather Cap\n--------\nEvasion Rating: 30\n--------\nItem Level: 40\n--------\n+38% to all Elemental Resistances\n--------\nNo metal slips as easily through the fingers.\n";

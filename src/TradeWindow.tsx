@@ -371,9 +371,14 @@ export default function TradeWindow() {
         </div>
       )}
       {setup.filters.some((f) => f.kind === "fractured") && it.rarity !== "Unique" && setup.category && (
-        <button className="link small tw-fract" title="Search for the same base with these fractured mods, ignoring the rest (crafting bases)"
-          onClick={() => { const s = { ...setup, base_only: true, filters: setup.filters.map((f) => ({ ...f, enabled: f.kind === "fractured" })) }; setSetup(s); run(s); }}>
-          Search {it.base_type} with just its fractured mods</button>
+        <div className="tw-fract">
+          <div className="small"><b>Fractured item</b> <span className="muted">· price it as a crafting base, like Awakened</span></div>
+          <button title="Same base, this item level or higher, only the fractured mods (at this item's rolls)"
+            onClick={() => { const s = { ...setup, base_only: true, ilvl_min: it.item_level ?? null,
+              filters: setup.filters.map((f) => ({ ...f, enabled: f.kind === "fractured", min: f.kind === "fractured" ? f.value : f.min })) };
+              setPreset(null); setSetup(s); run(s); }}>
+            Search {it.base_type}{it.item_level ? ` ilvl ${it.item_level}+` : ""} with only its fractured mods</button>
+        </div>
       )}
       {setup.unknown.length > 0 && showStats && (
         <div className="tw-unknown">

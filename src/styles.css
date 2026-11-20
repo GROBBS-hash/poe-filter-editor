@@ -689,7 +689,10 @@ input[type=range] { accent-color: var(--gold); }
 .tw-label.mod-crafted { color: #b4b4ff; }
 .tw-label.mod-enchant { color: #b8daf2; }
 .tw-label.mod-implicit { color: #c8c8ff; }
-button.link.tw-fract { display: block; margin: 4px 0; color: #c9b27a; }
+.tw-fract { margin: 8px 0; padding: 8px 10px; border-radius: 8px; background: rgba(162,145,98,0.12); border: 1px solid rgba(162,145,98,0.4); }
+.tw-fract .small b { color: #c9b27a; }
+.tw-fract button { margin-top: 6px; width: 100%; padding: 5px 8px; border-radius: 6px; border: 1px solid #a29162; background: rgba(162,145,98,0.2); color: #f0e2b6; font-weight: 600; cursor: pointer; }
+.tw-fract button:hover { background: rgba(162,145,98,0.35); }
 .tw-unknown .tw-label { padding: 3px 8px; opacity: 0.85; }
 .tw-label.mod-property { color: #f0e6c8; }
 /* Compared with your PoB build */
