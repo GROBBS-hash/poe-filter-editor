@@ -241,8 +241,10 @@ pub fn open_affixes(text: &str, item: &Item, index: &StatIndex) -> Vec<StatFilte
         if low.contains("suffix modifier") { suf += 1; }
     }
     if pre + suf == 0 { return vec![]; } // plain copy: can't tell
+    // Jewels (abyss and cluster too) hold two prefixes and two suffixes; other rares three of each.
+    let max = if item.item_class.contains("Jewel") { 2 } else { 3 };
     let mut out = Vec::new();
-    for (n, text_id, label) in [(3 - pre.min(3), "# Empty Prefix Modifiers", "prefix"), (3 - suf.min(3), "# Empty Suffix Modifiers", "suffix")] {
+    for (n, text_id, label) in [(max - pre.min(max), "# Empty Prefix Modifiers", "prefix"), (max - suf.min(max), "# Empty Suffix Modifiers", "suffix")] {
         if n == 0 { continue; }
         let Some(id) = index.pseudo_id(text_id) else { continue };
         out.push(StatFilter { id, label: format!("Open {label} ({n} free)"), value: n as f64, min: Some(1.0), enabled: false,

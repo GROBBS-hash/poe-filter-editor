@@ -165,7 +165,8 @@ fn roll_of(line: &str, values: &[f64]) -> Option<f64> {
     let r = ranges(line);
     if r.is_empty() || r.len() != values.len() { return None; }
     let spots: Vec<f64> = r.iter().zip(values).filter(|((a, b), _)| a != b)
-        .map(|((a, b), v)| ((v.abs() - a.abs()) / (b.abs() - a.abs())).clamp(0.0, 1.0)).collect();
+        // By size: "29(30-25)% reduced …" is written high to low, and the bigger number is the better roll.
+        .map(|((a, b), v)| { let (lo, hi) = (a.abs().min(b.abs()), a.abs().max(b.abs())); ((v.abs() - lo) / (hi - lo)).clamp(0.0, 1.0) }).collect();
     if spots.is_empty() { return None; }
     Some(spots.iter().sum::<f64>() / spots.len() as f64)
 }
@@ -175,7 +176,7 @@ fn roll_of(line: &str, values: &[f64]) -> Option<f64> {
 fn range_text(line: &str) -> Option<String> {
     let r = ranges(line);
     if r.is_empty() || r.iter().all(|(a, b)| a == b) { return None; }
-    Some(r.iter().map(|(a, b)| format!("{a}–{b}")).collect::<Vec<_>>().join(" / "))
+    Some(r.iter().map(|(a, b)| { let (lo, hi) = if a.abs() <= b.abs() { (a, b) } else { (b, a) }; format!("{lo}–{hi}") }).collect::<Vec<_>>().join(" / "))
 }
 
 /// Removes roll ranges "(25-29)" and tags like "(augmented)" from an advanced-copy line.
@@ -754,6 +755,8 @@ Item Level: 75
         assert_eq!(roll_of("+25(25-25)% Chance to Block", &[25.0]), None);
         // Negative ranges: further from zero counts as higher.
         assert_eq!(roll_of("-10(-15--5)% to Chaos Resistance", &[-10.0]), Some(0.5));
+        assert_eq!(roll_of("29(30-25)% reduced Effect of Curses on you", &[29.0]), Some(0.8));
+        assert_eq!(range_text("29(30-25)% reduced Effect of Curses on you").as_deref(), Some("25–30"));
         assert_eq!(clean("+10% to Cold Resistance (implicit)"), "+10% to Cold Resistance");
         let r = rates(|n| (n == "Divine Orb").then_some(200.0));
         let f = json!({ "result": [

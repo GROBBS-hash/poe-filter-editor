@@ -121,6 +121,12 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   valued now and every N minutes (`start_session_timer`), overlay shows time / made / per hour; pause, stop & save;
   "Best strategies" averages per name. OAuth would need GGG to register the app, hence POESESSID (kept local).
   Not tested against the live site: realm for PoE 2 and the exact error shapes.
+  20 Nov: scan profiles like WealthyExile (`ScanProfile` in WealthStore: name + tabs; `active` = None for whole stash;
+  `wealth_profile_save/delete/use`, `wealth_tabs_refresh`). Snapshots carry `profile`, so each profile has its own
+  total and history. "Worth selling" (`missed`) now adds up the same unlisted item across stacks and tabs before
+  comparing with the threshold (`Valued.places`), and the page shows "×10 in 3 places · 1.2c each".
+- Price check 20 Nov (4): jewels have max 2 prefixes / 2 suffixes in "Open prefix/suffix"; reversed ranges like
+  "29(30-25)% reduced …" count the bigger number as the better roll and show "25–30".
 
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
@@ -135,6 +141,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Roll bars and "T3 range 6–11" numbers look right; tier badges coloured. (Roll bars confirmed 20 Nov.)
 - [ ] Every Ctrl+D shows a trade price straight away (uniques, corpses, gems too) in the big box at the top.
       (Confirmed 20 Nov for a unique, a unique belt and a gem.)
+- [ ] Jewel "Open prefix/suffix" never says more than 2 free; reduced-mod rolls (curse effect) show the right high/low.
 - [ ] Rare/magic map: priced by tier + drop bonuses (Atlas Drops, Rarity, Pack Size, More Currency…), shown as
       tick boxes; the price looks sensible next to Awakened's. (Tier-only price confirmed 20 Nov.)
 - [ ] "Something's wrong?" saves a report (he'll mention it in chat; check the reports folder).
@@ -160,8 +167,10 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
       the "rarity unsure" note shows on NeverSink tiered gear.
 
 **Wealth page (Endgame → Wealth)**
-- [ ] Connect with account name + POESESSID; error message is clear if the POESESSID is wrong.
+- [x] Connected with account name + POESESSID (20 Nov). Still check: clear message if the POESESSID is wrong.
 - [ ] Scan whole stash: total, by-tab breakdown and history chart look right; "Worth selling" lists unlisted items.
+- [ ] Scan profiles: make one (e.g. dump tabs), scan it, switch back to Whole stash; each keeps its own total/history.
+- [ ] "Worth selling" adds up the same item across stacks (e.g. 10 Blight threads in a few stacks).
 - [ ] Earnings session: tick dump tabs, start, overlay shows time / made / per hour, pause, stop & save,
       "Best strategies" ranks runs.
 

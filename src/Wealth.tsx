@@ -4,13 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import { CurrencyIcon } from "./icons";
 
 export type Tab = { index: number; name: string; kind: string; colour: string };
-export type Snapshot = { time: number; league: string; total: number; divine: number | null; tabs: [string, number][] };
-export type Valued = { tab: string; name: string; stack: number; value: number; x: number; y: number; listed: boolean; icon: string };
+export type Snapshot = { time: number; league: string; total: number; divine: number | null; tabs: [string, number][]; profile?: string };
+export type Valued = { tab: string; name: string; stack: number; value: number; x: number; y: number; listed: boolean; icon: string; places?: number };
+export type ScanProfile = { name: string; tabs: number[] };
 export type Session = { name: string; league: string; tabs: number[]; start: number; end: number | null; start_value: number; last_value: number;
   paused: number; paused_at: number | null };
 export type WealthView = { account: string; has_sessid: boolean; league: string; tabs: Tab[]; tracked: number[]; min: number; minutes: number;
   snapshots: Snapshot[]; missed: Valued[]; sessions: Session[]; current: Session | null; strategies: [string, number, number, number][];
-  divine: number | null; now: number };
+  divine: number | null; now: number; profiles?: ScanProfile[]; active?: string | null };
 
 /** Seconds a session has run (pauses taken out). */
 export function seconds(s: Session, now: number) {
@@ -61,6 +62,58 @@ function History({ snaps, divine }: { snaps: Snapshot[]; divine: number | null }
   );
 }
 
+/** Scan profiles, like WealthyExile: named sets of tabs ("Dump tabs", "Currency"), or the whole stash. */
+function Profiles({ v, setV, setErr, busy }: { v: WealthView; setV: (w: WealthView) => void; setErr: (e: string) => void; busy: boolean }) {
+  // Editing: [name, tabs, the name it had before (null for a new one)].
+  const [edit, setEdit] = useState<[string, number[], string | null] | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const list = v.profiles ?? [];
+  const call = (cmd: string, args: Record<string, unknown>) => invoke<WealthView>(cmd, args).then((w) => { setV(w); setErr(""); return w; });
+  const active = list.find((p) => p.name === v.active) ?? null;
+  return (
+    <div className="w-profiles">
+      <div className="w-prof-row">
+        <span className="muted small">Scan</span>
+        <button className={`w-prof ${!active ? "on" : ""}`} disabled={busy} onClick={() => call("wealth_profile_use", { name: null })}>Whole stash</button>
+        {list.map((p) => (
+          <button key={p.name} className={`w-prof ${active?.name === p.name ? "on" : ""}`} disabled={busy}
+            title={`${p.tabs.length} tab${p.tabs.length === 1 ? "" : "s"}`} onClick={() => call("wealth_profile_use", { name: p.name })}>{p.name}</button>
+        ))}
+        <button className="link small" disabled={busy} onClick={() => setEdit(["", [], null])}>+ New profile</button>
+        {active && <button className="link small" disabled={busy} onClick={() => setEdit([active.name, active.tabs, active.name])}>Edit</button>}
+      </div>
+      {edit && (
+        <div className="w-prof-edit">
+          <div className="row">
+            <input className="text" autoFocus value={edit[0]} placeholder="Profile name, e.g. Dump tabs" onChange={(e) => setEdit([e.target.value, edit[1], edit[2]])} />
+            <button className="link small" disabled={refreshing} onClick={() => { setRefreshing(true);
+              invoke<WealthView>("wealth_tabs_refresh").then(setV).catch((e) => setErr(String(e))).finally(() => setRefreshing(false)); }}>
+              {refreshing ? "Reading tabs…" : "Refresh tab list"}</button>
+          </div>
+          <p className="muted small">Tick the tabs this profile scans. Its worth and history are kept apart from the whole stash's.</p>
+          <div className="w-tabpick">
+            {v.tabs.map((t) => (
+              <label key={t.index} className={`w-tabchip ${edit[1].includes(t.index) ? "on" : ""}`} style={{ borderColor: t.colour }}>
+                <input type="checkbox" checked={edit[1].includes(t.index)}
+                  onChange={() => setEdit([edit[0], edit[1].includes(t.index) ? edit[1].filter((x) => x !== t.index) : [...edit[1], t.index], edit[2]])} />
+                {t.name || `Tab ${t.index + 1}`}
+              </label>
+            ))}
+          </div>
+          <div className="row">
+            <button className="primary" disabled={!edit[0].trim() || edit[1].length === 0}
+              onClick={() => call("wealth_profile_save", { name: edit[0], tabs: edit[1], old: edit[2] }).then(() => setEdit(null)).catch((e) => setErr(String(e)))}>
+              Save profile</button>
+            <button className="link small" onClick={() => setEdit(null)}>Cancel</button>
+            {edit[2] && <button className="link small danger-text" onClick={() => call("wealth_profile_delete", { name: edit[2] }).then(() => setEdit(null))}>Delete profile</button>}
+            <span className="muted small">{edit[1].length} tab{edit[1].length === 1 ? "" : "s"} ticked</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Wealth tracker page: stash worth, things worth selling, and earnings per strategy. */
 export default function Wealth() {
   const [v, setV] = useState<WealthView | null>(null);
@@ -96,8 +149,10 @@ export default function Wealth() {
 
   if (!v) return <div className="card">{err || "Loading…"}</div>;
   const connected = v.has_sessid && v.account && v.tabs.length > 0;
-  const last = v.snapshots[v.snapshots.length - 1];
-  const prev = v.snapshots[v.snapshots.length - 2];
+  // History and totals for the profile in use ("" = whole stash) in this league.
+  const mine = v.snapshots.filter((s) => s.league === v.league && (s.profile ?? "") === (v.active ?? ""));
+  const last = mine[mine.length - 1];
+  const prev = mine[mine.length - 2];
   const cur = v.current;
 
   return (
@@ -130,9 +185,10 @@ export default function Wealth() {
       {connected && (
         <div className="card">
           <div className="row-between">
-            <h2>Your stash is worth</h2>
+            <h2>{v.active ? `${v.active} is worth` : "Your stash is worth"}</h2>
             <button className="link small" onClick={() => setShowSetup(!showSetup)}>{v.account} · {v.league}</button>
           </div>
+          <Profiles v={v} setV={setV} setErr={setErr} busy={!!busy} />
           {last ? (
             <div className="w-total">
               <Worth c={last.total} divine={v.divine ?? last.divine} big />
@@ -141,12 +197,12 @@ export default function Wealth() {
             </div>
           ) : <p className="muted">Scan your stash to see what it's worth.</p>}
           <div className="row">
-            <button className="primary" disabled={!!busy} onClick={() => run("scan", "wealth_scan")}>{busy === "scan" ? "Scanning…" : "Scan whole stash"}</button>
+            <button className="primary" disabled={!!busy} onClick={() => run("scan", "wealth_scan")}>{busy === "scan" ? "Scanning…" : v.active ? `Scan ${v.active}` : "Scan whole stash"}</button>
             {progress && busy === "scan" && <span className="muted small">Tab {progress[0]} of {progress[1]} {progress[2] && `· ${progress[2]}`}</span>}
           </div>
           {busy === "scan" && progress && <div className="w-bar"><div style={{ width: `${(progress[0] / Math.max(1, progress[1])) * 100}%` }} /></div>}
           <p className="muted small">pathofexile.com only allows so many requests a minute, so a big stash takes a few minutes. The app waits its turn.</p>
-          <History snaps={v.snapshots.filter((s) => s.league === v.league)} divine={v.divine} />
+          <History snaps={mine} divine={v.divine} />
           {last && last.tabs.length > 0 && (
             <details className="w-tabs"><summary className="small">By tab</summary>
               <table className="w-table"><tbody>{last.tabs.slice(0, 30).map(([t, c]) => <tr key={t}><td>{t}</td><td><Worth c={c} divine={v.divine} /></td></tr>)}</tbody></table>
@@ -166,8 +222,9 @@ export default function Wealth() {
               {v.missed.map((m, i) => (
                 <tr key={i}>
                   <td>{m.icon && <img src={m.icon} alt="" width={24} height={24} />}</td>
-                  <td>{m.name}{m.stack > 1 ? ` ×${m.stack}` : ""}</td>
-                  <td className="muted small">{m.tab} · {m.x + 1},{m.y + 1}</td>
+                  <td>{m.name}{m.stack > 1 ? ` ×${m.stack}` : ""}{(m.places ?? 1) > 1 && <span className="muted small"> in {m.places} places</span>}
+                    {m.stack > 1 && <div className="muted small">{+(m.value / m.stack).toFixed(2)}c each</div>}</td>
+                  <td className="muted small">{m.tab}{(m.places ?? 1) === 1 ? ` · ${m.x + 1},${m.y + 1}` : ""}</td>
                   <td><Worth c={m.value} divine={v.divine} /></td>
                 </tr>
               ))}

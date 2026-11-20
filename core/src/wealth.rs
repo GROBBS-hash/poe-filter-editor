@@ -61,6 +61,9 @@ pub struct Valued {
     /// Already up for sale (has a "~price" note).
     pub listed: bool,
     pub icon: String,
+    /// "Worth selling" adds up the same item from several stacks / slots: how many places it's in.
+    #[serde(default)]
+    pub places: u32,
 }
 
 pub fn value_item(item: &Value, tab: &str, lookup: Lookup) -> Option<Valued> {
@@ -81,7 +84,7 @@ pub fn value_item(item: &Value, tab: &str, lookup: Lookup) -> Option<Valued> {
         tab: tab.to_string(), name: shown, stack, value: each * stack as f64,
         x: item["x"].as_u64().unwrap_or(0) as u32, y: item["y"].as_u64().unwrap_or(0) as u32,
         listed: item["note"].as_str().map(|n| n.starts_with("~price") || n.starts_with("~b/o")).unwrap_or(false),
-        icon: item["icon"].as_str().unwrap_or("").to_string(),
+        icon: item["icon"].as_str().unwrap_or("").to_string(), places: 1,
     })
 }
 
@@ -110,6 +113,9 @@ pub struct Snapshot {
     /// Chaos per divine then.
     pub divine: Option<f64>,
     pub tabs: Vec<(String, f64)>,
+    /// Which scan profile it was ("" = the whole stash).
+    #[serde(default)]
+    pub profile: String,
 }
 
 pub fn snapshot(time: u64, league: &str, divine: Option<f64>, valued: &[Valued]) -> Snapshot {
@@ -118,12 +124,25 @@ pub fn snapshot(time: u64, league: &str, divine: Option<f64>, valued: &[Valued])
         match tabs.iter_mut().find(|t| t.0 == v.tab) { Some(t) => t.1 += v.value, None => tabs.push((v.tab.clone(), v.value)) }
     }
     tabs.sort_by(|a, b| b.1.total_cmp(&a.1));
-    Snapshot { time, league: league.into(), total: valued.iter().map(|v| v.value).sum(), divine, tabs }
+    Snapshot { time, league: league.into(), total: valued.iter().map(|v| v.value).sum(), divine, tabs, profile: String::new() }
 }
 
-/// Worth selling and not listed yet, most valuable first.
+/// Worth selling and not listed yet, most valuable first. The same item in several stacks or tabs is
+/// added up first: ten Blight threads together can be worth listing when three alone aren't.
 pub fn missed(valued: &[Valued], at_least: f64) -> Vec<Valued> {
-    let mut v: Vec<Valued> = valued.iter().filter(|v| !v.listed && v.value >= at_least && v.name != "Chaos Orb").cloned().collect();
+    let mut groups: Vec<Valued> = Vec::new();
+    for it in valued.iter().filter(|v| !v.listed && v.name != "Chaos Orb") {
+        match groups.iter_mut().find(|g| g.name == it.name) {
+            Some(g) => {
+                g.stack += it.stack;
+                g.value += it.value;
+                g.places += 1;
+                if !g.tab.split(", ").any(|t| t == it.tab) { g.tab = format!("{}, {}", g.tab, it.tab); }
+            }
+            None => groups.push(Valued { places: 1, ..it.clone() }),
+        }
+    }
+    let mut v: Vec<Valued> = groups.into_iter().filter(|g| g.value >= at_least).collect();
     v.sort_by(|a, b| b.value.total_cmp(&a.value));
     v.truncate(150);
     v
@@ -183,6 +202,15 @@ pub struct WealthStore {
     pub sessions: Vec<Session>,
     pub current: Option<Session>,
     pub missed: Vec<Valued>,
+    /// Named sets of tabs to scan (like WealthyExile's profiles), and the one in use (None = whole stash).
+    pub profiles: Vec<ScanProfile>,
+    pub active: Option<String>,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ScanProfile {
+    pub name: String,
+    pub tabs: Vec<usize>,
 }
 
 impl WealthStore {
@@ -246,6 +274,19 @@ mod tests {
         assert_eq!(tabs, vec![Tab { index: 0, name: "Dump".into(), kind: "PremiumStash".into(), colour: "#ff0010".into() }]);
     }
 
+
+    #[test]
+    fn worth_selling_adds_up_stacks() {
+        let it = |tab: &str, stack: u32, value: f64| Valued { tab: tab.into(), name: "Blighted Thread".into(), stack, value, x: 0, y: 0,
+            listed: false, icon: String::new(), places: 1 };
+        // 3 + 7 threads at 1.2c each: neither stack reaches 10c, together they do.
+        let v = vec![it("Dump 1", 3, 3.6), it("Dump 2", 7, 8.4), it("Dump 2", 0, 0.0)];
+        let m = missed(&v, 10.0);
+        assert_eq!(m.len(), 1);
+        assert_eq!((m[0].stack, m[0].places, m[0].tab.as_str()), (10, 3, "Dump 1, Dump 2"));
+        assert!((m[0].value - 12.0).abs() < 1e-9);
+        assert!(missed(&v[..1], 10.0).is_empty());
+    }
     #[test]
     fn sessions_per_hour() {
         let mut s = Session { name: "Strand alch & go".into(), league: "Covens".into(), tabs: vec![0], start: 1000, end: None,

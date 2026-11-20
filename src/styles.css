@@ -794,3 +794,11 @@ body.overlay.scroll::-webkit-scrollbar-thumb { background: #3a404c; border-radiu
 .tw-report-toggle { display: block; margin-top: 4px; color: var(--muted); }
 .tw-report { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
 .tw-report textarea { width: 100%; box-sizing: border-box; resize: vertical; font: inherit; font-size: 12.5px; }
+/* Wealth: scan profiles. */
+.w-profiles { margin: 4px 0 10px; }
+.w-prof-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.w-prof { font-size: 12.5px; padding: 3px 10px; border-radius: 14px; border: 1px solid var(--line); background: transparent; color: var(--text-2); cursor: pointer; }
+.w-prof:hover { color: #fff; border-color: #555c6a; }
+.w-prof.on { border-color: var(--gold); color: var(--gold); background: rgba(240,200,90,0.08); }
+.w-prof-edit { margin-top: 8px; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.03); border: 1px solid var(--line); }
+.danger-text { color: #ff9090 !important; }

@@ -4,7 +4,7 @@
 //! overlay showing chaos / divines per hour.
 
 use super::*;
-use filter_core::wealth::{self, Session, Snapshot, Tab, Valued, WealthStore};
+use filter_core::wealth::{self, ScanProfile, Session, Snapshot, Tab, Valued, WealthStore};
 
 fn store_path(state: &AppState) -> PathBuf { state.data_dir.join("wealth.json") }
 
@@ -86,6 +86,8 @@ pub struct WealthView {
     sessions: Vec<Session>,
     current: Option<Session>,
     strategies: Vec<(String, usize, f64, f64)>,
+    profiles: Vec<ScanProfile>,
+    active: Option<String>,
     divine: Option<f64>,
     now: u64,
 }
@@ -100,6 +102,7 @@ fn view(app: &AppHandle) -> WealthView {
         tracked: s.wealth_tabs, min: s.wealth_min, minutes: s.earn_minutes.max(1),
         strategies: wealth::by_strategy(&st.sessions),
         tabs: st.tabs, snapshots: st.snapshots, missed: st.missed, sessions: st.sessions, current: st.current,
+        profiles: st.profiles, active: st.active,
         divine: divine(app), now: now(),
     }
 }
@@ -145,16 +148,70 @@ pub fn wealth_prefs(app: AppHandle, tracked: Vec<usize>, min: f64, minutes: u32)
 #[tauri::command]
 pub async fn wealth_scan(app: AppHandle) -> Result<WealthView, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let valued = scan(&app, None)?;
         let state = app.state::<AppState>();
+        // The profile in use: only its tabs (None = the whole stash).
+        let (name, tabs) = with_store(&state, |s| {
+            let p = s.active.as_ref().and_then(|a| s.profiles.iter().find(|p| &p.name == a));
+            (p.map(|p| p.name.clone()).unwrap_or_default(), p.map(|p| p.tabs.clone()))
+        });
+        if tabs.as_ref().is_some_and(|t| t.is_empty()) { return Err(format!("Tick some tabs for \"{name}\" first")); }
+        let valued = scan(&app, tabs.as_deref())?;
         let (_, league) = trade_league(&app);
         let min = state.store.lock().unwrap().settings.wealth_min;
-        let snap = wealth::snapshot(now(), &league, divine(&app), &valued);
+        let mut snap = wealth::snapshot(now(), &league, divine(&app), &valued);
+        snap.profile = name;
         with_store(&state, |s| { s.add_snapshot(snap); s.missed = wealth::missed(&valued, min); });
         Ok(view(&app))
     }).await.map_err(err)?
 }
 
+
+/// Saves a scan profile (a named set of tabs); `old` renames an existing one. The saved one becomes the one in use.
+#[tauri::command]
+pub fn wealth_profile_save(app: AppHandle, name: String, tabs: Vec<usize>, old: Option<String>) -> Result<WealthView, String> {
+    let name = name.trim().to_string();
+    if name.is_empty() { return Err("Give the profile a name".into()); }
+    let state = app.state::<AppState>();
+    with_store(&state, |s| {
+        let from = old.unwrap_or_else(|| name.clone());
+        s.profiles.retain(|p| p.name != from && p.name != name);
+        // Its history follows a rename.
+        for snap in s.snapshots.iter_mut().filter(|x| x.profile == from) { snap.profile = name.clone(); }
+        s.profiles.push(ScanProfile { name: name.clone(), tabs });
+        s.active = Some(name);
+    });
+    Ok(view(&app))
+}
+
+#[tauri::command]
+pub fn wealth_profile_delete(app: AppHandle, name: String) -> WealthView {
+    let state = app.state::<AppState>();
+    with_store(&state, |s| {
+        s.profiles.retain(|p| p.name != name);
+        if s.active.as_deref() == Some(&name) { s.active = None; }
+    });
+    view(&app)
+}
+
+/// Picks the profile to scan (None = the whole stash).
+#[tauri::command]
+pub fn wealth_profile_use(app: AppHandle, name: Option<String>) -> WealthView {
+    let state = app.state::<AppState>();
+    with_store(&state, |s| s.active = name.filter(|n| s.profiles.iter().any(|p| &p.name == n)));
+    view(&app)
+}
+
+/// Reads the tab list again (after adding, renaming or moving tabs in game).
+#[tauri::command]
+pub async fn wealth_tabs_refresh(app: AppHandle) -> Result<WealthView, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let (account, sessid, league, poe2) = who(&app)?;
+        let tabs = wealth::tabs_from_json(&trade_api::stash_tab(&account, &sessid, &league, poe2, 0, true)?);
+        let state = app.state::<AppState>();
+        with_store(&state, |s| s.tabs = tabs);
+        Ok(view(&app))
+    }).await.map_err(err)?
+}
 /// Starts an earnings session for a strategy: values your tracked tabs now.
 #[tauri::command]
 pub async fn session_start(app: AppHandle, name: String) -> Result<WealthView, String> {
