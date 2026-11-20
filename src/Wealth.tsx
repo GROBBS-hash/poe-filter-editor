@@ -1,3 +1,4 @@
+import { friendly } from "./errors";
 import { PageLoading } from "./Loading";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -199,7 +200,7 @@ function Profiles({ v, setV, setErr, busy }: { v: WealthView; setV: (w: WealthVi
           <div className="row">
             <input className="text" autoFocus value={edit[0]} placeholder="Profile name, e.g. Dump tabs" onChange={(e) => setEdit([e.target.value, edit[1], edit[2]])} />
             <button className="link small" disabled={refreshing} onClick={() => { setRefreshing(true);
-              invoke<WealthView>("wealth_tabs_refresh").then(setV).catch((e) => setErr(String(e))).finally(() => setRefreshing(false)); }}>
+              invoke<WealthView>("wealth_tabs_refresh").then(setV).catch((e) => setErr(friendly(e))).finally(() => setRefreshing(false)); }}>
               {refreshing ? "Reading tabs…" : "Refresh tab list"}</button>
           </div>
           <p className="muted small">Tick the tabs this profile scans. Its worth and history are kept apart from the whole stash's.</p>
@@ -214,7 +215,7 @@ function Profiles({ v, setV, setErr, busy }: { v: WealthView; setV: (w: WealthVi
           </div>
           <div className="row">
             <button className="primary" disabled={!edit[0].trim() || edit[1].length === 0}
-              onClick={() => call("wealth_profile_save", { name: edit[0], tabs: edit[1], old: edit[2] }).then(() => setEdit(null)).catch((e) => setErr(String(e)))}>
+              onClick={() => call("wealth_profile_save", { name: edit[0], tabs: edit[1], old: edit[2] }).then(() => setEdit(null)).catch((e) => setErr(friendly(e)))}>
               Save profile</button>
             <button className="link small" onClick={() => setEdit(null)}>Cancel</button>
             {edit[2] && <button className="link small danger-text" onClick={() => call("wealth_profile_delete", { name: edit[2] }).then(() => setEdit(null))}>Delete profile</button>}
@@ -239,7 +240,7 @@ export default function Wealth() {
   const [showSetup, setShowSetup] = useState(false);
 
   useEffect(() => {
-    invoke<WealthView>("wealth_get").then((w) => { setV(w); setAccount(w.account); }).catch((e) => setErr(String(e)));
+    invoke<WealthView>("wealth_get").then((w) => { setV(w); setAccount(w.account); }).catch((e) => setErr(friendly(e)));
     const a = listen<[number, number, string]>("wealth-progress", (e) => setProgress(e.payload));
     const b = listen<WealthView>("earn-update", (e) => setV(e.payload));
     const c = listen<string>("earn-error", (e) => setErr(e.payload));
@@ -249,13 +250,13 @@ export default function Wealth() {
 
   const run = async (label: string, cmd: string, args: Record<string, unknown> = {}) => {
     setBusy(label); setErr(""); setProgress(null);
-    try { setV(await invoke<WealthView>(cmd, args)); } catch (e) { setErr(String(e)); }
+    try { setV(await invoke<WealthView>(cmd, args)); } catch (e) { setErr(friendly(e)); }
     setBusy(""); setProgress(null);
   };
   const prefs = (p: Partial<{ tracked: number[]; min: number; minutes: number }>) => {
     if (!v) return;
     invoke<WealthView>("wealth_prefs", { tracked: p.tracked ?? v.tracked, min: p.min ?? v.min, minutes: p.minutes ?? v.minutes })
-      .then(setV).catch((e) => setErr(String(e)));
+      .then(setV).catch((e) => setErr(friendly(e)));
   };
   const names = useMemo(() => [...new Set((v?.sessions ?? []).map((s) => s.name))], [v]);
 
@@ -353,7 +354,7 @@ export default function Wealth() {
           {(v.rares ?? 0) > 0 && (
             <label className="row small" title="Rare prices are rough guesses from similar items for sale. Unticked, they stay out of your worth, tabs and earnings, but still show in Worth selling and Find in stash.">
               <input type="checkbox" checked={v.count_rares ?? true} disabled={!!busy}
-                onChange={(e) => invoke<WealthView>("wealth_count_rares", { count: e.target.checked }).then(setV).catch((x) => setErr(String(x)))} />
+                onChange={(e) => invoke<WealthView>("wealth_count_rares", { count: e.target.checked }).then(setV).catch((x) => setErr(friendly(x)))} />
               Count rares in my worth</label>
           )}
           {busy === "rares" && progress && <div className="w-bar"><div style={{ width: `${(progress[0] / Math.max(1, progress[1])) * 100}%` }} /></div>}

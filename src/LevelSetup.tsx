@@ -1,3 +1,4 @@
+import { friendly } from "./errors";
 import { useEffect, useState } from "react";
 import { Tip } from "./Help";
 import { invoke } from "@tauri-apps/api/core";
@@ -29,7 +30,7 @@ export default function LevelSetup({ onDone }: { onDone: (msg: string) => void }
     } else {
       setO({ ...DEFAULT, armour_types: s.armour_types.map((a) => a[0]) });
     }
-  }).catch((e) => setErr(String(e)));
+  }).catch((e) => setErr(friendly(e)));
   useEffect(() => { load(); }, []);
   if (!st) return null;
 
@@ -51,7 +52,7 @@ export default function LevelSetup({ onDone }: { onDone: (msg: string) => void }
       await load();
       onDone(off ? "Levelling setup turned off. Press F4 in game."
         : "Levelling setup applied: your picks stand out until maps, everything else is hidden. Press F4 in game.");
-    } catch (e) { setErr(String(e)); }
+    } catch (e) { setErr(friendly(e)); }
   };
 
   return (

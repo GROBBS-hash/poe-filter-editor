@@ -1,3 +1,4 @@
+import { friendly } from "./errors";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
@@ -45,6 +46,32 @@ function Price({ n, cur }: { n: number; cur: string }) {
   return <span className="tw-pr">{v}{["chaos", "divine"].includes(cur) ? <CurrencyIcon id={cur} /> : <> {UNIT[cur] ?? cur}</>}</span>;
 }
 
+/** A number that counts up to its value (a quarter second) when it first shows or changes: the big price arriving. */
+function useCountUp(target: number, ms = 280) {
+  const [v, setV] = useState(target);
+  const from = useRef(0);
+  useEffect(() => {
+    const start = performance.now(), a = from.current;
+    let raf = 0;
+    const step = (t: number) => {
+      const k = Math.min(1, (t - start) / ms);
+      const e = 1 - Math.pow(1 - k, 3);
+      setV(a + (target - a) * e);
+      if (k < 1) raf = requestAnimationFrame(step); else from.current = target;
+    };
+    raf = requestAnimationFrame(step);
+    return () => { cancelAnimationFrame(raf); from.current = target; };
+  }, [target, ms]);
+  return v;
+}
+
+function CountPrice({ n, cur }: { n: number; cur: string }) {
+  return <Price n={useCountUp(n)} cur={cur} />;
+}
+
+/** A small turning ring while something loads. */
+export function Spinner() { return <span className="spin" aria-hidden="true" />; }
+
 /** The same price in the other currency: chaos -> divine, divine -> chaos. */
 function Other({ n, cur, divine }: { n: number; cur: string; divine: number | null }) {
   if (!divine) return null;
@@ -76,7 +103,7 @@ type Saved = { id: number; name: string; live: boolean; setup: Setup };
 /** Saved searches: run again, or turn on live (pops up new listings while you play). */
 function SavedPanel({ list, setList, onRun }: { list: Saved[]; setList: (l: Saved[]) => void; onRun: (s: Saved) => void }) {
   const [err, setErr] = useState("");
-  const call = (cmd: string, args: Record<string, unknown>) => invoke<Saved[]>(cmd, args).then((l) => { setList(l); setErr(""); }).catch((e) => setErr(String(e)));
+  const call = (cmd: string, args: Record<string, unknown>) => invoke<Saved[]>(cmd, args).then((l) => { setList(l); setErr(""); }).catch((e) => setErr(friendly(e)));
   if (list.length === 0) return <div className="muted small tw-saved">No saved searches yet: price check an item, then press Save search.</div>;
   return (
     <div className="tw-saved">
@@ -275,7 +302,7 @@ function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote, waiting, st
         </div>
       ) : main != null && big != null ? (
         <div className="tw-hero-main">
-          <span className="tw-hero-price" title={source || undefined}>{showDiv ? <Price n={big / divine!} cur="divine" /> : <Price n={big} cur="chaos" />}</span>
+          <span className="tw-hero-price" title={source || undefined}>{showDiv ? <CountPrice n={big / divine!} cur="divine" /> : <CountPrice n={big} cur="chaos" />}</span>
           <span className="tw-hero-side">
             <span className="tw-hero-label">{label}</span>
             {divine && <span className="muted">{showDiv ? <>= <Price n={big} cur="chaos" /></> : big / divine >= 0.01 ? <>= <Price n={big / divine} cur="divine" /></> : null}</span>}
@@ -283,7 +310,7 @@ function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote, waiting, st
         </div>
       ) : (
         <div className="tw-hero-main"><span className="tw-hero-label">
-          {busy ? "Checking the trade site…" : res && res.total === 0 ? "None listed like this: untick a stat or two" : res ? `${res.total} listed, none priced` : err ? "No trade price" : waiting ?? "No price yet"}</span></div>
+          {busy ? <><Spinner /> Checking the trade site…</> : res && res.total === 0 ? "None listed like this: untick a stat or two" : res ? `${res.total} listed, none priced` : err ? "No trade price" : waiting ?? "No price yet"}</span></div>
       )}
       {perDiv != null && name && (
         <div className="tw-perdiv">{perDiv >= 1
@@ -292,7 +319,7 @@ function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote, waiting, st
       )}
       <div className="tw-hero-foot muted small">
         {sub}
-        {busy && main != null && <span className="tw-hero-busy"> · checking trade…</span>}
+        {busy && main != null && <span className="tw-hero-busy"> · <Spinner /> checking trade…</span>}
         {res?.summary && ninjaChaos != null && <span> · poe.ninja {money(ninjaChaos, divine)}</span>}
       </div>
     </div>
@@ -390,20 +417,20 @@ export default function TradeWindow() {
         if (d && d.offers.length) { b = d; setPay("divine"); }
       }
       setBulk(b);
-    } catch (e) { setErr(String(e)); }
+    } catch (e) { setErr(friendly(e)); }
     setBusy(false);
   }, []);
 
   const run = useCallback(async (s: Setup) => {
     setBusy(true); setErr(""); setRes(null); setUntick(null); setSearched(searchKey(s));
-    try { setRes(await invoke<Result>("trade_search", { setup: s })); } catch (e) { setErr(String(e)); }
+    try { setRes(await invoke<Result>("trade_search", { setup: s })); } catch (e) { setErr(friendly(e)); }
     setBusy(false);
   }, []);
 
   useEffect(() => {
     const a = listen<Check>("price-check", (e) => {
       const c = e.payload;
-      setCheck(c); setSetup(c.setup); setRes(null); setSearched(null); setBulk(null); setErr(c.error ?? ""); setCopied(null); setPay("chaos"); setMinStock(false); setShowFixers(false);
+      setCheck(c); setSetup(c.setup); setRes(null); setSearched(null); setBulk(null); setErr(c.error ? friendly(c.error) : ""); setCopied(null); setPay("chaos"); setMinStock(false); setShowFixers(false);
       setSaving(null); setShowSaved(!c.setup); setPreset(null); setMapMods(false); setReporting(null); setReported(""); setAsBase(false); setOwnSetup(null); setUntick(null); window.scrollTo(0, 0);
       invoke<Saved[]>("saved_list").then(setSaved).catch(() => {});
       if (c.bulk) {
@@ -610,11 +637,11 @@ export default function TradeWindow() {
             // Hover to search, like Awakened, but only when coming from inside the window (not when it opens under the mouse).
             const from = e.relatedTarget as Node | null;
             if (!busy && !res && from && box.current?.contains(from)) run(setup);
-          }}>{busy ? "Searching…" : searched ? "Search again" : "Search trade"}</button>
+          }}>{busy ? <><Spinner /> Searching…</> : searched ? "Search again" : "Search trade"}</button>
       </div>}
       {saving != null && (
         <form className="tw-save" onSubmit={(e) => { e.preventDefault();
-          invoke<Saved[]>("saved_add", { name: saving, setup }).then((l) => { setSaved(l); setSaving(null); setShowSaved(true); }).catch((er) => setErr(String(er))); }}>
+          invoke<Saved[]>("saved_add", { name: saving, setup }).then((l) => { setSaved(l); setSaving(null); setShowSaved(true); }).catch((er) => setErr(friendly(er))); }}>
           <input className="text" autoFocus value={saving} onChange={(e) => setSaving(e.target.value)} placeholder="Name this search" />
           <button type="submit">Save</button>
         </form>
@@ -698,7 +725,7 @@ export default function TradeWindow() {
       ) : (
         <form className="tw-report" onSubmit={(e) => { e.preventDefault();
           invoke<string>("report_problem", { note: reporting, data: { check, setup, res, bulk, err } })
-            .then(() => { setReporting(null); setReported("ok"); }).catch((er) => setErr(String(er))); }}>
+            .then(() => { setReporting(null); setReported("ok"); }).catch((er) => setErr(friendly(er))); }}>
           <textarea className="text" autoFocus rows={2} value={reporting} onChange={(e) => setReporting(e.target.value)}
             placeholder="What looks wrong? e.g. price too high, wrong mod ticked" />
           <div className="row"><button type="submit">Save for Claude</button>

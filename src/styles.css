@@ -1358,3 +1358,25 @@ li:hover > .bv-item .bv-price { opacity: 1; }
 .bv-othergems { display: flex; flex-direction: column; gap: 6px; padding: 2px 2px 8px; cursor: default; list-style: none; }
 li.bv-newgems { list-style: none; margin: 0 0 8px; }
 .bv-gear li.got .bv-ingems { opacity: .6; }
+
+/* ---- Polish 1 (21 Nov): windows over the game ---- */
+/* One frame for every window over the game: same glass, edge, corners and depth. */
+.qm, .bo {
+  background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,0) 120px), rgba(17,20,25,.97);
+  border: 1px solid #3a4352; border-radius: 14px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 14px 36px rgba(0,0,0,.5);
+}
+/* A thin gold line along the top edge: the editor's mark on every pop-up. */
+.qm { position: relative; }
+.qm::before { content: ""; position: absolute; left: 16px; right: 16px; top: 0; height: 2px; border-radius: 0 0 2px 2px;
+  background: linear-gradient(90deg, transparent, rgba(220,178,90,.75), transparent); pointer-events: none; }
+/* Appearing: a quick fade and settle (a quarter second, never in the way). */
+#root.pop-in > * { animation: pop-in .16s cubic-bezier(.2,.8,.2,1); }
+@keyframes pop-in { from { opacity: 0; transform: translateY(6px) scale(.985); } to { opacity: 1; transform: none; } }
+/* Loading ring. */
+.spin { display: inline-block; width: .9em; height: .9em; margin-right: .35em; vertical-align: -.12em; border-radius: 50%;
+  border: 2px solid rgba(220,178,90,.25); border-top-color: var(--gold); animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+/* Errors: calm amber note, not a wall of red. */
+.qm-warn { border-radius: 8px; line-height: 1.45; }
+@media (prefers-reduced-motion: reduce) { #root.pop-in > *, .spin { animation: none; } }

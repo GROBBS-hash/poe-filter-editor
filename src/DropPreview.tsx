@@ -1,3 +1,4 @@
+import { friendly } from "./errors";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ProfileInfo, Item } from "./types";
@@ -21,7 +22,7 @@ export default function DropPreview({ profile, theme }: { profile: ProfileInfo; 
     setErr("");
     invoke<{ drops: Drop[]; area_level: number }>("preview_drops", {
       id: profile.id, theme: theme === undefined ? null : theme ?? "", areaLevel: area,
-    }).then(setData).catch((e) => setErr(String(e)));
+    }).then(setData).catch((e) => setErr(friendly(e)));
   }, [profile, theme, area]);
 
   if (err) return <div className="note">{err}</div>;

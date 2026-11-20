@@ -1,3 +1,4 @@
+import { friendly } from "./errors";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import Help from "./Help";
 import ErrorBoundary from "./ErrorBoundary";
@@ -100,7 +101,7 @@ function UpdateBar() {
       <span><b>Version {u.version} is ready</b> <span className="muted small">(you have {u.current})</span>
         {u.notes && <span className="muted small"> · {u.notes}</span>}</span>
       <button className="primary" disabled={busy} onClick={() => { setBusy(true); setErr("");
-        invoke("update_install").catch((e) => { setErr(String(e)); setBusy(false); }); }}>
+        invoke("update_install").catch((e) => { setErr(friendly(e)); setBusy(false); }); }}>
         {busy ? "Updating…" : "Restart to update"}</button>
       {err && <span className="danger-text small">{err}</span>}
     </div>

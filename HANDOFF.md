@@ -292,6 +292,11 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   `BuildView.tsx` (F6 + My build): a tick per item, key `slot|name|base`, in localStorage `build.have` (shared by both
   windows via the storage event), "Have N of M" bar with "hide what I have" (`build.hideHave`).
 
+- Polish 1, 21 Nov (0.2.4, windows over the game): one frame for every pop-up (.qm and .bo share glass, edge, shadow;
+  thin gold line on .qm), fade-and-settle each time a window appears (main.tsx: visibilitychange + price-check /
+  item-picked / build-shown re-trigger #root.pop-in), Spinner + counting big price (useCountUp) in the price window,
+  plain-English errors everywhere (src/errors.ts friendly(): trade 400/5xx, no internet, odd replies).
+
 - Gear and gems 21 Nov (0.2.3, his pick of 3 mock-ups): the Gems tab is gone; Gear shows each item's sockets
   (`SocketStrip`, from its "Sockets: R-G-B B" line) and the gem groups whose PoB slot is that item under it; groups
   with no slot or a slot this stage has no item for (e.g. "Weapon 1 Swap") go under "Other gems". "New gems this
@@ -487,6 +492,10 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 
 - [ ] Ctrl+D on a timeless jewel (Brutal Restraint): seed line ticked, prices for that exact seed; "any conqueror" row works.
 - [ ] Price window: "This week" line with ▲/▼ % under the price for currency, cards, uniques… (after the price file updates).
+
+**Polish (21 Nov)**
+- [ ] 0.2.4: pop-ups (Ctrl+D, F2, F6, F7, trades) fade in quickly and share one look; price window shows a spinner
+      while it checks and the big price counts up; errors read in plain English.
 
 **Installer (21 Nov, release 0.2.0)**
 - [x] (21 Nov: installed, "everything's there".) Still check: hotkeys work in game with the installed editor.

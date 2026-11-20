@@ -1,3 +1,4 @@
+import { friendly } from "./errors";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CurrencyIcon } from "./icons";
@@ -31,7 +32,7 @@ export default function Maps() {
   const [tradeErr, setTradeErr] = useState("");
   const loaded = useRef(false);
 
-  useEffect(() => { invoke<ToolState>("map_tool_get").then(setSt).catch((e) => setErr(String(e))); }, []);
+  useEffect(() => { invoke<ToolState>("map_tool_get").then(setSt).catch((e) => setErr(friendly(e))); }, []);
 
   // Every change: rebuild the regex and keep the choices.
   useEffect(() => {

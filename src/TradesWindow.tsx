@@ -1,3 +1,4 @@
+import { friendly } from "./errors";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
@@ -66,13 +67,13 @@ export default function TradesWindow() {
       await invoke("trade_action", { action, name: x.w.from });
       if (action === "kick") remove(x.id);
       else setList((l) => l.map((y) => (y.id === x.id ? { ...y, pressed: [...y.pressed, action] } : y)));
-    } catch (e) { setErr(String(e)); }
+    } catch (e) { setErr(friendly(e)); }
   };
 
   const whisper = async (h: Hit, i: number) => {
     setErr("");
     try { await invoke("send_whisper", { text: h.listings[i].whisper }); setHits((hs) => hs.map((y) => (y.id === h.id ? { ...y, sent: [...y.sent, i] } : y))); }
-    catch (e) { setErr(String(e)); }
+    catch (e) { setErr(friendly(e)); }
   };
 
   if (list.length === 0 && hits.length === 0) return null;
