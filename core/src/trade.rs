@@ -63,6 +63,9 @@ pub struct TradeSetup {
     /// Same base only (otherwise any base of that kind, e.g. any helmet).
     pub base_only: bool,
     pub ilvl_min: Option<u32>,
+    /// Top of the item-level band (see `ilvl_band`); None = no upper limit.
+    #[serde(default)]
+    pub ilvl_max: Option<u32>,
     pub links_min: Option<u32>,
     pub gem_level: Option<u32>,
     /// Mods the trade site's list doesn't know (shown, not searched).
@@ -334,6 +337,7 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
         category: category(&item.item_class).map(String::from),
         base_only: !matches!(item.rarity.as_str(), "Rare" | "Magic") || !gear || nothing_picked,
         ilvl_min: (gear && nothing_picked && item.rarity != "Unique").then_some(item.item_level).flatten(),
+        ilvl_max: (gear && nothing_picked && item.rarity != "Unique").then_some(item.item_level).flatten().and_then(|l| ilvl_band(l).1),
         links_min: (links >= 5).then_some(links),
         gem_level,
         filters, unknown, unknown_kinds, item, raw: text.to_string(),
@@ -345,6 +349,15 @@ fn is_map(it: &Item) -> bool { it.item_class == "Maps" }
 /// The map's tier: from "Map Tier: 16", or from the name "Map (Tier 2)".
 fn map_tier_of(it: &Item) -> Option<u32> {
     it.map_tier.or_else(|| it.base_type.split("(Tier ").nth(1)?.trim_end_matches(')').trim().parse().ok())
+}
+
+/// Item-level bands where base prices jump (better mod tiers unlock at 75, 82, 84 and 86): a base is
+/// compared with others in its own band, e.g. 73 -> 68..=74, 84 -> 84..=85, 86 -> 86 and up (None).
+pub fn ilvl_band(ilvl: u32) -> (u32, Option<u32>) {
+    match ilvl {
+        0..=67 => (1, Some(67)), 68..=74 => (68, Some(74)), 75..=81 => (75, Some(81)),
+        82..=83 => (82, Some(83)), 84..=85 => (84, Some(85)), _ => (86, None),
+    }
 }
 
 /// The search to send to the trade site.
@@ -374,6 +387,7 @@ pub fn query(s: &TradeSetup) -> Value {
     if type_f.as_object().map(|o| !o.is_empty()).unwrap_or(false) { filters["type_filters"] = json!({ "filters": type_f }); }
     let mut misc = json!({});
     if let Some(n) = s.ilvl_min { misc["ilvl"] = json!({ "min": n }); }
+    if let (Some(_), Some(m)) = (s.ilvl_min, s.ilvl_max) { misc["ilvl"]["max"] = json!(m); }
     if it.unidentified && it.rarity != "Unique" { misc["identified"] = json!({ "option": "false" }); }
     if let Some(n) = s.gem_level { misc["gem_level"] = json!({ "min": n }); }
     if foulborn { misc["mutated"] = json!({ "option": "true" }); }

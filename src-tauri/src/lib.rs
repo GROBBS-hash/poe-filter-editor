@@ -537,7 +537,7 @@ fn price_check(app: AppHandle) {
                 Ok(p) => {
                     let item = p.item;
                     let category = filter_core::trade::category(&item.item_class).map(String::from);
-                    let s = filter_core::trade::TradeSetup { item: item.clone(), filters: vec![], base_only: true, ilvl_min: None,
+                    let s = filter_core::trade::TradeSetup { item: item.clone(), filters: vec![], base_only: true, ilvl_min: None, ilvl_max: None,
                         links_min: None, gem_level: None, unknown: vec![], unknown_kinds: vec![], category, raw: String::new() };
                     PriceCheck { ninja: ninja_price(&app, &item), setup: Some(s), league, from_ground: true, error: None, bulk: None, map: None, divine: None, compare: vec![] }
                 }

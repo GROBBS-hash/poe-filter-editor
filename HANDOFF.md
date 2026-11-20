@@ -138,6 +138,8 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 - Fractured items 20 Nov: fractured mods keep their own row even when a total or the 20%-quality defence counts
   them (unticked then). "Fractured item" box searches base + ilvl+ + only fractured mods (Awakened-style). `StatIndex::find`
   now falls back to "… (Local)" stats (e.g. local % ES on armour). Live: his Fossilised Spirit Shield → 6 listed.
+  Item-level bands (`ilvl_band` / `ilvlBand`): 1–67, 68–74, 75–81, 82–83, 84–85, 86+; base searches use the item's
+  level up to its band top (`TradeSetup.ilvl_max`). Fractured box is one row: "Fractured · Price as base · ilvl 73–74".
 
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
