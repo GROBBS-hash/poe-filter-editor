@@ -17,8 +17,9 @@ import Gear from "./Gear";
 import MyBuild from "./MyBuild";
 import Maps from "./Maps";
 import Wealth from "./Wealth";
+import Atlas from "./Atlas";
 
-type Tab = "help" | "find" | "presets" | "tiers" | "gear" | "build" | "maps" | "wealth" | "edits" | "prices" | "themes" | "batch" | "profiles" | "settings";
+type Tab = "help" | "find" | "presets" | "tiers" | "gear" | "build" | "maps" | "atlas" | "wealth" | "edits" | "prices" | "themes" | "batch" | "profiles" | "settings";
 
 /** Small line icons for the side menu. */
 const ICONS: Record<Tab, string> = {
@@ -32,6 +33,7 @@ const ICONS: Record<Tab, string> = {
   gear: "M14 3l7 7-9 9-3-3-4 4-2-2 4-4-3-3 9-9zM14 3l-2 6 3 3 6-2",
   build: "M12 3v4M12 17v4M3 12h4M17 12h4M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8",
   maps: "M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14",
+  atlas: "M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 3v18M4 7.5l8 4.5 8-4.5",
   wealth: "M4 7h16v12H4zM4 7l2-3h12l2 3M9 12h6",
   profiles: "M3 7h6l2 2h10v10H3zM3 7v12",
   settings: "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM19.4 15l1.6 1-2 3.4-1.8-.7a7 7 0 0 1-2 1.2L15 22h-4l-.3-2.1a7 7 0 0 1-2-1.2l-1.8.7-2-3.4 1.6-1a7 7 0 0 1 0-2.4l-1.6-1 2-3.4 1.8.7a7 7 0 0 1 2-1.2L11 2h4l.3 2.1a7 7 0 0 1 2 1.2l1.8-.7 2 3.4-1.6 1a7 7 0 0 1 0 2.4z",
@@ -56,6 +58,7 @@ const MENU: { group: string; items: { id: Tab; name: string; hint: string }[] }[
   ] },
   { group: "Endgame", items: [
     { id: "maps", name: "Maps", hint: "Map regex for your stash, and buy maps you can run" },
+    { id: "atlas", name: "Atlas", hint: "Atlas strategies from maxroll or pathofexile.com, in game with F7" },
     { id: "wealth", name: "Wealth", hint: "Stash worth, things worth selling, earnings per strategy" },
   ] },
   { group: "App", items: [
@@ -150,6 +153,7 @@ export default function App() {
       {tab === "gear" && <Gear />}
       {tab === "build" && <MyBuild />}
       {tab === "maps" && <Maps />}
+      {tab === "atlas" && <Atlas />}
       {tab === "wealth" && <Wealth />}
       {tab === "tiers" && <Tiers profile={active} onChange={refresh} focus={focus?.kind === "neversink" ? focus : null} />}
       {tab === "presets" && <Find key="presets" view="presets" onChange={refresh} />}

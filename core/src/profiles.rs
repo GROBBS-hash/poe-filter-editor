@@ -92,6 +92,8 @@ pub struct Settings {
     pub price_compare: bool,
     /// Ctrl+D: show where each mod rolled in its range (low / high roll).
     pub price_rolls: bool,
+    /// Show/hide the atlas strategy window over the game.
+    pub key_atlas: String,
     /// Open the build window on its Tree tab when the game's passive tree key is pressed (and close it again).
     pub build_with_tree: bool,
     /// The game's passive skill tree key (P unless changed in the game's options).
@@ -113,7 +115,7 @@ impl Default for Settings {
             key_price: "Ctrl+D".into(), map_avoid: None,
             trade_helper: true, thanks_message: "thanks, good luck!".into(), chat_keys: vec![], map_tool: Default::default(),
             poe_account: String::new(), poesessid: String::new(), wealth_tabs: vec![], wealth_min: 10.0, earn_minutes: 3,
-            price_compare: true, price_rolls: true, build_with_tree: false, key_tree: "P".into() }
+            price_compare: true, price_rolls: true, build_with_tree: false, key_tree: "P".into(), key_atlas: "F7".into() }
     }
 }
 

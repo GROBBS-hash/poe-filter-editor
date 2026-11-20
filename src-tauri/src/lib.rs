@@ -2,6 +2,7 @@
 mod screen;
 mod trade_api;
 mod wealth_app;
+mod atlas_app;
 
 use filter_core::{
     evaluate::{status_with_fallback, Status},
@@ -53,7 +54,7 @@ struct AppState {
 }
 
 #[derive(Clone, Copy, PartialEq)]
-enum HotAction { QuickEdit, Batch, Reload, Cycle, Build, Price, Chat(usize) }
+enum HotAction { QuickEdit, Batch, Reload, Cycle, Build, Price, Atlas, Chat(usize) }
 
 /// (Re)registers hotkeys from settings. Errors name the key that failed.
 fn register_hotkeys(app: &AppHandle, s: &Settings) -> Result<(), String> {
@@ -64,10 +65,17 @@ fn register_hotkeys(app: &AppHandle, s: &Settings) -> Result<(), String> {
     for (i, c) in s.chat_keys.iter().enumerate() {
         if !c.key.trim().is_empty() && !c.command.trim().is_empty() { wanted.push((c.key.as_str(), HotAction::Chat(i))); }
     }
+    // Last, so a clash skips the atlas key and keeps the older ones.
+    if !s.key_atlas.trim().is_empty() { wanted.push((s.key_atlas.as_str(), HotAction::Atlas)); }
     let mut parsed = Vec::new();
     for (key, action) in wanted {
         let sc: Shortcut = key.parse().map_err(|_| format!("“{key}” isn't a key the app understands"))?;
         if parsed.iter().any(|(p, _): &(Shortcut, HotAction)| p.id() == sc.id()) {
+            // The atlas key is new: if it clashes with one he already uses, skip it rather than lose his other keys.
+            if action == HotAction::Atlas {
+                let _ = app.emit("hotkey-warning", format!("The atlas strategy key “{key}” is already used for something else: pick another in Settings"));
+                continue;
+            }
             return Err(format!("“{key}” is used for two things"));
         }
         parsed.push((sc, action));
@@ -83,6 +91,9 @@ fn register_hotkeys(app: &AppHandle, s: &Settings) -> Result<(), String> {
             // Another price checker (e.g. Awakened PoE Trade) may own Ctrl+D: carry on without it.
             Err(e) if action == HotAction::Price => {
                 let _ = app.emit("hotkey-warning", format!("Price check key unavailable (another program may own it): {e}"));
+            }
+            Err(e) if action == HotAction::Atlas => {
+                let _ = app.emit("hotkey-warning", format!("Atlas strategy key unavailable (another program may own it): {e}"));
             }
             Err(e) if matches!(action, HotAction::Chat(_)) => {
                 let _ = app.emit("hotkey-warning", format!("A chat hotkey is unavailable (another program may own it): {e}"));
@@ -2143,7 +2154,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         // Remembers the main window's size and position between runs (the pop-ups place themselves).
         .plugin(tauri_plugin_window_state::Builder::default()
-            .with_denylist(&["overlay", "build", "trade", "trades", "earnings"]).build())
+            .with_denylist(&["overlay", "build", "trade", "trades", "earnings", "atlas"]).build())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(move |app, sc, ev| {
@@ -2175,6 +2186,8 @@ pub fn run() {
                                 if let Err(e) = type_in_chat(&cmd, 0) { let _ = app.emit("reload-failed", e); }
                             });
                         }
+                    } else if action == Some(HotAction::Atlas) {
+                        atlas_app::toggle_atlas_window(app);
                     } else if action == Some(HotAction::Build) {
                         toggle_build_window(app);
                     } else if action == Some(HotAction::Batch) {
@@ -2279,6 +2292,8 @@ pub fn run() {
             pob_follow_now,
             pob_set_follow,
             hide_build_window,
+            atlas_app::atlas_list, atlas_app::atlas_import, atlas_app::atlas_rename, atlas_app::atlas_delete, atlas_app::atlas_use,
+            atlas_app::atlas_own_notes, atlas_app::atlas_official_link, atlas_app::hide_atlas_window,
             open_rule,
             gear_picks,
             open_url,

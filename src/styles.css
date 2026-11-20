@@ -987,3 +987,53 @@ button:focus-visible, select:focus-visible, .text:focus-visible, input:focus-vis
 .buildview.compact .tv-tools input { flex-basis: 300px; font-size: 13px; padding: 6px 10px; }
 .buildview.compact .tv-legend { font-size: 13px; }
 .buildview.compact .tv-svg { border-radius: 12px; border-color: #2a3240; }
+
+/* Atlas strategies (Endgame → Atlas page and the F7 window over the game). */
+.atv-labels text { fill: rgba(170,180,200,.11); font-weight: 700; letter-spacing: .04em; pointer-events: none; text-transform: uppercase; }
+.atv-names text { fill: var(--gold); font-weight: 600; pointer-events: none; paint-order: stroke; stroke: #050506; stroke-width: 18px; }
+.atv-names text.k2 { fill: #ffe1a0; }
+.atlas-tv .tv-nodes circle.k4 { stroke: #6a8ac0; }
+.atlas-tv .tv-nodes circle.k5 { fill: var(--gold); stroke: #fff1c4; }
+.atv-majors { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.atv-major { font-size: 12.5px; padding: 3px 9px; border-radius: 999px; background: var(--raised); border: 1px solid var(--line); color: var(--text-2); }
+.atv-major.k2 { border-color: rgba(220,178,90,.55); color: var(--gold); background: var(--gold-bg); }
+.atv-pick { color: #9db8ff; }
+.atlas-tv.compact .atv-majors { max-height: 72px; overflow-y: auto; }
+.at-msg { margin-top: 4px; color: var(--text-2); }
+.at-list { display: flex; flex-direction: column; gap: 6px; }
+.at-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--raised); cursor: pointer;
+  transition: border-color .15s var(--ease), background .15s var(--ease); }
+.at-row:hover { border-color: var(--line-2); }
+.at-row.sel { border-color: var(--gold); background: var(--gold-bg); }
+.at-row .grow { flex: 1; }
+.at-row .text { margin: 0; }
+.at-use { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); cursor: pointer; }
+.at-use input { accent-color: var(--gold); }
+.at-name b { font-weight: 600; }
+.at-variants { margin: 0 0 10px; }
+.at-variants .chip { cursor: pointer; padding: 4px 12px; }
+.at-own { width: 100%; resize: vertical; font: inherit; font-size: 13.5px; color: var(--text); background: var(--input); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.atn { display: flex; flex-direction: column; gap: 8px; font-size: 13.5px; line-height: 1.45; }
+.atn-device { display: grid; gap: 4px; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(220,178,90,.3); background: var(--gold-bg); }
+.atn-k { display: inline-block; min-width: 76px; color: var(--gold); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.atn-tip { color: var(--text-2); margin-top: 2px; }
+.atn-sec { border: 1px solid var(--line); border-radius: 10px; background: var(--raised); padding: 0 12px; }
+.atn-sec summary { cursor: pointer; padding: 8px 0; font-weight: 600; color: var(--text); }
+.atn-sec[open] summary { border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+.atn-sec p { margin: 0 0 8px; color: var(--text-2); }
+.atn-h { font-weight: 650; color: var(--gold); margin: 8px 0 4px; }
+.atn-li { position: relative; padding-left: 14px; margin-bottom: 5px; color: var(--text-2); }
+.atn-li::before { content: ""; position: absolute; left: 3px; top: .62em; width: 5px; height: 5px; border-radius: 50%; background: var(--gold); }
+.atn-own { white-space: pre-wrap; padding-bottom: 8px; color: var(--text); }
+/* The in-game window: bold, readable over the game. */
+.ao { font-weight: 500; }
+.ao .bo-bar { gap: 8px; }
+.ao-name { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 55%; }
+.ao-head { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.ao-head select { max-width: 150px; font-size: 12.5px; padding: 3px 6px; }
+.ao-head .grow { flex: 1; }
+.seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: 8px; overflow: hidden; }
+.seg button { border: none; border-radius: 0; padding: 3px 11px; font-size: 12.5px; background: transparent; color: var(--muted); min-height: 0; }
+.seg button.on { background: var(--gold-bg); color: var(--gold); }
+.ao .bo-body { padding: 8px 10px; }
+.ao .tv-tools { flex-wrap: wrap; }

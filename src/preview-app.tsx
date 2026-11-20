@@ -4,6 +4,8 @@
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import AtlasOverlay from "./AtlasOverlay";
+import maxrollSample from "../core/data/test_maxroll_vg1ga30g.json";
 import BuildOverlay from "./BuildOverlay";
 import "./styles.css";
 
@@ -43,11 +45,33 @@ const pob = async () => {
     gear: [{ slot: "Helmet", rarity: "rare", name: "Doom Crown", base: "Hubris Circlet", lines: ["+80 to maximum Life"] }] });
   return { build: { class: "Witch", ascendancy: "Elementalist", level: 50, active: 1, stages: [stage("Start of Maps", 90), stage("End of Early Maps", 120)] }, stage: 1, link: "", follow: false };
 };
-mockWindows(buildWin ? "build" : "main");
+// Atlas strategies: maxroll's "Leaguestart Shrine/Magic Atlas" (variant 2 is a full tree) with sample notes.
+// Add ?atlas-window to the address to see the F7 window instead of the main window.
+const mxVariant = JSON.parse((maxrollSample as { data: string }).data).profiles[1].atlas.variants[0];
+const note = (title: string, lines: [string, string][]) => ({ title, lines: lines.map(([kind, text]) => ({ kind, depth: 0, text })) });
+let atlas = { active: 1, variant: 0, list: [
+  { id: 1, name: "Leaguestart Shrine/Magic Atlas", site: "maxroll", link: "https://maxroll.gg/poe/farming-strategy-planner/vg1ga30g", author: "palsteron", imported: now,
+    device: { maps: ["City Square Map"], threads: ["Ritual ×8", "Breach", "Incursion"], rolls: ["30% increased Pack size"], text: "Activate the Sacred Flora before doing ritual." },
+    notes: [note("About", [["p", "Shrines and magic packs early in the league, cheap to run."]]), note("How to play", [["h", "Maps"], ["li", "Run any tier 16 with 30% pack size."], ["li", "Click every shrine."]])],
+    variants: [{ name: "Shrines", nodes: [29045, ...mxVariant.history], choices: Object.entries(mxVariant.masteries).map(([n, e]) => [Number(n), e]),
+      notes: [note("Map device & setup", [["li", "Breach Thread · Ritual Thread · Abyss Thread"]])] }],
+    own_notes: "Sell shrine maps in bulk." },
+  { id: 2, name: "My essence tree", site: "official", link: "", author: "", imported: now, device: null, notes: [], own_notes: "",
+    variants: [{ name: "Atlas tree", nodes: [29045, ...mxVariant.history.slice(0, 40)], choices: [], notes: [] }] },
+] };
+const atlasWindow = location.search.includes("atlas-window");
+mockWindows(atlasWindow ? "atlas" : buildWin ? "build" : "main");
 mockIPC((cmd, args) => {
   if (cmd === "overview") return { profiles: [{ id: "mid", name: "Mid-Game", game: "Poe1", base_file: "", output_file: "", rules: [] }], active: "mid", poe1_dir: "", poe2_dir: "", batch_on: false };
   if (cmd === "wealth_get") return wealth;
   if (cmd === "get_icons") return {};
+  if (cmd === "get_settings") return { key_atlas: "F7" };
+  if (cmd === "atlas_list") return atlas;
+  if (cmd === "atlas_use") { const a = args as { id: number; variant: number }; atlas = { ...atlas, active: a.id, variant: a.variant }; return atlas; }
+  if (cmd === "atlas_rename") { const a = args as { id: number; name: string }; atlas = { ...atlas, list: atlas.list.map((s) => s.id === a.id ? { ...s, name: a.name } : s) }; return atlas; }
+  if (cmd === "atlas_own_notes") { const a = args as { id: number; text: string }; atlas = { ...atlas, list: atlas.list.map((s) => s.id === a.id ? { ...s, own_notes: a.text } : s) }; return atlas; }
+  if (cmd === "atlas_delete") { const a = args as { id: number }; atlas = { ...atlas, list: atlas.list.filter((s) => s.id !== a.id) }; return atlas; }
+  if (cmd === "atlas_import") throw "The preview can't reach maxroll: try it in the app";
   if (cmd === "pob_get") return pob();
   if (cmd === "build_tree_opt") return [true, "P"];
   if (cmd === "get_tiers") return [];
@@ -58,4 +82,5 @@ mockIPC((cmd, args) => {
 
 try { if (!localStorage.getItem("tab")) localStorage.setItem("tab", "wealth"); } catch { /* fine */ }
 if (buildWin) document.body.classList.add("overlay");
-createRoot(document.getElementById("root")!).render(buildWin ? <BuildOverlay /> : <App />);
+if (atlasWindow) document.body.classList.add("overlay");
+createRoot(document.getElementById("root")!).render(atlasWindow ? <div style={{ width: 430, height: 640 }}><AtlasOverlay /></div> : buildWin ? <BuildOverlay /> : <App />);

@@ -1,4 +1,5 @@
 pub mod area;
+pub mod atlas;
 pub mod compare;
 pub mod ask;
 pub mod evaluate;

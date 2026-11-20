@@ -92,6 +92,21 @@
         "visible": false,
         "shadow": false,
         "focus": false
+      },
+      {
+        "label": "atlas",
+        "title": "Atlas strategy",
+        "width": 430,
+        "height": 640,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": true,
+        "visible": false,
+        "shadow": false,
+        "focus": false,
+        "dragDropEnabled": false
       }
     ],
     "security": {

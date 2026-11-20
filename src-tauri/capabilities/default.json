@@ -7,7 +7,8 @@
     "build",
     "trade",
     "trades",
-    "earnings"
+    "earnings",
+    "atlas"
   ],
   "permissions": [
     "core:default",

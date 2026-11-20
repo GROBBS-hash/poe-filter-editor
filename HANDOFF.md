@@ -12,6 +12,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 - **F2** quick edit: the item under the mouse (Ctrl+C in inventory, or reads the ground label + game hover box), shows
   what the filter does, **why** (rule box with "Modify this rule" → opens the main app on that rule), and buttons to change it.
 - **F3** batch mode, **F4** reload filter in game, **F5** cycle filters (off by default), **F6** build window (PoB gems/gear/tree).
+- **F7** atlas strategy window (`atlas`; Endgame → Atlas picks which one).
 - **Ctrl+D** price check (new, own window `trade`). Changeable in Settings; skipped quietly if another app owns it.
 
 ## Done (recent sessions)
@@ -176,6 +177,18 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   game), only while the game is in front; opens on the Tree tab without taking focus; P or Esc closes it if it opened
   that way. Enter toggles a "chat may be open" guard so typing P in chat doesn't open it.
   Preview: http://localhost:1420/preview-app.html?build renders the window with a sample build.
+- Atlas strategies 20 Nov (Endgame → Atlas; `core/src/atlas.rs`, `src-tauri/src/atlas_app.rs`, `src/Atlas.tsx`,
+  `src/AtlasOverlay.tsx`, `src/AtlasTreeView.tsx`; saved in atlas.json in the data folder). Paste a link → one request:
+  maxroll farming strategy planner (JSON at `planners.maxroll.gg/profiles/poe/<id>`; each profile × step = one tree,
+  picked nodes + `pathing.include` joined to the start with shortest paths avoiding `pathing.exclude`; notes are
+  Lexical rich text → lines; map device / threads / map rolls from `metadata.strategy`) or a pathofexile.com atlas
+  tree link (`/atlas-skill-tree/<code>`, passive-tree v6 code; checked on the live site: a link we make shows the
+  same tree there). Name, rename, delete, "In game" pick, own notes, "Open on pathofexile.com". poe.ninja/poeplanner
+  links: not supported (says to use their pathofexile.com export). Window `atlas` (F7, `settings.key_atlas`; a
+  clash only skips this key) shows without taking focus (re-focuses the game), Tree / Notes tabs, strategy and tree
+  pickers. Tree data: `public/atlas_poe1.json` (3.30.0, rebuild with tools/build_atlas_data.mjs for a new patch).
+  Preview: http://localhost:1420/preview-app.html (Atlas page) and `?atlas-window` for the F7 window.
+  Dev check of a saved maxroll reply: `ATLAS_SAMPLE=<file> cargo test -p filter-core --lib atlas::sample -- --ignored --nocapture`.
 
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
@@ -225,6 +238,13 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Opens bigger and easier to read; the tree fills the window.
 - [ ] With "Open with the passive tree (P)" ticked: pressing P in game opens it on the Tree tab and the game's tree
       opens too; P or Esc closes it; typing a P in chat doesn't open it.
+
+**Atlas strategies (Endgame → Atlas, F7, new 20 Nov)**
+- [ ] Import a maxroll farming strategy link and a pathofexile.com atlas tree link; both show the tree on the page.
+- [ ] Rename / delete / "In game" pick work and are still there after restarting the editor.
+- [ ] F7 in game shows the window without taking the game's focus (you can keep moving); F7 again hides it.
+- [ ] The window's Tree / Notes tabs, tree picker, dragging it, and resizing it from its edges.
+- [ ] The tree matches the site's (points count and the big notables), and "Open on pathofexile.com" shows the same tree.
 
 **Ground reader (F2)**
 - [ ] 20 Nov: two labels on top of each other (e.g. a map right under a shield): F2 on the lower one picks it, not the upper one.
