@@ -64,10 +64,17 @@ function Ascendancy({ tree, name, have, added }: { tree: TreeData; name: string;
   );
 }
 
-export default function TreeView({ nodes, previous, height = 520, ascendancy, masteries = [], prevMasteries }: {
+export type TreeJewel = { node: number; name: string; base: string; colour: string };
+
+export default function TreeView({ nodes, previous, height = 520, ascendancy, masteries = [], prevMasteries, jewels = [], highlight, onJewelClick }: {
   nodes: number[]; previous?: number[]; height?: number; ascendancy?: string;
   /** (mastery node, effect picked) for this stage and the one before. */
   masteries?: [number, number][]; prevMasteries?: [number, number][];
+  /** Jewels in tree sockets: a ring on each socket, the jewel's name on hover. */
+  jewels?: TreeJewel[];
+  /** A socket to centre on and make glow (picked in the jewel list). */
+  highlight?: number | null;
+  onJewelClick?: (node: number) => void;
 }) {
   const [tree, setTree] = useState<TreeData | null>(null);
   const [box, setBox] = useState<Box | null>(null);
@@ -104,6 +111,12 @@ export default function TreeView({ nodes, previous, height = 520, ascendancy, ma
     setBox({ x: Math.min(...xs) - pad, y: Math.min(...ys) - pad, w: Math.max(...xs) - Math.min(...xs) + pad * 2, h: Math.max(...ys) - Math.min(...ys) + pad * 2 });
   };
   useEffect(() => { fit(); }, [tree, nodes.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+  // A jewel picked in the list: centre on its socket.
+  useEffect(() => {
+    const n = tree && highlight != null ? tree.nodes[String(highlight)] : null;
+    if (n) setBox({ x: n[0] - 2400, y: n[1] - 1500, w: 4800, h: 3000 });
+  }, [tree, highlight]);
+  const jewelAt = useMemo(() => new Map(jewels.map((j) => [String(j.node), j])), [jewels]);
 
   if (!tree || !box) return <div className="empty">Loading the tree…</div>;
 
@@ -190,9 +203,26 @@ export default function TreeView({ nodes, previous, height = 520, ascendancy, ma
             );
           })}
         </g>
+        <g className="tv-jewels">
+          {jewels.map((j) => {
+            const n = tree.nodes[String(j.node)];
+            if (!n) return null;
+            return (
+              <g key={j.node} className={`tv-jewel ${highlight === j.node ? "hl" : ""}`}
+                onMouseEnter={(e) => setHover({ id: String(j.node), x: e.clientX, y: e.clientY })} onMouseLeave={() => setHover(null)}
+                onClick={() => onJewelClick?.(j.node)}>
+                <circle cx={n[0]} cy={n[1]} r={78} style={{ stroke: j.colour }} />
+                <circle cx={n[0]} cy={n[1]} r={130} className="hit" />
+              </g>
+            );
+          })}
+        </g>
       </svg>
       {hovered && hover && (
         <div className="tv-tip" style={{ left: hover.x + 14, top: hover.y + 14 }}>
+          {jewelAt.has(hover.id) && (() => { const j = jewelAt.get(hover.id)!; return (
+            <div className="tv-jtip"><b style={{ color: j.colour }}>{j.name}</b><div className="muted small">{j.base} · click for its mods</div></div>
+          ); })()}
           <b>{hovered[3] || "Passive"}</b>
           {hovered[2] === 3 && picked.has(hover.id) ? (
             <>

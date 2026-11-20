@@ -398,6 +398,15 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Opens bigger and easier to read; the tree fills the window.
 - [ ] With "Open with the passive tree (P)" ticked: pressing P in game opens it on the Tree tab and the game's tree
       opens too; P or Esc closes it; typing a P in chat doesn't open it.
+- [ ] Jewels tab (new): his 10 tree jewels (clusters with their notables, Watcher's Eye, Brutal Restraint, Cobalts) and
+      the belt's abyss jewel, click one for its mods; "on tree" centres and lights up its socket; jewel sockets have a
+      ring on the tree (hover = jewel name, click = open it in the list). Gear tab lists flasks under "Flasks".
+      How: `pob::Jewel` from each Spec's `<Sockets><Socket nodeId itemId>` (items looked up by id) and the item set's
+      "… Abyssal Socket N" slots; `Stage.jewels`. Checked against his pob.txt with
+      `cargo run -p filter-core --example pobdump -- %APPDATA%\com.grobbs.poefiltereditor\pob.txt`: matches his PoB.
+      Cluster jewels' own small passives aren't drawn on the tree (PoB's generated nodes aren't in the tree data).
+      Gems: every skill group parses (30 gems in "Endgame Whispers", incl. item-granted Herald of Purity/RF);
+      if some still look missing in F6, ask which stage and which gems.
 
 **Atlas strategies (Endgame → Atlas, F7, new 20 Nov)**
 - [ ] Import a maxroll farming strategy link and a pathofexile.com atlas tree link; both show the tree on the page.

@@ -309,7 +309,7 @@ Travel to this Map by using it in a personal Map Device. Maps can only be used o
     fn suggests_from_build() {
         let gem = |n: &str, s: bool| Gem { name: n.into(), level: 20, quality: 0, enabled: true, support: s, colour: "b".into() };
         let b = Build { class: "Witch".into(), ascendancy: "Elementalist".into(), level: 90, active: 0, stages: vec![Stage {
-            title: "Endgame".into(), tree: None, gear: vec![],
+            title: "Endgame".into(), tree: None, gear: vec![], jewels: vec![],
             groups: vec![
                 Group { label: String::new(), slot: String::new(), enabled: true,
                     gems: vec![gem("Arc", false), gem("Spell Echo", true), gem("Lightning Penetration", true)] },

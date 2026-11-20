@@ -37,6 +37,15 @@ pub struct Gear {
     pub lines: Vec<String>,
 }
 
+/// A jewel: in a passive tree socket (`node`) or an abyssal socket of an item (`node` None, slot "Belt Abyssal Socket 1").
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Jewel {
+    pub node: Option<u32>,
+    pub item: Gear,
+    /// Cluster jewels: the notables they add ("1 Added Passive Skill is Feed the Fury").
+    pub notables: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Tree {
     pub version: String,
@@ -56,6 +65,9 @@ pub struct Stage {
     pub tree: Option<Tree>,
     pub groups: Vec<Group>,
     pub gear: Vec<Gear>,
+    /// Tree and abyssal jewels.
+    #[serde(default)]
+    pub jewels: Vec<Jewel>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -175,11 +187,27 @@ pub fn parse(xml: &str) -> Result<Build, String> {
     let root = doc.root_element();
     let build_el = child(root, "Build").ok_or("Not a Path of Building build")?;
 
-    // Trees.
+    // Every item by its id (gear sets and tree sockets point at them).
+    let by_id: HashMap<String, String> = child(root, "Items").map(|items| items.children().filter(|c| c.has_tag_name("Item"))
+        .map(|i| (attr(&i, "id").to_string(), i.text().unwrap_or("").to_string())).collect()).unwrap_or_default();
+    let jewel_of = |node: Option<u32>, slot: &str, text: &str| {
+        let item = item_gear(slot, text);
+        let notables = item.lines.iter().filter_map(|l| l.strip_prefix("1 Added Passive Skill is ").map(String::from)).collect();
+        Jewel { node, item, notables }
+    };
+
+    // Trees, and the jewels in each tree's sockets.
     let mut trees: Vec<(String, Tree)> = vec![];
+    let mut tree_jewels: Vec<Vec<Jewel>> = vec![];
     if let Some(t) = child(root, "Tree") {
         for s in t.children().filter(|c| c.has_tag_name("Spec")) {
             let url = child(s, "URL").and_then(|u| u.text()).unwrap_or("").trim().to_string();
+            tree_jewels.push(child(s, "Sockets").map(|so| so.children().filter(|c| c.has_tag_name("Socket"))
+                .filter_map(|c| {
+                    let node: u32 = attr(&c, "nodeId").parse().ok()?;
+                    let text = by_id.get(attr(&c, "itemId"))?;
+                    Some(jewel_of(Some(node), &format!("Jewel socket {node}"), text))
+                }).collect()).unwrap_or_default());
             trees.push((attr(&s, "title").to_string(), Tree {
                 version: attr(&s, "treeVersion").to_string(),
                 class_id: attr(&s, "classId").parse().unwrap_or(0),
@@ -221,8 +249,6 @@ pub fn parse(xml: &str) -> Result<Build, String> {
     // Gear.
     let mut item_sets: Vec<(String, Vec<Gear>)> = vec![];
     if let Some(items) = child(root, "Items") {
-        let by_id: HashMap<&str, &str> = items.children().filter(|c| c.has_tag_name("Item"))
-            .map(|i| (attr(&i, "id"), i.text().unwrap_or(""))).collect();
         let read = |n: roxmltree::Node| -> Vec<Gear> {
             n.children().filter(|c| c.has_tag_name("Slot"))
                 .filter(|s| attr(s, "itemId") != "0" && !attr(s, "name").contains("Swap"))
@@ -246,9 +272,13 @@ pub fn parse(xml: &str) -> Result<Build, String> {
         let (title, tree) = trees.get(i).map(|(t, tr)| (t.clone(), Some(tr.clone())))
             .unwrap_or_else(|| (skill_titles.get(i).cloned().unwrap_or_default(), None));
         let groups = pick_by(&title, i, &skill_titles).map(|j| skill_sets[j].1.clone()).unwrap_or_default();
-        let gear = pick_by(&title, i, &item_titles).map(|j| item_sets[j].1.clone()).unwrap_or_default();
+        let gear: Vec<Gear> = pick_by(&title, i, &item_titles).map(|j| item_sets[j].1.clone()).unwrap_or_default();
+        // Abyss jewels sit in items' "… Abyssal Socket N" slots: list them with the other jewels.
+        let (abyss, gear): (Vec<Gear>, Vec<Gear>) = gear.into_iter().partition(|g| g.slot.contains("Abyssal Socket"));
+        let mut jewels: Vec<Jewel> = tree_jewels.get(i).filter(|_| i < trees.len()).cloned().unwrap_or_default();
+        jewels.extend(abyss.into_iter().map(|g| Jewel { node: None, notables: vec![], item: g }));
         let title = if title.is_empty() { format!("Setup {}", i + 1) } else { title };
-        stages.push(Stage { title, tree, groups, gear });
+        stages.push(Stage { title, tree, groups, gear, jewels });
     }
     Ok(Build {
         class: attr(&build_el, "className").to_string(),
@@ -301,6 +331,10 @@ mod tests {
 	<Tree activeSpec="2">
 		<Spec title="Act 1" treeVersion="3_29" classId="3" ascendClassId="0" nodes="739,1031,1957">
 			<URL>https://www.pathofexile.com/passive-skill-tree/AAAABgMADwLjBAc</URL>
+			<Sockets>
+				<Socket nodeId="7960" itemId="3"/>
+				<Socket nodeId="9408" itemId="0"/>
+			</Sockets>
 		</Spec>
 		<Spec title="Act 3" treeVersion="3_29" classId="3" ascendClassId="2" nodes="739,885,1031,1957,4184" masteryEffects="{12125,34242},{63268,55308}">
 			<URL>https://www.pathofexile.com/passive-skill-tree/AAAABgMAIgLjA3U</URL>
@@ -350,7 +384,23 @@ Goldrim
 Leather Cap
 +10% to Item Rarity
 		</Item>
+		<Item id="3">
+Rarity: RARE
+8 Passive Only! Not 9!
+Large Cluster Jewel
+Adds 8 Passive Skills
+Added Small Passive Skills grant: 12% increased Lightning Damage
+1 Added Passive Skill is Doryani's Lesson
+1 Added Passive Skill is Overshock
+		</Item>
+		<Item id="4">
+Rarity: RARE
+Bleed + CB Avoidance Jewel
+Hypnotic Eye Jewel
+Adds 10 to 20 Lightning Damage to Spells
+		</Item>
 		<ItemSet id="1" title="Act 1">
+			<Slot name="Belt Abyssal Socket 1" itemId="4"/>
 			<Slot name="Weapon 1" itemId="1"/>
 			<Slot name="Weapon 1 Swap" itemId="0"/>
 			<Slot name="Helmet" itemId="2"/>
@@ -388,7 +438,13 @@ Leather Cap
             {range:0.25}(60-80)% increased Spell Damage\n(25-35)% chance for Energy Shield Recharge to start when you Block");
         assert_eq!(crank.lines, ["+20% Chance to Block Attack Damage while wielding a Staff", "65% increased Spell Damage",
             "30% chance for Energy Shield Recharge to start when you Block"]);
-        assert_eq!(s.gear.len(), 2, "swap and empty slots skipped");
+        assert_eq!(s.gear.len(), 2, "swap and empty slots skipped, abyss jewel listed with the jewels");
+        // Jewels: the tree socket (empty ones skipped) and the abyss jewel.
+        assert_eq!(s.jewels.len(), 2);
+        assert_eq!((s.jewels[0].node, s.jewels[0].item.base.as_str()), (Some(7960), "Large Cluster Jewel"));
+        assert_eq!(s.jewels[0].notables, ["Doryani's Lesson", "Overshock"]);
+        assert_eq!((s.jewels[1].node, s.jewels[1].item.slot.as_str()), (None, "Belt Abyssal Socket 1"));
+        assert!(b.stages[1].jewels.is_empty());
         assert_eq!(b.stages[1].tree.as_ref().unwrap().masteries, vec![(12125, 34242), (63268, 55308)]);
         // Second stage: its own gems, gear falls back to nothing (only one item set).
         assert_eq!(b.stages[1].groups[0].slot, "Helmet");
@@ -400,7 +456,7 @@ Leather Cap
     fn follows_your_act() {
         let titles = ["Act 1", "Act 2 RF Swap", "Act 3", "Act 4 First Lab", "Act 7 Right Before Staff Swap", "Act 7 Staff Swap",
             "Start of Maps", "End of Early Maps", "Mageblood No Whispers", "Animate Guardian"];
-        let st: Vec<Stage> = titles.iter().map(|t| Stage { title: t.to_string(), tree: None, groups: vec![], gear: vec![] }).collect();
+        let st: Vec<Stage> = titles.iter().map(|t| Stage { title: t.to_string(), tree: None, groups: vec![], gear: vec![], jewels: vec![] }).collect();
         let at = |lvl| stage_for(&st, lvl).map(|i| titles[i]);
         assert_eq!(at(5), Some("Act 1"));
         assert_eq!(at(18), Some("Act 2 RF Swap"));

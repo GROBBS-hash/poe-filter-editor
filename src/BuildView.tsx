@@ -7,7 +7,9 @@ import TreeView from "./TreeView";
 export type PobGem = { name: string; level: number; quality: number; enabled: boolean; support: boolean; colour: string };
 export type PobGroup = { label: string; slot: string; enabled: boolean; gems: PobGem[] };
 export type PobGear = { slot: string; rarity: string; name: string; base: string; lines: string[] };
-export type PobStage = { title: string; tree: { version: string; nodes: number[]; url: string } | null; groups: PobGroup[]; gear: PobGear[] };
+/** A jewel in a tree socket (node) or in an item's abyssal socket (node null, slot "Belt Abyssal Socket 1"). */
+export type PobJewel = { node: number | null; item: PobGear; notables: string[] };
+export type PobStage = { title: string; tree: { version: string; nodes: number[]; url: string } | null; groups: PobGroup[]; gear: PobGear[]; jewels?: PobJewel[] };
 export type PobBuild = { class: string; ascendancy: string; level: number; stages: PobStage[]; active: number };
 export type PobState = { build: PobBuild; stage: number; link: string; follow?: boolean };
 
@@ -38,7 +40,9 @@ function treeChange(stages: PobStage[], i: number) {
 
 export default function BuildView({ compact = false }: { compact?: boolean }) {
   const [st, setSt] = useState<PobState | null>(null);
-  const [view, setView] = useState<"gems" | "gear" | "tree">(() => {
+  // A jewel picked in the list (shown on the tree) or on the tree (opened in the list).
+  const [jewelNode, setJewelNode] = useState<number | null>(null);
+  const [view, setView] = useState<"gems" | "gear" | "jewels" | "tree">(() => {
     try { return (localStorage.getItem("build.view") as "gems" | "gear" | "tree") || "gems"; } catch { return "gems"; }
   });
   const [openItem, setOpenItem] = useState<string | null>(null);
@@ -81,7 +85,24 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
   const before = new Set((build.stages[stage - 1]?.groups ?? []).flatMap((g) => g.gems.map((x) => x.name)));
   const newGems = stage > 0 ? [...new Set(s.groups.flatMap((g) => g.gems.filter((x) => x.enabled).map((x) => x.name)))].filter((n) => !before.has(n)) : [];
   const change = treeChange(build.stages, stage);
-  const gear = [...s.gear].sort((a, b) => (SLOT_ORDER.indexOf(a.slot) + 99) % 99 - (SLOT_ORDER.indexOf(b.slot) + 99) % 99);
+  const sorted = [...s.gear].sort((a, b) => (SLOT_ORDER.indexOf(a.slot) + 99) % 99 - (SLOT_ORDER.indexOf(b.slot) + 99) % 99);
+  const gear = sorted.filter((g) => !g.slot.startsWith("Flask"));
+  const flasks = sorted.filter((g) => g.slot.startsWith("Flask"));
+  const jewels = s.jewels ?? [];
+  const jewelWhere = (j: PobJewel) => j.node != null ? "Tree socket" : j.item.slot.replace(" Abyssal Socket ", " · abyssal socket ");
+  const itemRow = (it: PobGear, key: string, where: string) => (
+    <li key={key} onClick={() => setOpenItem(openItem === key ? null : key)}>
+      <div className="bv-item">
+        <span className="bv-slot muted small">{where}</span>
+        <ItemIcon name={it.rarity === "unique" ? it.name : null} base={it.base} size={26} />
+        <span className="bv-iname">
+          <span style={{ color: RARITY[it.rarity] ?? "#ccc" }}>{it.name}</span>
+          {it.base !== it.name && <span className="muted small"> {it.base}</span>}
+        </span>
+      </div>
+      {openItem === key && <ul className="bv-lines">{it.lines.map((l, k) => <li key={k}>{l}</li>)}</ul>}
+    </li>
+  );
 
   return (
     <div className={`buildview ${compact ? "compact" : ""}`}>
@@ -99,8 +120,8 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
         </span>
       </div>
       <div className="bv-tabs">
-        {(["gems", "gear", "tree"] as const).map((v) => (
-          <button key={v} className={view === v ? "on" : ""} onClick={() => setView(v)}>{{ gems: "Gems", gear: "Gear", tree: "Tree" }[v]}</button>
+        {(["gems", "gear", "jewels", "tree"] as const).map((v) => (
+          <button key={v} className={view === v ? "on" : ""} onClick={() => setView(v)}>{{ gems: "Gems", gear: "Gear", jewels: `Jewels${jewels.length ? ` (${jewels.length})` : ""}`, tree: "Tree" }[v]}</button>
         ))}
       </div>
 
@@ -123,19 +144,36 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
       {view === "gear" && (
         <ul className="bv-gear">
           {gear.length === 0 && <div className="empty">No gear set for this stage.</div>}
-          {gear.map((it) => (
-            <li key={it.slot} onClick={() => setOpenItem(openItem === it.slot ? null : it.slot)}>
-              <div className="bv-item">
-                <span className="bv-slot muted small">{SLOT_NAME[it.slot] ?? it.slot}</span>
-                <ItemIcon name={it.rarity === "unique" ? it.name : null} base={it.base} size={26} />
-                <span className="bv-iname">
-                  <span style={{ color: RARITY[it.rarity] ?? "#ccc" }}>{it.name}</span>
-                  {it.base !== it.name && <span className="muted small"> {it.base}</span>}
-                </span>
-              </div>
-              {openItem === it.slot && <ul className="bv-lines">{it.lines.map((l, k) => <li key={k}>{l}</li>)}</ul>}
-            </li>
-          ))}
+          {gear.map((it) => itemRow(it, it.slot, SLOT_NAME[it.slot] ?? it.slot))}
+          {flasks.length > 0 && <li className="bv-subhead">Flasks</li>}
+          {flasks.map((it) => itemRow(it, it.slot, it.slot))}
+        </ul>
+      )}
+
+      {view === "jewels" && (
+        <ul className="bv-gear bv-jewels">
+          {jewels.length === 0 && <div className="empty">No jewels in this stage.</div>}
+          {jewels.map((j, i) => {
+            const key = "j" + (j.node ?? j.item.slot);
+            return (
+              <li key={i} onClick={() => setOpenItem(openItem === key ? null : key)} className={j.node != null && j.node === jewelNode ? "hl" : ""}>
+                <div className="bv-item">
+                  <span className="bv-slot muted small">{jewelWhere(j)}</span>
+                  <ItemIcon name={j.item.rarity === "unique" ? j.item.name : null} base={j.item.base} size={26} />
+                  <span className="bv-iname">
+                    <span style={{ color: RARITY[j.item.rarity] ?? "#ccc" }}>{j.item.name}</span>
+                    {j.item.base !== j.item.name && <span className="muted small"> {j.item.base}</span>}
+                    {j.notables.length > 0 && <span className="bv-notables">{j.notables.map((n) => <span key={n} className="bv-notable">{n}</span>)}</span>}
+                  </span>
+                  {j.node != null && s.tree && (
+                    <button className="link small bv-onTree" title="Show this jewel's socket on the tree"
+                      onClick={(e) => { e.stopPropagation(); setJewelNode(j.node); setView("tree"); }}>on tree</button>
+                  )}
+                </div>
+                {openItem === key && <ul className="bv-lines">{j.item.lines.map((l, k) => <li key={k}>{l}</li>)}</ul>}
+              </li>
+            );
+          })}
         </ul>
       )}
 
@@ -149,7 +187,20 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
               </div>
               <TreeView nodes={s.tree.nodes} previous={stage > 0 ? build.stages[stage - 1].tree?.nodes : undefined} height={compact ? Math.max(240, (panelH || 600) - 100) : 560} ascendancy={build.ascendancy || undefined}
                 masteries={(s.tree as { masteries?: [number, number][] }).masteries ?? []}
-                prevMasteries={stage > 0 ? (build.stages[stage - 1].tree as { masteries?: [number, number][] } | null)?.masteries : undefined} />
+                prevMasteries={stage > 0 ? (build.stages[stage - 1].tree as { masteries?: [number, number][] } | null)?.masteries : undefined}
+                jewels={jewels.filter((j) => j.node != null).map((j) => ({ node: j.node!, name: j.item.name, base: j.item.base, colour: RARITY[j.item.rarity] ?? "#ccc" }))}
+                highlight={jewelNode} onJewelClick={(n) => { setJewelNode(n); setOpenItem("j" + n); setView("jewels"); }} />
+              {jewels.some((j) => j.node != null) && (
+                <div className="bv-jewelchips">
+                  <span className="muted small">Jewels:</span>
+                  {jewels.filter((j) => j.node != null).map((j) => (
+                    <button key={j.node} className={`bv-jchip ${jewelNode === j.node ? "on" : ""}`} title={`${j.item.name} · ${j.item.base}`}
+                      onMouseEnter={() => setJewelNode(j.node)} onClick={() => setJewelNode(jewelNode === j.node ? null : j.node)}>
+                      <span style={{ color: RARITY[j.item.rarity] ?? "#ccc" }}>{j.item.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </>
           ) : <div className="empty">No tree saved for this stage.</div>}
         </div>
