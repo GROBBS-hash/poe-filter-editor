@@ -292,6 +292,11 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   `BuildView.tsx` (F6 + My build): a tick per item, key `slot|name|base`, in localStorage `build.have` (shared by both
   windows via the storage event), "Have N of M" bar with "hide what I have" (`build.hideHave`).
 
+- Gear and gems 21 Nov (0.2.3, his pick of 3 mock-ups): the Gems tab is gone; Gear shows each item's sockets
+  (`SocketStrip`, from its "Sockets: R-G-B B" line) and the gem groups whose PoB slot is that item under it; groups
+  with no slot or a slot this stage has no item for (e.g. "Weapon 1 Swap") go under "Other gems". "New gems this
+  stage" sits on top. A saved "gems" tab choice opens Gear.
+
 - Find in stash 21 Nov (Wealth page, PoeStash-style "search every tab"): each scan keeps every item of the tabs it
   read, socketed gems too (`wealth::found_in_tab` → `Found`: tab index + name, spot, kind, ilvl, mods text from
   `item_text`, price note, scan value), replacing those tabs' old entries, in its own file `stash_index.json`
@@ -486,6 +491,8 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 **Installer (21 Nov, release 0.2.0)**
 - [x] (21 Nov: installed, "everything's there".) Still check: hotkeys work in game with the installed editor.
 - [ ] When 0.2.1 is out: "Version 0.2.1 is ready · Restart to update" shows at the top; clicking it updates and reopens.
+- [ ] 0.2.3: F6 / My build "Gear and gems" tab: each item shows its socket colours and links with its gems under it;
+      gems not in an item under "Other gems"; clicking a gem still price checks it.
 - [ ] 0.2.2: restart (update) while using the editor: it comes back in front; while it was behind other windows: stays on the taskbar.
 - [ ] 0.2.1: Wealth "Count rares in my worth" tick box: unticked, the total drops by the rares at once; ticked, back.
 - [ ] 0.2.1: Gear checklist (F6 Gear / Jewels tabs and My build): tick items you have, "Have N of M", "hide what I

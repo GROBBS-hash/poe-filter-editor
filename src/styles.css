@@ -1345,3 +1345,16 @@ li:hover > .bv-item .bv-price { opacity: 1; }
 .bv-gear li.got .bv-iname > span:first-child { text-decoration: line-through; text-decoration-color: rgba(255,255,255,.35); }
 .bv-havebar { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 4px 2px 8px; list-style: none; }
 .bv-havebar label { display: flex; align-items: center; gap: 6px; color: var(--text-2); cursor: pointer; }
+/* Gear and gems tab: sockets on each item, its gem groups under it */
+.bv-sockets { display: inline-flex; gap: 6px; align-items: center; margin-left: auto; padding: 0 4px; }
+.bv-link { display: inline-flex; align-items: center; gap: 0; }
+.bv-link .bv-sock + .bv-sock { margin-left: 4px; position: relative; }
+.bv-link .bv-sock + .bv-sock::before { content: ""; position: absolute; left: -6px; top: 3px; width: 6px; height: 3px; background: #b9a46a; }
+.bv-sock { width: 10px; height: 10px; border-radius: 50%; border: 2px solid #888; background: #1a1a1a; flex: none; }
+.sock-r { border-color: #d8423a; } .sock-g { border-color: #4cbf4c; } .sock-b { border-color: #4a7ef0; } .sock-w { border-color: #ddd; }
+.sock-a { border-color: #555; background: #333; }
+.bv-ingems { display: flex; flex-direction: column; gap: 6px; padding: 0 2px 8px 34px; cursor: default; }
+.bv-ingems .bv-group, .bv-othergems .bv-group { padding: 6px 8px; }
+.bv-othergems { display: flex; flex-direction: column; gap: 6px; padding: 2px 2px 8px; cursor: default; list-style: none; }
+li.bv-newgems { list-style: none; margin: 0 0 8px; }
+.bv-gear li.got .bv-ingems { opacity: .6; }

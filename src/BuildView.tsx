@@ -64,6 +64,22 @@ function GemPill({ g, main, fresh }: { g: PobGem; main: boolean; fresh?: boolean
   );
 }
 
+/** The item's sockets as PoB has them ("Sockets: R-G-B B"): coloured dots, linked ones joined by a bar. */
+function SocketStrip({ it }: { it: PobGear }) {
+  const line = (it.copy ?? "").split("\n").concat(it.lines).find((l) => l.startsWith("Sockets: "));
+  if (!line) return null;
+  const groups = line.slice(9).trim().split(/\s+/).map((g) => g.split("-").filter(Boolean));
+  return (
+    <span className="bv-sockets" title={`Sockets: ${line.slice(9).trim()}`}>
+      {groups.map((g, i) => (
+        <span key={i} className="bv-link">
+          {g.map((c, j) => <span key={j} className={`bv-sock sock-${c.toLowerCase()}`} />)}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 /** What's new on the tree at this stage compared with the one before. */
 function treeChange(stages: PobStage[], i: number) {
   const cur = stages[i]?.tree?.nodes ?? [];
@@ -115,8 +131,12 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
   const [st, setSt] = useState<PobState | null>(null);
   // A jewel picked in the list (shown on the tree) or on the tree (opened in the list).
   const [jewelNode, setJewelNode] = useState<number | null>(null);
-  const [view, setView] = useState<"gems" | "gear" | "jewels" | "tree">(() => {
-    try { return (localStorage.getItem("build.view") as "gems" | "gear" | "tree") || "gems"; } catch { return "gems"; }
+  // Gems live under their item on the Gear tab now (21 Nov): an old "gems" choice opens Gear.
+  const [view, setView] = useState<"gear" | "jewels" | "tree">(() => {
+    try {
+      const v = localStorage.getItem("build.view");
+      return v === "jewels" || v === "tree" ? v : "gear";
+    } catch { return "gear"; }
   });
   const [openItem, setOpenItem] = useState<string | null>(null);
   // In the overlay (F6) the page never scrolls: the tree fills the space under the tabs and
@@ -168,22 +188,39 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
       onClick={(e) => e.stopPropagation()} onChange={() => toggleHave(haveKey(it))} />
   );
   const shown = (it: PobGear) => !(hideHave && have.has(haveKey(it)));
-  const itemRow = (it: PobGear, key: string, where: string) => (
-    <li key={key} className={have.has(haveKey(it)) ? "got" : ""} onClick={() => setOpenItem(openItem === key ? null : key)}>
-      <div className="bv-item">
-        {haveBox(it)}
-        <span className="bv-slot muted small">{where}</span>
-        <ItemIcon name={it.rarity === "unique" ? it.name : null} base={it.base} size={26} />
-        <span className="bv-iname">
-          <span style={{ color: RARITY[it.rarity] ?? "#ccc" }}>{it.name}</span>
-          {it.base !== it.name && <span className="muted small"> {it.base}</span>}
-        </span>
-        {it.copy && <BuyButton it={it} />}
-        {it.copy && <PriceButton onClick={() => priceItem(it)} />}
-      </div>
-      {openItem === key && <ul className="bv-lines">{it.lines.map((l, k) => <li key={k}>{l}</li>)}</ul>}
-    </li>
+  // Gem groups by the item they're socketed in; the rest (no item set in PoB, or an item this stage doesn't have)
+  // go under "Other gems".
+  const slots = new Set(s.gear.map((g) => g.slot));
+  const groupsIn = (slot: string) => s.groups.filter((g) => g.slot === slot);
+  const otherGroups = s.groups.filter((g) => !slots.has(g.slot));
+  const groupView = (g: PobGroup, i: number, withSlot: boolean) => (
+    <div key={i} className={`bv-group ${g.enabled ? "" : "off"}`}>
+      {(g.label || (withSlot && g.slot)) && <div className="bv-glabel">{g.label}{g.label && withSlot && g.slot ? " · " : ""}
+        {withSlot && <span className="muted">{g.slot}</span>}</div>}
+      <div className="bv-gems">{g.gems.map((x, j) => <GemPill key={j} g={x} main={!x.support && j === 0} fresh={newGems.includes(x.name)} />)}</div>
+    </div>
   );
+  const itemRow = (it: PobGear, key: string, where: string) => {
+    const groups = groupsIn(it.slot);
+    return (
+      <li key={key} className={have.has(haveKey(it)) ? "got" : ""} onClick={() => setOpenItem(openItem === key ? null : key)}>
+        <div className="bv-item">
+          {haveBox(it)}
+          <span className="bv-slot muted small">{where}</span>
+          <ItemIcon name={it.rarity === "unique" ? it.name : null} base={it.base} size={26} />
+          <span className="bv-iname">
+            <span style={{ color: RARITY[it.rarity] ?? "#ccc" }}>{it.name}</span>
+            {it.base !== it.name && <span className="muted small"> {it.base}</span>}
+          </span>
+          <SocketStrip it={it} />
+          {it.copy && <BuyButton it={it} />}
+          {it.copy && <PriceButton onClick={() => priceItem(it)} />}
+        </div>
+        {groups.length > 0 && <div className="bv-ingems" onClick={(e) => e.stopPropagation()}>{groups.map((g, i) => groupView(g, i, false))}</div>}
+        {openItem === key && <ul className="bv-lines">{it.lines.map((l, k) => <li key={k}>{l}</li>)}</ul>}
+      </li>
+    );
+  };
 
   return (
     <div className={`buildview ${compact ? "compact" : ""}`}>
@@ -201,34 +238,22 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
         </span>
       </div>
       <div className="bv-tabs">
-        {(["gems", "gear", "jewels", "tree"] as const).map((v) => (
-          <button key={v} className={view === v ? "on" : ""} onClick={() => setView(v)}>{{ gems: "Gems", gear: "Gear", jewels: `Jewels${jewels.length ? ` (${jewels.length})` : ""}`, tree: "Tree" }[v]}</button>
+        {(["gear", "jewels", "tree"] as const).map((v) => (
+          <button key={v} className={view === v ? "on" : ""} onClick={() => setView(v)}>{{ gear: "Gear and gems", jewels: `Jewels${jewels.length ? ` (${jewels.length})` : ""}`, tree: "Tree" }[v]}</button>
         ))}
       </div>
 
       <div className="bv-panel" ref={panel}>
-      {view === "gems" && (
-        <div className="bv-groups">
-          {s.groups.length === 0 && <div className="empty">No gems in this stage.</div>}
-          {newGems.length > 0 && (
-            <div className="bv-newgems"><b>New this stage:</b> {newGems.join(" · ")}</div>
-          )}
-          {s.groups.map((g, i) => (
-            <div key={i} className={`bv-group ${g.enabled ? "" : "off"}`}>
-              {(g.label || g.slot) && <div className="bv-glabel">{g.label}{g.label && g.slot ? " · " : ""}<span className="muted">{g.slot}</span></div>}
-              <div className="bv-gems">{g.gems.map((x, j) => <GemPill key={j} g={x} main={!x.support && j === 0} fresh={newGems.includes(x.name)} />)}</div>
-            </div>
-          ))}
-        </div>
-      )}
-
       {view === "gear" && (
         <ul className="bv-gear">
+          {newGems.length > 0 && <li className="bv-newgems"><b>New gems this stage:</b> {newGems.join(" · ")}</li>}
           {gear.length === 0 && <div className="empty">No gear set for this stage.</div>}
           <HaveBar n={sorted.filter((it) => have.has(haveKey(it))).length} of={sorted.length} hide={hideHave} setHide={setHideHave} />
           {gear.filter(shown).map((it) => itemRow(it, it.slot, SLOT_NAME[it.slot] ?? it.slot))}
           {flasks.filter(shown).length > 0 && <li className="bv-subhead">Flasks</li>}
           {flasks.filter(shown).map((it) => itemRow(it, it.slot, it.slot))}
+          {otherGroups.length > 0 && <li className="bv-subhead">Other gems</li>}
+          {otherGroups.length > 0 && <li className="bv-othergems">{otherGroups.map((g, i) => groupView(g, i, true))}</li>}
         </ul>
       )}
 

@@ -51,8 +51,12 @@ const pob = async () => {
   const t = await fetch("/tree_poe1.json").then((r) => r.json());
   const ids = Object.keys(t.nodes).map(Number);
   const stage = (title: string, n: number) => ({ title, tree: { version: "3.30", nodes: ids.slice(200, 200 + n), url: "" },
-    groups: [{ label: "Main", slot: "Body Armour", enabled: true, gems: [gem("Arc", "b"), gem("Spell Echo", "b", true), gem("Lightning Penetration", "b", true)] }],
-    gear: [{ slot: "Helmet", rarity: "rare", name: "Doom Crown", base: "Hubris Circlet", lines: ["+80 to maximum Life"], copy: "x" }, { slot: "Flask 1", rarity: "unique", name: "Coruscating Elixir", base: "Ruby Flask", lines: [], copy: "x" }, { slot: "Flask 2", rarity: "magic", name: "Examiner's Topaz Flask of the Rainbow", base: "Topaz Flask", lines: [] }],
+    groups: [{ label: "Main", slot: "Body Armour", enabled: true, gems: [gem("Arc", "b"), gem("Spell Echo", "b", true), gem("Lightning Penetration", "b", true), gem("Elemental Focus", "g", true), gem("Added Lightning Damage", "b", true), gem("Inspiration", "r", true)] },
+      { label: "", slot: "Helmet", enabled: true, gems: [gem("Herald of Ash", "r"), gem("Arcane Surge", "b", true)] },
+      { label: "", slot: "Helmet", enabled: true, gems: [gem("Flame Dash", "b"), gem("Faster Casting", "b", true)] },
+      { label: "Swap", slot: "Weapon 1 Swap", enabled: true, gems: [gem("Clarity", "b")] }],
+    gear: [{ slot: "Body Armour", rarity: "rare", name: "Doom Shelter", base: "Vaal Regalia", lines: ["Sockets: B-B-B-G-B-R", "+90 to maximum Life"], copy: "x" },
+      { slot: "Helmet", rarity: "rare", name: "Doom Crown", base: "Hubris Circlet", lines: ["Sockets: R-B B-B", "+80 to maximum Life"], copy: "x" }, { slot: "Flask 1", rarity: "unique", name: "Coruscating Elixir", base: "Ruby Flask", lines: [], copy: "x" }, { slot: "Flask 2", rarity: "magic", name: "Examiner's Topaz Flask of the Rainbow", base: "Topaz Flask", lines: [] }],
     jewels: [{ node: 7960, notables: ["Doryani's Lesson", "Inspired Oppression", "Overshock"], item: { slot: "Jewel socket 7960", rarity: "rare", name: "8 Passive Only! Not 9!", base: "Large Cluster Jewel", lines: ["Adds 8 Passive Skills", "1 Added Passive Skill is Overshock"] } },
       { node: 26196, notables: [], item: { slot: "Jewel socket 26196", rarity: "unique", name: "Brutal Restraint", base: "Timeless Jewel", lines: ["Denoted service of 7000 dekhara in the akhara of Balbala"], copy: "x" } },
       { node: null, notables: [], item: { slot: "Belt Abyssal Socket 1", rarity: "rare", name: "Bleed + CB Avoidance Jewel", base: "Hypnotic Eye Jewel", lines: ["+12% chance to Avoid Bleeding"] } }] });
