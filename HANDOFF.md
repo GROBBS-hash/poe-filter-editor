@@ -253,7 +253,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Scans from before this only have totals (the card says to scan again).
 
 - One map list 20 Nov: the Maps page's "Mods you can't run" (`map_tool.bad`, poe.re ids) is the only list. Ctrl+D flags map
-  mods by matching their wording to the ticked mods (`maps::map_info_bad`, numbers ignored); `map_avoid` only seeds the
+  mods by matching their wording to the ticked mods (`maps::map_info_bad`, numbers and poe.re's "(20-40)" ranges ignored); `map_avoid` only seeds the
   first default. Settings → Map check is now a note + "Open the Maps page" (window event `goto-tab`). Maps page buttons:
   "Suggest from my build" (`map_suggest`) and "Tick the usual dangers".
 
