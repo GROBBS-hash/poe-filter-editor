@@ -1738,6 +1738,15 @@ fn base_uniques(state: State<AppState>, base: String) -> Vec<(String, f64)> {
     prices.get(&game).map(|f| filter_core::prices::uniques_on_base(f, &base)).unwrap_or_default()
 }
 
+/// Awakened-style "related items" for the Ctrl+D window: a fragment's set or parts, and the boss's drops, with prices.
+#[tauri::command]
+fn related_items(state: State<AppState>, name: String) -> Option<filter_core::related::Related> {
+    let game = active_game(&state);
+    let prices = state.prices.lock().unwrap();
+    if game != Game::Poe1 { return None } // the data is PoE 1 only
+    filter_core::related::related(prices.get(&game)?, &name)
+}
+
 /// What poe.ninja says this item is worth (for the pop-up).
 #[tauri::command]
 fn item_price(state: State<AppState>, item: Item) -> Option<(f64, String)> {
@@ -2136,7 +2145,7 @@ pub fn run() {
             get_price_settings,
             set_price_settings,
             refresh_prices,
-            item_price, base_uniques,
+            item_price, base_uniques, related_items,
             list_themes,
             set_profile_theme,
             set_base,

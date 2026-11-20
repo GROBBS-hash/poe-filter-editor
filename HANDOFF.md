@@ -138,6 +138,11 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 - Fractured items 20 Nov: fractured mods keep their own row even when a total or the 20%-quality defence counts
   them (unticked then). "Fractured item" box searches base + ilvl+ + only fractured mods (Awakened-style). `StatIndex::find`
   now falls back to "… (Local)" stats (e.g. local % ES on armour). Live: his Fossilised Spirit Shield → 6 listed.
+- Related items 20 Nov (Awakened-style): Ctrl+D on a fragment, invitation, boss key, Maven's Writ etc. shows the
+  rest of its set with prices and the whole-set total, "made from 10 × Crescent Splinter" (parts vs whole), and the
+  boss's drops with poe.ninja prices, dearest first. Data `core/data/related_items.json` from Awakened PoE Trade's
+  item-drop.json (MIT), rebuilt with `node tools/build_related_items.mjs`; core `related.rs`, command
+  `related_items`, `src/RelatedItems.tsx`. Preview page has "Fragment: …" examples using the real price file.
 
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
@@ -162,6 +167,8 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Prices shown in chaos and divines with orb icons; bulk "1 div ≈ N items".
 - [ ] Transfigured gem: searches without "Unknown item base type".
 - [ ] Foulborn / mutated unique searches correctly.
+- [ ] Ctrl+D on an invitation / Shaper or Elder fragment / Maven's Writ: the set (with total), parts and boss drops
+      show with prices at the bottom of the window.
 - [ ] Save search, Saved searches list (Run / Live / delete); a live search pops up new listings with a Whisper button.
 
 **Maps**

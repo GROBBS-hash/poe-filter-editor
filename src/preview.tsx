@@ -8,6 +8,7 @@ import { createRoot } from "react-dom/client";
 import { useEffect, useState } from "react";
 import TradeWindow from "./TradeWindow";
 import "./styles.css";
+import RELATED from "../core/data/related_items.json";
 
 type Json = any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -41,9 +42,41 @@ const EXAMPLE: { check: Json; result: Json } = {
 let current = EXAMPLE;
 let mode: "saved" | "slow" | "error" = "saved";
 let icons: Json = {};
+let prices: { name: string; value: number }[] = [];
+
+// Same as core/src/related.rs, on the real price file, so the related-items panel shows real numbers here.
+function related(name: string): Json {
+  const price = (n: string) => { const v = prices.filter((i) => i.name === n).map((i) => i.value); return v.length ? Math.max(...v) : null; };
+  const priced = (n: string, count = 1, me = false) => ({ name: n, value: price(n), count, me });
+  const r: Json = { own: price(name), made_from: null, makes: null, group: [], set: false, drops: [] };
+  const mf = RELATED.recipes.find((x) => x.item === name); if (mf) r.made_from = priced(mf.part, mf.count);
+  const mk = RELATED.recipes.find((x) => x.part === name); if (mk) r.makes = priced(mk.item, mk.count);
+  const g = RELATED.groups.find((x) => x.group.includes(name));
+  if (g) {
+    r.group = g.group.filter((n) => n !== r.made_from?.name && n !== r.makes?.name).map((n) => priced(n, 1, n === name));
+    if (r.group.length === 1 && !g.set) r.group = [];
+    r.set = g.set;
+    r.drops = g.drops.map((n) => priced(n)).sort((a, b) => (b.value ?? -1) - (a.value ?? -1));
+  }
+  return r.made_from || r.makes || r.group.length || r.drops.length ? r : null;
+}
+
+// Fragments / invitations to try the related-items panel on.
+const FRAGMENTS: Record<string, [string, string]> = {
+  "Polaric Invitation": ["Map Fragments", "Normal"], "The Maven's Writ": ["Map Fragments", "Normal"],
+  "Crescent Splinter": ["Map Fragments", "Normal"], "Fragment of the Chimera": ["Map Fragments", "Normal"],
+  "Fragment of Knowledge": ["Map Fragments", "Normal"], "Al-Hezmin's Crest": ["Map Fragments", "Normal"],
+  "Simulacrum": ["Map Fragments", "Normal"], "Screaming Invitation": ["Map Fragments", "Normal"],
+};
+function fragmentCheck(name: string): Json {
+  const v = prices.filter((i) => i.name === name).map((i) => i.value);
+  return { league: "Standard", from_ground: false, error: null, ninja: v.length ? [Math.max(...v), "chaos"] : null, divine: 225, bulk: name, map: null,
+    setup: { item: { item_class: FRAGMENTS[name][0], rarity: FRAGMENTS[name][1], name: null, base_type: name, item_level: null, corrupted: false, mirrored: false, unidentified: false },
+      base_only: true, ilvl_min: null, links_min: null, gem_level: null, unknown: [], unknown_kinds: [], category: null, filters: [] } };
+}
 
 mockWindows("trade");
-mockIPC(async (cmd) => {
+mockIPC(async (cmd, args) => {
   if (cmd === "trade_search") {
     if (mode === "error") throw "Waiting on the trade site's limit: try again in 12s";
     await new Promise((r) => setTimeout(r, mode === "slow" ? 2500 : 400));
@@ -51,6 +84,8 @@ mockIPC(async (cmd) => {
     return current.result;
   }
   if (cmd === "get_icons") return icons;
+  if (cmd === "related_items") return related((args as Json).name);
+  if (cmd === "trade_bulk") throw "Bulk exchange isn't mocked in the preview";
   if (cmd === "saved_list") return [];
   return null;
 }, { shouldMockEvents: true });
@@ -62,6 +97,7 @@ function Controls() {
   const load = async (name: string) => {
     setPick(name);
     if (!name) current = EXAMPLE;
+    else if (name.startsWith("frag:")) current = { check: fragmentCheck(name.slice(5)), result: null };
     else {
       const check = await fetch(`/preview-data/samples/${encodeURIComponent(name)}`).then((r) => r.json());
       const result = await fetch(`/preview-data/samples/${encodeURIComponent(name)}.result`).then((r) => r.json());
@@ -70,14 +106,18 @@ function Controls() {
     emit("price-check", current.check);
   };
   useEffect(() => {
-    fetch("/preview-data/icons").then((r) => r.json()).then((j) => { icons = j ?? {}; }).catch(() => {});
-    fetch("/preview-data/samples").then((r) => r.json()).then((l) => { setList(l ?? []); load(""); }).catch(() => load(""));
+    // Prices and icons first, so the first window drawn already has them.
+    Promise.all([
+      fetch("/preview-data/prices").then((r) => r.json()).then((j) => { prices = j?.items ?? []; }).catch(() => {}),
+      fetch("/preview-data/icons").then((r) => r.json()).then((j) => { icons = j ?? {}; }).catch(() => {}),
+    ]).then(() => fetch("/preview-data/samples")).then((r) => r.json()).then((l) => { setList(l ?? []); load(""); }).catch(() => load(""));
   }, []);
   return (
     <div className="pv-controls">
       <b>Price window preview</b>
       <select value={pick} onChange={(e) => load(e.target.value)}>
         <option value="">Built-in example (rare ring)</option>
+        {Object.keys(FRAGMENTS).map((f) => <option key={f} value={"frag:" + f}>Fragment: {f}</option>)}
         {list.map((s) => <option key={s} value={s}>{s}</option>)}
       </select>
       <select value={m} onChange={(e) => { mode = e.target.value as typeof mode; setM(mode); }}>

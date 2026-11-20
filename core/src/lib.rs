@@ -15,6 +15,7 @@ pub mod pob;
 pub mod preview;
 pub mod prices;
 pub mod profiles;
+pub mod related;
 pub mod rules;
 pub mod saved;
 pub mod search;

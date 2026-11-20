@@ -1,0 +1,1682 @@
+{
+ "source": "Awakened PoE Trade item-drop.json (MIT, (c) 2020 Alexander Drozdov)",
+ "groups": [
+  {
+   "group": [
+    "Sacrifice at Dawn",
+    "Sacrifice at Midnight",
+    "Sacrifice at Noon",
+    "Sacrifice at Dusk"
+   ],
+   "set": true,
+   "drops": [
+    "Atziri's Promise",
+    "Doryani's Catalyst",
+    "Mortal Ignorance",
+    "Mortal Hope",
+    "Mortal Rage",
+    "Mortal Grief",
+    "Alluring Bounty",
+    "The Ethereal"
+   ]
+  },
+  {
+   "group": [
+    "Mortal Ignorance",
+    "Mortal Hope",
+    "Mortal Rage",
+    "Mortal Grief"
+   ],
+   "set": true,
+   "drops": [
+    "Atziri's Acuity",
+    "Atziri's Disfavour",
+    "The Vertex",
+    "Atziri's Splendour",
+    "Beauty",
+    "Alluring Bounty",
+    "House of Mirrors"
+   ]
+  },
+  {
+   "group": [
+    "Vaal Temple Map"
+   ],
+   "set": false,
+   "drops": [
+    "Cooperation",
+    "Beauty Through Death"
+   ]
+  },
+  {
+   "group": [
+    "Shaper Guardian Map"
+   ],
+   "set": false,
+   "drops": [
+    "Fragment of the Minotaur",
+    "Fragment of the Chimera",
+    "Fragment of the Phoenix",
+    "Fragment of the Hydra"
+   ]
+  },
+  {
+   "group": [
+    "Nightmare Map"
+   ],
+   "set": false,
+   "drops": [
+    "Malachai's Mark",
+    "Manastorm",
+    "Yoke of Suffering",
+    "The Dark Seer",
+    "Wraithlord"
+   ]
+  },
+  {
+   "group": [
+    "The Black Barya"
+   ],
+   "set": false,
+   "drops": [
+    "The Sands of Time",
+    "The Broken Elegy",
+    "Screams of the Desiccated"
+   ]
+  },
+  {
+   "group": [
+    "Fleshrender",
+    "Khatal's Weeping",
+    "The Bane of Hope",
+    "Saresh's Darkness",
+    "The Desecrated Chalice",
+    "Coin of Restoration"
+   ],
+   "set": false,
+   "drops": [
+    "Skysunder",
+    "Khatal's Geyser",
+    "The Flame of Hope",
+    "Solerai's Radiance",
+    "The Sacred Chalice"
+   ]
+  },
+  {
+   "group": [
+    "Skysunder",
+    "Khatal's Geyser",
+    "The Flame of Hope",
+    "Solerai's Radiance",
+    "The Sacred Chalice",
+    "Coin of Desecration"
+   ],
+   "set": false,
+   "drops": [
+    "Fleshrender",
+    "Khatal's Weeping",
+    "The Bane of Hope",
+    "Saresh's Darkness",
+    "The Desecrated Chalice"
+   ]
+  },
+  {
+   "group": [
+    "Hivebrain Gland"
+   ],
+   "set": false,
+   "drops": [
+    "Flesh of Xesht",
+    "Uul-Netol's Vow",
+    "The Sundered Will",
+    "Hand of the Lords",
+    "The Grey Wind",
+    "The Will of Xoph",
+    "The Will of Tul",
+    "The Will of Esh",
+    "The Will of Uul-Netol"
+   ]
+  },
+  {
+   "group": [
+    "Fragment of the Minotaur",
+    "Fragment of the Chimera",
+    "Fragment of the Phoenix",
+    "Fragment of the Hydra"
+   ],
+   "set": true,
+   "drops": [
+    "Orb of Dominance",
+    "Shaper's Exalted Orb",
+    "Dying Sun",
+    "Fragment of Knowledge",
+    "Fragment of Shape",
+    "Shaper's Touch",
+    "Solstice Vigil",
+    "Voidwalker",
+    "Voidstorm Support"
+   ]
+  },
+  {
+   "group": [
+    "Cosmic Fragment"
+   ],
+   "set": false,
+   "drops": [
+    "Starforge",
+    "Echoes of Creation",
+    "Entropic Devastation",
+    "The Tides of Time",
+    "The Unblinking Eye",
+    "Sublime Vision",
+    "Cosmic Reliquary Key"
+   ]
+  },
+  {
+   "group": [
+    "Fragment of Eradication",
+    "Fragment of Enslavement",
+    "Fragment of Purification",
+    "Fragment of Constriction"
+   ],
+   "set": true,
+   "drops": [
+    "Orb of Dominance",
+    "Elder's Exalted Orb",
+    "Watcher's Eye",
+    "Fragment of Terror",
+    "Fragment of Emptiness",
+    "Impresence",
+    "Cyclopean Coil",
+    "Hopeshredder",
+    "Blasphemer's Grasp",
+    "Nebuloch",
+    "Shimmeron"
+   ]
+  },
+  {
+   "group": [
+    "Fragment of Knowledge",
+    "Fragment of Shape",
+    "Fragment of Terror",
+    "Fragment of Emptiness"
+   ],
+   "set": true,
+   "drops": [
+    "Orb of Dominance",
+    "Elder's Exalted Orb",
+    "Shaper's Exalted Orb",
+    "Watcher's Eye",
+    "Disintegrator",
+    "Voidfletcher",
+    "Indigon",
+    "Mark of the Elder",
+    "Mark of the Shaper"
+   ]
+  },
+  {
+   "group": [
+    "Decaying Fragment"
+   ],
+   "set": false,
+   "drops": [
+    "Voidforge",
+    "The Eternity Shroud",
+    "Call of the Void",
+    "Soul Ascension",
+    "The Devourer of Minds",
+    "Sublime Vision",
+    "Curio of Decay",
+    "Decaying Reliquary Key"
+   ]
+  },
+  {
+   "group": [
+    "Syndicate Medallion"
+   ],
+   "set": false,
+   "drops": [
+    "Veiled Exalted Orb",
+    "Cinderswallow Urn",
+    "Spinehail",
+    "The Devouring Diadem",
+    "Bitterbind Point",
+    "The Queen's Hunger",
+    "Cane of Kulemak"
+   ]
+  },
+  {
+   "group": [
+    "Echo of Loneliness",
+    "Memory of Loneliness"
+   ],
+   "set": false,
+   "drops": [
+    "Orb of Remembrance",
+    "Betrayal's Sting",
+    "The Arkhon's Tools",
+    "Venarius' Astrolabe",
+    "Legacy of the Rose",
+    "Bound By Destiny"
+   ]
+  },
+  {
+   "group": [
+    "Echo of Trauma",
+    "Memory of Trauma"
+   ],
+   "set": false,
+   "drops": [
+    "Orb of Intention",
+    "Servant of Decay",
+    "Coiling Whisper",
+    "Enmity's Embrace",
+    "Starcaller",
+    "Bound By Destiny"
+   ]
+  },
+  {
+   "group": [
+    "Echo of Reverence",
+    "Memory of Reverence"
+   ],
+   "set": false,
+   "drops": [
+    "Orb of Unravelling",
+    "Whispers of Infinity",
+    "The Dark Monarch",
+    "Seven Teachings",
+    "Wine of the Prophet",
+    "Bound By Destiny"
+   ]
+  },
+  {
+   "group": [
+    "Lonely Fragment"
+   ],
+   "set": false,
+   "drops": [
+    "Festering Resentment",
+    "Refuge in Isolation",
+    "Bitter Instinct",
+    "Haunting Memories",
+    "Lonely Reliquary Key"
+   ]
+  },
+  {
+   "group": [
+    "Traumatic Fragment"
+   ],
+   "set": false,
+   "drops": [
+    "Woespike",
+    "Coiling Whisper",
+    "The Caged Mammoth",
+    "Wing of the Wyvern",
+    "Traumatic Reliquary Key"
+   ]
+  },
+  {
+   "group": [
+    "Reverent Fragment"
+   ],
+   "set": false,
+   "drops": [
+    "The Golden Charlatan",
+    "Whispers of Infinity",
+    "The Hallowed Monarch",
+    "Wellwater Phylactery",
+    "Reverent Reliquary Key"
+   ]
+  },
+  {
+   "group": [
+    "Golden Oil",
+    "Silver Oil",
+    "Opalescent Oil",
+    "Black Oil",
+    "Crimson Oil",
+    "Violet Oil",
+    "Indigo Oil",
+    "Azure Oil",
+    "Teal Oil",
+    "Verdant Oil",
+    "Amber Oil",
+    "Sepia Oil",
+    "Clear Oil"
+   ],
+   "set": false,
+   "drops": [
+    "Reflective Oil",
+    "Tainted Oil",
+    "Prismatic Oil"
+   ]
+  },
+  {
+   "group": [
+    "Tainted Divine Teardrop",
+    "Tainted Orb of Fusing",
+    "Tainted Mythic Orb",
+    "Tainted Exalted Orb",
+    "Tainted Chaos Orb",
+    "Tainted Chromatic Orb",
+    "Tainted Jeweller's Orb"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Lesser Eldritch Ember",
+    "Greater Eldritch Ember",
+    "Grand Eldritch Ember",
+    "Exceptional Eldritch Ember"
+   ],
+   "set": false,
+   "drops": [
+    "Lesser Eldritch Ichor",
+    "Greater Eldritch Ichor",
+    "Grand Eldritch Ichor",
+    "Exceptional Eldritch Ichor",
+    "Orb of Conflict"
+   ]
+  },
+  {
+   "group": [
+    "Lesser Eldritch Ichor",
+    "Greater Eldritch Ichor",
+    "Grand Eldritch Ichor",
+    "Exceptional Eldritch Ichor"
+   ],
+   "set": false,
+   "drops": [
+    "Lesser Eldritch Ember",
+    "Greater Eldritch Ember",
+    "Grand Eldritch Ember",
+    "Exceptional Eldritch Ember",
+    "Orb of Conflict"
+   ]
+  },
+  {
+   "group": [
+    "Al-Hezmin's Crest",
+    "Baran's Crest",
+    "Veritania's Crest",
+    "Drox's Crest"
+   ],
+   "set": true,
+   "drops": [
+    "Awakener's Orb",
+    "Orb of Dominance",
+    "Crown of the Inward Eye",
+    "Hands of the High Templar",
+    "Thread of Hope",
+    "The Burden of Truth",
+    "Annihilation Support"
+   ]
+  },
+  {
+   "group": [
+    "Awakening Fragment"
+   ],
+   "set": false,
+   "drops": [
+    "The Saviour",
+    "Oriath's End",
+    "Zana's Ingenuity",
+    "Thread of Hope",
+    "The Tempest Rising",
+    "Oubliette Reliquary Key"
+   ]
+  },
+  {
+   "group": [
+    "Polaric Invitation"
+   ],
+   "set": false,
+   "drops": [
+    "Polaric Devastation",
+    "Sudden Dawn",
+    "The Eternal Struggle"
+   ]
+  },
+  {
+   "group": [
+    "Incandescent Invitation"
+   ],
+   "set": false,
+   "drops": [
+    "Forbidden Flame",
+    "Dissolution of the Flesh",
+    "Dawnbreaker",
+    "Dawnstrider",
+    "Exceptional Eldritch Ember"
+   ]
+  },
+  {
+   "group": [
+    "Blazing Fragment"
+   ],
+   "set": false,
+   "drops": [
+    "Crystallised Omniscience",
+    "The Annihilating Light",
+    "Annihilation's Approach",
+    "The Celestial Brace",
+    "Curio of Absorption",
+    "Archive Reliquary Key"
+   ]
+  },
+  {
+   "group": [
+    "Writhing Invitation"
+   ],
+   "set": false,
+   "drops": [
+    "Ceaseless Feast",
+    "Black Zenith",
+    "The Eternal Struggle",
+    "Choking Guilt"
+   ]
+  },
+  {
+   "group": [
+    "Screaming Invitation"
+   ],
+   "set": false,
+   "drops": [
+    "Forbidden Flesh",
+    "Melding of the Flesh",
+    "The Gluttonous Tide",
+    "Inextricable Fate",
+    "Exceptional Eldritch Ichor"
+   ]
+  },
+  {
+   "group": [
+    "Devouring Fragment"
+   ],
+   "set": false,
+   "drops": [
+    "Nimis",
+    "Ashes of the Stars",
+    "Ravenous Passion",
+    "Curio of Consumption",
+    "Visceral Reliquary Key"
+   ]
+  },
+  {
+   "group": [
+    "Crescent Splinter",
+    "The Maven's Writ"
+   ],
+   "set": false,
+   "drops": [
+    "Orb of Conflict",
+    "Doppelgänger Guise",
+    "Echoforge",
+    "Arn's Anguish",
+    "Graven's Secret",
+    "Olesya's Delight",
+    "Legacy of Fury"
+   ]
+  },
+  {
+   "group": [
+    "Reality Fragment"
+   ],
+   "set": false,
+   "drops": [
+    "Impossible Escape",
+    "Viridi's Veil",
+    "Progenesis",
+    "Grace of the Goddess",
+    "Curio of Potential",
+    "Shiny Reliquary Key"
+   ]
+  },
+  {
+   "group": [
+    "An Audience With The King"
+   ],
+   "set": false,
+   "drops": [
+    "Pragmatism",
+    "The Untouched Soul",
+    "The Light of Meaning",
+    "The Burden of Shadows",
+    "Perfect Forest Tiger"
+   ]
+  },
+  {
+   "group": [
+    "Cursed Poppet"
+   ],
+   "set": false,
+   "drops": [
+    "Bane of the Apostate",
+    "Veil of Flesh",
+    "The Covetous Dark"
+   ]
+  },
+  {
+   "group": [
+    "Zorath's Eye of Malevolence",
+    "Zorath's Eye of Authority",
+    "Zorath's Eye of the Inevitable",
+    "Zorath's Eye of the Endless"
+   ],
+   "set": false,
+   "drops": [
+    "Subsume the Source",
+    "Spinesnatch",
+    "Festering Vengeance",
+    "Extinguishing Grasp",
+    "Baleful Dominion",
+    "Destructive Aspiration"
+   ]
+  },
+  {
+   "group": [
+    "Festering Vengeance",
+    "Extinguishing Grasp",
+    "Baleful Dominion",
+    "Destructive Aspiration"
+   ],
+   "set": false,
+   "drops": [
+    "Reclaimed Malevolence"
+   ]
+  },
+  {
+   "group": [
+    "Abrasive Catalyst",
+    "Fertile Catalyst",
+    "Imbued Catalyst",
+    "Intrinsic Catalyst",
+    "Prismatic Catalyst",
+    "Tempering Catalyst",
+    "Turbulent Catalyst",
+    "Unstable Catalyst",
+    "Accelerating Catalyst",
+    "Noxious Catalyst"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Timeless Eternal Empire Splinter",
+    "Timeless Karui Splinter",
+    "Timeless Maraketh Splinter",
+    "Timeless Templar Splinter",
+    "Timeless Vaal Splinter"
+   ],
+   "set": false,
+   "drops": [
+    "Timeless Eternal Emblem",
+    "Timeless Karui Emblem",
+    "Timeless Maraketh Emblem",
+    "Timeless Templar Emblem",
+    "Timeless Vaal Emblem"
+   ]
+  },
+  {
+   "group": [
+    "Timeless Eternal Emblem",
+    "Timeless Karui Emblem",
+    "Timeless Maraketh Emblem",
+    "Timeless Templar Emblem",
+    "Timeless Vaal Emblem"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Prime Chaotic Resonator",
+    "Powerful Chaotic Resonator",
+    "Potent Chaotic Resonator",
+    "Primitive Chaotic Resonator"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "The Beachhead"
+   ],
+   "set": false,
+   "drops": [
+    "Infused Beachhead"
+   ]
+  },
+  {
+   "group": [
+    "Expedition Logbook",
+    "Olroth's Charge",
+    "Faithguard",
+    "Medved's Challenge",
+    "Nightgrip"
+   ],
+   "set": false,
+   "drops": [
+    "Elixir of the Unbroken Circle",
+    "Vorana's Preparation",
+    "Starlight Chalice",
+    "Olroth's Resolve",
+    "Cadigan's Crown",
+    "Vorana's March"
+   ]
+  },
+  {
+   "group": [
+    "Sacred Blossom"
+   ],
+   "set": false,
+   "drops": [
+    "Sacred Crystallised Lifeforce",
+    "Forbidden Shako",
+    "Abhorrent Interrogation",
+    "Law of the Wilds",
+    "Witchhunter's Judgment",
+    "The Bitter Blossom",
+    "The Aspirant"
+   ]
+  },
+  {
+   "group": [
+    "Farrul's Bite",
+    "Farrul's Pounce",
+    "Farrul's Fur",
+    "Farrul's Chase"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Craiceann's Chitin",
+    "Craiceann's Carapace",
+    "Craiceann's Pincers",
+    "Craiceann's Tracks"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Fenumus' Toxins",
+    "Fenumus' Shroud",
+    "Fenumus' Weave",
+    "Fenumus' Spinnerets"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Saqawal's Flock",
+    "Saqawal's Nest",
+    "Saqawal's Winds",
+    "Saqawal's Talons"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Simulacrum Splinter",
+    "Simulacrum"
+   ],
+   "set": false,
+   "drops": [
+    "Split Personality",
+    "Megalomaniac",
+    "Voices"
+   ]
+  },
+  {
+   "group": [
+    "Ancient Orb",
+    "Astragali",
+    "Voidborn Reliquary Key",
+    "Valdo's Puzzle Box"
+   ],
+   "set": false,
+   "drops": [
+    "Headhunter",
+    "Mageblood",
+    "Defiance of Destiny",
+    "The Squire",
+    "Soul Taker"
+   ]
+  },
+  {
+   "group": [
+    "The Doctor",
+    "The Nurse",
+    "The Patient"
+   ],
+   "set": false,
+   "drops": [
+    "Headhunter"
+   ]
+  },
+  {
+   "group": [
+    "Hall of Grandmasters"
+   ],
+   "set": false,
+   "drops": [
+    "The Immortal"
+   ]
+  },
+  {
+   "group": [
+    "Doryani's Machinarium"
+   ],
+   "set": false,
+   "drops": [
+    "Doryani's Delusion"
+   ]
+  },
+  {
+   "group": [
+    "House of Mirrors",
+    "Seven Years Bad Luck"
+   ],
+   "set": false,
+   "drops": [
+    "Mirror of Kalandra",
+    "Mirror Shard"
+   ]
+  },
+  {
+   "group": [
+    "Offering to the Goddess",
+    "Gift to the Goddess",
+    "Dedication to the Goddess",
+    "Tribute to the Goddess"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Eldritch Orb of Annulment",
+    "Eldritch Chaos Orb",
+    "Eldritch Exalted Orb",
+    "Exalted Orb",
+    "Orb of Annulment",
+    "Farric Wolf Alpha",
+    "Farric Lynx Alpha"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Hunter's Exalted Orb",
+    "Warlord's Exalted Orb",
+    "Crusader's Exalted Orb",
+    "Redeemer's Exalted Orb",
+    "Shaper's Exalted Orb",
+    "Elder's Exalted Orb",
+    "Awakener's Orb",
+    "Orb of Dominance"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Orb of Fusing",
+    "Omen of Connections",
+    "Bestiary Thread",
+    "Black Mórrigan",
+    "Craicic Sand Spitter"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Watcher's Eye",
+    "Wild Hellion Alpha"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Cortex",
+    "Replica Cortex"
+   ],
+   "set": false,
+   "drops": [
+    "Bottled Faith",
+    "Garb of the Ephemeral",
+    "Perepiteia",
+    "Offering to the Serpent",
+    "Greater Kinetic Instability Support",
+    "The Hook"
+   ]
+  },
+  {
+   "group": [
+    "Synthesising Fragment"
+   ],
+   "set": false,
+   "drops": [
+    "Rational Doctrine",
+    "The Apostate",
+    "Mask of the Tribunal",
+    "Nebulis",
+    "Circle of Ambition",
+    "Forgotten Reliquary Key"
+   ]
+  },
+  {
+   "group": [
+    "Rewritten Distant Memory",
+    "Augmented Distant Memory",
+    "Altered Distant Memory",
+    "Twisted Distant Memory"
+   ],
+   "set": false,
+   "drops": [
+    "Circle of Anguish",
+    "Circle of Fear",
+    "Circle of Guilt",
+    "Circle of Nostalgia",
+    "Circle of Regret",
+    "Cortex"
+   ]
+  },
+  {
+   "group": [
+    "The Twilight Temple"
+   ],
+   "set": false,
+   "drops": [
+    "Vix Lunaris",
+    "Invictus Solaris"
+   ]
+  },
+  {
+   "group": [
+    "The Vinktar Square"
+   ],
+   "set": false,
+   "drops": [
+    "Vessel of Vinktar"
+   ]
+  },
+  {
+   "group": [
+    "The Coward's Trial",
+    "Replica Poorjoy's Asylum",
+    "Poorjoy's Asylum"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Contract: Breaking the Unbreakable"
+   ],
+   "set": false,
+   "drops": [
+    "Apex Mode",
+    "Nadir Mode"
+   ]
+  },
+  {
+   "group": [
+    "Contract: Death to Darnaw"
+   ],
+   "set": false,
+   "drops": [
+    "The Admiral"
+   ]
+  },
+  {
+   "group": [
+    "Contract: Heart of Glory"
+   ],
+   "set": false,
+   "drops": [
+    "The Fledgling"
+   ]
+  },
+  {
+   "group": [
+    "Contract: The Slaver King"
+   ],
+   "set": false,
+   "drops": [
+    "Chains of Emancipation"
+   ]
+  },
+  {
+   "group": [
+    "Contract: The Twins"
+   ],
+   "set": false,
+   "drops": [
+    "Leadership's Price"
+   ]
+  },
+  {
+   "group": [
+    "Curio of Absorption",
+    "Curio of Consumption",
+    "Curio of Decay",
+    "Curio of Potential"
+   ],
+   "set": false,
+   "drops": [
+    "The Utmost"
+   ]
+  },
+  {
+   "group": [
+    "Primordial Might",
+    "Primordial Harmony",
+    "Primordial Eminence"
+   ],
+   "set": false,
+   "drops": [
+    "The Anima Stone"
+   ]
+  },
+  {
+   "group": [
+    "Grelwood Shank",
+    "Beltimber Blade"
+   ],
+   "set": false,
+   "drops": [
+    "Arborix"
+   ]
+  },
+  {
+   "group": [
+    "Shade of Solaris",
+    "Light of Lunaris"
+   ],
+   "set": false,
+   "drops": [
+    "Duskdawn"
+   ]
+  },
+  {
+   "group": [
+    "The Goddess Bound"
+   ],
+   "set": false,
+   "drops": [
+    "The Goddess Scorned"
+   ]
+  },
+  {
+   "group": [
+    "Soul Taker",
+    "Heartbreaker"
+   ],
+   "set": false,
+   "drops": [
+    "Kingmaker"
+   ]
+  },
+  {
+   "group": [
+    "Invictus Solaris",
+    "Vix Lunaris"
+   ],
+   "set": false,
+   "drops": [
+    "Magna Eclipsis"
+   ]
+  },
+  {
+   "group": [
+    "Feastbind",
+    "Faminebind"
+   ],
+   "set": false,
+   "drops": [
+    "The Retch"
+   ]
+  },
+  {
+   "group": [
+    "Berek's Grip",
+    "Berek's Pass",
+    "Berek's Respite"
+   ],
+   "set": false,
+   "drops": [
+    "The Taming"
+   ]
+  },
+  {
+   "group": [
+    "Beauty",
+    "Ambition",
+    "Cooperation",
+    "Curiosity"
+   ],
+   "set": false,
+   "drops": [
+    "The Adorned"
+   ]
+  },
+  {
+   "group": [
+    "First Piece of Brutality",
+    "Second Piece of Brutality",
+    "Third Piece of Brutality"
+   ],
+   "set": true,
+   "drops": [
+    "The Enmity Divine"
+   ]
+  },
+  {
+   "group": [
+    "The Enmity Divine",
+    "Haemocombustion Scroll"
+   ],
+   "set": false,
+   "drops": [
+    "The Yielding Mortality"
+   ]
+  },
+  {
+   "group": [
+    "First Piece of Directions",
+    "Second Piece of Directions",
+    "Third Piece of Directions"
+   ],
+   "set": true,
+   "drops": [
+    "The Fracturing Spinner"
+   ]
+  },
+  {
+   "group": [
+    "The Fracturing Spinner",
+    "Fragmentation Scroll"
+   ],
+   "set": false,
+   "drops": [
+    "The Shattered Divinity"
+   ]
+  },
+  {
+   "group": [
+    "First Piece of Focus",
+    "Second Piece of Focus",
+    "Third Piece of Focus",
+    "Fourth Piece of Focus"
+   ],
+   "set": true,
+   "drops": [
+    "The Unshattered Will"
+   ]
+  },
+  {
+   "group": [
+    "The Unshattered Will",
+    "Specularity Scroll"
+   ],
+   "set": false,
+   "drops": [
+    "The Immortal Will"
+   ]
+  },
+  {
+   "group": [
+    "First Piece of Storms",
+    "Second Piece of Storms",
+    "Third Piece of Storms"
+   ],
+   "set": true,
+   "drops": [
+    "The Tempest's Binding"
+   ]
+  },
+  {
+   "group": [
+    "The Tempest's Binding",
+    "Deregulation Scroll"
+   ],
+   "set": false,
+   "drops": [
+    "The Tempest's Liberation"
+   ]
+  },
+  {
+   "group": [
+    "First Piece of the Arcane",
+    "Second Piece of the Arcane",
+    "Third Piece of the Arcane"
+   ],
+   "set": true,
+   "drops": [
+    "The Rippling Thoughts"
+   ]
+  },
+  {
+   "group": [
+    "The Rippling Thoughts",
+    "Electroshock Scroll"
+   ],
+   "set": false,
+   "drops": [
+    "The Surging Thoughts"
+   ]
+  },
+  {
+   "group": [
+    "First Piece of Time",
+    "Second Piece of Time"
+   ],
+   "set": true,
+   "drops": [
+    "The Flow Untethered"
+   ]
+  },
+  {
+   "group": [
+    "The Flow Untethered",
+    "Time-light Scroll"
+   ],
+   "set": false,
+   "drops": [
+    "The Torrent's Reclamation"
+   ]
+  },
+  {
+   "group": [
+    "The Blue Dream",
+    "Skin of the Loyal",
+    "The Red Dream",
+    "Severed in Sleep",
+    "Eye of Chayula",
+    "The Green Dream",
+    "Flesh of Xesht"
+   ],
+   "set": false,
+   "drops": [
+    "The Blue Nightmare",
+    "Skin of the Lords",
+    "The Red Nightmare",
+    "United in Dream",
+    "Presence of Chayula",
+    "The Green Nightmare"
+   ]
+  },
+  {
+   "group": [
+    "Esh's Mirror",
+    "Voice of the Storm",
+    "Hand of Thought and Motion",
+    "Flesh of Xesht"
+   ],
+   "set": false,
+   "drops": [
+    "Esh's Visage",
+    "Choir of the Storm",
+    "Hand of Wisdom and Action"
+   ]
+  },
+  {
+   "group": [
+    "Tulborn",
+    "The Snowblind Grace",
+    "The Halcyon",
+    "Flesh of Xesht"
+   ],
+   "set": false,
+   "drops": [
+    "Tulfall",
+    "The Perfect Form",
+    "The Pandemonius"
+   ]
+  },
+  {
+   "group": [
+    "The Infinite Pursuit",
+    "The Anticipation",
+    "Uul-Netol's Kiss",
+    "Flesh of Xesht"
+   ],
+   "set": false,
+   "drops": [
+    "The Red Trail",
+    "The Surrender",
+    "Uul-Netol's Embrace"
+   ]
+  },
+  {
+   "group": [
+    "The Formless Flame",
+    "Xoph's Inception",
+    "Xoph's Heart",
+    "Flesh of Xesht"
+   ],
+   "set": false,
+   "drops": [
+    "The Formless Inferno",
+    "Xoph's Nurture",
+    "Xoph's Blood"
+   ]
+  },
+  {
+   "group": [
+    "Vial of Awakening",
+    "Apep's Slumber"
+   ],
+   "set": false,
+   "drops": [
+    "Apep's Supremacy"
+   ]
+  },
+  {
+   "group": [
+    "Vial of Consequence",
+    "Coward's Chains"
+   ],
+   "set": false,
+   "drops": [
+    "Coward's Legacy"
+   ]
+  },
+  {
+   "group": [
+    "Vial of Dominance",
+    "Architect's Hand"
+   ],
+   "set": false,
+   "drops": [
+    "Slavedriver's Hand"
+   ]
+  },
+  {
+   "group": [
+    "Vial of Fate",
+    "Story of the Vaal"
+   ],
+   "set": false,
+   "drops": [
+    "Fate of the Vaal"
+   ]
+  },
+  {
+   "group": [
+    "Vial of Summoning",
+    "Mask of the Spirit Drinker"
+   ],
+   "set": false,
+   "drops": [
+    "Mask of the Stitched Demon"
+   ]
+  },
+  {
+   "group": [
+    "Vial of the Ritual",
+    "Dance of the Offered"
+   ],
+   "set": false,
+   "drops": [
+    "Omeyocan"
+   ]
+  },
+  {
+   "group": [
+    "Tempered Flesh",
+    "Tempered Spirit",
+    "Tempered Mind",
+    "Vial of Transcendence"
+   ],
+   "set": false,
+   "drops": [
+    "Transcendent Flesh",
+    "Transcendent Spirit",
+    "Transcendent Mind"
+   ]
+  },
+  {
+   "group": [
+    "Vial of Sacrifice",
+    "Sacrificial Heart"
+   ],
+   "set": false,
+   "drops": [
+    "Zerphi's Heart"
+   ]
+  },
+  {
+   "group": [
+    "Vial of the Ghost",
+    "Soul Catcher"
+   ],
+   "set": false,
+   "drops": [
+    "Soul Ripper"
+   ]
+  },
+  {
+   "group": [
+    "Trarthan Scarab",
+    "Trarthan Scarab of Renown"
+   ],
+   "set": false,
+   "drops": [
+    "Hand of Heresy",
+    "Binds of Bloody Vengeance",
+    "Azadi Crest",
+    "The Ghastly Theatre",
+    "Howlcrack",
+    "Scornflux"
+   ]
+  },
+  {
+   "group": [
+    "Deafening Essence of Greed",
+    "Shrieking Essence of Greed",
+    "Screaming Essence of Greed"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Deafening Essence of Contempt",
+    "Shrieking Essence of Contempt",
+    "Screaming Essence of Contempt"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Deafening Essence of Hatred",
+    "Shrieking Essence of Hatred",
+    "Screaming Essence of Hatred"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Deafening Essence of Woe",
+    "Shrieking Essence of Woe",
+    "Screaming Essence of Woe"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Deafening Essence of Fear",
+    "Shrieking Essence of Fear",
+    "Screaming Essence of Fear"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Deafening Essence of Anger",
+    "Shrieking Essence of Anger",
+    "Screaming Essence of Anger"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Deafening Essence of Torment",
+    "Shrieking Essence of Torment",
+    "Screaming Essence of Torment"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Deafening Essence of Sorrow",
+    "Shrieking Essence of Sorrow",
+    "Screaming Essence of Sorrow"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Deafening Essence of Rage",
+    "Shrieking Essence of Rage",
+    "Screaming Essence of Rage"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Deafening Essence of Suffering",
+    "Shrieking Essence of Suffering",
+    "Screaming Essence of Suffering"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Deafening Essence of Wrath",
+    "Shrieking Essence of Wrath",
+    "Screaming Essence of Wrath"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Deafening Essence of Doubt",
+    "Shrieking Essence of Doubt",
+    "Screaming Essence of Doubt"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Deafening Essence of Loathing",
+    "Shrieking Essence of Loathing",
+    "Screaming Essence of Loathing"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Deafening Essence of Zeal",
+    "Shrieking Essence of Zeal",
+    "Screaming Essence of Zeal"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Deafening Essence of Anguish",
+    "Shrieking Essence of Anguish",
+    "Screaming Essence of Anguish"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Deafening Essence of Spite",
+    "Shrieking Essence of Spite",
+    "Screaming Essence of Spite"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Deafening Essence of Scorn",
+    "Shrieking Essence of Scorn",
+    "Screaming Essence of Scorn"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Deafening Essence of Envy",
+    "Shrieking Essence of Envy",
+    "Screaming Essence of Envy"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Deafening Essence of Misery",
+    "Shrieking Essence of Misery",
+    "Screaming Essence of Misery"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Deafening Essence of Dread",
+    "Shrieking Essence of Dread",
+    "Screaming Essence of Dread"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Essence of Insanity",
+    "Essence of Horror",
+    "Essence of Delirium",
+    "Essence of Hysteria"
+   ],
+   "set": false,
+   "drops": [
+    "Primal Crystallised Lifeforce"
+   ]
+  },
+  {
+   "group": [
+    "Primal Crystallised Lifeforce",
+    "Wild Crystallised Lifeforce",
+    "Vivid Crystallised Lifeforce",
+    "Sacred Crystallised Lifeforce"
+   ],
+   "set": false,
+   "drops": [
+    "Diviner's Delirium Orb",
+    "Fractured Fossil",
+    "Golden Oil"
+   ]
+  },
+  {
+   "group": [
+    "Ventor's Gamble",
+    "Sadima's Touch",
+    "Bisco's Leash",
+    "Goldwyrm",
+    "Divination Distillate",
+    "The Ascetic",
+    "Greed's Embrace",
+    "Sentari's Answer"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "Cast on Death Support",
+    "Goldrim",
+    "Tabula Rasa",
+    "Lochtonial Caress",
+    "Wanderlust",
+    "Lifesprig",
+    "Karui Ward"
+   ],
+   "set": false,
+   "drops": []
+  },
+  {
+   "group": [
+    "The Original Scripture",
+    "The Power and the Promise",
+    "The Blood of Innocence",
+    "The Chains of Castigation",
+    "The Second Sacrament",
+    "Forbidden Tome"
+   ],
+   "set": false,
+   "drops": [
+    "Original Sin",
+    "Eternal Damnation",
+    "The Balance of Terror",
+    "Sandstorm Visage",
+    "The Winds of Fate",
+    "Volatile Vaal Orb",
+    "The Gilded Chalice",
+    "The Hour of Divinity",
+    "The First Crest",
+    "The Night Lamp",
+    "The Broken Censer"
+   ]
+  }
+ ],
+ "recipes": [
+  {
+   "item": "The Maven's Writ",
+   "part": "Crescent Splinter",
+   "count": 10
+  },
+  {
+   "item": "Simulacrum",
+   "part": "Simulacrum Splinter",
+   "count": 300
+  },
+  {
+   "item": "Timeless Eternal Empire Emblem",
+   "part": "Timeless Eternal Empire Splinter",
+   "count": 100
+  },
+  {
+   "item": "Timeless Karui Emblem",
+   "part": "Timeless Karui Splinter",
+   "count": 100
+  },
+  {
+   "item": "Timeless Maraketh Emblem",
+   "part": "Timeless Maraketh Splinter",
+   "count": 100
+  },
+  {
+   "item": "Timeless Templar Emblem",
+   "part": "Timeless Templar Splinter",
+   "count": 100
+  },
+  {
+   "item": "Timeless Vaal Emblem",
+   "part": "Timeless Vaal Splinter",
+   "count": 100
+  }
+ ]
+}
