@@ -275,7 +275,7 @@ function MapCheck({ map }: { map: MapInfo }) {
           Copy map regex</button>
         {copied && <span className="muted small">{copied}</span>}
       </div>
-      <div className="muted small">Change which mods to warn about in Settings → Map check. Build the regex on the Maps page.</div>
+      <div className="muted small">Change which mods you can't run on the Maps page: this warning and the stash search use the same list.</div>
     </div>
   );
 }

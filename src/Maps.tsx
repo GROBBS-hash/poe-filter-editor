@@ -51,10 +51,16 @@ export default function Maps() {
   if (!st) return <div className="card">{err || "Loading the map mod list…"}</div>;
   const setWants = (p: Partial<Wants>) => { setSt({ ...st, wants: { ...st.wants, ...p } }); setCopied(false); };
   const toggle = (id: number) => { setSt({ ...st, bad: st.bad.includes(id) ? st.bad.filter((x) => x !== id) : [...st.bad, id] }); setCopied(false); };
-  const fromCheck = async () => {
-    const s = await invoke<{ map_avoid?: string[] | null }>("get_settings").catch(() => ({ map_avoid: null }));
-    const avoid = s.map_avoid;
-    setSt({ ...st, bad: st.mods.filter((m) => m.danger && (avoid == null || avoid.includes(m.danger))).map((m) => m.id) });
+  const [suggestNote, setSuggestNote] = useState("");
+  // The one list of mods you can't run (Ctrl+D warns about the same ones). Quick ways to fill it:
+  const usualDangers = () => setSt({ ...st, bad: st.mods.filter((m) => m.danger).map((m) => m.id) });
+  const fromBuild = async () => {
+    try {
+      const s = await invoke<{ name: string; why: string }[]>("map_suggest");
+      const names = s.map((x) => x.name);
+      setSt({ ...st, bad: st.mods.filter((m) => m.danger && names.includes(m.danger)).map((m) => m.id) });
+      setSuggestNote(`Ticked what your build can't run: ${s.map((x) => `${x.name} (${x.why})`).join(", ") || "nothing"}. Check them over.`);
+    } catch (e) { setSuggestNote(String(e)); }
   };
   const copy = () => { invoke("copy_text", { text: regex }); setCopied(true); };
   const trade = async () => {
@@ -125,10 +131,13 @@ export default function Maps() {
         <h2>Mods you can't run ({st.bad.length})</h2>
         <div className="row">
           <input className="text" placeholder="Search mods, e.g. reflect" value={q} onChange={(e) => setQ(e.target.value)} />
-          <button onClick={fromCheck} title="Tick the mods on your Settings → Map check list">Use my map check list</button>
+          <button onClick={fromBuild} title="Tick the mods your Path of Building build can't handle (needs a PoB link on My build)">Suggest from my build</button>
+          <button onClick={usualDangers} title="Tick the well-known dangerous mods (reflect, no regen, …)">Tick the usual dangers</button>
           <button onClick={() => setSt({ ...st, bad: [] })}>Untick all</button>
           <label className="check"><input type="checkbox" checked={nightmare} onChange={(e) => setNightmare(e.target.checked)} /><span>Show nightmare mods</span></label>
         </div>
+        {suggestNote && <p className="note small">{suggestNote}</p>}
+        <p className="muted small">This is the one list of mods you can't run: Ctrl+D warns about these on a map, and the stash search above hides maps that have them.</p>
         <div className="map-mods">
           {shown.map((m) => (
             <label key={m.id} className={`map-mod ${st.bad.includes(m.id) ? "on" : ""}`}>

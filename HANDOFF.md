@@ -252,6 +252,11 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   a chip per tab (worth + bar), and the picked tab's items grouped by name, most valuable first, listed ones marked.
   Scans from before this only have totals (the card says to scan again).
 
+- One map list 20 Nov: the Maps page's "Mods you can't run" (`map_tool.bad`, poe.re ids) is the only list. Ctrl+D flags map
+  mods by matching their wording to the ticked mods (`maps::map_info_bad`, numbers ignored); `map_avoid` only seeds the
+  first default. Settings → Map check is now a note + "Open the Maps page" (window event `goto-tab`). Maps page buttons:
+  "Suggest from my build" (`map_suggest`) and "Tick the usual dangers".
+
 
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
@@ -275,6 +280,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
       "Only sellers with at least N in stock" works; repeat item listings show "× N".
 - [ ] Related items panel beside the price window: lifeforce, fragments, invitations, boss keys.
 - [x] Wealth "By tab" works (confirmed 20 Nov).
+- [ ] Maps: tick a mod on the Maps page, Ctrl+D a map with it: shown in red; the stash search hides it. Settings → Map check opens the Maps page.
 - [ ] Menu icons: each page has its own colour tile (Find blue, Tiers coral, Wealth gold…), page title matches.
 - [ ] New Clean glass look: opens bigger and remembers its size; pages fade in; Wealth tiles look right; nothing broken on other pages.
 - [ ] Unidentified unique (e.g. Karui Sceptre): no false tier 1 / divine sound; the "Could be one of N uniques" list shows in F2 and Ctrl+D.

@@ -198,9 +198,37 @@ pub fn suggest(build: &Build) -> Vec<Suggestion> {
     out
 }
 
+/// The Ctrl+D map check against the one list of mods you can't run (the Maps page's ticks, poe.re's mod list):
+/// a map mod line is flagged when it matches any line of a ticked mod, numbers ignored.
+pub fn map_info_bad(text: &str, mods: &[crate::mapregex::MapModEntry], bad: &[i64]) -> MapInfo {
+    let shape = |s: &str| crate::trade::template(&s.to_lowercase()).0.replace('+', "").split_whitespace().collect::<Vec<_>>().join(" ");
+    let ticked: Vec<(String, String)> = mods.iter().filter(|m| bad.contains(&m.id)).flat_map(|m| {
+        let name = m.danger.clone().unwrap_or_else(|| "can't run".into());
+        m.text.split(" / ").map(move |part| (shape(part), name.clone())).collect::<Vec<_>>()
+    }).collect();
+    let mut info = map_info(text, Some(&[]));
+    for m in &mut info.mods {
+        let s = shape(&m.text);
+        m.warn = ticked.iter().find(|(t, _)| *t == s).map(|(_, n)| n.clone());
+    }
+    info
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn warns_from_the_maps_page_list() {
+        let e = |id: i64, text: &str| crate::mapregex::MapModEntry { id, text: text.into(), token: String::new(), scary: 0, nightmare: false,
+            trade_id: None, danger: None };
+        let mods = vec![e(1, "Monsters reflect 18% of Elemental Damage"), e(2, "Monsters Poison on Hit / Monsters have 100% increased Poison Duration")];
+        let t = "Item Class: Maps\nRarity: Rare\nX\nMap (Tier 14)\n--------\nItem Level: 83\n--------\nMonsters reflect 15% of Elemental Damage\nMonsters Poison on Hit\nArea has patches of Burning Ground\n--------\nTravel to this Map\n";
+        let only_poison = map_info_bad(t, &mods, &[2]);
+        let flagged: Vec<&str> = only_poison.mods.iter().filter(|m| m.warn.is_some()).map(|m| m.text.as_str()).collect();
+        assert_eq!(flagged, ["Monsters Poison on Hit"], "numbers ignored, only ticked mods: {:?}", only_poison.mods);
+        assert_eq!(map_info_bad(t, &mods, &[1, 2]).mods.iter().filter(|m| m.warn.is_some()).count(), 2);
+    }
     use crate::pob::{Gem, Group, Stage};
 
     const MAP: &str = "Item Class: Maps

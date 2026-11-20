@@ -107,9 +107,12 @@ export default function App() {
       setFocus({ ...src });
       refresh();
     });
+    // Other pages can send you somewhere (e.g. Settings → "Open the Maps page").
+    const onGoto = (e: Event) => { const t = (e as CustomEvent<string>).detail as Tab; if (t) setTab(t); };
+    window.addEventListener("goto-tab", onGoto);
     const onFocus = () => refresh();
     window.addEventListener("focus", onFocus);
-    return () => { a.then((f) => f()); c.then((f) => f()); d.then((f) => f()); g.then((f) => f()); window.removeEventListener("focus", onFocus); };
+    return () => { a.then((f) => f()); c.then((f) => f()); d.then((f) => f()); g.then((f) => f()); window.removeEventListener("focus", onFocus); window.removeEventListener("goto-tab", onGoto); };
   }, [refresh]);
 
   if (!ov) return error ? <div className="page">{error}</div> : <LoadingShell />;

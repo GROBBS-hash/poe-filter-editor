@@ -575,8 +575,15 @@ fn price_check(app: AppHandle) {
         }
         if let Some(it) = payload.setup.as_ref().map(|s| s.item.clone()) {
             if filter_core::maps::is_map(&it.item_class) && !payload.from_ground {
-                let avoid = state.store.lock().unwrap().settings.map_avoid.clone();
-                payload.map = Some(filter_core::maps::map_info(&text, avoid.as_deref()));
+                // One list of mods you can't run: the Maps page's ticks (which start from the map check list).
+                let (mods, _) = map_mods(&state);
+                let s = state.store.lock().unwrap().settings.clone();
+                payload.map = Some(if mods.is_empty() {
+                    filter_core::maps::map_info(&text, s.map_avoid.as_deref())
+                } else {
+                    let bad = s.map_tool.bad.clone().unwrap_or_else(|| filter_core::mapregex::default_bad(&mods, s.map_avoid.as_deref()));
+                    filter_core::maps::map_info_bad(&text, &mods, &bad)
+                });
             }
         }
         if let Some(it) = payload.setup.as_ref().map(|s| s.item.clone()) {
