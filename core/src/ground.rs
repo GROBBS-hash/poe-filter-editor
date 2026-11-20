@@ -179,8 +179,9 @@ fn split_stack(text: &str) -> (Option<u32>, &str) {
 /// "Karui Chopper (Tier 2)" -> (Some(2), "Karui Chopper")
 fn split_tier(text: &str) -> (Option<u32>, String) {
     let lower = text.to_lowercase();
-    if let Some(i) = lower.find("(tier") {
-        let tier = lower[i + 5..].chars().skip_while(|c| !c.is_ascii_digit())
+    // The reader sometimes misreads the end of the word ("(TIEE 4)").
+    if let Some(i) = lower.find("(tier").or_else(|| lower.find("(tie")).or_else(|| lower.find("(ti")) {
+        let tier = lower[i + 3..].chars().skip_while(|c| !c.is_ascii_digit())
             .take_while(|c| c.is_ascii_digit()).collect::<String>().parse().ok();
         return (tier, text[..i].trim().to_string());
     }
@@ -191,6 +192,15 @@ fn split_tier(text: &str) -> (Option<u32>, String) {
 /// first; if the text recognition garbled or split a word, a close match.
 pub fn match_base(text: &str, known: &HashSet<String>) -> Option<GroundMatch> {
     let (tier, without_tier) = split_tier(text);
+    // Maps: "MAP (TIER 14)", "BLIGHTED MAP (TIER 3)", "BLIGHT-RAVAGED MAP (TIER 16)" are all the base
+    // "Map (Tier N)" (class Maps). Not the gear item tier, and not the old "Map" fragment base.
+    if let Some(n) = tier {
+        let w = compact(&without_tier);
+        let b = format!("Map (Tier {n})");
+        if w.ends_with("map") && w.len() <= 24 && (known.contains(&b) || base_classes().contains_key(&b)) {
+            return Some(GroundMatch { base: b, stack: None, tier: None, superior: false, unique: None, confidence: 1.0 });
+        }
+    }
     let (stack, rest) = split_stack(&without_tier);
     let mut t = compact(rest);
     // "Superior" = has quality. The reader sometimes clips its first letters ("JPERIOR").
@@ -274,6 +284,13 @@ pub fn ground_item(segs: &[Segment], m: &GroundMatch, label: Option<LabelColours
     let mut item = Item { base_type: m.base.clone(), stack_size: m.stack, item_tier: m.tier,
         quality: m.superior.then_some(1), ..Default::default() };
     fill_class(&mut item);
+    if item.item_class == "Maps" {
+        item.map_tier = item.base_type.strip_prefix("Map (Tier ").and_then(|r| r.trim_end_matches(')').parse().ok());
+        // Rarity from the label's colours when the filter draws rarities differently; Normal otherwise.
+        item.rarity = "Normal".into();
+        if label.is_some() { item.rarity = guess_rarity(segs, &item, label, area_level); }
+        return item;
+    }
     let class = item.item_class.as_str();
     if let Some(name) = m.unique.as_ref().filter(|_| m.tier.is_none()) {
         item.rarity = "Unique".into();
@@ -383,6 +400,25 @@ mod tests {
     fn known() -> HashSet<String> {
         ["Coral Ring", "Ring", "Chaos Orb", "Orb of Alteration", "Leather Belt", "Divine Orb"]
             .iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn map_labels_are_map_tiers() {
+        let mut k = known();
+        k.insert("Map".into()); // NeverSink also names a plain \"Map\" base
+        for (text, n) in [("MAP (TIER 14)", 14), ("Map (Tier 2)", 2), ("BLIGHTED MAP (TIER 3)", 3), ("BLIGHT-RAVAGED MAP (TIER 16)", 16), ("MAP (TIEE 14)", 14)] {
+            let m = match_base(text, &k).unwrap_or_else(|| panic!("{text}"));
+            assert_eq!(m.base, format!("Map (Tier {n})"), "{text}");
+            assert_eq!(m.tier, None, "{text}");
+        }
+        // Read against NeverSink's real filter: tier 14 lands on its tier 14 map rule, not the catch-all.
+        let f = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/poe1-semistrict.filter")).unwrap();
+        let segs = parse_filter(&f);
+        let m = match_base("MAP (TIER 14)", &k).unwrap();
+        let it = ground_item(&segs, &m, None, 79);
+        assert_eq!((it.item_class.as_str(), it.map_tier, it.rarity.as_str()), ("Maps", Some(14), "Normal"));
+        let v = crate::evaluate::status(&segs, &it, Some(79), true).verdict;
+        assert!(v.decided_by.contains("maps_a_t14") || v.decided_by.contains("Tier 14"), "{}", v.decided_by);
     }
 
     #[test]

@@ -266,6 +266,16 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Unticking "Upgrade borders" drops the red border on higher-tier maps; ticking puts it back.
 - [ ] Step 3 "with / without" example labels match what the maps look like in game (colours from NeverSink's
       rules: `MapExtra.border` + `sample_tier`, drawn with the tier's own look).
+- [ ] F2 on a map on the ground: shows "Map (Tier 14)", class Maps, the red tier-14 look and NeverSink's tier 14 map
+      rule (not the pink "anything left over"); "Modify this rule" opens Tiers → Map tiers. Also a blighted map.
+      (`match_base` turns "… MAP (TIER N)" into base "Map (Tier N)"; `ground_item` sets map_tier. Blighted maps
+      still read as plain maps: the item has no blighted flag yet, so NeverSink's blighted rule can't match.)
+
+**Clickable looks (everywhere, 20 Nov)**
+- [ ] Every label preview has a gold outline and "✎ edit look" on hover; clicking opens the look editor for that rule:
+      Tiers rows, Map tiers groups / border examples / special maps, Prices tiers, My edits, the F2 / Find item panel,
+      Themes (opens the theme's colour editor; NeverSink's and built-in themes make a copy first).
+      Shared `LookButton` in StyleEditor.tsx. Saved as normal edits (survive NeverSink updates).
 
 **Build window (F6, new look 20 Nov)**
 - [ ] Opens bigger and easier to read; the tree fills the window.

@@ -92,6 +92,7 @@ mockIPC((cmd, args) => {
   if (cmd === "atlas_import") throw "The preview can't reach maxroll: try it in the app";
   if (cmd === "pob_get") return pob();
   if (cmd === "build_tree_opt") return [true, "P"];
+  if (cmd === "list_sounds") return [];
   if (cmd === "get_tiers") return [];
   if (cmd === "get_map_tiers") return mapTiers();
   if (cmd === "set_tiers") { const a = args as { tiers: string[]; show: boolean | null; clearStyle?: boolean; reset?: boolean }; for (const t of a.tiers) { if (a.clearStyle) extrasOff.add(t); else if (a.reset) extrasOff.delete(t); } for (const t of a.tiers) { if (a.show === false) mapHidden.add(t); else if (a.show) mapHidden.delete(t); } return []; }

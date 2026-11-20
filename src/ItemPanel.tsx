@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Item, RARITY_COLOUR, itemSub, itemTitle } from "./types";
-import StyleEditor, { CurrentStyle, CustomStyle, GAME_COLOURS, fromCurrent } from "./StyleEditor";
+import StyleEditor, { CurrentStyle, CustomStyle, GAME_COLOURS, LookButton, fromCurrent } from "./StyleEditor";
 import { ItemIcon } from "./icons";
 import BaseUniques from "./BaseUniques";
 
@@ -133,7 +133,7 @@ function StackTiers({ base, onDone }: { base: string; onDone: (msg: string) => v
   );
 }
 
-export default function ItemPanel({ start, inGame, replacing: replacingProp, onClose, onChanged, onEditingChange }: {
+export default function ItemPanel({ start, inGame, replacing: replacingProp, onClose, onChanged, onEditingChange, openLook }: {
   start: Picked;
   inGame: boolean;
   replacing?: Replacing | null;
@@ -141,6 +141,8 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
   onChanged?: () => void;
   /** Tells the pop-up window not to close itself while a sub-editor is open. */
   onEditingChange?: (editing: boolean) => void;
+  /** Open straight on the look editor (a label preview was clicked). */
+  openLook?: boolean;
 }) {
   const [picked, setPicked] = useState<Picked>(start);
   const [replacing, setReplacing] = useState<Replacing | null>(replacingProp ?? null);
@@ -151,7 +153,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
   /** Always, only while levelling (areas below 68), or only in maps. */
   const [when, setWhen] = useState<When>(replacingProp?.detail.when ?? "always");
   /** false = not editing; otherwise the stack size the look applies from (1 = all). */
-  const [editing, setEditingRaw] = useState<false | { minStack: number }>(false);
+  const [editing, setEditingRaw] = useState<false | { minStack: number }>(openLook ? { minStack: 1 } : false);
   const setEditing = (v: boolean | { minStack: number }) => setEditingRaw(v === true ? { minStack: 1 } : v);
   const [stackPick, setStackPick] = useState(-1); // index into the slider steps
   const [autoReload, setAutoReload] = useState(() => {
@@ -385,12 +387,12 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
           <div className="qm-status-top">
             <span className="qm-pill">{!shown(v.visibility) ? "HIDDEN" : st?.label_hidden ? "ICON ONLY" : v.visibility === "Minimal" ? "SHOWN SMALL" : "SHOWN"}</span>
             {shown(v.visibility) && !st?.label_hidden && (
-              <span className="qm-preview" style={{
+              <LookButton onClick={() => setEditing(true)}><span className="qm-preview" style={{
                 color: rgba(st?.text, "#c8c8c8"),
                 borderColor: rgba(st?.border, "transparent"),
                 background: rgba(st?.background, "rgba(0,0,0,.7)"),
                 fontSize: Math.max(11, Math.min(22, (st?.font_size ?? 32) / 2.2)),
-              }}>{item.base_type}</span>
+              }}>{item.base_type}</span></LookButton>
             )}
           </div>
           <Why v={v} onEditHere={v.by_user_edit && !replacing && v.source?.kind === "edit" ? () => openRule(v.decided_by) : undefined} />

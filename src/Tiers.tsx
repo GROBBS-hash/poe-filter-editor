@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Tip } from "./Help";
 import { useEffect, useMemo, useState } from "react";
 import { ProfileInfo } from "./types";
-import StyleEditor, { CurrentStyle, CustomStyle, Preview, fromCurrent } from "./StyleEditor";
+import StyleEditor, { CurrentStyle, CustomStyle, LookButton, Preview, fromCurrent } from "./StyleEditor";
 import { ItemIcon } from "./icons";
 import MapTiers, { MapSection } from "./MapTiers";
 
@@ -226,9 +226,9 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
                     {t.min_stack != null && <StackBox value={t.min_stack} onSave={(n) => setTier(t, { minStack: n })} />}
                     {t.min_item_tier != null && <StackBox label="item tier" title="Lowest item tier (shown on the label in 3.30) this row applies to"
                       value={t.min_item_tier} onSave={(n) => setTier(t, { minItemTier: n })} />}
-                    <button className="tier-look" title="Change this tier's look" onClick={() => setEditing(editing === key ? null : key)}>
+                    <LookButton className="tier-look" onClick={() => setEditing(editing === key ? null : key)}>
                       <Preview s={fromCurrent(t.style, "Currency")} text={t.bases[0] ?? t.name} />
-                    </button>
+                    </LookButton>
                     <span className="tier-tools">
                       <button className="link small" title="Copy this tier's look"
                         onClick={() => { setCopied({ style: fromCurrent(t.style, "Currency"), from: t.name }); setMsg(`Copied the look of ${t.name}. Use Paste on another tier.`); }}>Copy</button>

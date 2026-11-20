@@ -959,7 +959,6 @@ button:focus-visible, select:focus-visible, .text:focus-visible, input:focus-vis
 .map-tiers .mt-chip.off { background: transparent; color: var(--muted); border-style: dashed; text-decoration: line-through; }
 .map-tiers .mt-chip:hover:not(:disabled) { border-color: var(--gold); }
 .map-tiers .mt-h { margin-top: 18px; }
-.map-tiers .mt-special .tier-look { pointer-events: none; }
 
 /* Build window (F6), Clean glass: roomier, clear headings, the tree fills the window. */
 .bo { background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,0) 140px), rgba(17,20,25,.97);
@@ -1149,3 +1148,12 @@ button:focus-visible, select:focus-visible, .text:focus-visible, input:focus-vis
   border-radius: 0 0 14px 0; }
 .rg-se svg { fill: none; stroke: #8b95a6; stroke-width: 1.8; stroke-linecap: round; transition: stroke .15s; }
 .rg-se:hover svg, .rg-se:active svg { stroke: var(--gold); }
+
+/* Every label preview opens the look editor: outline on hover and a small "edit look" hint. */
+button.look-btn, .qm button.look-btn { position: relative; display: inline-flex; align-items: center; background: none; border: 1px dashed transparent;
+  border-radius: 8px; padding: 3px; margin: 0; cursor: pointer; min-width: 0; font: inherit; color: inherit; box-shadow: none; }
+button.look-btn:hover, .qm button.look-btn:hover { border-color: var(--gold); background: rgba(220,178,90,.07); }
+.look-hint { position: absolute; right: 4px; bottom: -10px; z-index: 2; font-size: 10.5px; line-height: 1; padding: 3px 6px; border-radius: 5px;
+  background: var(--gold); color: #1a1405; font-weight: 650; opacity: 0; pointer-events: none; transition: opacity .15s; white-space: nowrap; }
+button.look-btn:hover .look-hint, button.look-btn:focus-visible .look-hint { opacity: 1; }
+.th-card button.look-btn { display: block; width: 100%; text-align: left; }

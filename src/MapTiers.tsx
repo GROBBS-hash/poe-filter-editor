@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 import { Tip } from "./Help";
-import StyleEditor, { CurrentStyle, Preview, fromCurrent } from "./StyleEditor";
+import StyleEditor, { CurrentStyle, LookButton, Preview, fromCurrent } from "./StyleEditor";
 
 type Row = { tier: string; name: string; visibility: string; style: CurrentStyle; note: string; bases: string[]; min_stack: number | null; min_item_tier?: number | null };
 type MapRow = Row & { map_tier: number; band: string };
@@ -104,9 +104,9 @@ export default function MapTiers({ profileId, onChange, onOpen }: { profileId: s
                   onChange={(e) => change(MAPS, rows.map((r) => r.tier), { show: e.target.checked }, `${label} ${e.target.checked ? "shown" : "hidden"}.`)} />
                 <span>{label}</span>
               </label>
-              <button className="tier-look" title="Change the look of every map in this band" onClick={() => setEditing(editing === b ? null : b)}>
+              <LookButton className="tier-look" title="Change the look of every map in this group" onClick={() => setEditing(editing === b ? null : b)}>
                 <Preview s={fromCurrent(rows[rows.length - 1].style, "Maps")} text={`Map (Tier ${rows[rows.length - 1].map_tier})`} />
-              </button>
+              </LookButton>
               <span className="tier-tools">
                 <button className="link small" disabled={busy} title="Put this band back to NeverSink's"
                   onClick={() => change(MAPS, rows.map((r) => r.tier), { reset: true }, `${label} is back to NeverSink's.`)}>Reset</button>
@@ -126,7 +126,12 @@ export default function MapTiers({ profileId, onChange, onOpen }: { profileId: s
       {(data.extras ?? []).length > 0 && <>
         <h3 className="mt-h">3 · Extra borders</h3>
         <p className="mt-what">NeverSink adds these borders on top of the looks above. Untick one to drop that border; the map itself still shows.</p>
-        {(data.extras ?? []).map((x) => (
+        {(data.extras ?? []).map((x) => {
+          const ek = "x:" + x.key;
+          const t = data.tiers.find((r) => r.map_tier === (x.sample_tier ?? 14)) ?? data.tiers[data.tiers.length - 1];
+          const base = t ? fromCurrent(t.style, "Maps") : null;
+          const text = t ? `Map (Tier ${t.map_tier})` : "Map";
+          return (
           <div key={x.key} className={"tier mt-extra " + (x.on ? "" : "off")}>
             <div className="tier-head">
               <label className="tier-name">
@@ -135,22 +140,26 @@ export default function MapTiers({ profileId, onChange, onOpen }: { profileId: s
                 <span>{x.title}</span>
               </label>
               <span className="muted small mt-extra-what">{x.what}</span>
-              {(() => {
-                // Example: a map of that tier with this border, and the same map without it.
-                const t = data.tiers.find((r) => r.map_tier === (x.sample_tier ?? 14)) ?? data.tiers[data.tiers.length - 1];
-                if (!t || !x.border) return null;
-                const base = fromCurrent(t.style, "Maps");
-                const text = `Map (Tier ${t.map_tier})`;
-                return (
-                  <span className="mt-demo">
-                    <span className="mt-demo-one"><Preview s={{ ...base, border: x.border }} text={text} /><span className="muted small">with</span></span>
-                    <span className="mt-demo-one"><Preview s={{ ...base, border: null }} text={text} /><span className="muted small">without</span></span>
-                  </span>
-                );
-              })()}
+              {base && x.border && (
+                // Example: a map of that tier with this border, and the same map without it. Click to change the border.
+                <span className="mt-demo">
+                  <span className="mt-demo-one"><LookButton hint="edit border" title="Click to change this border's colour" onClick={() => setEditing(editing === ek ? null : ek)}>
+                    <Preview s={{ ...base, border: x.border }} text={text} /></LookButton><span className="muted small">with</span></span>
+                  <span className="mt-demo-one"><Preview s={{ ...base, border: null }} text={text} /><span className="muted small">without</span></span>
+                </span>
+              )}
             </div>
+            {editing === ek && base && (
+              <div className="qm tier-edit">
+                <p className="mt-what">Only the <b>border</b> counts here: the map's own group look (step 2) sets everything else.</p>
+                <StyleEditor start={{ ...base, border: x.border ?? base.border }} label={text}
+                  onCancel={() => setEditing(null)}
+                  onSave={(st) => { setEditing(null); change(MAPS, x.tiers, { style: st }, `${x.title}: new border.`); }} />
+              </div>
+            )}
           </div>
-        ))}
+          );
+        })}
       </>}
 
       {data.special.length > 0 && <>
@@ -158,6 +167,7 @@ export default function MapTiers({ profileId, onChange, onOpen }: { profileId: s
         <p className="mt-what">NeverSink shows these before the tier rules, so they show even when their tier is hidden. Untick a kind to hide it; Open shows its separate rules.</p>
         {data.special.map((s) => {
           const all = s.tiers.every(shown), none = !s.tiers.some(shown);
+          const sk = "s:" + s.type_path.join(">");
           return (
             <div key={s.type_path.join(">")} className={`tier mt-special ${none ? "off" : ""}`}>
               <div className="tier-head">
@@ -167,12 +177,20 @@ export default function MapTiers({ profileId, onChange, onOpen }: { profileId: s
                     onChange={(e) => change(s.type_path, s.tiers.map((r) => r.tier), { show: e.target.checked }, `${s.title} ${e.target.checked ? "shown" : "hidden"}.`)} />
                   <span>{s.title}</span>
                 </label>
-                <span className="tier-look"><Preview s={fromCurrent(s.tiers[0].style, "Maps")} text="Map" /></span>
+                <LookButton className="tier-look" title={`Change the look of every rule in ${s.title}`} onClick={() => setEditing(editing === sk ? null : sk)}>
+                  <Preview s={fromCurrent(s.tiers[0].style, "Maps")} text="Map" /></LookButton>
                 <span className="tier-tools">
                   <button className="link small" onClick={() => onOpen(s)}>Open</button>
                 </span>
               </div>
               <div className="muted small mt-special-rules">{s.tiers.map((r) => r.name).join(" · ")}</div>
+              {editing === sk && (
+                <div className="qm tier-edit">
+                  <StyleEditor start={fromCurrent(s.tiers[0].style, "Maps")} label="Map"
+                    onCancel={() => setEditing(null)}
+                    onSave={(st) => { setEditing(null); change(s.type_path, s.tiers.map((r) => r.tier), { style: st }, `${s.title} restyled.`); }} />
+                </div>
+              )}
             </div>
           );
         })}

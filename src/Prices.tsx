@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { ProfileInfo } from "./types";
-import StyleEditor, { CustomStyle, Preview } from "./StyleEditor";
+import StyleEditor, { CustomStyle, LookButton, Preview } from "./StyleEditor";
 
 type Group = "Uniques" | "DivinationCards" | "Currency" | "Other";
 type Tier = { min: number; style: CustomStyle };
@@ -126,7 +126,7 @@ export default function Prices({ profile }: { profile: ProfileInfo }) {
                     <input type="number" min={0} step="any" value={t.min}
                       onChange={(e) => change((x) => { x.groups[gi].tiers[ti].min = Math.max(0, +e.target.value || 0); })} />
                     <span className="muted small">{u} or more</span>
-                    <span className="tier-preview"><Preview s={t.style} text="Example" /></span>
+                    <span className="tier-preview"><LookButton onClick={() => setStyling({ g: gi, t: ti })}><Preview s={t.style} text="Example" /></LookButton></span>
                     <button className="link" onClick={() => setStyling({ g: gi, t: ti })}>Change look</button>
                     <button className="link" onClick={() => change((x) => { x.groups[gi].tiers.splice(ti, 1); })}>✕</button>
                   </li>

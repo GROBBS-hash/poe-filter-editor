@@ -5,20 +5,21 @@ import { ProfileInfo, RuleInfo, RARITY_COLOUR } from "./types";
 import ItemPanel, { RuleDetail, itemFromRule } from "./ItemPanel";
 import { ItemIcon } from "./icons";
 import DropPreview from "./DropPreview";
+import { LookButton } from "./StyleEditor";
 
 const css = (c?: number[] | null) => (c ? `rgba(${c[0]},${c[1]},${c[2]},${(c[3] ?? 255) / 255})` : "transparent");
 
 /** A tiny copy of how the rule looks in game. */
-function Look({ r }: { r: RuleInfo }) {
+function Look({ r, onEdit }: { r: RuleInfo; onEdit: () => void }) {
   const d = r.detail;
   if (!d) return null;
   if (!d.show) return <span className="look-pill hidden">Hidden</span>;
   const st = d.style;
   if (st.label_hidden) return <span className="look-pill ghost">Icon & beam only</span>;
   return (
-    <span className="look" style={{ color: css(st.text) || "#ccc", borderColor: css(st.border), background: css(st.background) }}>
+    <LookButton onClick={onEdit}><span className="look" style={{ color: css(st.text) || "#ccc", borderColor: css(st.border), background: css(st.background) }}>
       {d.base_type || d.item_class}
-    </span>
+    </span></LookButton>
   );
 }
 
@@ -102,6 +103,8 @@ function History({ profile, onChange }: { profile: ProfileInfo; onChange: () => 
 export default function Edits({ profile, onChange, focus }: { profile: ProfileInfo; onChange: () => void; focus?: { label: string } | null }) {
   const [msg, setMsg] = useState("");
   const [open, setOpen] = useState<{ index: number; detail: RuleDetail } | null>(null);
+  // Opened by clicking its look: start on the look editor.
+  const [lookFirst, setLookFirst] = useState(false);
   const [q, setQ] = useState("");
 
   const remove = async (index: number) => {
@@ -181,18 +184,18 @@ export default function Edits({ profile, onChange, focus }: { profile: ProfileIn
                     <li key={r.index} data-rule={r.index} className={`${open?.index === r.index ? "open" : ""} ${r.shadowed_by ? "unused" : ""}`}>
                       <div className="rule-line">
                         <span className="rule-main">
-                          <Look r={r} />
+                          <Look r={r} onEdit={() => { setLookFirst(true); if (open?.index !== r.index) edit(r.index); }} />
                           <span className="rule-scope">{scope(r) || (r.detail ? "" : r.label.replace(/^Preset: [^:]+: /, ""))}</span>
                         </span>
                         <span>
-                          <button className="link" onClick={() => edit(r.index)}>{open?.index === r.index ? "Close" : "Edit"}</button>
+                          <button className="link" onClick={() => { setLookFirst(false); edit(r.index); }}>{open?.index === r.index ? "Close" : "Edit"}</button>
                           <button className="link" onClick={() => remove(r.index)}>Remove</button>
                         </span>
                       </div>
                       {r.shadowed_by && <div className="unused-note">Never applies: “{r.shadowed_by}” is newer and always wins. Remove this one, or change the newer one.</div>}
                       {open?.index === r.index && (
                         <div className="rule-edit qm">
-                          <ItemPanel key={r.index} inGame={false}
+                          <ItemPanel key={r.index + (lookFirst ? "l" : "")} inGame={false} openLook={lookFirst}
                             start={{ item: itemFromRule(open.detail), from_screen: false, screen_text: null, confidence: 1 }}
                             replacing={{ id: profile.id, index: r.index, detail: open.detail }}
                             onClose={() => setOpen(null)} onChanged={onChange} />

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ProfileInfo } from "./types";
 import DropPreview from "./DropPreview";
+import { LookButton } from "./StyleEditor";
 
 type LevelLook = { text: number[]; border: number[] | null; background: number[] };
 type Theme = { name: string; levels: LevelLook[]; classic?: Record<string, number[]> | null; neversink_style?: string | null; game?: string | null };
@@ -204,7 +205,8 @@ export default function Themes({ profile, onChange }: { profile: ProfileInfo; on
             <button className="link" onClick={() => copyOf(t)}>Copy & make my own</button>
           </span>
         </div>
-        <Samples t={t} />
+        <LookButton hint={kind === "custom" ? "edit colours" : "copy & edit colours"} title="Click to change these colours"
+          onClick={() => kind === "custom" ? setEditing({ theme: t, oldName: t.name }) : copyOf(t)}><Samples t={t} /></LookButton>
         <button className="link" onClick={() => setPreviewing(previewing === (name ?? "") ? null : (name ?? ""))}>
           {previewing === (name ?? "") ? "Close preview" : "Preview with real drops"}
         </button>

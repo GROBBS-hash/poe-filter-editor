@@ -69,6 +69,16 @@ const hex = (c: number[]) => "#" + c.slice(0, 3).map((n) => n.toString(16).padSt
 const fromHex = (h: string, a = 255) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)).concat(a);
 export const css = (c?: number[] | null) => (c ? `rgba(${c[0]},${c[1]},${c[2]},${(c[3] ?? 255) / 255})` : "transparent");
 
+/** Every label preview in the app is a button that opens the look editor: an outline on hover and a small "edit look" hint. */
+export function LookButton({ onClick, children, hint = "edit look", title = "Click to change this look (colours, border, size, beam, icon, sound)", className = "" }: {
+  onClick: () => void; children: React.ReactNode; hint?: string; title?: string; className?: string }) {
+  return (
+    <button type="button" className={`look-btn ${className}`} title={title} onClick={(e) => { e.stopPropagation(); onClick(); }}>
+      {children}<span className="look-hint">✎ {hint}</span>
+    </button>
+  );
+}
+
 export function Preview({ s, text }: { s: CustomStyle; text: string }) {
   if (s.label_hidden) {
     return <span className="se-preview se-ghost">no label · {[s.beam && `${s.beam.colour} beam`, s.minimap && "map icon"].filter(Boolean).join(" + ") || "nothing visible!"}</span>;
