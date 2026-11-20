@@ -790,3 +790,7 @@ body.overlay.scroll::-webkit-scrollbar-thumb { background: #3a404c; border-radiu
 .tw-roll-range { margin-left: 4px; opacity: .85; }
 .tw-roll-bar span { display: block; height: 100%; border-radius: 3px; background: #8a8f99; }
 .tw-roll.mid { color: #e0c98a; }
+.tw-mapmods { display: block; margin: 6px 0 2px; text-align: left; }
+.tw-report-toggle { display: block; margin-top: 4px; color: var(--muted); }
+.tw-report { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.tw-report textarea { width: 100%; box-sizing: border-box; resize: vertical; font: inherit; font-size: 12.5px; }

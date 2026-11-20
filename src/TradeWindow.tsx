@@ -234,6 +234,9 @@ export default function TradeWindow() {
   const [showSaved, setShowSaved] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
   const [preset, setPreset] = useState<number | null>(0);
+  const [mapMods, setMapMods] = useState(false);
+  const [reporting, setReporting] = useState<string | null>(null);
+  const [reported, setReported] = useState("");
   const box = useRef<HTMLDivElement | null>(null);
 
   const close = useCallback(() => { setCheck(null); setRes(null); setBulk(null); setAi(null); setErr(""); invoke("hide_trade_window"); }, []);
@@ -254,7 +257,7 @@ export default function TradeWindow() {
     const a = listen<Check>("price-check", (e) => {
       const c = e.payload;
       setCheck(c); setSetup(c.setup); setRes(null); setBulk(null); setAi(null); setErr(c.error ?? ""); setCopied(null); setPay("chaos");
-      setSaving(null); setShowSaved(!c.setup); setPreset(null); window.scrollTo(0, 0);
+      setSaving(null); setShowSaved(!c.setup); setPreset(null); setMapMods(false); setReporting(null); setReported(""); window.scrollTo(0, 0);
       invoke<Saved[]>("saved_list").then(setSaved).catch(() => {});
       if (c.bulk) runBulk(c.bulk, "chaos");
       else if (c.setup && needsTrade(c)) run(c.setup);
@@ -298,6 +301,8 @@ export default function TradeWindow() {
   if (!setup) return <div className="qm tw" ref={box}><div className="qm-fail">{err || "Nothing to price."}</div>{savedBlock}</div>;
 
   const it = setup.item;
+  // Maps: priced by tier and rarity; their mods are behind a link.
+  const showStats = !check.map || mapMods;
   const patch = (i: number, p: Partial<StatFilter>) => { if ("min" in p) setPreset(null); return setSetup({ ...setup, filters: setup.filters.map((f, j) => (j === i ? { ...f, ...p } : f)) }); };
   const divine = res?.divine ?? bulk?.divine ?? check?.divine ?? null;
   const copy = (text: string, key: string) => { invoke("copy_text", { text }); setCopied(key); };
@@ -324,7 +329,11 @@ export default function TradeWindow() {
       {check.map && <MapCheck map={check.map} />}
       {check.compare && check.compare.length > 0 && <CompareBlock list={check.compare} />}
 
-      {setup.filters.length > 0 && !check.map && (
+      {check.map && setup.filters.length > 0 && (
+        <button className="link small tw-mapmods" onClick={() => setMapMods(!mapMods)}>
+          {mapMods ? "▾" : "▸"} Search by map mods too ({setup.filters.length}): priced by tier and rarity otherwise</button>
+      )}
+      {setup.filters.length > 0 && showStats && (
         <div className="tw-range">
           <span className="tw-sec">Search for</span>
           <span className="tw-range-btns" title="Set every minimum relative to this item's rolls">
@@ -342,7 +351,7 @@ export default function TradeWindow() {
           </span>
         </div>
       )}
-      {setup.filters.length > 0 && !check.map && (
+      {setup.filters.length > 0 && showStats && (
         <div className="tw-stats">
           {setup.filters.map((f, i) => (
             <label key={f.id + i} className={`tw-stat ${f.enabled ? "on" : ""} ${f.junk ? "junk" : ""}`} title={f.junk ? "Rarely changes the price" : undefined}>
@@ -361,7 +370,7 @@ export default function TradeWindow() {
           onClick={() => { const s = { ...setup, base_only: true, filters: setup.filters.map((f) => ({ ...f, enabled: f.kind === "fractured" })) }; setSetup(s); run(s); }}>
           Search {it.base_type} with just its fractured mods</button>
       )}
-      {setup.unknown.length > 0 && (
+      {setup.unknown.length > 0 && showStats && (
         <div className="tw-unknown">
           {setup.unknown.map((u, i) => {
             const k = setup.unknown_kinds?.[i] ?? "explicit";
@@ -436,12 +445,12 @@ export default function TradeWindow() {
         <div className="tw-res">
           <div className="tw-sec tw-res-sec">Cheapest listed</div>
           <div className="tw-table">
-            <div className="tw-th"><span>Price</span><span>ilvl</span><span>Listed</span><span>Seller</span><span /></div>
+            <div className="tw-th"><span>Price</span><span>{res.listings.some((l) => l.ilvl) ? "ilvl" : ""}</span><span>Listed</span><span>Seller</span><span /></div>
             {res.listings.map((l, i) => (
               <div key={i} className="tw-tr">
                 <span className="tw-price"><Price n={l.amount} cur={l.currency} />
                   {l.chaos != null && !["chaos", "divine"].includes(l.currency) && <span className="tw-eq">{money(l.chaos, divine)}</span>}</span>
-                <span className="muted">{l.ilvl ?? ""}</span>
+                <span className="muted">{l.ilvl || ""}</span>
                 <span className="muted">{ago(l.indexed)}</span>
                 <span className="tw-seller muted">{l.account}</span>
                 {l.instant ? <span className="tw-instant" title="Instant buyout: buy it straight from the trade site or the in-game market, no whisper">Instant</span>
@@ -454,6 +463,20 @@ export default function TradeWindow() {
         </div>
       )}
       {!check.bulk && savedBlock}
+      {reporting == null ? (
+        <button className="link small tw-report-toggle" onClick={() => { setReporting(""); setReported(""); }}
+          title="Saves this price check with your note, so Claude can see exactly what went wrong">
+          {reported ? "✓ Saved: mention it to Claude in chat" : "Something's wrong?"}</button>
+      ) : (
+        <form className="tw-report" onSubmit={(e) => { e.preventDefault();
+          invoke<string>("report_problem", { note: reporting, data: { check, setup, res, bulk, err, ai } })
+            .then(() => { setReporting(null); setReported("ok"); }).catch((er) => setErr(String(er))); }}>
+          <textarea className="text" autoFocus rows={2} value={reporting} onChange={(e) => setReporting(e.target.value)}
+            placeholder="What looks wrong? e.g. price too high, wrong mod ticked" />
+          <div className="row"><button type="submit">Save for Claude</button>
+            <button type="button" className="link small" onClick={() => setReporting(null)}>Cancel</button></div>
+        </form>
+      )}
     </div>
   );
 }

@@ -101,6 +101,12 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   (`src/preview.tsx`). The app saves every price check and trade result to `%APPDATA%\com.grobbs.poefiltereditor\samples`
   (newest 60, local only); vite.config.ts serves them to the preview's dropdown. Use it to check layout changes
   before asking GROBBS to test in game.
+- Map price check, 20 Nov: maps were searched as type "Map (Tier 2)" with every T1 map mod ticked (hidden in the
+  window), so nothing matched. Now: type `{option:"Map", discriminator:"map"}` for "Map (Tier N)" bases, `map_tier`
+  min=max, rarity filter, no mods ticked; mods behind "Search by map mods too" in the window. Gems: empty ilvl hidden.
+- **"Something's wrong?" button** (price window): saves his note plus check/setup/result/error to
+  `%APPDATA%\com.grobbs.poefiltereditor\reports\<unix time>.json` (`report_problem`). Read these when he says he
+  reported something.
 - Wealth page (Endgame → Wealth; `core/src/wealth.rs`, `src-tauri/src/wealth_app.rs`, `src/Wealth.tsx`,
   `src/EarningsWindow.tsx`, window "earnings"): reads the stash via the session API
   (character-window/get-stash-items, Cookie POESESSID, realm pc/poe2, rate-limited as kind "stash", learns
@@ -123,6 +129,9 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] "Search trade" on a tall window (e.g. Duskdawn): prices appear and the window scrolls to them.
 - [ ] Roll bars and "T3 range 6–11" numbers look right; tier badges coloured. (Roll bars confirmed 20 Nov.)
 - [ ] Every Ctrl+D shows a trade price straight away (uniques, corpses, gems too) in the big box at the top.
+      (Confirmed 20 Nov for a unique, a unique belt and a gem.)
+- [ ] Rare/magic map (e.g. "Map (Tier 2)") gets a trade price by tier and rarity.
+- [ ] "Something's wrong?" saves a report (he'll mention it in chat; check the reports folder).
 - [ ] Settings → Price check: turning off the build comparison / roll bars hides them.
 - [ ] Prices shown in chaos and divines with orb icons; bulk "1 div ≈ N items".
 - [ ] Transfigured gem: searches without "Unknown item base type".

@@ -648,6 +648,19 @@ fn saved_add(state: State<AppState>, name: String, setup: filter_core::trade::Tr
     saved_store(&state)
 }
 
+/// "Something's wrong" in the price window: keeps the note with everything the window had
+/// (item text, search, trade result) in the data folder's "reports", for Claude to look at. Local only.
+#[tauri::command]
+fn report_problem(state: State<AppState>, note: String, data: serde_json::Value) -> Result<String, String> {
+    let dir = state.data_dir.join("reports");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    let path = dir.join(format!("{secs}.json"));
+    let body = serde_json::json!({ "note": note, "at": secs, "window": data });
+    std::fs::write(&path, serde_json::to_string_pretty(&body).unwrap_or_default()).map_err(|e| e.to_string())?;
+    Ok(path.display().to_string())
+}
+
 #[tauri::command]
 fn saved_delete(state: State<AppState>, id: u64) -> Result<Vec<SavedInfo>, String> {
     state.saved.lock().unwrap().remove(id);
@@ -2127,7 +2140,7 @@ pub fn run() {
             list_farm_presets,
             apply_farm_preset,
             list_level_presets,
-            get_tiers, get_rule_section, trade_search, trade_bulk, rare_estimate, map_dangers, map_suggest, map_tool_get, map_tool_save, map_tool_regex, map_regex_copy, map_tool_trade, trade_action, hide_trades_window, wealth_app::wealth_get, wealth_app::wealth_setup, wealth_app::wealth_prefs, wealth_app::wealth_scan, wealth_app::session_start, wealth_app::session_check, wealth_app::session_pause, wealth_app::session_stop, wealth_app::session_delete, wealth_app::earnings_overlay, saved_list, saved_add, saved_delete, saved_live, send_whisper, copy_text, hide_trade_window, keep_on_screen,
+            get_tiers, get_rule_section, trade_search, trade_bulk, rare_estimate, map_dangers, map_suggest, map_tool_get, map_tool_save, map_tool_regex, map_regex_copy, map_tool_trade, trade_action, hide_trades_window, wealth_app::wealth_get, wealth_app::wealth_setup, wealth_app::wealth_prefs, wealth_app::wealth_scan, wealth_app::session_start, wealth_app::session_check, wealth_app::session_pause, wealth_app::session_stop, wealth_app::session_delete, wealth_app::earnings_overlay, saved_list, saved_add, saved_delete, saved_live, report_problem, send_whisper, copy_text, hide_trade_window, keep_on_screen,
             move_tier_item,
             stack_choices,
             gear_setup,

@@ -307,7 +307,8 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
         let (t, _) = template(&m.text);
         let good = if has_tiers { m.tier.map(|t| t <= 2).unwrap_or(false) } else { VALUABLE.iter().any(|k| t.contains(k)) };
         let junk = is_junk(&t);
-        let enabled = !unique && m.kind != "enchant" && good && !junk;
+        // Maps: price by tier and rarity; mods are there to tick, never ticked for you.
+        let enabled = !unique && !is_map(&item) && m.kind != "enchant" && good && !junk;
         // A mod with no number is just "has it": no minimum.
         let min = if m.values.is_empty() { None } else { Some(min_for(value)) };
         filters.push(StatFilter { id, label: m.text.clone(), value, min, enabled, kind, tier: m.tier, junk, roll: m.roll, range: m.range.clone() });
@@ -330,6 +331,13 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
         gem_level,
         filters, unknown, unknown_kinds, item, raw: text.to_string(),
     })
+}
+
+fn is_map(it: &Item) -> bool { it.item_class == "Maps" }
+
+/// The map's tier: from "Map Tier: 16", or from the name "Map (Tier 2)".
+fn map_tier_of(it: &Item) -> Option<u32> {
+    it.map_tier.or_else(|| it.base_type.split("(Tier ").nth(1)?.trim_end_matches(')').trim().parse().ok())
 }
 
 /// The search to send to the trade site.
@@ -368,6 +376,12 @@ pub fn query(s: &TradeSetup) -> Value {
     }
     if misc.as_object().map(|o| !o.is_empty()).unwrap_or(false) { filters["misc_filters"] = json!({ "filters": misc }); }
     if let Some(n) = s.links_min { filters["socket_filters"] = json!({ "filters": { "links": { "min": n } } }); }
+    // "Map (Tier 2)" is listed as "Map" with the tier as a filter.
+    if is_map(it) && it.rarity != "Unique" {
+        if it.base_type.starts_with("Map (Tier") { q["type"] = json!({ "option": "Map", "discriminator": "map" }); }
+        if let Some(t) = map_tier_of(it) { filters["map_filters"] = json!({ "filters": { "map_tier": { "min": t, "max": t } } }); }
+        filters["type_filters"] = json!({ "filters": { "rarity": { "option": it.rarity.to_lowercase() } } });
+    }
     // Weapon DPS / defences go in their own filter groups, not the stat list.
     for f in s.filters.iter().filter(|f| f.enabled) {
         if let Some((group, key)) = crate::trade_rules::property_query(&f.id) {
@@ -629,6 +643,20 @@ Item Level: 75
         assert!(q["query"].get("type").is_none());
     }
 
+
+    #[test]
+    fn rare_map_by_tier() {
+        let t = "Item Class: Maps\nRarity: Rare\nRemote Grind\nMap (Tier 2)\n--------\nItem Rarity: +46% (augmented)\n--------\nItem Level: 70\n--------\nMonster Level: 69\n--------\n\
+{ Prefix Modifier \"Resistant\" (Tier: 1) — Elemental, Chaos, Resistance }\n+15% Monster Chaos Resistance\n+20% Monster Elemental Resistances\n--------\nTravel to a Map of this tier or lower by using this in a personal Map Device.\n";
+        let s = setup(t, &index()).unwrap();
+        assert!(s.filters.iter().all(|f| !f.enabled), "map mods aren't ticked: {:?}", s.filters);
+        let q = query(&s);
+        assert_eq!(q["query"]["type"]["option"], "Map");
+        assert_eq!(q["query"]["type"]["discriminator"], "map");
+        assert_eq!(q["query"]["filters"]["map_filters"]["filters"]["map_tier"]["max"], 2);
+        assert_eq!(q["query"]["filters"]["type_filters"]["filters"]["rarity"]["option"], "rare");
+        assert_eq!(q["query"]["stats"][0]["filters"].as_array().unwrap().len(), 0);
+    }
     #[test]
     fn plain_copy_and_unique() {
         let t = "Item Class: Helmets\nRarity: Unique\nGoldrim\nLeather Cap\n--------\nEvasion Rating: 30\n--------\nItem Level: 40\n--------\n+38% to all Elemental Resistances\n--------\nNo metal slips as easily through the fingers.\n";
