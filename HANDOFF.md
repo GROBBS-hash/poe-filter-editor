@@ -83,7 +83,9 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 - Price check "Compared with your build (PoB)" (`core/src/compare.rs`): checked item vs the PoB stage's gear in the
   same slot (both rings), totals for life(+Str/2)/ES/mana/each res/attributes/speeds/suppress/crit multi/spell dmg,
-  plus mods only one side has. Collapsible (remembered).
+  plus mods only one side has. Collapsible (remembered). 20 Nov: PoB gear keeps only the selected variant's lines and
+  rolls "(60-80)" ranges at PoB's {range} (`roll_ranges` in pob.rs); window re-laid out (section headings, "yours /
+  this" table with ▲▼, one mod per line folding after four, verdict badge, highlighted minimum preset).
 - Wealth page (Endgame → Wealth; `core/src/wealth.rs`, `src-tauri/src/wealth_app.rs`, `src/Wealth.tsx`,
   `src/EarningsWindow.tsx`, window "earnings"): reads the stash via the session API
   (character-window/get-stash-items, Cookie POESESSID, realm pc/poe2, rate-limited as kind "stash", learns
@@ -97,12 +99,12 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
 (move them to "Confirmed in game") as he reports back, and add new features here as they land.
-Confirmed in game so far: basic Ctrl+D price check (trade search returned listings).
+Confirmed in game so far: basic Ctrl+D price check (trade search returned listings); 20 Nov: weapon + armour
+windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
 **Price check (Ctrl+D)**
-- [ ] On a weapon and an armour piece: totals table (life/res/attributes etc.), pDPS/eDPS/total DPS and
-      armour/evasion/ES at 20% quality, "Minimums: exact / −10% / −20%" buttons. Results look sensible.
-- [ ] "Compared with your build (PoB)" box: right slot (both rings for a ring), numbers match the gear, folds away.
+- [ ] "min: exact / −10% / −20%" buttons change the results, and the picked one stays highlighted.
+- [ ] New layout of the price window (20 Nov) is easier to read; your gear's mods show real numbers, not "(60-80)".
 - [ ] Prices shown in chaos and divines with orb icons; bulk "1 div ≈ N items".
 - [ ] Transfigured gem: searches without "Unknown item base type".
 - [ ] Foulborn / mutated unique searches correctly.

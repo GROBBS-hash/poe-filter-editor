@@ -81,29 +81,59 @@ function SavedPanel({ list, setList, onRun }: { list: Saved[]; setList: (l: Save
 function CompareBlock({ list }: { list: Comparison[] }) {
   const [open, setOpen] = useState(() => { try { return localStorage.getItem("tw-compare") !== "0"; } catch { return true; } });
   const toggle = () => { setOpen(!open); try { localStorage.setItem("tw-compare", open ? "0" : "1"); } catch { /* ignore */ } };
+  const score = (c: Comparison) => [c.rows.filter((r) => r.this > r.now).length, c.rows.filter((r) => r.this < r.now).length];
   return (
     <div className="tw-cmp">
-      <button className="link small tw-cmp-toggle" onClick={toggle}>{open ? "▾" : "▸"} Compared with your build (PoB)</button>
+      <button className="tw-cmp-toggle" onClick={toggle}>
+        <span className="tw-sec">{open ? "▾" : "▸"} Against your build</span>
+        {!open && list.map((c) => { const [u, d] = score(c);
+          return <Verdict key={c.slot} up={u} down={d} />; })}
+      </button>
       {open && list.map((c) => {
-        const up = c.rows.filter((r) => r.this > r.now).length, down = c.rows.filter((r) => r.this < r.now).length;
+        const [up, down] = score(c);
         return (
           <div key={c.slot} className="tw-cmp-slot">
-            <div className="small"><b>{c.slot}</b> <span className="muted">· now: {c.current}</span>
-              <span className={`tw-cmp-sum ${up > down ? "up" : down > up ? "down" : ""}`}>{up} better · {down} worse</span></div>
+            <div className="tw-cmp-head">
+              <span className="small"><span className="muted">{c.slot}:</span> {c.current}</span>
+              <Verdict up={up} down={down} />
+            </div>
             {c.rows.length > 0 && (
-              <table className="tw-cmp-rows"><tbody>
-                {c.rows.map((r) => {
-                  const d = r.this - r.now;
-                  return <tr key={r.stat}><td>{r.stat}</td><td className="muted">{r.now} → {r.this}</td>
-                    <td className={d > 0 ? "up" : "down"}>{d > 0 ? "+" : ""}{d}</td></tr>;
-                })}
-              </tbody></table>
+              <table className="tw-cmp-rows">
+                <thead><tr><th></th><th>yours</th><th>this</th><th></th></tr></thead>
+                <tbody>
+                  {c.rows.map((r) => {
+                    const d = r.this - r.now;
+                    return <tr key={r.stat}><td>{r.stat}</td><td className="muted">{r.now}</td><td>{r.this}</td>
+                      <td className={d > 0 ? "up" : "down"}>{d > 0 ? "▲ " : "▼ "}{Math.abs(d)}</td></tr>;
+                  })}
+                </tbody>
+              </table>
             )}
-            {c.gain.length > 0 && <div className="small up">+ Only on this: {c.gain.join(" · ")}</div>}
-            {c.lose.length > 0 && <div className="small down">− You'd lose: {c.lose.join(" · ")}</div>}
+            <ModList title="Only on this item" lines={c.gain} cls="up" mark="+" />
+            <ModList title="You'd lose" lines={c.lose} cls="down" mark="−" />
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/** "4 better · 1 worse" as a coloured badge. */
+function Verdict({ up, down }: { up: number; down: number }) {
+  const cls = up > down ? "up" : down > up ? "down" : "";
+  return <span className={`tw-verdict ${cls}`}>{up > 0 && `${up} better`}{up > 0 && down > 0 && " · "}{down > 0 && `${down} worse`}{!up && !down && "same stats"}</span>;
+}
+
+/** Other mods, one per line; long lists fold after four. */
+function ModList({ title, lines, cls, mark }: { title: string; lines: string[]; cls: string; mark: string }) {
+  const [all, setAll] = useState(false);
+  if (lines.length === 0) return null;
+  const shown = all ? lines : lines.slice(0, 4);
+  return (
+    <div className="tw-cmp-mods">
+      <div className={`tw-cmp-mods-title ${cls}`}>{title}</div>
+      <ul>{shown.map((l, i) => <li key={i}><span className={cls}>{mark}</span> {l}</li>)}</ul>
+      {lines.length > 4 && <button className="link small" onClick={() => setAll(!all)}>{all ? "show fewer" : `+ ${lines.length - 4} more`}</button>}
     </div>
   );
 }
@@ -149,6 +179,7 @@ export default function TradeWindow() {
   const [saved, setSaved] = useState<Saved[]>([]);
   const [showSaved, setShowSaved] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
+  const [preset, setPreset] = useState<number | null>(0);
   const box = useRef<HTMLDivElement | null>(null);
 
   const close = useCallback(() => { setCheck(null); setRes(null); setBulk(null); setAi(null); setErr(""); invoke("hide_trade_window"); }, []);
@@ -169,7 +200,7 @@ export default function TradeWindow() {
     const a = listen<Check>("price-check", (e) => {
       const c = e.payload;
       setCheck(c); setSetup(c.setup); setRes(null); setBulk(null); setAi(null); setErr(c.error ?? ""); setCopied(null); setPay("chaos");
-      setSaving(null); setShowSaved(!c.setup);
+      setSaving(null); setShowSaved(!c.setup); setPreset(null);
       invoke<Saved[]>("saved_list").then(setSaved).catch(() => {});
       if (c.bulk) runBulk(c.bulk, "chaos");
       else if (c.setup && needsTrade(c)) run(c.setup);
@@ -211,7 +242,7 @@ export default function TradeWindow() {
   if (!setup) return <div className="qm tw" ref={box}><div className="qm-fail">{err || "Nothing to price."}</div>{savedBlock}</div>;
 
   const it = setup.item;
-  const patch = (i: number, p: Partial<StatFilter>) => setSetup({ ...setup, filters: setup.filters.map((f, j) => (j === i ? { ...f, ...p } : f)) });
+  const patch = (i: number, p: Partial<StatFilter>) => { if ("min" in p) setPreset(null); return setSetup({ ...setup, filters: setup.filters.map((f, j) => (j === i ? { ...f, ...p } : f)) }); };
   const divine = res?.divine ?? bulk?.divine ?? check?.divine ?? null;
   const copy = (text: string, key: string) => { invoke("copy_text", { text }); setCopied(key); };
   // Mouse wheel on a minimum: 1 at a time (Shift: 10).
@@ -240,17 +271,20 @@ export default function TradeWindow() {
 
       {setup.filters.length > 0 && !check.map && (
         <div className="tw-range">
-          <span className="muted small">Minimums:</span>
+          <span className="tw-sec">Search for</span>
+          <span className="tw-range-btns" title="Set every minimum relative to this item's rolls">
+          <span className="muted small">min</span>
           {[0, 10, 20].map((p) => (
-            <button key={p} className="link small" title={p ? `Every minimum ${p}% below this item's roll` : "Every minimum at this item's roll"}
-              onClick={() => setSetup({ ...setup, filters: setup.filters.map((f) => {
+            <button key={p} className={preset === p ? "on" : ""} title={p ? `Every minimum ${p}% below this item's roll` : "Every minimum at this item's roll"}
+              onClick={() => { setPreset(p); setSetup({ ...setup, filters: setup.filters.map((f) => {
                 if (f.min == null || f.id.includes("empty")) return f;
                 if (p === 0 || Math.abs(f.value) <= 3) return { ...f, min: f.value };
                 const v = f.value * (1 - p / 100);
                 return { ...f, min: Math.abs(f.value) >= 10 ? Math.floor(v) : Math.floor(v * 10) / 10 };
-              }) })}>
+              }) }); }}>
               {p === 0 ? "exact" : `−${p}%`}</button>
           ))}
+          </span>
         </div>
       )}
       {setup.filters.length > 0 && !check.map && (
@@ -346,6 +380,7 @@ export default function TradeWindow() {
 
       {res && (
         <div className="tw-res">
+          <div className="tw-sec tw-res-sec">Prices on trade</div>
           <div className="tw-sum">
             {res.summary ? <>Around <b><Price n={res.summary[1]} cur="chaos" /></b> <Other n={res.summary[1]} cur="chaos" divine={divine} />
               <span className="muted small"> · cheapest {money(res.summary[0], divine)} · {res.total} listed</span></>

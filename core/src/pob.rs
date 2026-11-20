@@ -108,6 +108,14 @@ fn item_gear(slot: &str, text: &str) -> Gear {
     let two_names = matches!(rarity.as_str(), "RARE" | "UNIQUE" | "RELIC");
     let name = if lines.is_empty() { String::new() } else { lines.remove(0) };
     let base = if two_names && !lines.is_empty() { lines.remove(0) } else { name.clone() };
+    // Uniques with variants: PoB lists every variant's lines, tagged {variant:1,3}; keep the chosen one's.
+    let pick = |key: &str| lines.iter().find_map(|l| l.strip_prefix(key)).and_then(|v| v.trim().parse::<u32>().ok());
+    let (variant, alt) = (pick("Selected Variant: "), pick("Selected Alt Variant: "));
+    let lines: Vec<String> = lines.iter().filter(|l| {
+        let Some(tag) = l.find("{variant:").map(|i| &l[i + 9..]).and_then(|t| t.split('}').next()) else { return true };
+        let ids: Vec<u32> = tag.split(',').filter_map(|v| v.trim().parse().ok()).collect();
+        variant.is_none_or(|v| ids.contains(&v)) || alt.is_some_and(|a| ids.contains(&a))
+    }).cloned().collect();
     // Drop PoB-only bookkeeping ("Prefix: …", "Crafted: true", "ArmourBasePercentile: 1"…), keep what you'd see on the item.
     const DROP: [&str; 16] = ["Unique ID", "Item Level", "LevelReq", "Implicits", "Prefix", "Suffix", "Crafted", "Variant",
         "Selected Variant", "Has Alt Variant", "Selected Alt Variant", "Catalyst", "CatalystQuality", "League", "Source", "Talisman Tier"];
@@ -117,16 +125,42 @@ fn item_gear(slot: &str, text: &str) -> Gear {
             !(l.contains(": ") && (DROP.contains(&key) || key.ends_with("BasePercentile")))
         })
         .map(|l| {
+            // How far along each "(60-80)" range the roll is: {range:0.25}, or the middle when PoB doesn't say.
+            let range = l.find("{range:").and_then(|i| l[i + 7..].split('}').next()).and_then(|r| r.parse::<f64>().ok()).unwrap_or(0.5);
             let mut out = String::new();
             let mut depth = 0;
             for c in l.chars() { match c { '{' => depth += 1, '}' => depth -= 1, _ if depth == 0 => out.push(c), _ => {} } }
-            out.trim().to_string()
+            roll_ranges(out.trim(), range)
         })
         .filter(|l| !l.is_empty())
         .collect();
     // PoB calls items you made up "New Item": show the base instead.
     let name = if name == "New Item" { base.clone() } else { name };
     Gear { slot: slot.to_string(), rarity: rarity.to_lowercase(), name, base, lines }
+}
+
+/// "(60-80)% increased Spell Damage" at 0.5 -> "70% increased Spell Damage".
+fn roll_ranges(l: &str, at: f64) -> String {
+    let mut out = String::new();
+    let mut rest = l;
+    while let Some(i) = rest.find('(') {
+        let Some(j) = rest[i..].find(')').map(|j| i + j) else { break };
+        let inner = &rest[i + 1..j];
+        // "-" splits the two ends; a leading "-" belongs to the number ("(-10--5)").
+        let parsed = inner.char_indices().skip(1).find(|(_, c)| *c == '-')
+            .and_then(|(k, _)| Some((inner[..k].parse::<f64>().ok()?, inner[k + 1..].parse::<f64>().ok()?)));
+        out.push_str(&rest[..i]);
+        match parsed {
+            Some((a, b)) => {
+                let v = a + (b - a) * at;
+                out.push_str(&if inner.contains('.') { format!("{}", (v * 100.0).round() / 100.0) } else { format!("{}", v.round()) });
+            }
+            None => out.push_str(&rest[i..=j]),
+        }
+        rest = &rest[j + 1..];
+    }
+    out.push_str(rest);
+    out
 }
 
 fn attr<'a>(n: &roxmltree::Node<'a, 'a>, k: &str) -> &'a str { n.attribute(k).unwrap_or("") }
@@ -347,6 +381,13 @@ Leather Cap
         assert!(staff.lines.contains(&"43% increased Cast Speed".to_string()) && staff.lines.contains(&"Sockets: B-R-R-R-B-B".to_string()), "{:?}", staff.lines);
         assert!(!staff.lines.iter().any(|l| l.starts_with("Unique ID") || l.contains('{') || l.starts_with("Prefix") || l.starts_with("Crafted") || l.contains("Percentile")), "{:?}", staff.lines);
         assert!(staff.lines.contains(&"Quality: 20".to_string()));
+        assert_eq!(roll_ranges("Adds (10-15) to (20-30) Cold Damage", 1.0), "Adds 15 to 30 Cold Damage");
+        assert_eq!(roll_ranges("(-10--5)% to Chaos Resistance (Hidden)", 0.0), "-10% to Chaos Resistance (Hidden)");
+        let crank = item_gear("Weapon 1", "Rarity: UNIQUE\nXirgil's Crank\nCoiled Staff\nVariant: Pre 3.0.0\nVariant: Current\nSelected Variant: 2\n\
+            {variant:1}+18% Chance to Block Attack Damage while wielding a Staff\n{variant:2}+20% Chance to Block Attack Damage while wielding a Staff\n\
+            {range:0.25}(60-80)% increased Spell Damage\n(25-35)% chance for Energy Shield Recharge to start when you Block");
+        assert_eq!(crank.lines, ["+20% Chance to Block Attack Damage while wielding a Staff", "65% increased Spell Damage",
+            "30% chance for Energy Shield Recharge to start when you Block"]);
         assert_eq!(s.gear.len(), 2, "swap and empty slots skipped");
         assert_eq!(b.stages[1].tree.as_ref().unwrap().masteries, vec![(12125, 34242), (63268, 55308)]);
         // Second stage: its own gems, gear falls back to nothing (only one item set).
