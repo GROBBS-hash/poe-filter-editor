@@ -147,6 +147,9 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
   const [picked, setPicked] = useState<Picked>(start);
   const [replacing, setReplacing] = useState<Replacing | null>(replacingProp ?? null);
   const [status, setStatus] = useState<Status | null>(null);
+  // "More options" folded or open, remembered between pop-ups.
+  const [more, setMore] = useState(() => { try { return localStorage.getItem("qm-more") === "1"; } catch { return false; } });
+  const toggleMore = (on: boolean) => { setMore(on); try { localStorage.setItem("qm-more", on ? "1" : "0"); } catch { /* not kept */ } };
   const [extra, setExtra] = useState<Omit<Reply, "status"> | null>(null);
   const [toast, setToast] = useState("");
   const [anyRarity, setAnyRarity] = useState(replacingProp ? !replacingProp.detail.rarity : false);
@@ -319,7 +322,8 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
   const wholeType = !item.base_type;
   const v = status?.verdict;
   const st = v?.style;
-  const isGear = GEAR.includes(item.rarity);
+  // Rarity only matters for gear and maps; currency, fragments, cards etc. are "Normal" but have no rarity to pick.
+  const isGear = GEAR.includes(item.rarity) && !extra?.stackable && !/Currency|Fragment|Divination|Gem|Corpse/.test(item.item_class);
 
   const gf = extra?.game_filter;
   const nameOf = (f: string) => f.replace(/\.filter$/i, "");
@@ -435,26 +439,6 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
         <div className="qm-status"><div className="qm-facts">Checking your filter…</div></div>
       )}
 
-      {!wholeType && extra?.stackable && status && (
-        <div className="qm-stack">
-          <div className="qm-label">Stack size: <b>{stackN.toLocaleString()}</b>{item.stack_size ? ` (this one: ${item.stack_size.toLocaleString()})` : ""}</div>
-          <input type="range" min={0} max={steps.length - 1} value={pickIndex}
-            onChange={(e) => setStackPick(+e.target.value)} />
-          <div className="qm-row">
-            <button className="qm-btn small hide" onClick={() => hideBelow(stackN)} disabled={stackN <= 1}
-              title={`Hide stacks smaller than ${stackN.toLocaleString()}`}>
-              Only show {stackN.toLocaleString()}+
-            </button>
-            <button className="qm-btn small" onClick={() => setEditing({ minStack: stackN })}>
-              Style {stackN.toLocaleString()}+…
-            </button>
-          </div>
-          {item.item_class === "Stackable Currency" && item.base_type && (
-            <StackTiers base={item.base_type} onDone={(m) => afterChange(m)} />
-          )}
-        </div>
-      )}
-
       <div className="qm-row">
         {(() => {
           // Show · Hide · Minimap icon only, with the item's current state lit up.
@@ -511,6 +495,33 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
         Customise colours, beam, icon & sound…
       </button>
 
+      {/* Less-used settings, folded away (remembered): stack sizes, when it applies, every rarity, auto reload. */}
+      <button className="qm-more-toggle" onClick={() => toggleMore(!more)}>
+        {more ? "▾" : "▸"} More options
+        {!more && <span className="muted small"> · {[extra?.stackable && "stack sizes", "when it applies", isGear && "every rarity", inGame && "auto reload"].filter(Boolean).join(" · ")}</span>}
+      </button>
+      {more && (
+        <div className="qm-more">
+      {!wholeType && extra?.stackable && status && (
+        <div className="qm-stack">
+          <div className="qm-label">Stack size: <b>{stackN.toLocaleString()}</b>{item.stack_size ? ` (this one: ${item.stack_size.toLocaleString()})` : ""}</div>
+          <input type="range" min={0} max={steps.length - 1} value={pickIndex}
+            onChange={(e) => setStackPick(+e.target.value)} />
+          <div className="qm-row">
+            <button className="qm-btn small hide" onClick={() => hideBelow(stackN)} disabled={stackN <= 1}
+              title={`Hide stacks smaller than ${stackN.toLocaleString()}`}>
+              Only show {stackN.toLocaleString()}+
+            </button>
+            <button className="qm-btn small" onClick={() => setEditing({ minStack: stackN })}>
+              Style {stackN.toLocaleString()}+…
+            </button>
+          </div>
+          {item.item_class === "Stackable Currency" && item.base_type && (
+            <StackTiers base={item.base_type} onDone={(m) => afterChange(m)} />
+          )}
+        </div>
+      )}
+
       <div className="qm-when">
         <span>When:</span>
         {([["always", "Always"], ["levelling", "While levelling"], ["maps", "In maps"]] as [When, string][]).map(([k, label]) => (
@@ -531,6 +542,8 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
           <input type="checkbox" checked={autoReload} onChange={(e) => toggleAuto(e.target.checked)} />
           <span>Reload {gf ? <b>{nameOf(gf.expected)}</b> : "the filter"} in game after each change (F4 does it by hand)</span>
         </label>
+      )}
+        </div>
       )}
 
       <div className="qm-foot">

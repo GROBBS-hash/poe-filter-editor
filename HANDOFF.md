@@ -277,6 +277,10 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Notes about older edits whose NeverSink tier is gone ("… is gone in this version") no longer block the reload or
   replace "Saved" (My edits lists them).
 
+- F2 pop-up tidied 20 Nov: order is item, status card, Show · Hide · Minimap, sound, quick highlight, Customise;
+  stack sizes/tiers, When, every rarity and auto reload sit under "More options" (remembered, localStorage qm-more).
+  Rarity choices only for gear and maps (not currency/fragments/cards/gems/corpses).
+
 
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
@@ -303,7 +307,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [x] Maps: a mod ticked on the Maps page shows in red on Ctrl+D and the stash search hides those maps (confirmed 20 Nov).
 - [ ] Unidentified rares like "Fated Composite Ring" price as "Composite Ring" (no "Unknown item base type").
 - [ ] Maven's chisels: side panel lists the other chisels; offers show (paid in divines).
-- [ ] F2: Show / Hide / Minimap icon only buttons; Show brings back an item you hid.
+- [ ] F2: tidier pop-up (Show / Hide / Minimap up top, "More options" fold); Show brings back an item you hid.
 - [ ] Menu icons: each page has its own colour tile (Find blue, Tiers coral, Wealth gold…), page title matches.
 - [ ] New Clean glass look: opens bigger and remembers its size; pages fade in; Wealth tiles look right; nothing broken on other pages.
 - [ ] Unidentified unique (e.g. Karui Sceptre): no false tier 1 / divine sound; the "Could be one of N uniques" list shows in F2 and Ctrl+D.
