@@ -37,8 +37,8 @@
       {
         "label": "build",
         "title": "Build",
-        "width": 560,
-        "height": 720,
+        "width": 780,
+        "height": 900,
         "decorations": false,
         "alwaysOnTop": true,
         "skipTaskbar": true,

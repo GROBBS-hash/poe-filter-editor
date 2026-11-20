@@ -1299,6 +1299,88 @@ fn hide_build_window(app: AppHandle) {
     if let Some(w) = app.get_webview_window("build") { let _ = w.hide(); }
 }
 
+/// "Open when the passive skill tree is opened": (on, the game's tree key).
+#[tauri::command]
+fn build_tree_opt(state: State<AppState>) -> (bool, String) {
+    let s = &state.store.lock().unwrap().settings;
+    (s.build_with_tree, s.key_tree.clone())
+}
+
+#[tauri::command]
+fn set_build_tree(app: AppHandle, state: State<AppState>, on: bool) -> Result<(), String> {
+    let mut store = state.store.lock().unwrap();
+    store.settings.build_with_tree = on;
+    store.save(&state.store_path).map_err(err)?;
+    let _ = app.emit("build-tree-opt", on);
+    Ok(())
+}
+
+/// Windows key code for a key name: letters, digits, F1-F24, Tab, Space.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn vk_of(key: &str) -> Option<i32> {
+    let k = key.trim().to_uppercase();
+    let mut c = k.chars();
+    match (c.next(), c.next()) {
+        (Some(ch), None) if ch.is_ascii_alphanumeric() => return Some(ch as i32),
+        _ => {}
+    }
+    if let Some(n) = k.strip_prefix('F').and_then(|n| n.parse::<i32>().ok()) {
+        if (1..=24).contains(&n) { return Some(0x70 + n - 1); }
+    }
+    match k.as_str() { "TAB" => Some(0x09), "SPACE" => Some(0x20), _ => None }
+}
+
+/// Watches the game's passive tree key without taking it from the game (it only looks at
+/// the keyboard, the game still gets the key): tree key with the game in front opens the build
+/// window on its Tree tab without taking focus; the tree key or Esc closes it again.
+/// Enter opens/sends chat, so the tree key is ignored while chat may be open.
+#[cfg(windows)]
+fn start_tree_watcher(app: AppHandle) {
+    use windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
+    thread::spawn(move || {
+        let down = |vk: i32| unsafe { GetAsyncKeyState(vk) } as u16 & 0x8000 != 0;
+        let (mut was_key, mut was_esc, mut was_enter) = (false, false, false);
+        let mut chat = false;
+        let mut opened = false; // opened by the tree key (so Esc / the key closes it)
+        loop {
+            let (on, key) = {
+                let st = app.state::<AppState>();
+                let s = &st.store.lock().unwrap().settings;
+                (s.build_with_tree, s.key_tree.clone())
+            };
+            let vk = vk_of(&key).filter(|_| on);
+            let Some(vk) = vk else { opened = false; thread::sleep(Duration::from_millis(500)); continue };
+            thread::sleep(Duration::from_millis(25));
+            let (k, esc, enter) = (down(vk), down(0x1B), down(0x0D));
+            let front = game_in_front();
+            if !front { chat = false; }
+            if enter && !was_enter && front { chat = !chat; }
+            if esc && !was_esc { chat = false; }
+            let Some(w) = app.get_webview_window("build") else { continue };
+            let shown = w.is_visible().unwrap_or(false);
+            if !shown { opened = false; }
+            if k && !was_key && front && !chat {
+                if !shown {
+                    let _ = w.emit_to("build", "build-tree", ());
+                    let _ = w.emit("build-shown", ());
+                    let _ = w.show();
+                    focus_game(); // keep the keyboard on the game
+                    opened = true;
+                } else if opened {
+                    let _ = w.hide();
+                    opened = false;
+                }
+            } else if esc && !was_esc && opened && shown && front {
+                let _ = w.hide();
+                opened = false;
+            }
+            (was_key, was_esc, was_enter) = (k, esc, enter);
+        }
+    });
+}
+#[cfg(not(windows))]
+fn start_tree_watcher(_app: AppHandle) {}
+
 /// In-game panel: the stack tiers a currency can go in, and where it is now.
 #[tauri::command]
 fn stack_choices(app: AppHandle, base: String) -> Result<Vec<filter_core::tiers::StackChoice>, String> {
@@ -2116,6 +2198,7 @@ pub fn run() {
             }
             start_batch_watcher(app.handle().clone());
             start_whisper_watcher(app.handle().clone());
+            start_tree_watcher(app.handle().clone());
             start_live_searches(app.handle().clone());
             wealth_app::start_session_timer(app.handle().clone());
 
@@ -2186,7 +2269,7 @@ pub fn run() {
             list_farm_presets,
             apply_farm_preset,
             list_level_presets,
-            get_tiers, get_rule_section, get_map_tiers, set_tiers, trade_search, trade_bulk, rare_estimate, map_dangers, map_suggest, map_tool_get, map_tool_save, map_tool_regex, map_regex_copy, map_tool_trade, trade_action, hide_trades_window, wealth_app::wealth_get, wealth_app::wealth_setup, wealth_app::wealth_prefs, wealth_app::wealth_scan, wealth_app::wealth_profile_save, wealth_app::wealth_profile_delete, wealth_app::wealth_profile_use, wealth_app::wealth_tabs_refresh, wealth_app::session_start, wealth_app::session_check, wealth_app::session_pause, wealth_app::session_stop, wealth_app::session_delete, wealth_app::earnings_overlay, saved_list, saved_add, saved_delete, saved_live, report_problem, send_whisper, copy_text, hide_trade_window, keep_on_screen,
+            get_tiers, get_rule_section, get_map_tiers, set_tiers, build_tree_opt, set_build_tree, trade_search, trade_bulk, rare_estimate, map_dangers, map_suggest, map_tool_get, map_tool_save, map_tool_regex, map_regex_copy, map_tool_trade, trade_action, hide_trades_window, wealth_app::wealth_get, wealth_app::wealth_setup, wealth_app::wealth_prefs, wealth_app::wealth_scan, wealth_app::wealth_profile_save, wealth_app::wealth_profile_delete, wealth_app::wealth_profile_use, wealth_app::wealth_tabs_refresh, wealth_app::session_start, wealth_app::session_check, wealth_app::session_pause, wealth_app::session_stop, wealth_app::session_delete, wealth_app::earnings_overlay, saved_list, saved_add, saved_delete, saved_live, report_problem, send_whisper, copy_text, hide_trade_window, keep_on_screen,
             move_tier_item,
             stack_choices,
             gear_setup,

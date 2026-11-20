@@ -160,6 +160,22 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   league-mechanic groups (Expedition: Ancient Orb + Astragali + keys) show only drops ("Can reroll a unique into").
   The preview page's mock of `related_items` is a rough JS copy; trust the Rust tests.
 
+- Tiers → **Map tiers** (20 Nov, FilterBlade-style; , core , commands
+   / ): "Show maps from tier N and up" (hides NeverSink's   blocks below N), one chip per tier to toggle, one look per band (d = T1–5 whites, c = T6–10, b = T11–13, a = T14–16),
+  and the special kinds () with a tick and "Open".
+  All saved as normal Tier rules, so they survive NeverSink updates. Searching "map" on the Tiers page offers it.
+  Not done: rarity-specific map hiding (e.g. only hide white maps), which would need an Override block.
+- Ground reader 20 Nov: a label stacked right under another (grey "MAP (TIER 4)" under a dark "SPINY ROUND SHIELD")
+  was joined into one text and picked the shield. Stacked lines now also need the same background colour
+  ( in screen.rs). The game's hover highlight wasn't used: the little squares at the end of labels in his
+  screenshot look like socket colours, not a hover marker.
+- Build window (F6) 20 Nov: opens 780×900, Clean glass look (gold heading bar, card header, pill tabs, tree fills the
+  window height). "Open with the passive tree (P)" tick box in the window and in Settings (,
+  ):  in lib.rs polls the key with GetAsyncKeyState (does NOT take the key from the
+  game), only while the game is in front; opens on the Tree tab without taking focus; P or Esc closes it if it opened
+  that way. Enter toggles a "chat may be open" guard so typing P in chat doesn't open it.
+  Preview: http://localhost:1420/preview-app.html?build renders the window with a sample build.
+
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
 (move them to "Confirmed in game") as he reports back, and add new features here as they land.
@@ -200,7 +216,17 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Invite / Trade / Thanks / Kick each type exactly one chat line in game; turns green when the buyer arrives.
 - [ ] Chat hotkeys (e.g. /hideout) work.
 
+**Map tiers (Tiers → Map tiers, new 20 Nov)**
+- [ ] "Show maps from tier N" hides lower white maps on the floor after F4; special maps (blighted etc.) still show.
+- [ ] Band look (e.g. make tier 14–16 bigger) shows in game; Reset puts it back.
+
+**Build window (F6, new look 20 Nov)**
+- [ ] Opens bigger and easier to read; the tree fills the window.
+- [ ] With "Open with the passive tree (P)" ticked: pressing P in game opens it on the Tree tab and the game's tree
+      opens too; P or Esc closes it; typing a P in chat doesn't open it.
+
 **Ground reader (F2)**
+- [ ] 20 Nov: two labels on top of each other (e.g. a map right under a shield): F2 on the lower one picks it, not the upper one.
 - [ ] 19 Nov fixes: our own pop-ups no longer get read as the item; names missing a letter are still found;
       the "rarity unsure" note shows on NeverSink tiered gear.
 

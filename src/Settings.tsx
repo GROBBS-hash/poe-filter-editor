@@ -6,7 +6,7 @@ type Settings = {
   key_quick_edit: string; key_batch: string; key_reload: string; key_cycle: string; key_build: string; key_price?: string;
   cycle_enabled: boolean; fallback_area_level: number; claude_api_key: string; map_avoid?: string[] | null;
   trade_helper?: boolean; thanks_message?: string; chat_keys?: { key: string; command: string }[];
-  price_compare?: boolean; price_rolls?: boolean;
+  price_compare?: boolean; price_rolls?: boolean; build_with_tree?: boolean; key_tree?: string;
 };
 const CHAT_IDEAS = ["/hideout", "/kingsmarch", "/menagerie", "/delve", "/exit", "/invite", "/kick", "/afk"];
 type Suggestion = { name: string; why: string };
@@ -97,6 +97,10 @@ export default function SettingsPage() {
           <label className="check"><input type="checkbox" checked={s.cycle_enabled} onChange={(e) => set({ cycle_enabled: e.target.checked })} />
             <span>Switch to your next filter (e.g. League Start → Strict 1 → Strict 2) and load it</span></label>
           <KeyBox value={s.key_cycle} disabled={!s.cycle_enabled} onChange={(k) => set({ key_cycle: k })} />
+          <label className="check"><input type="checkbox" checked={s.build_with_tree ?? false} onChange={(e) => set({ build_with_tree: e.target.checked })} />
+            <span>Open the build window (on its Tree tab) when the passive skill tree is opened in game; that key or Esc closes it.
+              Set the box to the game's passive tree key (P unless you changed it). The game still gets the key.</span></label>
+          <KeyBox value={s.key_tree ?? "P"} disabled={!(s.build_with_tree ?? false)} onChange={(k) => set({ key_tree: k })} />
         </div>
       </div>
 

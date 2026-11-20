@@ -4,6 +4,7 @@
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import BuildOverlay from "./BuildOverlay";
 import "./styles.css";
 
 const now = Math.floor(Date.now() / 1000);
@@ -31,11 +32,24 @@ const mapTiers = () => ({
     .map(([k, title, n]) => ({ type_path: ["maps", k], title, group: "Maps", shared_bases: true,
       tiers: Array.from({ length: n as number }, (_, i) => ({ tier: "t" + i, name: "Tier " + i, visibility: "Show", style: mapStyle("a"), bases: [], note: "", min_stack: null })) })),
 });
-mockWindows("main");
+// ?build shows the F6 build window instead, with a sample build.
+const buildWin = location.search.includes("build");
+const gem = (name: string, colour: string, support = false) => ({ name, level: 20, quality: 20, enabled: true, support, colour });
+const pob = async () => {
+  const t = await fetch("/tree_poe1.json").then((r) => r.json());
+  const ids = Object.keys(t.nodes).map(Number);
+  const stage = (title: string, n: number) => ({ title, tree: { version: "3.30", nodes: ids.slice(200, 200 + n), url: "" },
+    groups: [{ label: "Main", slot: "Body Armour", enabled: true, gems: [gem("Arc", "b"), gem("Spell Echo", "b", true), gem("Lightning Penetration", "b", true)] }],
+    gear: [{ slot: "Helmet", rarity: "rare", name: "Doom Crown", base: "Hubris Circlet", lines: ["+80 to maximum Life"] }] });
+  return { build: { class: "Witch", ascendancy: "Elementalist", level: 50, active: 1, stages: [stage("Start of Maps", 90), stage("End of Early Maps", 120)] }, stage: 1, link: "", follow: false };
+};
+mockWindows(buildWin ? "build" : "main");
 mockIPC((cmd, args) => {
   if (cmd === "overview") return { profiles: [{ id: "mid", name: "Mid-Game", game: "Poe1", base_file: "", output_file: "", rules: [] }], active: "mid", poe1_dir: "", poe2_dir: "", batch_on: false };
   if (cmd === "wealth_get") return wealth;
   if (cmd === "get_icons") return {};
+  if (cmd === "pob_get") return pob();
+  if (cmd === "build_tree_opt") return [true, "P"];
   if (cmd === "get_tiers") return [];
   if (cmd === "get_map_tiers") return mapTiers();
   if (cmd === "set_tiers") { const a = args as { tiers: string[]; show: boolean | null }; for (const t of a.tiers) { if (a.show === false) mapHidden.add(t); else if (a.show) mapHidden.delete(t); } return []; }
@@ -43,4 +57,5 @@ mockIPC((cmd, args) => {
 }, { shouldMockEvents: true });
 
 try { if (!localStorage.getItem("tab")) localStorage.setItem("tab", "wealth"); } catch { /* fine */ }
-createRoot(document.getElementById("root")!).render(<App />);
+if (buildWin) document.body.classList.add("overlay");
+createRoot(document.getElementById("root")!).render(buildWin ? <BuildOverlay /> : <App />);
