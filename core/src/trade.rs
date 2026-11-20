@@ -45,6 +45,9 @@ pub struct StatFilter {
     pub roll: Option<f64>,
     #[serde(default)]
     pub range: Option<String>,
+    /// "prefix" or "suffix" (shown as P / S in the window).
+    #[serde(default)]
+    pub affix: Option<String>,
 }
 
 /// Mods that almost never change what an item sells for.
@@ -324,19 +327,19 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
         let enabled = !unique && !is_map(&item) && m.kind != "enchant" && good && !junk && !counted.contains(&i);
         // A mod with no number is just "has it": no minimum.
         let min = if m.values.is_empty() { None } else { Some(min_for(value)) };
-        filters.push(StatFilter { id, label: m.text.clone(), value, min, enabled, kind, tier: m.tier, junk, roll: m.roll, range: m.range.clone() });
+        filters.push(StatFilter { id, label: m.text.clone(), value, min, enabled, kind, tier: m.tier, junk, roll: m.roll, range: m.range.clone(), affix: m.affix.clone() });
     }
     if is_map(&item) { filters.splice(0..0, crate::trade_rules::map_props(text, &item)); }
     else { filters.extend(crate::trade_rules::open_affixes(text, &item, index)); }
     // The game's own order: defences / damage first, then totals, enchants, implicits, prefixes, suffixes,
     // and the "open prefix / suffix" rows last. Same-group rows keep the item's order.
-    let affix_of = |label: &str| lines.iter().find(|m| m.text == label).and_then(|m| m.affix.clone());
+    let affix_of = |f: &StatFilter| f.affix.clone();
     let group = |f: &StatFilter| -> u8 {
         if f.id.starts_with("prop.") { return 0 }
         if f.kind == "pseudo" { return if f.id.contains("empty") { 9 } else { 1 } }
         match f.kind.as_str() {
             "enchant" => 2, "implicit" => 3,
-            _ => match affix_of(&f.label).as_deref() { Some("prefix") => 4, Some("suffix") => 5, _ => 6 },
+            _ => match affix_of(f).as_deref() { Some("prefix") => 4, Some("suffix") => 5, _ => 6 },
         }
     };
     filters.sort_by_key(|f| group(f));

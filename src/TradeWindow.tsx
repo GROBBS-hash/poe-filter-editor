@@ -7,7 +7,7 @@ import BaseUniques from "./BaseUniques";
 import RelatedItems from "./RelatedItems";
 import { Item, RARITY_COLOUR, itemTitle } from "./types";
 
-type StatFilter = { id: string; label: string; value: number; min: number | null; enabled: boolean; kind: string; tier: number | null; junk?: boolean; roll?: number | null; range?: string | null };
+type StatFilter = { id: string; label: string; value: number; min: number | null; enabled: boolean; kind: string; tier: number | null; junk?: boolean; roll?: number | null; range?: string | null; affix?: string | null };
 type Setup = { item: Item; filters: StatFilter[]; unknown_kinds?: string[]; base_only: boolean; ilvl_min: number | null; ilvl_max?: number | null; links_min: number | null;
   gem_level: number | null; unknown: string[]; category: string | null; raw?: string };
 type MapInfo = { mods: { text: string; warn: string | null }[]; unidentified: boolean; tier: number | null; stats: string[] };
@@ -432,6 +432,7 @@ export default function TradeWindow() {
               <input type="checkbox" checked={f.enabled} onChange={(e) => patch(i, { enabled: e.target.checked })} />
               <span className={`tw-label mod-${f.kind}`}>{f.label}{KIND[f.kind] && <span className="tw-kind">{KIND[f.kind]}</span>}
                 {f.tier != null && <span className={`tw-tier ${tierClass(f.tier)}`} title="Tier 1 is the best this mod can roll">T{f.tier}</span>}
+                {f.affix && <span className={`tw-affix ${f.affix}`} title={f.affix === "prefix" ? "Prefix: an item has up to 3 (jewels 2)" : "Suffix: an item has up to 3 (jewels 2)"}>{f.affix === "prefix" ? "P" : "S"}</span>}
                 {f.roll != null && <Roll r={f.roll} range={f.range} tier={f.tier} />}</span>
               <input className="tw-min" type="number" value={f.min ?? ""} placeholder="min" onWheel={(e) => wheel(i, f, e)}
                 onChange={(e) => patch(i, { min: e.target.value === "" ? null : +e.target.value, enabled: true })} />
