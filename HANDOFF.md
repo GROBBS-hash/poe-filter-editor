@@ -322,7 +322,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [x] F2: Show / Hide / Minimap work; Show brings items back with NeverSink's look (confirmed 20 Nov), "More options" fold works (design may change).
 - [ ] F2 card: chips and "Change this look" button; no NeverSink jargon box.
 - [ ] Main window item panel (Find): one sheet, two columns, nothing folded.
-- [ ] Price check on a stack (e.g. 732 lifeforce): "Your 732 ≈ …" in the price box.
+- [ ] Price check on a stack (e.g. 732 lifeforce): the big number is the whole stack's worth ("your 732"), price each small.
 - [ ] Menu icons: each page has its own colour tile (Find blue, Tiers coral, Wealth gold…), page title matches.
 - [ ] New Clean glass look: opens bigger and remembers its size; pages fade in; Wealth tiles look right; nothing broken on other pages.
 - [ ] Unidentified unique (e.g. Karui Sceptre): no false tier 1 / divine sound; the "Could be one of N uniques" list shows in F2 and Ctrl+D.
@@ -376,7 +376,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
       filter's look for a Zana map vs a plain map (`label_distance`) and sets `zana_memory` when the Zana look fits
       far better. `map_tiers` splits NeverSink's `maps->influenced` rules into "Originator maps" (zanamap, zanamaplow)
       and the other influenced maps. Ctrl+C: "Originator's Memories" / "Originator Item" lines (guessed, unverified).
-- [ ] Citadel (conqueror) maps ("Map contains Drox's Citadel" implicit): purple look in game (NeverSink's own rule, which
+- [x] (Confirmed 20 Nov: citadel maps show purple in game.) Citadel (conqueror) maps ("Map contains Drox's Citadel" implicit): purple look in game (NeverSink's own rule, which
       he ships commented out), F2 / Ctrl+C show "maps › implicitmod", "Modify this rule" opens the new "Citadel
       (conqueror) maps" row in Map tiers step 4 (looks clickable, with "plain map" examples; untick hides them).
       How: `filter::enable_commented` switches on NeverSink's `#Show … $type->maps->implicitmod` blocks in place on every

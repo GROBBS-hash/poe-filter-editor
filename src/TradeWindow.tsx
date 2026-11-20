@@ -210,20 +210,19 @@ function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote, waiting, st
   } else if (ninjaChaos != null) {
     main = ninjaChaos; label = `poe.ninja${ninjaNote}`;
   }
-  const showDiv = main != null && divine && main >= divine;
+  // With a stack (e.g. 732 lifeforce) the big number is what your whole stack is worth; the price each goes small.
+  const many = stack != null && stack > 1 && main != null;
+  const big = main != null ? (many ? main * stack! : main) : null;
+  const showDiv = big != null && divine && big >= divine;
   return (
     <div className={`tw-hero ${main == null ? "empty" : ""}`}>
-      {main != null ? (
+      {main != null && big != null ? (
         <div className="tw-hero-main">
-          <span className="tw-hero-price" title={source || undefined}>{showDiv ? <Price n={main / divine!} cur="divine" /> : <Price n={main} cur="chaos" />}</span>
+          <span className="tw-hero-price" title={source || undefined}>{showDiv ? <Price n={big / divine!} cur="divine" /> : <Price n={big} cur="chaos" />}</span>
           <span className="tw-hero-side">
-            <span className="tw-hero-label">{label}</span>
-            {divine && <span className="muted">{showDiv ? <>= <Price n={main} cur="chaos" /></> : main / divine >= 0.01 ? <>= <Price n={main / divine} cur="divine" /></> : null}</span>}
-            {stack != null && stack > 1 && (
-              // What the whole stack you hovered is worth (e.g. 732 lifeforce).
-              <span className="tw-hero-stack">Your {stack.toLocaleString()} ≈ <b>{divine && main * stack >= divine ? <Price n={(main * stack) / divine} cur="divine" /> : <Price n={main * stack} cur="chaos" />}</b>
-                {divine && main * stack >= divine ? <> = <Price n={main * stack} cur="chaos" /></> : null}</span>
-            )}
+            <span className="tw-hero-label">{many ? `your ${stack!.toLocaleString()}` : label}</span>
+            {divine && <span className="muted">{showDiv ? <>= <Price n={big} cur="chaos" /></> : big / divine >= 0.01 ? <>= <Price n={big / divine} cur="divine" /></> : null}</span>}
+            {many && <span className="muted small">{money(main, divine)} each</span>}
           </span>
         </div>
       ) : (
