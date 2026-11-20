@@ -118,6 +118,57 @@ function ByTab({ tabs, items, divine }: { tabs: [string, number][]; items: Value
   );
 }
 
+type Found = { tab_index: number; tab: string; name: string; kind: string; stack: number; x: number; y: number; icon: string;
+  ilvl: number; mods: string; note: string; value: number | null };
+type FindResult = { items: number; time: number; league: string; total: number; hits: Found[] };
+
+/** Find in stash: every item from the last scans (all tabs), by name, kind, tab or mod. Like PoeStash's search. */
+function FindInStash({ divine, scanned }: { divine: number | null; scanned: number }) {
+  const [q, setQ] = useState("");
+  const [r, setR] = useState<FindResult | null>(null);
+  const [open, setOpen] = useState<number | null>(null);
+  const [copied, setCopied] = useState<number | null>(null);
+  useEffect(() => {
+    const t = setTimeout(() => invoke<FindResult>("wealth_find", { query: q }).then(setR).catch(() => {}), 120);
+    return () => clearTimeout(t);
+  }, [q, scanned]);
+  const copy = (i: number, f: Found) => {
+    // The game's stash search (Ctrl+F) lights up items matching this.
+    invoke("copy_text", { text: `"${f.name.replace(/"/g, "")}"` }).then(() => { setCopied(i); setTimeout(() => setCopied(null), 1500); });
+  };
+  return (
+    <div className="card">
+      <h2>Find in stash</h2>
+      <input className="text w-find" value={q} placeholder="Search every tab, e.g. divine, maximum life, ring -unique"
+        onChange={(e) => { setQ(e.target.value); setOpen(null); }} />
+      <p className="muted small">
+        {!r || r.items === 0 ? "Scan your stash first: the search looks through what the last scan saw."
+          : <>Searching {r.items.toLocaleString()} items from your scans ({new Date(r.time * 1000).toLocaleString()}). Names, kinds (rare, unique,
+            gem…), tabs and mods all count; put a minus in front to leave a word out.</>}
+      </p>
+      {r && q.trim() && (r.total === 0 ? <p className="muted small">Nothing matches.</p> : (
+        <>
+          {r.total > r.hits.length && <p className="muted small">{r.total} found, showing the first {r.hits.length}.</p>}
+          <table className="w-table w-missed"><tbody>
+            {r.hits.map((f, i) => (
+              <tr key={i} className="w-found" onClick={() => setOpen(open === i ? null : i)}>
+                <td>{f.icon && <img src={f.icon} alt="" width={24} height={24} />}</td>
+                <td>{f.name}{f.stack > 1 ? ` ×${f.stack}` : ""}
+                  <div className="muted small">{f.kind}{f.ilvl ? ` · ilvl ${f.ilvl}` : ""}{f.note && ` · ${f.note}`}</div>
+                  {open === i && f.mods && <pre className="w-mods">{f.mods}</pre>}</td>
+                <td className="muted small">{f.tab || `Tab ${f.tab_index + 1}`} · {f.x + 1},{f.y + 1}</td>
+                <td>{f.value != null ? <Worth c={f.value} divine={divine} /> : <span className="muted small">–</span>}</td>
+                <td><button className="link small" title="Copies the name: paste it into the stash search in game (Ctrl+F) to light it up"
+                  onClick={(e) => { e.stopPropagation(); copy(i, f); }}>{copied === i ? "Copied" : "Copy"}</button></td>
+              </tr>
+            ))}
+          </tbody></table>
+        </>
+      ))}
+    </div>
+  );
+}
+
 /** A rare priced from similar items on the trade site: a rough guess. */
 function RareTag() {
   return <span className="w-rare" title="Priced from similar rares for sale on the trade site (a rough guess)">rare · trade guess</span>;
@@ -304,6 +355,8 @@ export default function Wealth() {
           <History snaps={mine} divine={v.divine} />
         </div>
       )}
+
+      {connected && <FindInStash divine={v.divine} scanned={last?.time ?? 0} />}
 
       {connected && last && last.tabs.length > 0 && <ByTab tabs={last.tabs} items={v.last_items ?? []} divine={v.divine} />}
 

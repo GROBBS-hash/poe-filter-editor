@@ -71,20 +71,85 @@ fn scan(app: &AppHandle, only: Option<&[usize]>) -> Result<(Vec<Valued>, Vec<Rar
     let pick: Vec<Tab> = tabs.into_iter().filter(|t| only.map(|o| o.contains(&t.index)).unwrap_or(true)).collect();
     let mut out = Vec::new();
     let mut rares = Vec::new();
+    let mut found = Vec::new();
     for (n, t) in pick.iter().enumerate() {
         let _ = app.emit("wealth-progress", (n, pick.len(), t.name.clone()));
         let v = trade_api::stash_tab(&account, &sessid, &league, poe2, t.index, false)?;
-        out.extend(value(app, &v, &t.name));
+        let priced = value(app, &v, &t.name);
+        let mut f = wealth::found_in_tab(&v["items"], t.index, &t.name);
+        attach_values(&mut f, &priced);
+        found.extend(f);
+        out.extend(priced);
         rares.extend(wealth::rares_in_tab(&v["items"], &t.name));
     }
     let _ = app.emit("wealth-progress", (pick.len(), pick.len(), String::new()));
     let t = now();
+    let mut rare_values = Vec::new();
     with_store(&state, |s| for r in &rares {
         if let Some(p) = s.rare_prices.get(&r.id).filter(|p| p.chaos > 0.0 && t.saturating_sub(p.time) < RARE_KEEP) {
-            out.push(wealth::rare_valued(r, p.chaos));
+            rare_values.push(wealth::rare_valued(r, p.chaos));
         }
     });
+    attach_values(&mut found, &rare_values);
+    out.extend(rare_values);
+    // "Find in stash": these tabs' items replace what the index had for them.
+    let scanned: Vec<usize> = pick.iter().map(|t| t.index).collect();
+    with_index(&state, |ix| {
+        ix.items.retain(|f| !scanned.contains(&f.tab_index));
+        ix.items.extend(found);
+        ix.time = now();
+        ix.league = league.clone();
+    });
     Ok((out, rares))
+}
+
+/// Puts the scan's prices on the found items (same tab, same spot, same name; socketed gems aren't priced).
+fn attach_values(found: &mut [wealth::Found], priced: &[Valued]) {
+    for f in found.iter_mut().filter(|f| !f.note.starts_with("in ")) {
+        if let Some(v) = priced.iter().find(|v| v.tab == f.tab && v.x == f.x && v.y == f.y && v.name == f.name) { f.value = Some(v.value); }
+    }
+}
+
+/// Every item from the last scans, for "Find in stash" (stash_index.json: kept apart from wealth.json, it's big).
+#[derive(Default, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+struct StashIndex { time: u64, league: String, items: Vec<wealth::Found> }
+
+static INDEX: Mutex<Option<StashIndex>> = Mutex::new(None);
+
+fn with_index<T>(state: &AppState, f: impl FnOnce(&mut StashIndex) -> T) -> T {
+    let path = state.data_dir.join("stash_index.json");
+    let mut g = INDEX.lock().unwrap();
+    let ix = g.get_or_insert_with(|| std::fs::read_to_string(&path).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default());
+    let before = (ix.time, ix.items.len());
+    let out = f(ix);
+    if (ix.time, ix.items.len()) != before {
+        let tmp = path.with_extension("tmp");
+        if serde_json::to_string(&*ix).ok().and_then(|t| std::fs::write(&tmp, t).ok()).is_some() { let _ = std::fs::rename(&tmp, &path); }
+    }
+    out
+}
+
+#[derive(serde::Serialize)]
+pub struct FindResult {
+    /// Items in the index, and when it was last filled.
+    items: usize,
+    time: u64,
+    league: String,
+    /// How many matched (only the first 200 are sent).
+    total: usize,
+    hits: Vec<wealth::Found>,
+}
+
+/// "Find in stash": searches every item from your last scans by name, kind, tab and mods.
+#[tauri::command]
+pub fn wealth_find(app: AppHandle, query: String) -> FindResult {
+    let state = app.state::<AppState>();
+    with_index(&state, |ix| {
+        let hits = wealth::find(&ix.items, &query);
+        FindResult { items: ix.items.len(), time: ix.time, league: ix.league.clone(), total: hits.len(),
+            hits: hits.into_iter().take(200).cloned().collect() }
+    })
 }
 
 #[derive(serde::Serialize, Clone)]

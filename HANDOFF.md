@@ -272,6 +272,14 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   otherwise it opens as before. Checked on his PC: after a restart the window was minimised and not in front.
   Tray "Open editor" un-minimises too.
 
+- Find in stash 21 Nov (Wealth page, PoeStash-style "search every tab"): each scan keeps every item of the tabs it
+  read, socketed gems too (`wealth::found_in_tab` → `Found`: tab index + name, spot, kind, ilvl, mods text from
+  `item_text`, price note, scan value), replacing those tabs' old entries, in its own file `stash_index.json`
+  (`StashIndex` in wealth_app.rs; kept out of wealth.json, which is saved on every view). `wealth_find` searches it
+  (`wealth::find`: every word in name/kind/tab/mods, "-word" leaves out, name matches first, then worth; first 200).
+  Results: tab and spot, worth, mods on click, "Copy" puts `"name"` on the clipboard for the game's stash search.
+  Quiet restarts: the 45s window was too short (a rebuild took longer and the editor popped up mid-game); now 30 min.
+
 - Wealth "By tab" card 20 Nov: a scan keeps every priced item (`WealthStore.last_items`, top 3000 by value); the card shows
   a chip per tab (worth + bar), and the picked tab's items grouped by name, most valuable first, listed ones marked.
   Scans from before this only have totals (the card says to scan again).
@@ -559,6 +567,8 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 **Wealth page (Endgame → Wealth)**
 - [x] Connected with account name + POESESSID (20 Nov). Still check: clear message if the POESESSID is wrong.
 - [ ] Scan whole stash: total, by-tab breakdown and history chart look right; "Worth selling" lists unlisted items.
+- [ ] 21 Nov: Find in stash (after a fresh scan): typing finds items in any tab (names, "rare", mods like
+      "maximum life", "-unique"); tab and spot right; click shows mods; Copy + Ctrl+F in the stash lights it up.
 - [x] (Confirmed 21 Nov.) After a scan, "Price N rares" prices his rares (about 10 a minute, progress shown); the total goes up,
       rares show "rare · trade guess" in By tab / Worth selling, and the prices look sensible next to Ctrl+D.
 - [x] Scan profiles: made one, scanned it, own total and history (confirmed 20 Nov). Still check: switching back to Whole stash.

@@ -222,6 +222,79 @@ pub fn value_tab(items: &Value, tab: &str, lookup: Lookup) -> Vec<Valued> {
     items.as_array().into_iter().flatten().filter_map(|it| value_item(it, tab, lookup)).collect()
 }
 
+/// Any item in the stash, for "Find in stash" (like PoeStash's search over every tab).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Found {
+    /// Tab index and name (several tabs can share a name, e.g. "~price 5 chaos").
+    pub tab_index: usize,
+    pub tab: String,
+    pub name: String,
+    /// "Normal", "Magic", "Rare", "Unique", "Gem", "Currency", "Card"…
+    pub kind: String,
+    pub stack: u32,
+    pub x: u32,
+    pub y: u32,
+    pub icon: String,
+    pub ilvl: u32,
+    /// Mods and properties, one per line (searched too, e.g. "maximum life").
+    pub mods: String,
+    /// The item's price note ("~price 2 chaos"), if any.
+    pub note: String,
+    /// Chaos for the stack, when the scan priced it.
+    pub value: Option<f64>,
+}
+
+/// Every item in a tab (and gems socketed in its gear), for searching.
+pub fn found_in_tab(items: &Value, tab_index: usize, tab: &str) -> Vec<Found> {
+    let mut out = Vec::new();
+    for it in items.as_array().into_iter().flatten() {
+        out.push(found_item(it, tab_index, tab));
+        for g in it["socketedItems"].as_array().into_iter().flatten() {
+            let mut f = found_item(g, tab_index, tab);
+            f.x = it["x"].as_u64().unwrap_or(0) as u32;
+            f.y = it["y"].as_u64().unwrap_or(0) as u32;
+            f.note = format!("in {}", clean(it["name"].as_str().filter(|n| !n.is_empty()).or(it["typeLine"].as_str()).unwrap_or("")));
+            out.push(f);
+        }
+    }
+    out
+}
+
+fn found_item(it: &Value, tab_index: usize, tab: &str) -> Found {
+    let name = clean(it["name"].as_str().unwrap_or(""));
+    let type_line = clean(it["typeLine"].as_str().unwrap_or(""));
+    let kind = match it["frameType"].as_u64().unwrap_or(0) {
+        0 => "Normal", 1 => "Magic", 2 => "Rare", 3 | 9 => "Unique", 4 => "Gem", 5 => "Currency", 6 => "Card", 7 => "Quest",
+        8 => "Prophecy", _ => "Other",
+    };
+    let text = item_text(it);
+    // The searchable part: everything after the name lines.
+    let mods = text.lines().skip_while(|l| !l.starts_with("--------")).filter(|l| !l.starts_with("--------")).collect::<Vec<_>>().join("\n");
+    Found {
+        tab_index, tab: tab.to_string(),
+        name: if name.is_empty() { type_line } else { format!("{name} {type_line}") },
+        kind: kind.into(), stack: it["stackSize"].as_u64().unwrap_or(1).max(1) as u32,
+        x: it["x"].as_u64().unwrap_or(0) as u32, y: it["y"].as_u64().unwrap_or(0) as u32,
+        icon: it["icon"].as_str().unwrap_or("").to_string(), ilvl: it["ilvl"].as_u64().unwrap_or(0) as u32,
+        mods, note: it["note"].as_str().unwrap_or("").to_string(), value: None,
+    }
+}
+
+/// "Find in stash": items whose name, kind, tab or mods hold every word typed (any order, any case).
+/// Name matches first, then the most valuable. Words starting with "-" must NOT be there ("ring -unique").
+pub fn find<'a>(all: &'a [Found], query: &str) -> Vec<&'a Found> {
+    let words: Vec<String> = query.to_lowercase().split_whitespace().map(String::from).collect();
+    if words.is_empty() { return vec![]; }
+    let mut hits: Vec<(bool, &Found)> = all.iter().filter_map(|f| {
+        let name = f.name.to_lowercase();
+        let hay = format!("{name}\n{}\n{}\n{}", f.kind.to_lowercase(), f.tab.to_lowercase(), f.mods.to_lowercase());
+        let ok = words.iter().all(|w| match w.strip_prefix('-') { Some(n) if !n.is_empty() => !hay.contains(n), _ => hay.contains(w.as_str()) });
+        ok.then(|| (words.iter().filter(|w| !w.starts_with('-')).all(|w| name.contains(w.as_str())), f))
+    }).collect();
+    hits.sort_by(|a, b| b.0.cmp(&a.0).then(b.1.value.unwrap_or(0.0).total_cmp(&a.1.value.unwrap_or(0.0))));
+    hits.into_iter().map(|h| h.1).collect()
+}
+
 /// One stash scan's total.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Snapshot {
@@ -437,6 +510,32 @@ Eater of Worlds Item"), "{t}");
         assert_eq!((s.item.rarity.as_str(), s.item.base_type.as_str(), s.category.as_deref()), ("Rare", "Paladin Boots", Some("armour.boots")));
         let v = rare_valued(&r[0], 40.0);
         assert!(v.rare && !v.listed && v.value == 40.0);
+    }
+
+    #[test]
+    fn finds_items_in_every_tab() {
+        let items = json!([
+            { "frameType": 2, "name": "Woe Buckle", "typeLine": "Stygian Vise", "baseType": "Stygian Vise", "ilvl": 84, "x": 1, "y": 2,
+              "explicitMods": [ { "description": "+80 to maximum Life" } ], "socketedItems": [] },
+            { "frameType": 3, "name": "Headhunter", "typeLine": "Leather Belt", "baseType": "Leather Belt", "ilvl": 80, "x": 3, "y": 0,
+              "explicitMods": [ "+55 to maximum Life" ] },
+            { "frameType": 2, "name": "Rage Touch", "typeLine": "Paladin Gloves", "baseType": "Paladin Gloves", "ilvl": 85, "x": 5, "y": 0,
+              "socketedItems": [ { "frameType": 4, "typeLine": "Vaal Grace", "baseType": "Vaal Grace", "properties": [ { "name": "Level", "values": [["20", 0]] } ] } ] },
+            { "frameType": 5, "typeLine": "Divine Orb", "baseType": "Divine Orb", "stackSize": 3, "x": 0, "y": 0, "note": "~price 1 divine" },
+        ]);
+        let mut all = found_in_tab(&items, 4, "Dump");
+        assert_eq!(all.len(), 5, "the socketed gem counts too");
+        all[1].value = Some(30000.0);
+        let names = |q: &str| find(&all, q).iter().map(|f| f.name.clone()).collect::<Vec<_>>();
+        // Name first, then by worth.
+        assert_eq!(names("maximum life"), ["Headhunter Leather Belt", "Woe Buckle Stygian Vise"]);
+        assert_eq!(names("belt"), ["Headhunter Leather Belt"], "Stygian Vise's 'belt' is only its class, not in the text");
+        assert_eq!(names("LIFE -unique"), ["Woe Buckle Stygian Vise"]);
+        assert_eq!(names("divine"), ["Divine Orb"]);
+        assert_eq!(find(&all, "divine")[0].stack, 3);
+        let gem = find(&all, "vaal grace")[0];
+        assert_eq!((gem.x, gem.note.as_str(), gem.tab_index), (5, "in Rage Touch", 4));
+        assert!(names("  ").is_empty());
     }
 
     #[test]

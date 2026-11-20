@@ -91,6 +91,17 @@ mockWindows(atlasWindow ? "atlas" : buildWin ? "build" : "main");
 mockIPC((cmd, args) => {
   if (cmd === "overview") return { profiles: [{ id: "mid", name: "Mid-Game", game: "Poe1", base_file: "", output_file: "", rules: [] }], active: "mid", poe1_dir: "", poe2_dir: "", batch_on: false };
   if (cmd === "wealth_get") return wealth;
+  if (cmd === "wealth_find") {
+    const all = [
+      { tab_index: 28, tab: "TENDY", name: "Woe Buckle Stygian Vise", kind: "Rare", stack: 1, x: 3, y: 1, icon: "", ilvl: 84, note: "", value: 210,
+        mods: "Item Level: 84\n+32% to Chaos Resistance\n+47 to maximum Energy Shield\n38% increased Elemental Damage with Attack Skills" },
+      { tab_index: 5, tab: "$$$", name: "Divine Orb", kind: "Currency", stack: 9, x: 0, y: 0, icon: "", ilvl: 0, note: "", value: 1953, mods: "Stack Size: 9/20" },
+      { tab_index: 18, tab: "GEM", name: "Vaal Grace", kind: "Gem", stack: 1, x: 5, y: 0, icon: "", ilvl: 0, note: "in Rage Touch Paladin Gloves", value: null, mods: "Level: 20" },
+    ];
+    const q = String((args as { query: string }).query).toLowerCase().trim();
+    const hits = q ? all.filter((f) => (f.name + f.kind + f.mods).toLowerCase().includes(q)) : [];
+    return { items: 4231, time: now, league: "Covens", total: hits.length, hits };
+  }
   if (cmd === "map_tool_get") return { source: "poe.re (preview)", bad: [1], wants: { quantity: null, pack_size: null, rarity: null, more_maps: null, more_currency: null, more_scarabs: null, more_cards: null, tier_min: null, kind: "any", corrupted_ok: true },
     mods: [{ id: 1, text: "Monsters reflect 18% of Elemental Damage", token: "s def", scary: 900, nightmare: false, trade_id: null, danger: "Elemental reflect" },
       { id: 2, text: "Players cannot Regenerate Life, Mana or Energy Shield", token: "t reg", scary: 800, nightmare: false, trade_id: null, danger: "No regen" }] };
