@@ -1124,6 +1124,15 @@ fn get_rule_section(state: State<AppState>, id: String, type_path: Vec<String>) 
     Ok(filter_core::tiers::section_at(&parse_filter(&text), &type_path))
 }
 
+#[tauri::command]
+fn get_map_tiers(state: State<AppState>, id: String) -> Result<filter_core::tiers::MapTiers, String> {
+    let store = state.store.lock().unwrap();
+    let game = store.profiles.get(&id).ok_or("Profile not found")?.game;
+    let prices = state.prices.lock().unwrap();
+    let (text, _) = render_profile(&store, &id, &filter_dir(game), prices.get(&game), None).map_err(err)?;
+    Ok(filter_core::tiers::map_tiers(&parse_filter(&text)))
+}
+
 #[derive(serde::Serialize)]
 struct GearSetup {
     /// From the game's log: (name, class, level).
@@ -1315,6 +1324,35 @@ fn move_tier_item(state: State<AppState>, id: String, type_path: Vec<String>, ba
     save_and_build(&state, &store, &id)
 }
 
+/// Changes several tiers of one section at once (the map panel: "hide tiers 1-5", one look for a band).
+#[tauri::command]
+fn set_tiers(state: State<AppState>, id: String, type_path: Vec<String>, tiers: Vec<String>, show: Option<bool>,
+             style: Option<CustomStyle>, reset: bool) -> Result<Vec<String>, String> {
+    let mut store = state.store.lock().unwrap();
+    remember(&state, &store, &id, &format!("{} tiers", tiers.len()));
+    let p = store.profiles.get_mut(&id).ok_or("Profile not found")?;
+    for t in &tiers { tier_edit(&mut p.rules, &type_path, t, show, style.as_ref(), None, None, reset); }
+    save_and_build(&state, &store, &id)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn tier_edit(rules: &mut Vec<Rule>, type_path: &[String], tier: &str, show: Option<bool>, style: Option<&CustomStyle>,
+             min_stack: Option<u32>, min_item_tier: Option<u32>, reset: bool) {
+    let same = |r: &Rule| matches!(r, Rule::Tier { type_path: tp, tier: t, .. } if tp.as_slice() == type_path && t == tier);
+    let old = rules.iter().find(|r| same(r)).cloned();
+    rules.retain(|r| !same(r));
+    if reset {
+        // Also undo items dragged into this tier.
+        rules.retain(|r| !matches!(r, Rule::MoveBase { type_path: tp, to_tier, .. } if tp.as_slice() == type_path && to_tier == tier));
+    } else {
+        let (old_show, old_actions, old_stack, old_it) = match old {
+            Some(Rule::Tier { show, actions, min_stack, min_item_tier, .. }) => (show, actions, min_stack, min_item_tier), _ => (None, None, None, None) };
+        rules.push(Rule::Tier { type_path: type_path.to_vec(), tier: tier.to_string(), show: show.or(old_show),
+            actions: style.map(filter_core::rules::style_actions).or(old_actions), min_stack: min_stack.or(old_stack),
+            min_item_tier: min_item_tier.or(old_it) });
+    }
+}
+
 /// Show/hide a whole tier, give it a new look, or put it back (reset).
 #[tauri::command]
 fn set_tier(state: State<AppState>, id: String, type_path: Vec<String>, tier: String, show: Option<bool>,
@@ -1322,19 +1360,7 @@ fn set_tier(state: State<AppState>, id: String, type_path: Vec<String>, tier: St
     let mut store = state.store.lock().unwrap();
     remember(&state, &store, &id, &format!("Tier {}", filter_core::tiers::tier_name(&tier)));
     let p = store.profiles.get_mut(&id).ok_or("Profile not found")?;
-    let same = |r: &Rule| matches!(r, Rule::Tier { type_path: tp, tier: t, .. } if *tp == type_path && *t == tier);
-    let old = p.rules.iter().find(|r| same(r)).cloned();
-    p.rules.retain(|r| !same(r));
-    if reset {
-        // Also undo items dragged into this tier.
-        p.rules.retain(|r| !matches!(r, Rule::MoveBase { type_path: tp, to_tier, .. } if *tp == type_path && *to_tier == tier));
-    } else {
-        let (old_show, old_actions, old_stack, old_it) = match old {
-            Some(Rule::Tier { show, actions, min_stack, min_item_tier, .. }) => (show, actions, min_stack, min_item_tier), _ => (None, None, None, None) };
-        p.rules.push(Rule::Tier { type_path, tier, show: show.or(old_show),
-            actions: style.map(|s| filter_core::rules::style_actions(&s)).or(old_actions), min_stack: min_stack.or(old_stack),
-            min_item_tier: min_item_tier.or(old_it) });
-    }
+    tier_edit(&mut p.rules, &type_path, &tier, show, style.as_ref(), min_stack, min_item_tier, reset);
     save_and_build(&state, &store, &id)
 }
 
@@ -2160,7 +2186,7 @@ pub fn run() {
             list_farm_presets,
             apply_farm_preset,
             list_level_presets,
-            get_tiers, get_rule_section, trade_search, trade_bulk, rare_estimate, map_dangers, map_suggest, map_tool_get, map_tool_save, map_tool_regex, map_regex_copy, map_tool_trade, trade_action, hide_trades_window, wealth_app::wealth_get, wealth_app::wealth_setup, wealth_app::wealth_prefs, wealth_app::wealth_scan, wealth_app::wealth_profile_save, wealth_app::wealth_profile_delete, wealth_app::wealth_profile_use, wealth_app::wealth_tabs_refresh, wealth_app::session_start, wealth_app::session_check, wealth_app::session_pause, wealth_app::session_stop, wealth_app::session_delete, wealth_app::earnings_overlay, saved_list, saved_add, saved_delete, saved_live, report_problem, send_whisper, copy_text, hide_trade_window, keep_on_screen,
+            get_tiers, get_rule_section, get_map_tiers, set_tiers, trade_search, trade_bulk, rare_estimate, map_dangers, map_suggest, map_tool_get, map_tool_save, map_tool_regex, map_regex_copy, map_tool_trade, trade_action, hide_trades_window, wealth_app::wealth_get, wealth_app::wealth_setup, wealth_app::wealth_prefs, wealth_app::wealth_scan, wealth_app::wealth_profile_save, wealth_app::wealth_profile_delete, wealth_app::wealth_profile_use, wealth_app::wealth_tabs_refresh, wealth_app::session_start, wealth_app::session_check, wealth_app::session_pause, wealth_app::session_stop, wealth_app::session_delete, wealth_app::earnings_overlay, saved_list, saved_add, saved_delete, saved_live, report_problem, send_whisper, copy_text, hide_trade_window, keep_on_screen,
             move_tier_item,
             stack_choices,
             gear_setup,

@@ -4,6 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { ProfileInfo } from "./types";
 import StyleEditor, { CurrentStyle, CustomStyle, Preview, fromCurrent } from "./StyleEditor";
 import { ItemIcon } from "./icons";
+import MapTiers, { MapSection } from "./MapTiers";
+
+const MAPS_KEY = "__maps";
 
 type TierRow = { tier: string; name: string; visibility: string; style: CurrentStyle; bases: string[]; note: string; min_stack: number | null; min_item_tier?: number | null };
 
@@ -89,7 +92,7 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
 
   const load = () => invoke<Section[]>("get_tiers", { id: profile.id }).then((s) => {
     setSections(s);
-    setSel((cur) => (cur && (cur === extraKey || s.some((x) => x.type_path.join(">") === cur)) ? cur : s[0] ? s[0].type_path.join(">") : ""));
+    setSel((cur) => (cur && (cur === extraKey || cur === MAPS_KEY || s.some((x) => x.type_path.join(">") === cur)) ? cur : s[0] ? s[0].type_path.join(">") : ""));
     if (extra) invoke<Section | null>("get_rule_section", { id: profile.id, typePath: extra.type_path }).then(setExtra).catch(() => {});
   }).catch((e) => setMsg(String(e)));
   useEffect(() => { load(); }, [profile.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -105,6 +108,11 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
   const needle = q.trim().toLowerCase();
   const hits = needle.length >= 2
     ? sections.flatMap((s) => s.tiers.flatMap((t) => t.bases.filter((b) => b.toLowerCase().includes(needle)).map((b) => ({ s, t, b })))).slice(0, 12)
+    : [];
+  // Typing "map" (or a section's name) offers that page too, not just items.
+  const pageHits = needle.length >= 2
+    ? [...("maps map tiers".includes(needle) || needle.startsWith("map") ? [{ key: MAPS_KEY, title: "Map tiers", group: "Maps" }] : []),
+      ...sections.filter((s) => s.title.toLowerCase().includes(needle)).map((s) => ({ key: s.type_path.join(">"), title: s.title, group: s.group }))]
     : [];
 
   useEffect(() => {
@@ -143,8 +151,14 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
     <div className="tiers">
       <div className="tiers-nav">
         <input className="text" placeholder="Find an item…" value={q} onChange={(e) => setQ(e.target.value)} />
-        {hits.length > 0 && (
+        {(hits.length > 0 || pageHits.length > 0) && (
           <ul className="results">
+            {pageHits.map((h) => (
+              <li key={"page" + h.key} onClick={() => { setSel(h.key); setQ(""); setEditing(null); }}>
+                <span className="with-icon"><b>{h.title}</b></span>
+                <span className="muted small">{h.group} · whole list</span>
+              </li>
+            ))}
             {hits.map(({ s, t, b }) => (
               <li key={s.title + t.tier + b} onClick={() => {
                 setSel(s.type_path.join(">")); setQ(""); setEditing(null);
@@ -158,6 +172,10 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
             ))}
           </ul>
         )}
+        <div className="tiers-group">
+          <div className="tiers-gname">Maps</div>
+          <button className={"tiers-sec " + (sel === MAPS_KEY ? "on" : "")} onClick={() => { setSel(MAPS_KEY); setEditing(null); }}>Map tiers</button>
+        </div>
         {groups.map(([g, list]) => (
           <div key={g} className="tiers-group">
             <div className="tiers-gname">{g}</div>
@@ -170,7 +188,10 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
       </div>
 
       <div className="tiers-main">
-        {!section ? <div className="empty">No tier lists found in this filter.</div> : (
+        {sel === MAPS_KEY ? (
+          <MapTiers profileId={profile.id} onChange={onChange}
+            onOpen={(s: MapSection) => { setExtra({ ...s, group: "Opened rule" }); setSel(s.type_path.join(">")); setEditing(null); }} />
+        ) : !section ? <div className="empty">No tier lists found in this filter.</div> : (
           <div className="card">
             {isExtra && (
               <div className="note">This is one of NeverSink's own rules (not a tier list). <b>Untick</b> a row to hide what it

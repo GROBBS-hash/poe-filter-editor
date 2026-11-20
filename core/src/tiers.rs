@@ -273,8 +273,83 @@ pub fn stack_choices(segs: &[Segment], base: &str) -> Vec<StackChoice> {
         .collect()
 }
 
+/// One map tier rule of NeverSink's ("maps_d_t3" → maps of tier 3).
+#[derive(Debug, Clone, Serialize)]
+pub struct MapTierRow {
+    pub map_tier: u32,
+    /// NeverSink's band letter: a = T14–16, b = T11–13, c = T6–10, d = T1–5.
+    pub band: String,
+    #[serde(flatten)]
+    pub row: TierRow,
+}
+
+/// Maps for the Tiers tab's map panel: the plain tier-by-tier rules and the special kinds
+/// (influenced, blighted, Valdo…), which NeverSink checks first.
+#[derive(Debug, Clone, Serialize)]
+pub struct MapTiers {
+    pub tiers: Vec<MapTierRow>,
+    pub special: Vec<Section>,
+}
+
+/// "maps_a_t16" → ("a", 16).
+fn map_tier_of(tier: &str) -> Option<(String, u32)> {
+    let rest = tier.strip_prefix("maps_")?;
+    let (band, t) = rest.split_once("_t")?;
+    Some((band.to_string(), t.parse().ok()?))
+}
+
+fn map_kind(p: &str) -> String {
+    match p {
+        "influenced" => "Influenced maps (Shaper, Elder, Conquerors, Zana)".into(),
+        "nightmare" => "Valdo's, nightmare & guardian maps".into(),
+        "blighted" => "Blighted maps".into(),
+        "vaaltemple" => "Vaal Temple maps".into(),
+        "specialmods" => "Maps with special mods (8 mods, rare boss mods)".into(),
+        "enchanted" => "Enchanted maps".into(),
+        "corruptedimplicit" => "Maps with corrupted implicits".into(),
+        "implicitmod" => "Maps with implicits".into(),
+        _ => plain_part(p),
+    }
+}
+
+pub fn map_tiers(segs: &[Segment]) -> MapTiers {
+    let maps = ["maps".to_string()];
+    let mut tiers: Vec<MapTierRow> = section_at(segs, &maps).map(|s| s.tiers).unwrap_or_default().into_iter()
+        .filter_map(|row| map_tier_of(&row.tier).map(|(band, map_tier)| MapTierRow { map_tier, band, row }))
+        .collect();
+    tiers.sort_by_key(|t| t.map_tier);
+    let mut paths: Vec<Vec<String>> = vec![];
+    for s in segs {
+        let Segment::Block(b) = s else { continue };
+        if b.type_path.len() >= 2 && b.type_path[0] == "maps" && !paths.contains(&b.type_path) { paths.push(b.type_path.clone()); }
+    }
+    let special = paths.iter().filter_map(|p| section_at(segs, p).map(|mut s| {
+        s.title = map_kind(&p[1..].join("->"));
+        s.group = "Maps".into();
+        s
+    })).collect();
+    MapTiers { tiers, special }
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn map_tier_rules() {
+        let segs = crate::filter::parse_filter(&fixture());
+        let m = super::map_tiers(&segs);
+        assert_eq!(m.tiers.iter().map(|t| t.map_tier).collect::<Vec<_>>(), (1..=16).collect::<Vec<_>>());
+        assert_eq!(m.tiers[15].band, "a");
+        assert_eq!(m.tiers[0].band, "d");
+        assert!(m.special.iter().any(|s| s.title == "Blighted maps"));
+        // Hiding tiers 1-3 survives as tier rules.
+        let mut segs = segs;
+        let rules: Vec<Rule> = m.tiers.iter().filter(|t| t.map_tier < 4).map(|t| Rule::Tier {
+            type_path: vec!["maps".into()], tier: t.row.tier.clone(), show: Some(false), actions: None, min_stack: None, min_item_tier: None }).collect();
+        assert!(apply(&mut segs, &rules, "\n").is_empty());
+        let after = super::map_tiers(&segs);
+        assert!(after.tiers.iter().all(|t| (t.row.visibility == "Hide") == (t.map_tier < 4)));
+    }
+
     #[test]
     fn opens_any_rule() {
         let f = "Show # $type->leveling->normalmagic->4l $tier->general\n\tLinkedSockets >= 4\n\tRarity Normal Magic\n\tAreaLevel <= 67\n\tSetTextColor 255 255 255 255\n";

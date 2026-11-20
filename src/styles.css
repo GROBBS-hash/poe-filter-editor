@@ -945,3 +945,18 @@ button:focus-visible, select:focus-visible, .text:focus-visible, input:focus-vis
 .qm.tw, .tw-side { font-weight: 600; }
 .qm.tw .muted, .tw-side .muted, .qm.tw .small, .tw-th, .tw-hero-foot, .tw-eq, .tw-kind { font-weight: 500; }
 .tw-price, .bu-price, .tw-hero-price { font-weight: 700; }
+
+/* Tiers → Map tiers: "show maps from tier N", one chip per tier, a look per band. */
+.map-tiers .mt-from { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 14px; margin: 4px 0 12px; }
+.map-tiers .mt-from select { min-width: 92px; }
+.map-tiers .mt-strip { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 5px; margin-bottom: 6px; }
+.map-tiers .mt-chip { padding: 7px 0; border-radius: 8px; font-weight: 650; font-size: 13px; font-variant-numeric: tabular-nums;
+  border: 1px solid var(--line-2); background: var(--raised); color: var(--text); }
+.map-tiers .mt-chip.band-d.on { background: #2a2d33; color: #fff; }
+.map-tiers .mt-chip.band-c.on { background: rgba(230,200,80,.18); border-color: rgba(230,200,80,.45); color: #f3dc84; }
+.map-tiers .mt-chip.band-b.on { background: rgba(230,90,70,.16); border-color: rgba(230,90,70,.42); color: #f39a8a; }
+.map-tiers .mt-chip.band-a.on { background: rgba(230,90,70,.3); border-color: rgba(240,110,90,.7); color: #ffd0c6; }
+.map-tiers .mt-chip.off { background: transparent; color: var(--muted); border-style: dashed; text-decoration: line-through; }
+.map-tiers .mt-chip:hover:not(:disabled) { border-color: var(--gold); }
+.map-tiers .mt-h { margin-top: 18px; }
+.map-tiers .mt-special .tier-look { pointer-events: none; }
