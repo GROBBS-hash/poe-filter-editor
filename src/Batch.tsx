@@ -69,7 +69,7 @@ export default function Batch({ on, onChange }: { on: boolean; onChange: () => v
                     <button key={c.name} className={e.colour === c.name ? "dot on" : "dot"} style={{ background: c.hex }}
                       onClick={() => update(i, { colour: c.name })} />
                   ))}
-                  <button className="link" onClick={() => setList((l) => l.filter((_, j) => j !== i))}>✕</button>
+                  <button className="link" title="Remove from the list" onClick={() => setList((l) => l.filter((_, j) => j !== i))}>✕</button>
                 </div>
               </li>
             ))}

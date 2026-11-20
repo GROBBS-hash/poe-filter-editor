@@ -128,7 +128,7 @@ export default function Prices({ profile }: { profile: ProfileInfo }) {
                     <span className="muted small">{u} or more</span>
                     <span className="tier-preview"><LookButton onClick={() => setStyling({ g: gi, t: ti })}><Preview s={t.style} text="Example" /></LookButton></span>
                     <button className="link" onClick={() => setStyling({ g: gi, t: ti })}>Change look</button>
-                    <button className="link" onClick={() => change((x) => { x.groups[gi].tiers.splice(ti, 1); })}>✕</button>
+                    <button className="link" title="Remove this tier" onClick={() => change((x) => { x.groups[gi].tiers.splice(ti, 1); })}>✕</button>
                   </li>
                 ))}
               </ul>

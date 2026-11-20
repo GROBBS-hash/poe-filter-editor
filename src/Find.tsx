@@ -1,3 +1,4 @@
+import { usePersist } from "./usePersist";
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import ItemPanel from "./ItemPanel";
@@ -63,7 +64,7 @@ function Chips({ value, onPick }: { value: string; onPick: (c: string) => void }
 }
 
 export default function Find({ onChange, view = "find" }: { onChange: () => void; view?: "find" | "presets" }) {
-  const [q, setQ] = useState("");
+  const [q, setQ] = usePersist("find.q", "");
   const [results, setResults] = useState<Found[]>([]);
   const [chosen, setChosen] = useState<Found | null>(null);
   const [presets, setPresets] = useState<Preset[]>([]);

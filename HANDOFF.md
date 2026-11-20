@@ -292,6 +292,12 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   `BuildView.tsx` (F6 + My build): a tick per item, key `slot|name|base`, in localStorage `build.have` (shared by both
   windows via the storage event), "Have N of M" bar with "hide what I have" (`build.hideHave`).
 
+- Polish 3, 21 Nov (0.2.6, feel): main window keys (App.tsx): Ctrl+F = Find with the cursor in its box, Ctrl+1–9 =
+  menu pages in order, Alt+← = previous page; each page's scroll position kept (localStorage scroll.<tab>, the window
+  scrolls, restored a few times while data loads); Find and Find-in-stash keep their text (usePersist.ts); Wealth
+  "also price new rares" (on by default) runs Price rares after a scan; spinners on Wealth buttons; hints on the
+  last symbol-only buttons.
+
 - Polish 2, 21 Nov (0.2.5, game look): Fontin isn't installable from GGG (Cloudflare blocks), so --game-font falls
   back to Alegreya SC (npm @fontsource/alegreya-sc, @import at the top of styles.css). Page titles, card headings,
   item names, F6 headings use it; pop-up headers look like the game tooltip (dark band, gold rule); gem pills show the
@@ -503,6 +509,8 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
       while it checks and the big price counts up; errors read in plain English.
 - [ ] 0.2.5: headings and item names in the game-style lettering; Ctrl+D / F2 header looks like the game tooltip;
       gem pictures in F6 / My build.
+- [ ] 0.2.6: Ctrl+F, Ctrl+1–9, Alt+← in the editor; pages come back scrolled where you left them; Find text stays;
+      Wealth scan goes on to price new rares (tick box).
 
 **Installer (21 Nov, release 0.2.0)**
 - [x] (21 Nov: installed, "everything's there".) Still check: hotkeys work in game with the installed editor.

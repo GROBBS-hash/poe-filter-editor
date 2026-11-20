@@ -1,3 +1,5 @@
+import { Spinner } from "./TradeWindow";
+import { usePersist } from "./usePersist";
 import { friendly } from "./errors";
 import { PageLoading } from "./Loading";
 import { invoke } from "@tauri-apps/api/core";
@@ -125,7 +127,7 @@ type FindResult = { items: number; time: number; league: string; total: number; 
 
 /** Find in stash: every item from the last scans (all tabs), by name, kind, tab or mod. Like PoeStash's search. */
 function FindInStash({ divine, scanned }: { divine: number | null; scanned: number }) {
-  const [q, setQ] = useState("");
+  const [q, setQ] = usePersist("wealth.find", "");
   const [r, setR] = useState<FindResult | null>(null);
   const [open, setOpen] = useState<number | null>(null);
   const [copied, setCopied] = useState<number | null>(null);
@@ -248,10 +250,18 @@ export default function Wealth() {
     return () => { a.then((f) => f()); b.then((f) => f()); c.then((f) => f()); clearInterval(t); };
   }, []);
 
-  const run = async (label: string, cmd: string, args: Record<string, unknown> = {}) => {
+  const run = async (label: string, cmd: string, args: Record<string, unknown> = {}): Promise<WealthView | null> => {
     setBusy(label); setErr(""); setProgress(null);
-    try { setV(await invoke<WealthView>(cmd, args)); } catch (e) { setErr(friendly(e)); }
+    let out: WealthView | null = null;
+    try { out = await invoke<WealthView>(cmd, args); setV(out); } catch (e) { setErr(friendly(e)); }
     setBusy(""); setProgress(null);
+    return out;
+  };
+  // "Also price new rares": a scan goes straight on to pricing the rares that need it.
+  const [autoRares, setAutoRares] = usePersist("wealth.autoRares", true);
+  const scan = async () => {
+    const w = await run("scan", "wealth_scan");
+    if (w && autoRares && (w.rares_todo ?? 0) > 0) await run("rares", "wealth_price_rares");
   };
   const prefs = (p: Partial<{ tracked: number[]; min: number; minutes: number }>) => {
     if (!v) return;
@@ -336,14 +346,16 @@ export default function Wealth() {
             </div>
           ) : <p className="muted">Scan your stash to see what it's worth.</p>}
           <div className="row">
-            <button className="primary" disabled={!!busy} onClick={() => run("scan", "wealth_scan")}>{busy === "scan" ? "Scanning…" : v.active ? `Scan ${v.active}` : "Scan whole stash"}</button>
+            <button className="primary" disabled={!!busy} onClick={scan}>{busy === "scan" ? <><Spinner /> Scanning…</> : v.active ? `Scan ${v.active}` : "Scan whole stash"}</button>
             {progress && busy === "scan" && <span className="muted small">Tab {progress[0]} of {progress[1]} {progress[2] && `· ${progress[2]}`}</span>}
+            {!busy && <label className="small muted" title="After the scan, look up the rares that don't have a recent trade price (about 10 a minute)">
+              <input type="checkbox" checked={autoRares} onChange={(e) => setAutoRares(e.target.checked)} /> also price new rares</label>}
           </div>
           {(v.rares ?? 0) > 0 && (
             <div className="row">
               <button disabled={!!busy || (v.rares_todo ?? 0) === 0} onClick={() => run("rares", "wealth_price_rares")}
                 title="Searches the trade site for each rare, like Ctrl+D does, and counts the going price">
-                {busy === "rares" ? "Pricing rares…" : (v.rares_todo ?? 0) === 0 ? "Rares priced"
+                {busy === "rares" ? <><Spinner /> Pricing rares…</> : (v.rares_todo ?? 0) === 0 ? "Rares priced"
                   : `Price ${Math.min(40, v.rares_todo ?? 0)} rare${(v.rares_todo ?? 0) === 1 ? "" : "s"}`}</button>
               {busy === "rares" && progress
                 ? <span className="muted small">{Math.min(progress[0] + 1, progress[1])} of {progress[1]} {progress[2] && `· ${progress[2]}`}</span>
@@ -451,7 +463,7 @@ export default function Wealth() {
                 {[...v.sessions].reverse().map((s) => (
                   <tr key={s.start}><td>{s.name}</td><td className="muted small">{new Date(s.start * 1000).toLocaleString()} · {clock(seconds(s, now))}</td>
                     <td><Worth c={s.last_value - s.start_value} divine={v.divine} /></td><td><Worth c={perHour(s, now)} divine={v.divine} />/h</td>
-                    <td><button className="link small" onClick={() => invoke<WealthView>("session_delete", { start: s.start }).then(setV)}>×</button></td></tr>
+                    <td><button className="link small" title="Delete this session" onClick={() => invoke<WealthView>("session_delete", { start: s.start }).then(setV)}>×</button></td></tr>
                 ))}
               </tbody></table>
             </details>

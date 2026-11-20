@@ -1,5 +1,5 @@
 import { friendly } from "./errors";
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import Help from "./Help";
 import ErrorBoundary from "./ErrorBoundary";
 import { invoke } from "@tauri-apps/api/core";
@@ -113,7 +113,11 @@ export default function App() {
   const [tab, setTabRaw] = useState<Tab>(() => {
     try { return (localStorage.getItem("tab") as Tab) || "edits"; } catch { return "edits"; }
   });
-  const setTab = (t: Tab) => { setTabRaw(t); try { localStorage.setItem("tab", t); } catch { /* not kept */ } };
+  const prevTab = useRef<Tab | null>(null);
+  const setTab = (t: Tab) => {
+    setTabRaw((cur) => { if (cur !== t) prevTab.current = cur; return t; });
+    try { localStorage.setItem("tab", t); } catch { /* not kept */ }
+  };
   const [error, setError] = useState("");
   /** "Modify rule" from the quick menu: which rule to show. */
   const [focus, setFocus] = useState<Source | null>(null);
@@ -141,6 +145,42 @@ export default function App() {
     window.addEventListener("focus", onFocus);
     return () => { a.then((f) => f()); c.then((f) => f()); d.then((f) => f()); g.then((f) => f()); window.removeEventListener("focus", onFocus); window.removeEventListener("goto-tab", onGoto); };
   }, [refresh]);
+
+  // Keyboard: Ctrl+F jumps to Find and into its search box; Ctrl+1…9 opens the menu's pages in order;
+  // Alt+← goes back to the page you were on before.
+  useEffect(() => {
+    const pages = MENU.flatMap((g) => g.items.map((i) => i.id));
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        setTab("find");
+        setTimeout(() => (document.querySelector("main.content input[type=search], main.content input.text, main.content input:not([type])") as HTMLInputElement | null)?.focus(), 80);
+      } else if (e.ctrlKey && !e.altKey && /^[1-9]$/.test(e.key) && pages[+e.key - 1]) {
+        e.preventDefault();
+        setTab(pages[+e.key - 1]);
+      } else if (e.altKey && e.key === "ArrowLeft" && prevTab.current) {
+        e.preventDefault();
+        setTab(prevTab.current);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  // Each page comes back scrolled where you left it (also after a restart).
+  useEffect(() => {
+    const el = document.scrollingElement as HTMLElement | null;
+    if (!el || !ov) return;
+    const key = `scroll.${tab}`;
+    let saved = 0;
+    try { saved = +(localStorage.getItem(key) ?? 0); } catch { /* none */ }
+    // Pages fill in after their data arrives: put the scroll back a few times while they settle.
+    const timers = [0, 150, 500, 1200].map((ms) => setTimeout(() => { if (saved && el.scrollTop < 5) el.scrollTop = saved; }, ms));
+    let t = 0;
+    const onScroll = () => { clearTimeout(t); t = window.setTimeout(() => { try { localStorage.setItem(key, String(Math.round(el.scrollTop))); } catch { /* not kept */ } }, 200); };
+    window.addEventListener("scroll", onScroll);
+    return () => { timers.forEach(clearTimeout); clearTimeout(t); window.removeEventListener("scroll", onScroll); };
+  }, [tab, !!ov]);
 
   if (!ov) return error ? <div className="page">{error}</div> : <LoadingShell />;
   if (ov.profiles.length === 0 || adding) {
@@ -174,7 +214,7 @@ export default function App() {
             </div>
           ))}
         </nav>
-        <div className="side-foot muted small">In game: <b>F2</b> edit item · <b>F4</b> reload · <b>F6</b> build</div>
+        <div className="side-foot muted small">In game: <b>F2</b> edit item · <b>F4</b> reload · <b>F6</b> build<br />Here: <b>Ctrl+F</b> find · <b>Ctrl+1–9</b> pages · <b>Alt+←</b> back</div>
       </aside>
 
       <main className="content">
