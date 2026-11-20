@@ -262,6 +262,13 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   most 1–10c, one ring with nothing like it listed = 0. Rares with nothing worth ticking price as "any rare of that
   base". Dev tool: `cargo run -p filter-core --example rarequeries -- tab.json trade_stats_poe1.json`.
 
+- Quiet restarts 21 Nov: `npm run tauri dev` restarts the app whenever the 30s `git pull` brings Rust changes, and
+  each restart popped the editor up mid-screen. The main window now starts hidden (`"visible": false`) and
+  `win_place::start_main` decides: a heartbeat file (`alive.txt`, "time shown|hidden", every 10s) under 45s old means a
+  restart → minimised to the taskbar without focus (`SW_SHOWMINNOACTIVE`), or stays in the tray if it was hidden;
+  otherwise it opens as before. Checked on his PC: after a restart the window was minimised and not in front.
+  Tray "Open editor" un-minimises too.
+
 - Wealth "By tab" card 20 Nov: a scan keeps every priced item (`WealthStore.last_items`, top 3000 by value); the card shows
   a chip per tab (worth + bar), and the picked tab's items grouped by name, most valuable first, listed ones marked.
   Scans from before this only have totals (the card says to scan again).
@@ -444,6 +451,10 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 
 - [ ] Ctrl+D on a timeless jewel (Brutal Restraint): seed line ticked, prices for that exact seed; "any conqueror" row works.
 - [ ] Price window: "This week" line with ▲/▼ % under the price for currency, cards, uniques… (after the price file updates).
+
+**Editor restarts (21 Nov)**
+- [ ] When the editor restarts by itself (new version pulled) while you play, it stays on the taskbar instead of
+      popping up in the middle of the screen; starting it with "Start editor.bat" still opens it normally.
 
 **Tiers menu (21 Nov)**
 - [ ] Pictures next to every section; Transmutation / Augmentation stacks gone.

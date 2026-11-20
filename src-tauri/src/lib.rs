@@ -2321,6 +2321,7 @@ pub fn run() {
             start_tree_watcher(app.handle().clone());
             start_live_searches(app.handle().clone());
             wealth_app::start_session_timer(app.handle().clone());
+            win_place::start_main(app.handle());
 
             // Tray icon: the app lives here so hotkeys work while you play.
             use tauri::menu::{Menu, MenuItem};
@@ -2335,6 +2336,7 @@ pub fn run() {
                 .on_menu_event(|app, e| match e.id.as_ref() {
                     "open" => {
                         if let Some(w) = app.get_webview_window("main") {
+                            let _ = w.unminimize();
                             let _ = w.show();
                             let _ = w.set_focus();
                         }

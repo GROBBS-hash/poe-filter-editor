@@ -92,3 +92,41 @@ pub fn show_over_game(app: &AppHandle, w: &tauri::WebviewWindow) {
     let _ = w.show();
     if front { focus_game(); }
 }
+
+/// The main window when the editor starts. The dev build restarts itself whenever new code arrives, and each
+/// restart used to pop the editor up in the middle of the screen while he was playing. So: started within
+/// 45 seconds of the last run (a restart), it comes back the way it was, quietly: minimised to the taskbar
+/// without taking focus, or still in the tray if he'd closed it. A normal start opens it as usual.
+/// A small heartbeat file ("alive.txt": time and shown/hidden) is how a restart is told from a start.
+pub fn start_main(app: &AppHandle) {
+    let Some(w) = app.get_webview_window("main") else { return };
+    let file = app.state::<AppState>().data_dir.join("alive.txt");
+    let now = || std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    let last = std::fs::read_to_string(&file).unwrap_or_default();
+    let mut parts = last.split_whitespace();
+    let at: u64 = parts.next().and_then(|t| t.parse().ok()).unwrap_or(0);
+    let shown = parts.next() != Some("hidden");
+    match (now().saturating_sub(at) < 45, shown) {
+        (false, _) => { let _ = w.show(); let _ = w.set_focus(); }
+        (true, true) => show_minimised_quietly(&w),
+        (true, false) => {}
+    }
+    thread::spawn(move || loop {
+        let state = if w.is_visible().unwrap_or(false) { "shown" } else { "hidden" };
+        let _ = std::fs::write(&file, format!("{} {state}", now()));
+        thread::sleep(Duration::from_secs(10));
+    });
+}
+
+#[cfg(windows)]
+fn show_minimised_quietly(w: &tauri::WebviewWindow) {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_SHOWMINNOACTIVE};
+    match w.hwnd() {
+        Ok(h) => unsafe { let _ = ShowWindow(HWND(h.0 as _), SW_SHOWMINNOACTIVE); },
+        Err(_) => { let _ = w.minimize(); let _ = w.show(); }
+    }
+}
+
+#[cfg(not(windows))]
+fn show_minimised_quietly(w: &tauri::WebviewWindow) { let _ = w.minimize(); let _ = w.show(); }
