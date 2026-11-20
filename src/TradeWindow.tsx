@@ -477,7 +477,7 @@ export default function TradeWindow() {
         waiting={!res && !busy && !check.bulk ? (searched ? "Filters changed: move onto Search again" : "Pick the stats, then move your mouse onto Search") : null}
         ninja={check.ninja} ninjaNote={it.rarity === "Unique" && !it.name ? " (best ground unique on this base)" : ""} stack={it.stack_size ?? undefined} name={it.base_type} />
       {err && <div className="qm-warn">{err}</div>}
-      {res && res.total === 0 && searched === searchKey(setup) && (setup.filters.some((f) => f.enabled) || setup.base_only || setup.ilvl_min) && (
+      {res && res.total === 0 && searched === searchKey(setup) && (setup.filters.some((f) => f.enabled) || (setup.base_only && setup.category) || setup.ilvl_min) && (
         <UntickHelp state={untick} onAsk={() => { setUntick("busy");
             invoke<{ key: string; label: string; total: number }[]>("trade_untick_one", { setup }).then(setUntick).catch((e) => setUntick(String(e))); }}
           onPick={(key) => {

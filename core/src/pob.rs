@@ -215,7 +215,9 @@ fn game_copy(rarity: &str, name: &str, base: &str, lines: &[String]) -> String {
 pub fn gem_copy(g: &Gem) -> String {
     let class = if g.support { "Support Gems" } else { "Skill Gems" };
     let q = if g.quality > 0 { format!("\nQuality: +{}% (augmented)", g.quality) } else { String::new() };
-    format!("Item Class: {class}\nRarity: Gem\n{}\n--------\nLevel: {}{q}\n--------\nItem Level: 1\n", g.name, g.level)
+    // Past level 20 or 20% quality only happens by corrupting (PoB guides often list 21/20): search it as corrupted.
+    let corrupted = if g.level > 20 || g.quality > 20 { "--------\nCorrupted\n" } else { "" };
+    format!("Item Class: {class}\nRarity: Gem\n{}\n--------\nLevel: {}{q}\n{corrupted}", g.name, g.level)
 }
 
 /// "(60-80)% increased Spell Damage" at 0.5 -> "70% increased Spell Damage".
@@ -567,6 +569,11 @@ Adds 10 to 20 Lightning Damage to Spells
 
         let gem = Gem { name: "Arc".into(), level: 20, quality: 20, enabled: true, support: false, colour: "b".into() };
         let s = crate::trade::setup(&gem_copy(&gem), &Default::default()).unwrap();
-        assert_eq!((s.item.base_type.as_str(), s.gem_level), ("Arc", Some(20)));
+        assert_eq!((s.item.base_type.as_str(), s.gem_level, s.item.corrupted), ("Arc", Some(20), false));
+        // His Lightning Tendrils of Eccentricity at 21/20: only exists corrupted.
+        let g21 = Gem { name: "Lightning Tendrils of Eccentricity".into(), level: 21, quality: 20, enabled: true, support: false, colour: "b".into() };
+        let s = crate::trade::setup(&gem_copy(&g21), &Default::default()).unwrap();
+        assert_eq!((s.gem_level, s.item.corrupted, s.item.item_level), (Some(21), true, None));
+        assert_eq!(crate::trade::query(&s)["query"]["filters"]["misc_filters"]["filters"]["corrupted"]["option"], "true");
     }
 }

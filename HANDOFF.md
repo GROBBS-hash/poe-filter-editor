@@ -325,6 +325,8 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   `trade_untick_one`: the search again without each ticked stat (and without "<base> only" / item level), one search
   request each, at most 8, stopping early if the trade site's limit is near; lists "Untick <stat> · N for sale", most first;
   click = untick + search. Preview: "Trade: nothing found" mode mocks it.
+- Build gems 21 Nov: PoB lists 21/20 gems; level > 20 or quality > 20 is now searched as corrupted (`gem_copy`), no fake
+  "Item Level: 1". Live: Lightning Tendrils of Eccentricity 21/20 uncorrupted 0, corrupted 13.
 - Prefix / suffix limits 21 Nov: `trade_rules::affix_limits` reads implicits like the Cogwork Ring's "-1 Prefix Modifier
   allowed" / "+1 Suffix Modifier allowed" (jewels 2/2, other rares 3/3); open-slot rows and the "Prefixes · up to N on this
   item" headings use it (`TradeSetup.affix_max`). His Dragon Turn: 2/4, so 1 free prefix + 1 free suffix (was "2 free prefixes").
@@ -367,8 +369,8 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Every Ctrl+D shows a trade price straight away (uniques, corpses, gems too) in the big box at the top.
       (Confirmed 20 Nov for a unique, a unique belt and a gem.)
 - [x] (Confirmed 21 Nov.) A search with nothing listed: "Which stat to untick?" lists what each stat left out would find; clicking one searches.
-- [ ] Cogwork Ring: "Prefixes · up to 2", "Suffixes · up to 4", open prefix / suffix counts right.
-- [ ] "This item / As a base" tabs (Awakened-style): "As a base" shows on fractured / influenced / synthesised items, magic jewels, cluster
+- [x] (Confirmed 21 Nov.) Cogwork Ring: "Prefixes · up to 2", "Suffixes · up to 4", open prefix / suffix counts right.
+- [x] (Confirmed 21 Nov: Woe Buckle base search, 3 listed.) "This item / As a base" tabs (Awakened-style): "As a base" shows on fractured / influenced / synthesised items, magic jewels, cluster
       jewels and unfinished gear of item level 82+, says why, and the prices look like Awakened's base search. Not on
       finished items (crafted mod, 20% quality, corrupted). Magic items keep only their tier 1-2 mods.
 - [x] Price window rows read in game order (confirmed 20 Nov).
