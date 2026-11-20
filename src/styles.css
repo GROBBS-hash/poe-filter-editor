@@ -1097,7 +1097,7 @@ button:focus-visible, select:focus-visible, .text:focus-visible, input:focus-vis
 /* Atlas window (F7), 21 Nov: same look as the build window; steps beside the tree; nothing scrolls the
    whole window (the tree fits, lists scroll in their own panel with a scrollbar that shows on hover). */
 .ao { font-weight: 500; }
-.ao .bo-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.ao .bo-title { color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
 .ao .bo-title::before { display: inline-block; vertical-align: -2px; margin-right: 9px; }
 .ao .ao-hint { margin-left: auto; white-space: nowrap; }
 .ao-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); }

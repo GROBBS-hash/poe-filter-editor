@@ -115,22 +115,80 @@ pub fn atlas_official_link(app: AppHandle, id: u64, variant: usize) -> Result<St
     })?
 }
 
+// ---------- the window's place ----------
+
+/// Where the atlas window was last (screen pixels), kept in atlas_window.json.
+#[derive(Serialize, serde::Deserialize, Clone, Copy, PartialEq)]
+struct Place { x: i32, y: i32, w: u32, h: u32 }
+
+fn place_path(app: &AppHandle) -> PathBuf { app.state::<AppState>().data_dir.join("atlas_window.json") }
+
+static PLACE: Mutex<Option<Place>> = Mutex::new(None);
+/// Bumped on every move/resize; the save waits until it settles (no file write per pixel dragged).
+static PLACE_GEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+/// True while we place the window ourselves, so that doesn't count as him moving it.
+static PLACING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Moved or resized by hand: remember it (saved half a second after it stops changing).
+pub fn on_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
+    if !matches!(event, tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_)) { return; }
+    if PLACING.load(Ordering::Relaxed) || !window.is_visible().unwrap_or(false) || window.is_minimized().unwrap_or(false) { return; }
+    let (Ok(p), Ok(s)) = (window.outer_position(), window.outer_size()) else { return };
+    if s.width < 200 || s.height < 200 { return; }
+    *PLACE.lock().unwrap() = Some(Place { x: p.x, y: p.y, w: s.width, h: s.height });
+    let gen = PLACE_GEN.fetch_add(1, Ordering::Relaxed) + 1;
+    let app = window.app_handle().clone();
+    thread::spawn(move || {
+        thread::sleep(Duration::from_millis(500));
+        if PLACE_GEN.load(Ordering::Relaxed) != gen { return; }
+        if let Some(pl) = *PLACE.lock().unwrap() {
+            if let Ok(text) = serde_json::to_string(&pl) { let _ = std::fs::write(place_path(&app), text); }
+        }
+    });
+}
+
+/// Puts the window where it was last time (pulled fully onto a screen), or top right the first time.
+fn restore_place(app: &AppHandle, w: &tauri::WebviewWindow) {
+    let saved = {
+        let mut g = PLACE.lock().unwrap();
+        if g.is_none() {
+            *g = std::fs::read_to_string(place_path(app)).ok().and_then(|t| serde_json::from_str(&t).ok());
+        }
+        *g
+    };
+    PLACING.store(true, Ordering::Relaxed);
+    match saved {
+        Some(pl) => {
+            // The screen it was on (by its middle), else the first one; never bigger than that screen.
+            if let Some((mx, my, mw, mh)) = monitor_at(w, pl.x as f64 + pl.w as f64 / 2.0, pl.y as f64 + pl.h as f64 / 2.0) {
+                let (ww, hh) = (pl.w.min(mw as u32), pl.h.min(mh as u32));
+                let x = pl.x.clamp(mx, (mx + mw - ww as i32).max(mx));
+                let y = pl.y.clamp(my, (my + mh - hh as i32).max(my));
+                let _ = w.set_size(tauri::PhysicalSize::new(ww, hh));
+                let _ = w.set_position(PhysicalPosition::new(x, y));
+            }
+        }
+        None => {
+            if let (Ok(Some(m)), Ok(size)) = (w.current_monitor(), w.outer_size()) {
+                let (mp, ms) = (m.position(), m.size());
+                let (ww, hh) = (size.width.min(ms.width), size.height.min(ms.height * 9 / 10));
+                let _ = w.set_size(tauri::PhysicalSize::new(ww, hh));
+                let x = mp.x + ms.width as i32 - ww as i32 - (ms.width as f64 * 0.12) as i32;
+                let _ = w.set_position(PhysicalPosition::new(x.max(mp.x), mp.y + (ms.height as f64 * 0.06) as i32));
+            }
+        }
+    }
+    let _ = std::thread::spawn(|| { thread::sleep(Duration::from_millis(400)); PLACING.store(false, Ordering::Relaxed); });
+}
+
 /// Hotkey: show/hide the atlas window over the game, leaving the game in front.
 pub fn toggle_atlas_window(app: &AppHandle) {
-    static PLACED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
     let Some(w) = app.get_webview_window("atlas") else { return };
     if w.is_visible().unwrap_or(false) {
         let _ = w.hide();
         return;
     }
-    // First time: top right of the screen, clear of the minimap's left edge.
-    if !PLACED.swap(true, Ordering::Relaxed) {
-        if let (Ok(Some(m)), Ok(size)) = (w.current_monitor(), w.outer_size()) {
-            let (mp, ms) = (m.position(), m.size());
-            let x = mp.x + ms.width as i32 - size.width as i32 - (ms.width as f64 * 0.17) as i32;
-            let _ = w.set_position(PhysicalPosition::new(x.max(mp.x), mp.y + (ms.height as f64 * 0.08) as i32));
-        }
-    }
+    restore_place(app, &w);
     let front = game_in_front();
     let _ = w.emit("atlas-changed", ());
     let _ = w.show();

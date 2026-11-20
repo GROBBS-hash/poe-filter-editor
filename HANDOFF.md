@@ -206,6 +206,11 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   remembered per tree (localStorage, shared by page and window). Tree decluttered: area names off (button "Area
   names"), no notable names except the current step's, rest of the atlas faint, bigger taken notables, text sized
   to the window.
+  21 Nov (2), after testing in game: F7 window opens 780×820 like the build window (same title bar), remembers its
+  size and place (`atlas_window.json`, saved half a second after a move/resize via `on_window_event`; restored on
+  open and pulled onto a screen). Steps list on the left and the tree on the right in one view (list hidden when the
+  window is under 560px wide; arrows stay); Tree / Notes tabs. No scrollbar on the window: the tree is sized to the
+  space, lists scroll in their own panel with a thin scrollbar that shows on hover. Preview `?atlas-window` fills the page.
 
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
@@ -269,6 +274,9 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] 21 Nov: steps: ‹ › arrows walk through the tree like maxroll's Leveling Path (same order and counts), the Steps
       tab jumps to a step, and F7 reopens on the step you were on. Tree is readable at the window's size (no area names
       unless "Area names" is on). His already-saved strategy gets its steps by itself after the editor restarts.
+      (Steps confirmed working 21 Nov.)
+- [ ] 21 Nov (2): F7 opens big enough (like F6), steps list beside the tree, no scrollbar on the window's edge;
+      move and resize it, hide and reopen (and restart the editor): it comes back in the same place and size.
 
 **Ground reader (F2)**
 - [ ] 20 Nov: two labels on top of each other (e.g. a map right under a shield): F2 on the lower one picks it, not the upper one.

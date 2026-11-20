@@ -2247,6 +2247,7 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
+            if window.label() == "atlas" { atlas_app::on_window_event(window, event); }
             // Closing the main window just hides it; the hotkeys keep working.
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if window.label() == "main" {

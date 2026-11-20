@@ -1,20 +1,36 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import AtlasTreeView, { AtlasStore, StepBar, StepList, StrategyNotes, currentStrategy, useStep } from "./AtlasTreeView";
 
-type View = "tree" | "steps" | "notes";
+type View = "tree" | "notes";
 
-/** The atlas strategy window over the game (F7): tree step by step, the steps list, and notes. Opens without taking the game's focus. */
+/** Size of an element, kept up to date as the window is resized. */
+function useSize<T extends HTMLElement>(): [React.RefObject<T | null>, { w: number; h: number }] {
+  const ref = useRef<T | null>(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => { const r = el.getBoundingClientRect(); setSize({ w: r.width, h: r.height }); });
+    ro.observe(el);
+    return () => ro.disconnect();
+  });
+  return [ref, size];
+}
+
+/**
+ * The atlas strategy window over the game (F7): steps on the left, the tree up to the chosen step on the
+ * right, notes on their own tab. Nothing scrolls the whole window: the tree fits the space, lists scroll in place.
+ * Opens without taking the game's focus; remembers its size and place (atlas_app.rs).
+ */
 export default function AtlasOverlay() {
   const [store, setStore] = useState<AtlasStore | null>(null);
-  const [view, setView] = useState<View>(() => {
-    try { const v = localStorage.getItem("atlas-view"); return v === "notes" || v === "steps" ? v : "tree"; } catch { return "tree"; }
-  });
+  const [view, setView] = useState<View>(() => { try { return localStorage.getItem("atlas-view") === "notes" ? "notes" : "tree"; } catch { return "tree"; } });
   const [key, setKey] = useState("F7");
-  const [h, setH] = useState(window.innerHeight);
-  useEffect(() => { const r = () => setH(window.innerHeight); window.addEventListener("resize", r); return () => window.removeEventListener("resize", r); }, []);
+  const [treeBox, treeSize] = useSize<HTMLDivElement>();
+  const [body, bodySize] = useSize<HTMLDivElement>();
 
   const load = () => {
     invoke<AtlasStore>("atlas_list").then(setStore).catch(() => setStore(null));
@@ -34,16 +50,18 @@ export default function AtlasOverlay() {
   const v = s?.variants[vi];
   const steps = v?.steps ?? [];
   const [step, setStep] = useStep(`${s?.id ?? 0}-${vi}`, steps.length);
+  // Narrow window: no room for the list beside the tree (the arrows still step through).
+  const side = steps.length > 0 && bodySize.w >= 560;
 
   return (
     <div className="bo ao">
       <div className="bo-bar" onMouseDown={(e) => { if (e.button === 0 && (e.target as HTMLElement).closest("button,select") == null) getCurrentWindow().startDragging(); }}>
-        <span className="ao-name" title={s?.name}>{s ? s.name : "Atlas strategy"}</span>
-        <span className="muted small">drag · {key} / Esc hides</span>
-        <button className="link" onClick={() => invoke("hide_atlas_window")}>✕</button>
+        <span className="bo-title" title={s?.name}>{s ? s.name : "Atlas strategy"}</span>
+        <span className="muted small ao-hint">drag to move · Esc / {key} to hide</span>
+        <button className="link bo-close" title="Hide" onClick={() => invoke("hide_atlas_window")}>✕</button>
       </div>
       {!s ? (
-        <div className="bo-body"><div className="empty">No atlas strategy yet. In the editor go to <b>Endgame → Atlas</b> and paste a maxroll or pathofexile.com link.</div></div>
+        <div className="ao-empty"><div className="empty">No atlas strategy yet. In the editor go to <b>Endgame → Atlas</b> and paste a maxroll or pathofexile.com link.</div></div>
       ) : (
         <>
           <div className="ao-head">
@@ -58,18 +76,31 @@ export default function AtlasOverlay() {
               </select>
             )}
             <span className="grow" />
-            <div className="seg">
+            <div className="ao-tabs">
               <button className={view === "tree" ? "on" : ""} onClick={() => pick("tree")}>Tree</button>
-              {steps.length > 0 && <button className={view === "steps" ? "on" : ""} onClick={() => pick("steps")}>Steps</button>}
               <button className={view === "notes" ? "on" : ""} onClick={() => pick("notes")}>Notes</button>
             </div>
           </div>
-          {view !== "notes" && steps.length > 0 && <div className="ao-stepbar"><StepBar steps={steps} step={step} onStep={setStep} /></div>}
-          <div className="bo-body">
-            {view === "tree" && v && <AtlasTreeView key={`${s.id}-${vi}`} nodes={v.nodes} choices={v.choices} steps={steps} step={step}
-              height={Math.max(240, h - (steps.length ? 190 : 140))} compact />}
-            {view === "steps" && <StepList steps={steps} step={step} onStep={(i) => { setStep(i); pick("tree"); }} />}
-            {view === "notes" && <StrategyNotes s={s} v={v} />}
+          <div className="ao-body" ref={body}>
+            {view === "notes" ? (
+              <div className="ao-scroll ao-notes"><StrategyNotes s={s} v={v} /></div>
+            ) : (
+              <div className={`ao-split ${side ? "" : "solo"}`}>
+                {side && (
+                  <div className="ao-steps">
+                    <div className="ao-steps-head"><b>Steps</b><span className="muted small">{steps[steps.length - 1].total} points</span></div>
+                    <div className="ao-scroll"><StepList steps={steps} step={step} onStep={setStep} /></div>
+                  </div>
+                )}
+                <div className="ao-treecol">
+                  {steps.length > 0 && <StepBar steps={steps} step={step} onStep={setStep} />}
+                  <div className="ao-treebox" ref={treeBox}>
+                    {v && treeSize.h > 0 && <AtlasTreeView key={`${s.id}-${vi}`} nodes={v.nodes} choices={v.choices}
+                      steps={steps} step={step} height={Math.max(160, treeSize.h - 34)} compact />}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </>
       )}

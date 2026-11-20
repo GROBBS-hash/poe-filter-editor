@@ -96,8 +96,10 @@
       {
         "label": "atlas",
         "title": "Atlas strategy",
-        "width": 430,
-        "height": 640,
+        "width": 780,
+        "height": 820,
+        "minWidth": 420,
+        "minHeight": 420,
         "transparent": true,
         "decorations": false,
         "alwaysOnTop": true,

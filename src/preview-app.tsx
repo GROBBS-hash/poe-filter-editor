@@ -101,4 +101,4 @@ mockIPC((cmd, args) => {
 try { if (!localStorage.getItem("tab")) localStorage.setItem("tab", "wealth"); } catch { /* fine */ }
 if (buildWin) document.body.classList.add("overlay");
 if (atlasWindow) document.body.classList.add("overlay");
-createRoot(document.getElementById("root")!).render(atlasWindow ? <div style={{ width: 430, height: 640 }}><AtlasOverlay /></div> : buildWin ? <BuildOverlay /> : <App />);
+createRoot(document.getElementById("root")!).render(atlasWindow ? <AtlasOverlay /> : buildWin ? <BuildOverlay /> : <App />);
