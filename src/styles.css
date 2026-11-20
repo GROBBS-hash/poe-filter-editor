@@ -1224,3 +1224,4 @@ body.main ::-webkit-scrollbar-thumb:hover { background: #4a5566; }
 .w-bytab-bar span { display: block; height: 100%; background: var(--gold); border-radius: 2px; }
 .w-bytab-head { margin: 4px 0 6px; }
 .w-listed { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: rgba(98,207,128,.15); color: #a6e6b7; }
+.err-box { white-space: pre-wrap; font-size: 12px; background: var(--input); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; color: #f0a49c; }

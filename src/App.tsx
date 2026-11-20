@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import Help from "./Help";
+import ErrorBoundary from "./ErrorBoundary";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Overview } from "./types";
@@ -151,6 +152,7 @@ export default function App() {
       </aside>
 
       <main className="content">
+        <ErrorBoundary key={tab}>
         <div key={tab} className="page-in">
         <div className="content-head">
           <h1><span className="head-icon" style={{ "--c": COLOURS[tab] } as CSSProperties}><Icon d={ICONS[tab]} /></span>{current?.name}</h1>
@@ -172,6 +174,7 @@ export default function App() {
       {tab === "batch" && <Batch on={ov.batch_on} onChange={refresh} />}
       {tab === "profiles" && <Profiles ov={ov} active={active} onChange={refresh} onNew={() => setAdding(true)} />}
         </div>
+        </ErrorBoundary>
       </main>
     </div>
   );

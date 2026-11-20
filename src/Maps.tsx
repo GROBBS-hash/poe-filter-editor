@@ -42,6 +42,7 @@ export default function Maps() {
     return () => window.clearTimeout(t);
   }, [st]);
 
+  const [suggestNote, setSuggestNote] = useState("");
   const shown = useMemo(() => {
     if (!st) return [];
     const words = q.toLowerCase().split(/\s+/).filter(Boolean);
@@ -51,7 +52,6 @@ export default function Maps() {
   if (!st) return <div className="card">{err || "Loading the map mod list…"}</div>;
   const setWants = (p: Partial<Wants>) => { setSt({ ...st, wants: { ...st.wants, ...p } }); setCopied(false); };
   const toggle = (id: number) => { setSt({ ...st, bad: st.bad.includes(id) ? st.bad.filter((x) => x !== id) : [...st.bad, id] }); setCopied(false); };
-  const [suggestNote, setSuggestNote] = useState("");
   // The one list of mods you can't run (Ctrl+D warns about the same ones). Quick ways to fill it:
   const usualDangers = () => setSt({ ...st, bad: st.mods.filter((m) => m.danger).map((m) => m.id) });
   const fromBuild = async () => {

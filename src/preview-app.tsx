@@ -84,6 +84,10 @@ mockWindows(atlasWindow ? "atlas" : buildWin ? "build" : "main");
 mockIPC((cmd, args) => {
   if (cmd === "overview") return { profiles: [{ id: "mid", name: "Mid-Game", game: "Poe1", base_file: "", output_file: "", rules: [] }], active: "mid", poe1_dir: "", poe2_dir: "", batch_on: false };
   if (cmd === "wealth_get") return wealth;
+  if (cmd === "map_tool_get") return { source: "poe.re (preview)", bad: [1], wants: { quantity: null, pack_size: null, rarity: null, more_maps: null, more_currency: null, more_scarabs: null, more_cards: null, tier_min: null, kind: "any", corrupted_ok: true },
+    mods: [{ id: 1, text: "Monsters reflect 18% of Elemental Damage", token: "s def", scary: 900, nightmare: false, trade_id: null, danger: "Elemental reflect" },
+      { id: 2, text: "Players cannot Regenerate Life, Mana or Energy Shield", token: "t reg", scary: 800, nightmare: false, trade_id: null, danger: "No regen" }] };
+  if (cmd === "map_tool_regex") return "\"!s def\"";
   if (cmd === "get_icons") return {};
   if (cmd === "get_settings") return { key_atlas: "F7" };
   if (cmd === "atlas_list") return atlas;

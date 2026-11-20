@@ -257,6 +257,10 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   first default. Settings → Map check is now a note + "Open the Maps page" (window event `goto-tab`). Maps page buttons:
   "Suggest from my build" (`map_suggest`) and "Tick the usual dangers".
 
+- 20 Nov: the main window went blank because a React hook was added after an early return on the Maps page (hooks must
+  come before any `return`). Fixed, and every page is now wrapped in `ErrorBoundary` (src/ErrorBoundary.tsx): a crash shows
+  the error in that page with "Try again" instead of blanking the window. preview-app mocks `map_tool_get` now.
+
 
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
