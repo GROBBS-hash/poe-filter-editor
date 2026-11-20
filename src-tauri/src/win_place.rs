@@ -95,7 +95,7 @@ pub fn show_over_game(app: &AppHandle, w: &tauri::WebviewWindow) {
 
 /// The main window when the editor starts. The dev build restarts itself whenever new code arrives, and each
 /// restart used to pop the editor up in the middle of the screen while he was playing. So: started within
-/// 45 seconds of the last run (a restart), it comes back the way it was, quietly: minimised to the taskbar
+/// 30 minutes of the last run (a restart), it comes back the way it was, quietly: minimised to the taskbar
 /// without taking focus, or still in the tray if he'd closed it. A normal start opens it as usual.
 /// A small heartbeat file ("alive.txt": time and shown/hidden) is how a restart is told from a start.
 pub fn start_main(app: &AppHandle) {
@@ -106,7 +106,9 @@ pub fn start_main(app: &AppHandle) {
     let mut parts = last.split_whitespace();
     let at: u64 = parts.next().and_then(|t| t.parse().ok()).unwrap_or(0);
     let shown = parts.next() != Some("hidden");
-    match (now().saturating_sub(at) < 45, shown) {
+    // A rebuild can take minutes (it ran over 45s on 21 Nov and the editor popped up mid-game): anything within
+    // half an hour of the last run counts as a restart. A start after a longer break opens as usual.
+    match (now().saturating_sub(at) < 30 * 60, shown) {
         (false, _) => { let _ = w.show(); let _ = w.set_focus(); }
         (true, true) => show_minimised_quietly(&w),
         (true, false) => {}
