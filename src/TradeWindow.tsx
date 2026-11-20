@@ -194,7 +194,7 @@ function MarketRatio({ c, divine }: { c: number; divine: number | null }) {
 function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote, waiting, stack }: { res: Result | null; bulk: Bulk | null; busy: boolean; err: string; waiting?: string | null; stack?: number;
   divine: number | null; ninja: [number, string] | null; ninjaNote: string }) {
   const ninjaChaos = ninja ? (ninja[1] === "divine" && divine ? ninja[0] * divine : ninja[1] === "chaos" ? ninja[0] : null) : null;
-  let main: number | null = null, label = "", sub: React.ReactNode = null;
+  let main: number | null = null, label = "", sub: React.ReactNode = null, source = "";
   if (res?.summary) {
     main = res.summary[1]; label = "on trade now";
     sub = <>cheapest {money(res.summary[0], divine)} · {res.total.toLocaleString()} listed</>;
@@ -203,7 +203,8 @@ function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote, waiting, st
     // fixers can't move); our stock-weighted going rate only when poe.ninja doesn't have the item.
     const t = bulkTypical(bulk.offers, divine, ninjaChaos);
     const o = bulk.offers[0];
-    main = ninjaChaos ?? t.typical; label = ninjaChaos != null ? "each · poe.ninja, from the currency exchange" : "each, going rate on the exchange";
+    main = ninjaChaos ?? t.typical; label = "each";
+    source = ninjaChaos != null ? "poe.ninja's price, from real trades on the in-game Currency Exchange" : "Going rate on the trade site's exchange, weighted by stock";
     sub = <>cheapest listed {money(t.cheapest, divine)}{o.stock ? ` (${o.stock} in stock)` : ""}
       {ninjaChaos == null && <> · going rate {money(t.typical, divine)}</>} · {bulk.offers.length} sellers</>;
   } else if (ninjaChaos != null) {
@@ -214,7 +215,7 @@ function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote, waiting, st
     <div className={`tw-hero ${main == null ? "empty" : ""}`}>
       {main != null ? (
         <div className="tw-hero-main">
-          <span className="tw-hero-price">{showDiv ? <Price n={main / divine!} cur="divine" /> : <Price n={main} cur="chaos" />}</span>
+          <span className="tw-hero-price" title={source || undefined}>{showDiv ? <Price n={main / divine!} cur="divine" /> : <Price n={main} cur="chaos" />}</span>
           <span className="tw-hero-side">
             <span className="tw-hero-label">{label}</span>
             {divine && <span className="muted">{showDiv ? <>= <Price n={main} cur="chaos" /></> : main / divine >= 0.01 ? <>= <Price n={main / divine} cur="divine" /></> : null}</span>}
