@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef, useState } from "react";
 import { ResizeGrips, WinBar } from "./WinFrame";
-import AtlasTreeView, { AtlasStore, StepBar, StepList, StrategyNotes, currentStrategy, useStep } from "./AtlasTreeView";
+import AtlasTreeView, { AtlasStore, ChoiceList, StepBar, StepList, StrategyNotes, currentStrategy, useStep } from "./AtlasTreeView";
 
 type View = "tree" | "notes";
 
@@ -50,6 +50,8 @@ export default function AtlasOverlay() {
   const v = s?.variants[vi];
   const steps = v?.steps ?? [];
   const [step, setStep] = useStep(`${s?.id ?? 0}-${vi}`, steps.length);
+  const [find, setFind] = useState<{ id: number; n: number } | null>(null);
+  const finder = (id: number) => setFind((f) => ({ id, n: (f?.n ?? 0) + 1 }));
   // Narrow window: no room for the list beside the tree (the arrows still step through).
   const side = steps.length > 0 && bodySize.w >= 560;
 
@@ -93,8 +95,9 @@ export default function AtlasOverlay() {
                   {steps.length > 0 && <StepBar steps={steps} step={step} onStep={setStep} />}
                   <div className="ao-treebox" ref={treeBox}>
                     {v && treeSize.h > 0 && <AtlasTreeView key={`${s.id}-${vi}`} nodes={v.nodes} choices={v.choices}
-                      steps={steps} step={step} height={Math.max(160, treeSize.h - 34)} compact />}
+                      steps={steps} step={step} height={Math.max(160, treeSize.h - 34)} compact find={find} />}
                   </div>
+                  {v && <div className="ao-choices ao-scroll"><ChoiceList nodes={v.nodes} choices={v.choices} steps={steps} step={step} onFind={finder} /></div>}
                 </div>
               </div>
             )}

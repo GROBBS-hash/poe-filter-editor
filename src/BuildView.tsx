@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ItemIcon } from "./icons";
 import TreeView from "./TreeView";
 
@@ -42,14 +42,21 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
     try { return (localStorage.getItem("build.view") as "gems" | "gear" | "tree") || "gems"; } catch { return "gems"; }
   });
   const [openItem, setOpenItem] = useState<string | null>(null);
-  // In the overlay the tree fills the window (it can be resized).
-  const [winH, setWinH] = useState(() => window.innerHeight);
+  // In the overlay (F6) the page never scrolls: the tree fills the space under the tabs and
+  // lists scroll inside their own panel. This is that panel's height.
+  const panel = useRef<HTMLDivElement | null>(null);
+  const [panelH, setPanelH] = useState(0);
   useEffect(() => {
-    const on = () => setWinH(window.innerHeight);
-    window.addEventListener("resize", on);
+    const el = panel.current;
+    if (!compact || !el) return;
+    const ro = new ResizeObserver(() => setPanelH(el.getBoundingClientRect().height));
+    ro.observe(el);
+    return () => ro.disconnect();
+  });
+  useEffect(() => {
     // The game's passive tree key opened the overlay: show the tree.
     const t = listen("build-tree", () => setView("tree"));
-    return () => { window.removeEventListener("resize", on); t.then((f) => f()); };
+    return () => { t.then((f) => f()); };
   }, []);
 
   // Follow the game first (moves to your act's stage if that's on), then show.
@@ -97,6 +104,7 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
         ))}
       </div>
 
+      <div className="bv-panel" ref={panel}>
       {view === "gems" && (
         <div className="bv-groups">
           {s.groups.length === 0 && <div className="empty">No gems in this stage.</div>}
@@ -139,13 +147,14 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
                 {stage > 0 && <> · <b className="c-new">{change.added}</b> new{change.removed ? <>, <b className="c-gone">{change.removed}</b> to take back</> : ""} since “{build.stages[stage - 1].title}”</>}
                 <button className="link small" onClick={() => invoke("open_url", { url: s.tree!.url })}>Open on pathofexile.com</button>
               </div>
-              <TreeView nodes={s.tree.nodes} previous={stage > 0 ? build.stages[stage - 1].tree?.nodes : undefined} height={compact ? Math.max(420, winH - 340) : 560} ascendancy={build.ascendancy || undefined}
+              <TreeView nodes={s.tree.nodes} previous={stage > 0 ? build.stages[stage - 1].tree?.nodes : undefined} height={compact ? Math.max(240, (panelH || 600) - 100) : 560} ascendancy={build.ascendancy || undefined}
                 masteries={(s.tree as { masteries?: [number, number][] }).masteries ?? []}
                 prevMasteries={stage > 0 ? (build.stages[stage - 1].tree as { masteries?: [number, number][] } | null)?.masteries : undefined} />
             </>
           ) : <div className="empty">No tree saved for this stage.</div>}
         </div>
       )}
+      </div>
     </div>
   );
 }

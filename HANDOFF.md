@@ -218,6 +218,11 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   windows.json in the data folder): build + atlas keep place and size, trades + earnings keep place (they size
   themselves). Shown windows go through `win_place::show_over_game` / `restore`. The Ctrl+D price window still places
   itself by the mouse.
+- 21 Nov (3): atlas "Options picked" list under the tree (`ChoiceList`: multiple-choice nodes taken up to the step with
+  the strategy's pick, this step's highlighted, click → `find` zooms the tree to it), in F7 and on the Atlas page.
+  F6 fits its window like F7 (`.bv-panel` under the tabs fills the rest; tree sized to it; lists and masteries scroll
+  inside it). Scroll bars everywhere are thin and only show while the mouse is over what scrolls (global
+  `::-webkit-scrollbar` rules at the end of styles.css).
 
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
@@ -298,6 +303,9 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] 21 Nov: corner grip (bottom right) resizes F6 and F7 both ways at once; left/right/bottom edges resize too.
       F6 now remembers its place and size like F7. Trades list and earnings box: same title bar, and they come back
       where you dragged them.
+- [ ] 21 Nov (3): F7 lists "Options picked" under the tree (e.g. Blended Realities → its option), click one zooms to it.
+      F6 has no scroll bar down its side (tree fills the window; masteries scroll inside). Scroll bars in the price
+      window, F2 pop-up, trades list and main window are thin and only show on mouse-over.
 
 **Ground reader (F2)**
 - [ ] 20 Nov: two labels on top of each other (e.g. a map right under a shield): F2 on the lower one picks it, not the upper one.

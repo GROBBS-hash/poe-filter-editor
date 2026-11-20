@@ -93,8 +93,10 @@ export function StepList({ steps, step, onStep }: { steps: AtlasStep[]; step: nu
  * The atlas passive tree: what you take in gold, the current step bright green with its name,
  * the rest of the atlas faint. Hover any point for its name. Scroll to zoom, drag to move.
  */
-export default function AtlasTreeView({ nodes, choices = [], steps, step, height = 520, compact }: {
+export default function AtlasTreeView({ nodes, choices = [], steps, step, height = 520, compact, find }: {
   nodes: number[]; choices?: [number, number][]; steps?: AtlasStep[]; step?: number; height?: number; compact?: boolean;
+  /** Centre the view on this node (`n` changes on every click, so the same node can be found again). */
+  find?: { id: number; n: number } | null;
 }) {
   const [tree, setTree] = useState<AtlasData | null>(null);
   const [box, setBox] = useState<Box | null>(null);
@@ -137,6 +139,12 @@ export default function AtlasTreeView({ nodes, choices = [], steps, step, height
     setBox({ x: Math.min(...xs) - pad, y: Math.min(...ys) - pad, w: Math.max(...xs) - Math.min(...xs) + pad * 2, h: Math.max(...ys) - Math.min(...ys) + pad * 2 });
   };
   useEffect(() => { fit(); }, [tree, nodes.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+  // "Find it on the tree": zoom in around that node.
+  useEffect(() => {
+    const n = find && tree?.nodes[String(find.id)];
+    if (!n) return;
+    setBox((b) => { const w = 3600, h = b ? 3600 * (b.h / b.w) : 3600; return { x: n[0] - w / 2, y: n[1] - h / 2, w, h }; });
+  }, [find?.n, tree]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!tree || !box) return <div className="empty" style={{ height }}>Loading the atlas…</div>;
 
@@ -207,7 +215,7 @@ export default function AtlasTreeView({ nodes, choices = [], steps, step, height
           {Object.entries(tree.nodes).map(([id, n]) => {
             const taken = on(id);
             const r = (taken ? R_ON : R_OFF)[n[2]] ?? 24;
-            const cls = `k${n[2]} ${taken ? (now.has(id) ? "now" : "on") : ""}`;
+            const cls = `k${n[2]} ${taken ? (now.has(id) ? "now" : "on") : ""} ${find && String(find.id) === id ? "found" : ""}`;
             return (
               <g key={id}>
                 <circle cx={n[0]} cy={n[1]} r={Math.max(r, taken ? (n[2] === 1 || n[2] === 2 ? 5 : 3) * upp : 0)} className={cls} />
@@ -231,6 +239,36 @@ export default function AtlasTreeView({ nodes, choices = [], steps, step, height
           {now.has(hover.id) ? <div className="tv-tag new">This step</div> : on(hover.id) && <div className="tv-tag on">Taken</div>}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Nodes with several options (e.g. Blended Realities) taken up to this step, with the option the strategy
+ * picks; this step's ones highlighted. Click one to find it on the tree (like the build window's Masteries).
+ */
+export function ChoiceList({ nodes, choices, steps, step, onFind }: {
+  nodes: number[]; choices: [number, number][]; steps?: AtlasStep[]; step?: number; onFind: (id: number) => void;
+}) {
+  const [tree, setTree] = useState<AtlasData | null>(null);
+  useEffect(() => { loadAtlas().then(setTree).catch(() => setTree(null)); }, []);
+  if (!tree || choices.length === 0) return null;
+  const stepping = !!steps && steps.length > 0 && step != null;
+  const taken = new Set(stepping ? steps!.slice(0, step! + 1).flatMap((s) => s.nodes) : nodes);
+  const now = new Set(stepping ? steps![step!].nodes : []);
+  // In the order they're taken.
+  const order = stepping ? steps!.flatMap((s) => s.nodes) : nodes;
+  const list = choices.filter(([n]) => taken.has(n)).sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]));
+  if (list.length === 0) return null;
+  return (
+    <div className="atv-choices">
+      <div className="atv-choices-head">Options picked <span className="muted small">(click one to find it on the tree)</span></div>
+      {list.map(([node, eff]) => (
+        <button key={node} className={`tv-mastery ${now.has(node) ? "new" : ""}`} onClick={() => onFind(node)}>
+          <span className="tv-m-name">{tree.nodes[String(node)]?.[3] ?? "Option"}{now.has(node) && <span className="tv-tag new"> this step</span>}</span>
+          <span className="tv-m-eff">{tree.choices[String(node)]?.[String(eff)] ?? "?"}</span>
+        </button>
+      ))}
     </div>
   );
 }

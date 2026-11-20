@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
-import AtlasTreeView, { AtlasStore, AtlasStrategy, StepBar, StepList, StrategyNotes, useStep } from "./AtlasTreeView";
+import AtlasTreeView, { AtlasStore, AtlasStrategy, ChoiceList, StepBar, StepList, StrategyNotes, useStep } from "./AtlasTreeView";
 import { PageLoading } from "./Loading";
 
 const SITE: Record<string, string> = { maxroll: "maxroll", official: "pathofexile.com" };
@@ -116,6 +116,8 @@ function Preview({ s, store, run }: { s: AtlasStrategy; store: AtlasStore; run: 
   const v = s.variants[vi];
   const steps = v?.steps ?? [];
   const [step, setStep] = useStep(`${s.id}-${vi}`, steps.length);
+  const [find, setFind] = useState<{ id: number; n: number } | null>(null);
+  const finder = (id: number) => setFind((f) => ({ id, n: (f?.n ?? 0) + 1 }));
   const pick = (i: number) => { setVi(i); if (store.active === s.id) run("atlas_use", { id: s.id, variant: i }); };
   const openOfficial = async () => {
     try { invoke("open_url", { url: await invoke<string>("atlas_official_link", { id: s.id, variant: vi }) }); } catch { /* shown nowhere */ }
@@ -143,10 +145,14 @@ function Preview({ s, store, run }: { s: AtlasStrategy; store: AtlasStore; run: 
             </div>
             <div>
               <StepBar steps={steps} step={step} onStep={setStep} />
-              <AtlasTreeView key={vi} nodes={v.nodes} choices={v.choices} steps={steps} step={step} height={540} />
+              <AtlasTreeView key={vi} nodes={v.nodes} choices={v.choices} steps={steps} step={step} height={540} find={find} />
+              <ChoiceList nodes={v.nodes} choices={v.choices} steps={steps} step={step} onFind={finder} />
             </div>
           </div>
-        ) : v && <AtlasTreeView key={vi} nodes={v.nodes} choices={v.choices} height={560} />}
+        ) : v && <>
+          <AtlasTreeView key={vi} nodes={v.nodes} choices={v.choices} height={560} find={find} />
+          <ChoiceList nodes={v.nodes} choices={v.choices} onFind={finder} />
+        </>}
       </div>
       <div className="card">
         <h2>Notes</h2>
