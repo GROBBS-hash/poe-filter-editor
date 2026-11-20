@@ -223,6 +223,8 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   F6 fits its window like F7 (`.bv-panel` under the tabs fills the rest; tree sized to it; lists and masteries scroll
   inside it). Scroll bars everywhere are thin and only show while the mouse is over what scrolls (global
   `::-webkit-scrollbar` rules at the end of styles.css).
+- 21 Nov (4): changing atlas step glides the view (0.4 s, `glide` in AtlasTreeView; straight there with reduced motion) to
+  fit everything taken so far incl. the new step; the first view fits the steps taken too. Zoom/drag stop a glide.
 
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
@@ -315,6 +317,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] 21 Nov (3): F7 lists "Options picked" under the tree (e.g. Blended Realities → its option), click one zooms to it.
       F6 has no scroll bar down its side (tree fills the window; masteries scroll inside). Scroll bars in the price
       window, F2 pop-up, trades list and main window are thin and only show on mouse-over.
+- [ ] 21 Nov (4): stepping (arrows or clicking a step) smoothly moves the tree so the new step's green points are on screen.
 
 **Ground reader (F2)**
 - [ ] 20 Nov: two labels on top of each other (e.g. a map right under a shield): F2 on the lower one picks it, not the upper one.

@@ -105,6 +105,27 @@ export default function AtlasTreeView({ nodes, choices = [], steps, step, height
   const [areas, setAreas] = useState(false);
   const svg = useRef<SVGSVGElement | null>(null);
   const drag = useRef<{ x: number; y: number; box: Box } | null>(null);
+  // The view right now, and the glide to a new view when the step changes.
+  const boxNow = useRef<Box | null>(null);
+  boxNow.current = box;
+  const anim = useRef<number | null>(null);
+  const stopGlide = () => { if (anim.current != null) { cancelAnimationFrame(anim.current); anim.current = null; } };
+  useEffect(() => stopGlide, []);
+  /** Moves the view smoothly to `to` (straight there when Windows asks for less motion). */
+  const glide = (to: Box) => {
+    stopGlide();
+    const from = boxNow.current;
+    const still = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!from || still) { setBox(to); return; }
+    const t0 = performance.now(), ms = 420;
+    const tick = (now: number) => {
+      const k = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - k, 3); // ease out
+      const mix = (a: number, b: number) => a + (b - a) * e;
+      setBox({ x: mix(from.x, to.x), y: mix(from.y, to.y), w: mix(from.w, to.w), h: mix(from.h, to.h) });
+      anim.current = k < 1 ? requestAnimationFrame(tick) : null;
+    };
+    anim.current = requestAnimationFrame(tick);
+  };
 
   useEffect(() => { loadAtlas().then(setTree).catch(() => setTree(null)); }, []);
   useEffect(() => {
@@ -126,7 +147,20 @@ export default function AtlasTreeView({ nodes, choices = [], steps, step, height
   const now = useMemo(() => new Set(stepping ? steps![step!].nodes.map(String) : []), [steps, step, stepping]);
   const picked = useMemo(() => new Map(choices.map(([n, e]) => [String(n), String(e)])), [choices]);
 
+  /** The view around these nodes, with room round the edge (never zoomed in too far). */
+  const around = (ids: Iterable<string>): Box | null => {
+    if (!tree) return null;
+    const pts = [...ids].map((id) => tree.nodes[id]).filter(Boolean);
+    if (pts.length === 0) return null;
+    const xs = pts.map((n) => n[0]), ys = pts.map((n) => n[1]);
+    const pad = 700, min = 3200;
+    let x0 = Math.min(...xs) - pad, x1 = Math.max(...xs) + pad, y0 = Math.min(...ys) - pad, y1 = Math.max(...ys) + pad;
+    if (x1 - x0 < min) { const c = (x0 + x1) / 2; x0 = c - min / 2; x1 = c + min / 2; }
+    if (y1 - y0 < min) { const c = (y0 + y1) / 2; y0 = c - min / 2; y1 = c + min / 2; }
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  };
   const fit = (all = false) => {
+    stopGlide();
     if (!tree) return;
     const pts = all ? [] : nodes.map((id) => tree.nodes[String(id)]).filter(Boolean);
     if (pts.length < 2) {
@@ -138,12 +172,24 @@ export default function AtlasTreeView({ nodes, choices = [], steps, step, height
     const pad = 600;
     setBox({ x: Math.min(...xs) - pad, y: Math.min(...ys) - pad, w: Math.max(...xs) - Math.min(...xs) + pad * 2, h: Math.max(...ys) - Math.min(...ys) + pad * 2 });
   };
-  useEffect(() => { fit(); }, [tree, nodes.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const b = stepping ? around(have) : null;
+    if (b) setBox(b); else fit();
+  }, [tree, nodes.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+  // A new step: glide to show everything taken so far, the new step's points included.
+  const firstStep = useRef(true);
+  useEffect(() => {
+    if (firstStep.current) { firstStep.current = false; return; }
+    if (!stepping || !tree) return;
+    const b = around(have);
+    if (b) glide(b);
+  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
   // "Find it on the tree": zoom in around that node.
   useEffect(() => {
     const n = find && tree?.nodes[String(find.id)];
     if (!n) return;
-    setBox((b) => { const w = 3600, h = b ? 3600 * (b.h / b.w) : 3600; return { x: n[0] - w / 2, y: n[1] - h / 2, w, h }; });
+    const b = boxNow.current, w = 3600, h = b ? 3600 * (b.h / b.w) : 3600;
+    glide({ x: n[0] - w / 2, y: n[1] - h / 2, w, h });
   }, [find?.n, tree]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!tree || !box) return <div className="empty" style={{ height }}>Loading the atlas…</div>;
@@ -155,6 +201,7 @@ export default function AtlasTreeView({ nodes, choices = [], steps, step, height
     return { x: ox + (cx - r.left) * scale, y: oy + (cy - r.top) * scale };
   };
   const zoom = (f: number, cx?: number, cy?: number) => {
+    stopGlide();
     const r = svg.current!.getBoundingClientRect();
     const p = toTree(cx ?? r.left + r.width / 2, cy ?? r.top + r.height / 2);
     const w = Math.min(Math.max(box.w * f, 900), 26000), h = box.h * (w / box.w);
@@ -182,7 +229,7 @@ export default function AtlasTreeView({ nodes, choices = [], steps, step, height
       </div>
       <svg ref={svg} className="tv-svg atv-svg" style={{ height }} viewBox={`${box.x} ${box.y} ${box.w} ${box.h}`}
         onWheel={(e) => zoom(e.deltaY > 0 ? 1.18 : 0.85, e.clientX, e.clientY)}
-        onMouseDown={(e) => { drag.current = { x: e.clientX, y: e.clientY, box }; }}
+        onMouseDown={(e) => { stopGlide(); drag.current = { x: e.clientX, y: e.clientY, box }; }}
         onMouseMove={(e) => {
           if (!drag.current) return;
           const r = svg.current!.getBoundingClientRect();
