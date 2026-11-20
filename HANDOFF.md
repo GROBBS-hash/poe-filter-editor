@@ -261,6 +261,9 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   earnings sessions use the cached prices. Live check, his TENDY tab: Woe Buckle ≈ 1 div, Maelström chest ≈ 100c,
   most 1–10c, one ring with nothing like it listed = 0. Rares with nothing worth ticking price as "any rare of that
   base". Dev tool: `cargo run -p filter-core --example rarequeries -- tab.json trade_stats_poe1.json`.
+  Fix same day: his first try stopped on "Unknown item base type": 3.30 rare blighted maps ("Blighted Map (Tier 2)",
+  a "Map Area" line, no "Map Tier") weren't seen as maps, so they went to the trade site as gear and poe.ninja's map
+  price was skipped. `is_gear` knows that shape now; and a 400 for one rare is saved as 0 and the run carries on.
 
 - Quiet restarts 21 Nov: `npm run tauri dev` restarts the app whenever the 30s `git pull` brings Rust changes, and
   each restart popped the editor up mid-screen. The main window now starts hidden (`"visible": false`) and

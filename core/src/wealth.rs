@@ -208,8 +208,10 @@ pub fn item_text(it: &Value) -> String {
 /// Normal/magic/rare gear and jewels (worth what the trade site says, not poe.ninja).
 fn is_gear(item: &Value) -> bool {
     // Maps have tiers and item levels too, but poe.ninja prices them.
-    let map = item["typeLine"].as_str().map(|t| t.ends_with(" Map") || t.contains("Waystone")).unwrap_or(false)
-        || item["properties"].as_array().into_iter().flatten().any(|p| p["name"].as_str().map(|n| n.starts_with("Map Tier")).unwrap_or(false));
+    // 3.30 names them "Blighted Map (Tier 2)" and gives a "Map Area" line instead of "Map Tier".
+    let map = item["typeLine"].as_str().map(|t| t.ends_with(" Map") || t.contains("Map (Tier ") || t.contains("Waystone")).unwrap_or(false)
+        || item["properties"].as_array().into_iter().flatten()
+            .any(|p| p["name"].as_str().map(|n| n.starts_with("Map Tier") || n == "Map Area").unwrap_or(false));
     if map { return false; }
     item["properties"].as_array().map(|p| !p.is_empty()).unwrap_or(false) && item["stackSize"].is_null()
         || item["ilvl"].as_u64().unwrap_or(0) > 0 && item["stackSize"].is_null() && item["frameType"].as_u64().unwrap_or(0) <= 2
@@ -413,7 +415,10 @@ mod tests {
                 { "description": "60% chance to Avoid Bleeding", "flags": { "crafted": true } } ] },
             { "id": "u", "frameType": 2, "identified": false, "typeLine": "Paladin Boots", "baseType": "Paladin Boots", "ilvl": 86 },
             { "id": "m", "frameType": 2, "identified": true, "name": "Grim Path", "typeLine": "Strand Map", "baseType": "Strand Map", "ilvl": 83,
-              "properties": [ { "name": "Map Tier", "values": [["16", 0]] } ] }]);
+              "properties": [ { "name": "Map Tier", "values": [["16", 0]] } ] },
+            // 3.30's rare blighted maps (his Fossil tab, 21 Nov): no "Map Tier" line.
+            { "id": "b", "frameType": 2, "identified": true, "name": "Void Trail", "typeLine": "Blighted Map (Tier 2)",
+              "baseType": "Blighted Map (Tier 2)", "ilvl": 70, "properties": [ { "name": "Map Area", "values": [["Armoury", 0]] } ] }]);
         let r = rares_in_tab(&items, "TENDY");
         assert_eq!(r.len(), 1, "unidentified rares and rare maps aren't searched this way");
         assert_eq!((r[0].id.as_str(), r[0].name.as_str()), ("abc", "Cataclysm Trail Paladin Boots"));

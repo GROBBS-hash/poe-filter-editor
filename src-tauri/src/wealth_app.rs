@@ -235,6 +235,11 @@ pub async fn wealth_price_rares(app: AppHandle) -> Result<WealthView, String> {
                     with_store(&state, |s| { s.rare_prices.insert(r.id.clone(), RarePrice { chaos, time: now(), found: total }); });
                     done += 1;
                 }
+                // The trade site couldn't search this one item (e.g. "Unknown item base type"): skip it, carry on.
+                Err(e) if e.contains(" 400") => {
+                    with_store(&state, |s| { s.rare_prices.insert(r.id.clone(), RarePrice { chaos: 0.0, time: now(), found: 0 }); });
+                }
+                // The limit, or the site is down: stop, keep what we have.
                 Err(e) => { failed = Some(e); break; }
             }
         }
