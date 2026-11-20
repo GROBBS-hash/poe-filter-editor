@@ -15,6 +15,11 @@ fn main() {
             for g in s.gear.iter().chain(s.jewels.iter().map(|j| &j.item)) {
                 let Some(setup) = filter_core::trade::setup(&g.copy, &index) else { continue };
                 let b = filter_core::trade::buy_setup(setup);
+                if std::env::var("POB_BUY_DEBUG").is_ok() {
+                    eprintln!("== {} ({})", g.name, g.base);
+                    for f in &b.filters { eprintln!("   {} {:9} {} min {:?}", if f.enabled { "[x]" } else { "[ ]" }, f.kind, f.label, f.min); }
+                    for u in &b.unknown { eprintln!("   ??? not on the trade site's list: {u}"); }
+                }
                 let q = |spare| filter_core::trade::buy_query(&b, spare);
                 println!("BUY\t{}\t{}\t{}\t{}\t{}", g.name, filter_core::trade::buy_mod_count(&b), q(0), q(1), q(2));
             }

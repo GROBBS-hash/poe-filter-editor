@@ -130,10 +130,56 @@ impl StatIndex {
                 let inc = t.replace("reduced", "increased");
                 if let Some(id) = self.by_text.get(&(k.to_string(), inc.to_lowercase())) { return Some((id.clone(), -value)); }
             }
+            // "applying -12% to Lightning Resistance": the site writes "applying #%" and searches -12.
+            if t.contains("-#") {
+                if let Some(id) = self.by_text.get(&(k.to_string(), t.replacen("-#", "#", 1).to_lowercase())) { return Some((id.clone(), -value)); }
+            }
+        }
+        // Small wording differences: "-3 to Total Mana Cost" listed as "+# to Total Mana Cost", "Has 1 Abyssal Socket" as
+        // "Has # Abyssal Sockets", "Grants Level 20 Aspect of Solaris Skill" as "Grants Level # Aspect of Solaris".
+        let plural = t.split_once("# ").map(|(a, b)| { let (w, r) = b.split_once(' ').unwrap_or((b, "")); format!("{a}# {w}s {r}").trim().to_string() });
+        let variants = [(t.contains("-#").then(|| t.replacen("-#", "+#", 1)), -value), (plural, value),
+            (t.strip_suffix(" Skill").map(String::from), value), (Some(format!("{t}s")), value)];
+        for (v, val) in variants {
+            let Some(v) = v else { continue };
+            for k in kinds {
+                if let Some(id) = self.by_text.get(&(k.to_string(), v.to_lowercase())) { return Some((id.clone(), val)); }
+            }
+        }
+        // "Flasks gain a Charge every # seconds" is listed as "Flasks gain # Charges every 3 seconds" (one, as a number).
+        if let Some(i) = m.text.rfind(" a ") {
+            let rest = &m.text[i + 3..];
+            let (word, after) = rest.split_once(' ').unwrap_or((rest, ""));
+            let plural = format!("{} # {word}s {after}", &m.text[..i]);
+            for k in kinds {
+                if let Some(id) = self.by_text.get(&(k.to_string(), plural.trim().to_lowercase())) { return Some((id.clone(), 1.0)); }
+            }
+        }
+        // Some numbers are part of the stat's text ("#% chance to Unnerve Enemies for 4 seconds on Hit"):
+        // try leaving each number as it is, searching on the others.
+        let nums = vals.len().min(4);
+        if nums >= 2 {
+            for keep in 1..(1u32 << nums) - 1 {
+                let (mut text, mut n, mut first) = (String::new(), 0usize, None);
+                for (i, part) in t.split('#').enumerate() {
+                    if i > 0 {
+                        let v = vals.get(n).copied().unwrap_or(0.0);
+                        if n < nums && keep & (1 << n) != 0 { text.push_str(&fmt_num(v)); } else { text.push('#'); first.get_or_insert(v); }
+                        n += 1;
+                    }
+                    text.push_str(part);
+                }
+                for k in kinds {
+                    if let Some(id) = self.by_text.get(&(k.to_string(), text.to_lowercase())) { return Some((id.clone(), first.unwrap_or(value))); }
+                }
+            }
         }
         None
     }
 }
+
+/// 4.0 -> "4", 0.15 -> "0.15" (as the number reads on the item).
+fn fmt_num(v: f64) -> String { if v.fract() == 0.0 { format!("{}", v as i64) } else { format!("{v}") } }
 
 /// "+52 to maximum Life" -> ("+# to maximum Life", [52]).
 pub fn template(line: &str) -> (String, Vec<f64>) {
@@ -317,10 +363,14 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
     filters.extend(totals_f);
     filters.extend(props_f);
     let has_tiers = lines.iter().any(|m| m.tier.is_some());
+    let local_first = category(&item.item_class).is_some_and(|c| c.starts_with("armour.") || c.starts_with("weapon."));
     for (i, m) in lines.iter().enumerate() {
         if hidden.contains(&i) { continue; }
         // Foulborn uniques' special mods are on the site's "mutated" list.
-        let found = if foulborn { index.find(&ModLine { kind: "mutated".into(), ..m.clone() }).or_else(|| index.find(m)) } else { index.find(m) };
+        // Armour and weapons: "+# to Armour" on the item itself is the site's "+# to Armour (Local)", not the global one
+        // (that's for belts and jewels); try the local one first.
+        let local = || index.find(&ModLine { text: format!("{} (Local)", m.text), ..m.clone() }).filter(|_| local_first);
+        let found = if foulborn { index.find(&ModLine { kind: "mutated".into(), ..m.clone() }).or_else(|| index.find(m)) } else { local().or_else(|| index.find(m)) };
         let Some((id, value)) = found else { unknown.push(m.text.clone()); unknown_kinds.push(m.kind.clone()); continue };
         // Found on the mutated list = a Foulborn mod (shown in its own colour).
         let kind = if id.starts_with("mutated.") { "mutated".to_string() } else { m.kind.clone() };
@@ -540,26 +590,39 @@ impl StaticIndex {
 /// discriminator), from api/trade/data/items.
 #[derive(Debug, Default)]
 pub struct ItemTypes { by_text: HashMap<String, (String, String)>, /// Every base type the trade site knows (lower case), to tell a base from extra words in front of it.
-    bases: std::collections::HashSet<String> }
+    bases: std::collections::HashSet<String>,
+    /// Every unique's name (lower case -> as the site writes it), for renamed ones ("Endgame Marylene's Fallacy" in a PoB guide).
+    uniques: HashMap<String, String> }
 
 impl ItemTypes {
     pub fn from_json(v: &Value) -> ItemTypes {
         let mut by_text = HashMap::new();
         let mut bases = std::collections::HashSet::new();
+        let mut uniques = HashMap::new();
         for group in v["result"].as_array().into_iter().flatten() {
             for e in group["entries"].as_array().into_iter().flatten() {
                 if e.get("name").is_none() { if let Some(t) = e["type"].as_str() { bases.insert(t.to_lowercase()); } }
+                if let Some(n) = e["name"].as_str() { uniques.insert(n.to_lowercase(), n.to_string()); }
                 if let (Some(t), Some(text), Some(disc)) = (e["type"].as_str(), e["text"].as_str(), e["disc"].as_str()) {
                     if e.get("name").is_none() { by_text.entry(text.to_lowercase()).or_insert_with(|| (t.to_string(), disc.to_string())); }
                 }
             }
         }
-        ItemTypes { by_text, bases }
+        ItemTypes { by_text, bases, uniques }
     }
 
     /// Rewrites a search's plain type ("Scourge Arrow of Menace") into the form the
     /// trade site wants ({option: "Scourge Arrow", discriminator: "alt_x"}).
     pub fn fix_query(&self, q: &mut Value) {
+        // A unique with words in front of its name (renamed in PoB): drop words until it's a unique the site knows.
+        if let Some(n) = q["query"]["name"].as_str().map(str::to_string) {
+            if !self.uniques.is_empty() && !self.uniques.contains_key(&n.to_lowercase()) {
+                let words: Vec<&str> = n.split_whitespace().collect();
+                if let Some(real) = (1..words.len()).find_map(|i| self.uniques.get(&words[i..].join(" ").to_lowercase())) {
+                    q["query"]["name"] = json!(real);
+                }
+            }
+        }
         let Some(t) = q["query"]["type"].as_str().map(str::to_string) else { return };
         // "Fated Composite Ring" (unidentified, with a word in front): drop leading words until it's a base the site knows.
         let mut t = t;
@@ -641,12 +704,9 @@ pub fn poeprices(v: &Value) -> Option<(f64, f64, String, f64)> {
 pub fn buy_setup(mut s: TradeSetup) -> TradeSetup {
     let unique = s.item.rarity == "Unique";
     let jewel = s.item.item_class.contains("Jewel");
-    let loose = |v: f64| if v.abs() <= 5.0 { v } else { (v * 0.9).floor() };
-    let armour = s.category.as_deref().is_some_and(|c| c.starts_with("armour."));
+    // 10% easier: lower for positive numbers, closer to zero for negative ones ("applying -12%" -> -10 or better).
+    let loose = |v: f64| if v.abs() <= 5.0 { v } else if v < 0.0 { (v * 0.9).ceil() } else { (v * 0.9).floor() };
     for f in &mut s.filters {
-        // Armour pieces: PoB's "+113 to Armour" / "133% increased Armour and Energy Shield" are rarely rolled
-        // exactly like that; left for you to tick on the site.
-        let local_defence = armour && crate::trade_rules::is_local_defence(&template(&f.label).0.to_lowercase());
         f.enabled = if unique {
             f.label.contains("while affected by")
         } else {
@@ -658,7 +718,7 @@ pub fn buy_setup(mut s: TradeSetup) -> TradeSetup {
                 "crafted" => false,
                 // Cluster jewels: "Adds 8 Passive Skills" and what the small passives grant matter.
                 "enchant" => jewel,
-                _ => !f.junk && !local_defence,
+                _ => !f.junk,
             }
         };
         if f.enabled && !f.label.contains("Passive Skills") { f.min = f.min.map(loose); }
@@ -674,20 +734,28 @@ pub fn buy_setup(mut s: TradeSetup) -> TradeSetup {
 /// for when every mod at once finds nothing. Totals stay required. Cluster jewels' passive count is exact.
 pub fn buy_query(s: &TradeSetup, spare: usize) -> Value {
     let mut q = query(s);
+    // Everything else PoB lists goes in unticked, so the trade page shows it ready to tick.
+    let off: Vec<Value> = s.filters.iter().filter(|f| !f.enabled && !f.id.starts_with("prop.") && !f.id.contains("empty")).map(|f| {
+        let mut v = json!({ "id": f.id, "disabled": true });
+        if let Some(m) = f.min { v["value"] = json!({ "min": m }); }
+        v
+    }).collect();
     let exact: Vec<&str> = s.filters.iter().filter(|f| f.enabled && f.label.contains("Passive Skills") && f.kind == "enchant")
         .map(|f| f.id.as_str()).collect();
     let totals: Vec<&str> = s.filters.iter().filter(|f| f.enabled && f.kind == "pseudo").map(|f| f.id.as_str()).collect();
     let Some(list) = q["query"]["stats"][0]["filters"].as_array().cloned() else { return q };
     let list: Vec<Value> = list.into_iter().map(|mut v| {
         if exact.contains(&v["id"].as_str().unwrap_or("")) && !v["value"]["min"].is_null() { let m = v["value"]["min"].clone(); v["value"]["max"] = m; }
+        // A negative number ("applying -12% to Lightning Resistance") is better the lower it goes: a maximum, not a minimum.
+        else if v["value"]["min"].as_f64().is_some_and(|m| m < 0.0) { let m = v["value"]["min"].clone(); v["value"] = json!({ "max": m }); }
         v
     }).collect();
     let (must, rest): (Vec<Value>, Vec<Value>) = list.into_iter().partition(|v| totals.contains(&v["id"].as_str().unwrap_or("")));
     q["query"]["stats"] = if spare == 0 || rest.len() <= spare {
-        json!([{ "type": "and", "filters": must.into_iter().chain(rest).collect::<Vec<_>>() }])
+        json!([{ "type": "and", "filters": must.into_iter().chain(rest).chain(off).collect::<Vec<_>>() }])
     } else {
         let n = rest.len() - spare;
-        json!([{ "type": "and", "filters": must }, { "type": "count", "filters": rest, "value": { "min": n } }])
+        json!([{ "type": "and", "filters": must.into_iter().chain(off).collect::<Vec<_>>() }, { "type": "count", "filters": rest, "value": { "min": n } }])
     };
     q
 }

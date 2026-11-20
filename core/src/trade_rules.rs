@@ -189,11 +189,6 @@ const WEAPON_LOCAL: &[&str] = &["adds # to # physical damage", "#% increased phy
     "adds # to # fire damage", "adds # to # cold damage", "adds # to # lightning damage"];
 const DEFENCE_FLAT: &[&str] = &["+# to armour", "+# to evasion rating", "+# to maximum energy shield", "+# to ward"];
 
-/// A local defence mod ("+# to Armour", "#% increased Armour and Energy Shield"…), by its lower-case template.
-pub fn is_local_defence(t: &str) -> bool {
-    [AR_INC, EV_INC, ES_INC, DEFENCE_FLAT, &["#% increased ward"][..]].iter().any(|l| l.contains(&t))
-}
-
 fn sum_inc(mods: &[ModLine], list: &[&str]) -> f64 {
     mods.iter().filter(|m| m.kind != "enchant").map(|m| {
         let (t, v) = template(&m.text);
@@ -456,5 +451,53 @@ Item Level: 80
         assert_eq!((f["value"]["min"].as_f64(), f["value"]["max"].as_f64()), (Some(8.0), Some(8.0)));
         // Cluster jewels are their own category on the trade site.
         assert_eq!(q["query"]["filters"]["type_filters"]["filters"]["category"]["option"], "jewel.cluster");
+    }
+}
+
+#[cfg(test)]
+mod pob_wording_tests {
+    use crate::trade::{buy_query, buy_setup, setup, ItemTypes, StatIndex};
+    use serde_json::json;
+
+    #[test]
+    fn pob_items_find_their_trade_stats() {
+        let idx = StatIndex::from_json(&json!({ "result": [
+            { "label": "Explicit", "entries": [
+                { "id": "explicit.ar_global", "text": "+# to Armour", "type": "explicit" },
+                { "id": "explicit.ar_local", "text": "+# to Armour (Local)", "type": "explicit" },
+                { "id": "explicit.abyss", "text": "Has # Abyssal Sockets", "type": "explicit" },
+                { "id": "explicit.solaris", "text": "Grants Level # Aspect of Solaris", "type": "explicit" },
+                { "id": "explicit.chan", "text": "Channelling Skills have +# to Total Mana Cost", "type": "explicit" } ] },
+            { "label": "Implicit", "entries": [
+                { "id": "implicit.unnerve", "text": "While a Unique Enemy is in your Presence, #% chance to Unnerve Enemies for 4 seconds on Hit", "type": "implicit" },
+                { "id": "implicit.expo", "text": "While a Unique Enemy is in your Presence, Inflict Lightning Exposure on Hit, applying #% to Lightning Resistance", "type": "implicit" },
+                { "id": "implicit.flask", "text": "While a Unique Enemy is in your Presence, Flasks gain # Charges every 3 seconds", "type": "implicit" } ] } ] }));
+        let gloves = "Item Class: Gloves\nRarity: Rare\nX\nPaladin Gloves\n--------\nItem Level: 1\n--------\n\
+            While a Unique Enemy is in your Presence, 20% chance to Unnerve Enemies for 4 seconds on Hit (implicit)\n\
+            While a Unique Enemy is in your Presence, Inflict Lightning Exposure on Hit, applying -12% to Lightning Resistance (implicit)\n\
+            While a Unique Enemy is in your Presence, Flasks gain a Charge every 3 seconds (implicit)\n--------\n+68 to Armour\n\
+            Channelling Skills have -3 to Total Mana Cost\nGrants Level 20 Aspect of Solaris Skill\nHas 1 Abyssal Socket\n";
+        let s = setup(gloves, &idx).unwrap();
+        assert!(s.unknown.is_empty(), "{:?}", s.unknown);
+        let get = |id: &str| s.filters.iter().find(|f| f.id == id).map(|f| f.value);
+        assert_eq!(get("implicit.unnerve"), Some(20.0)); // the "4 seconds" stays words
+        assert_eq!(get("implicit.expo"), Some(-12.0));
+        assert_eq!(get("implicit.flask"), Some(1.0));
+        assert_eq!(get("explicit.ar_local"), Some(68.0)); // gloves' own armour, not the global stat
+        assert_eq!(get("explicit.chan"), Some(-3.0));
+        assert_eq!((get("explicit.solaris"), get("explicit.abyss")), (Some(20.0), Some(1.0)));
+        // Buy: a negative number searches as a maximum (10% easier), unticked rows still sent, disabled.
+        let q = buy_query(&buy_setup(s), 0);
+        let rows = q["query"]["stats"][0]["filters"].as_array().unwrap();
+        let expo = rows.iter().find(|v| v["id"] == "implicit.expo").unwrap();
+        assert_eq!(expo["value"], json!({ "max": -10.0 }));
+
+        // A unique renamed in PoB ("Endgame Marylene's Fallacy") is searched by its real name.
+        let types = ItemTypes::from_json(&json!({ "result": [ { "entries": [
+            { "name": "Marylene's Fallacy", "type": "Lapis Amulet", "text": "Marylene's Fallacy Lapis Amulet", "flags": { "unique": true } },
+            { "type": "Lapis Amulet", "text": "Lapis Amulet" } ] } ] }));
+        let mut q = json!({ "query": { "name": "Endgame Marylene's Fallacy", "type": "Lapis Amulet" } });
+        types.fix_query(&mut q);
+        assert_eq!(q["query"]["name"], "Marylene's Fallacy");
     }
 }

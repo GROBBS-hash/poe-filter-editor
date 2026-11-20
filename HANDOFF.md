@@ -309,6 +309,15 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   shows "N for sale · any 3 of 4 mods". Live 21 Nov on his build: helmet 391, boots 5, ring 8 (3 of 4), cobalt 21,
   large clusters 13 and 20. Found on the way: cluster jewels are category `jewel.cluster` (Ctrl+D searched jewel.base:
   nothing), and notables like "1 Added Passive Skill is Overshock" are matched word for word (`StatIndex::find`).
+  21 Nov (2), he found rares got almost no mods: armour pieces' armour/ES mods are now ticked (PoB's "Armour: 1675" lines
+  don't match the real item, so no 20%-quality totals), unticked rows are sent too ("disabled": they show on the page),
+  negative numbers search as a maximum. Stat matching fixes (help Ctrl+D too): armour/weapon mods use the site's
+  "(Local)" stat first ("+# to Armour" had matched the global one), numbers that are part of the text ("for 4
+  seconds"), "-#" vs "+#", "a Charge" vs "# Charges", singular vs plural, trailing " Skill". Eldritch implicits get
+  "While a Unique Enemy is in your Presence, " (PoB drops it; it doesn't say Unique vs Pinnacle). Uniques renamed in a
+  PoB guide ("Endgame Marylene's Fallacy") are cut down to the real name (`ItemTypes.uniques` in fix_query).
+  Live: gloves / boots 1 (4 of 6 mods), body 10 (3 of 5), helmet 0 (that implicit pair isn't for sale at all).
+  Debug: add `POB_BUY_DEBUG=1` to the dev check below to see each item's ticked / unticked / unknown mods.
   Dev check: `POB_STAGE="Endgame" POB_BUY=<data dir>/trade_stats_poe1.json cargo run -p filter-core --example pobdump -- <pob.txt>`.
 
 - Resistances like Awakened 21 Nov (he asked; read in its pseudo/index.ts): elemental total always ticked, chaos total ticked
@@ -364,7 +373,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
       show with prices at the bottom of the window.
 - [ ] Save search, Saved searches list (Run / Live / delete); a live search pops up new listings with a Whisper button.
 
-- [x] (Confirmed 21 Nov.) Build window (F6) / My build: gold "Buy" opens the trade site in your browser with the item's mods filled in, and
+- [ ] (Uniques/jewels confirmed 21 Nov; rares fixed after.) Build window (F6) / My build: gold "Buy" opens the trade site in your browser with the item's mods filled in, and
       says how many are for sale ("any 3 of 4 mods" when it had to loosen). Try a rare, a cluster jewel, Watcher's Eye.
 - [ ] Ctrl+D on a cluster jewel in game finds listings (it searched the wrong category before 21 Nov).
 - [ ] Build window (F6) / My build: "Price" on a gear item, flask or jewel, or a click on a gem, opens the price window for it
