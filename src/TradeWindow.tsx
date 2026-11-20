@@ -334,7 +334,7 @@ export default function TradeWindow() {
         <ItemIcon name={it.rarity === "Unique" ? it.name : null} base={it.base_type || null} size={36} />
         <div className="qm-head-text">
           <div className="qm-name" style={{ color: RARITY_COLOUR[it.rarity] ?? "#ddd" }}>{itemTitle(it)}</div>
-          <div className="qm-sub">{it.item_class}{it.item_level ? ` · ilvl ${it.item_level}` : ""}{setup.links_min ? ` · ${setup.links_min}-link` : ""}</div>
+          <div className="qm-sub">{["Rare", "Magic"].includes(it.rarity) && it.base_type && it.name ? it.base_type : it.item_class}{it.item_level ? ` · ilvl ${it.item_level}` : ""}{setup.links_min ? ` · ${setup.links_min}-link` : ""}</div>
         </div>
       </div>
 
