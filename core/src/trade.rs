@@ -20,6 +20,8 @@ pub struct ModLine {
     pub values: Vec<f64>,
     /// Where the roll sits in its range, 0 (lowest) to 1 (highest), from the advanced copy's "(30-39)".
     pub roll: Option<f64>,
+    /// Its range as shown, "25–29" (several numbers: "8–12 / 18–25").
+    pub range: Option<String>,
 }
 
 /// One stat to search on, with a tick box and a minimum.
@@ -39,6 +41,8 @@ pub struct StatFilter {
     /// Where the roll sits in its range (0 lowest, 1 highest), when the copy showed one.
     #[serde(default)]
     pub roll: Option<f64>,
+    #[serde(default)]
+    pub range: Option<String>,
 }
 
 /// Mods that almost never change what an item sells for.
@@ -166,6 +170,14 @@ fn roll_of(line: &str, values: &[f64]) -> Option<f64> {
     Some(spots.iter().sum::<f64>() / spots.len() as f64)
 }
 
+/// The ranges as shown in the window: "25–29", or "8–12 / 18–25" for several numbers.
+/// None when there are none or every number is fixed.
+fn range_text(line: &str) -> Option<String> {
+    let r = ranges(line);
+    if r.is_empty() || r.iter().all(|(a, b)| a == b) { return None; }
+    Some(r.iter().map(|(a, b)| format!("{a}–{b}")).collect::<Vec<_>>().join(" / "))
+}
+
 /// Removes roll ranges "(25-29)" and tags like "(augmented)" from an advanced-copy line.
 fn clean(line: &str) -> String {
     let mut out = String::new();
@@ -235,8 +247,8 @@ pub fn mods(text: &str) -> Vec<ModLine> {
             let numberless_ok = header_kind.is_some() || t.contains("Cannot") || t.contains("Has ");
             if t.is_empty() || !t.chars().any(|c| c.is_ascii_digit()) && !numberless_ok { continue; }
             let (_, values) = template(&t);
-            let roll = roll_of(l, &values);
-            out.push(ModLine { text: t, kind, tier: header_tier, values, roll });
+            let (roll, range) = (roll_of(l, &values), range_text(l));
+            out.push(ModLine { text: t, kind, tier: header_tier, values, roll, range });
         }
     }
     out
@@ -298,7 +310,7 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
         let enabled = !unique && m.kind != "enchant" && good && !junk;
         // A mod with no number is just "has it": no minimum.
         let min = if m.values.is_empty() { None } else { Some(min_for(value)) };
-        filters.push(StatFilter { id, label: m.text.clone(), value, min, enabled, kind, tier: m.tier, junk, roll: m.roll });
+        filters.push(StatFilter { id, label: m.text.clone(), value, min, enabled, kind, tier: m.tier, junk, roll: m.roll, range: m.range.clone() });
     }
     filters.extend(crate::trade_rules::open_affixes(text, &item, index));
     let links = item.sockets.as_deref().map(crate::item::max_links).unwrap_or(0);
@@ -588,10 +600,12 @@ Item Level: 75
     fn reads_advanced_copy() {
         let m = mods(BOOTS);
         assert_eq!(m.len(), 5);
-        assert_eq!(m[0], ModLine { text: "+8% to Cold Resistance".into(), kind: "implicit".into(), tier: None, values: vec![8.0], roll: None });
+        assert_eq!(m[0], ModLine { text: "+8% to Cold Resistance".into(), kind: "implicit".into(), tier: None, values: vec![8.0], roll: None, range: None });
         assert_eq!((m[1].text.as_str(), m[1].tier, m[1].values[0]), ("+28 to maximum Life", Some(7), 28.0));
         assert_eq!(m[3].tier, Some(1));
         assert!(m[1].roll.is_some(), "life has a range: {:?}", m[1]);
+        assert_eq!(m[1].range.as_deref(), Some("25–29"));
+        assert_eq!(range_text("Adds 8(8-12) to 25(18-25) Fire Damage").as_deref(), Some("8–12 / 18–25"));
     }
 
     #[test]

@@ -474,6 +474,20 @@ struct PriceCheck {
     compare: Vec<filter_core::compare::Comparison>,
 }
 
+
+/// Keeps your recent price checks (and their trade results) in the data folder's "samples",
+/// so the price window can be tried out without the game (preview.html). Local only, newest 60.
+fn save_sample(data_dir: &std::path::Path, item: &filter_core::item::Item, suffix: &str, v: &impl Serialize) {
+    let dir = data_dir.join("samples");
+    if std::fs::create_dir_all(&dir).is_err() { return; }
+    let key = filter_core::profiles::slug(&format!("{} {}", item.name.as_deref().unwrap_or(""), item.base_type));
+    let Ok(json) = serde_json::to_string_pretty(v) else { return };
+    let _ = std::fs::write(dir.join(format!("{}{suffix}.json", key.trim_matches('-'))), json);
+    if let Ok(rd) = std::fs::read_dir(&dir) {
+        let mut files: Vec<_> = rd.flatten().filter_map(|e| Some((e.metadata().ok()?.modified().ok()?, e.path()))).collect();
+        if files.len() > 60 { files.sort(); for (_, p) in &files[..files.len() - 60] { let _ = std::fs::remove_file(p); } }
+    }
+}
 fn trade_league(app: &AppHandle) -> (bool, String) {
     let state = app.state::<AppState>();
     let game = active_game(&state);
@@ -534,7 +548,7 @@ fn price_check(app: AppHandle) {
         payload.divine = currency_rates(&app).get("divine").copied();
         // "Is this an upgrade?" against your PoB build's gear in that slot.
         if !state.store.lock().unwrap().settings.price_rolls {
-            if let Some(s) = payload.setup.as_mut() { for f in &mut s.filters { f.roll = None; } }
+            if let Some(s) = payload.setup.as_mut() { for f in &mut s.filters { f.roll = None; f.range = None; } }
         }
         if !payload.from_ground && state.store.lock().unwrap().settings.price_compare {
             if let (Some(setup), Some(pob)) = (payload.setup.as_ref(), pob_load(&state)) {
@@ -557,6 +571,7 @@ fn price_check(app: AppHandle) {
         }
         if let Some(w) = app.get_webview_window("trade") {
             place_near_cursor(&w, 24);
+            if let Some(s) = payload.setup.as_ref() { save_sample(&state.data_dir, &s.item, "", &payload); }
             let _ = w.emit("price-check", payload);
             let _ = w.show();
             let _ = w.set_focus();
@@ -604,8 +619,10 @@ fn trade_search(app: AppHandle, setup: filter_core::trade::TradeSetup) -> Result
     let fetched = trade_api::fetch(poe2, &ids, &id)?;
     let rates = currency_rates(&app);
     let listings = filter_core::trade::listings(&fetched, &rates);
-    Ok(TradeResult { summary: filter_core::trade::summary(&listings), total, url: trade_api::site_url(poe2, &league, &id),
-        divine: rates.get("divine").copied(), listings })
+    let r = TradeResult { summary: filter_core::trade::summary(&listings), total, url: trade_api::site_url(poe2, &league, &id),
+        divine: rates.get("divine").copied(), listings };
+    save_sample(&app.state::<AppState>().data_dir, &setup.item, ".result", &r);
+    Ok(r)
 }
 
 // ---------- saved & live searches ----------

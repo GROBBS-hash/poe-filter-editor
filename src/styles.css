@@ -606,7 +606,6 @@ input[type=range] { accent-color: var(--gold); }
 .tw-label { line-height: 1.25; }
 .tw-kind { margin-left: 6px; font-size: 10.5px; color: var(--muted); }
 .tw-tier { margin-left: 6px; font-size: 10.5px; padding: 0 4px; border-radius: 3px; background: #2b303a; color: var(--muted); }
-.tw-tier.good { background: #3b3212; color: var(--gold); }
 .tw-min { width: 66px; padding: 2px 4px; background: var(--input); color: var(--text); border: 1px solid var(--line); border-radius: 4px; font-size: 12px; }
 .tw-opts { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 6px 0; font-size: 12.5px; color: var(--text-2); }
 .tw-search { margin-left: auto; background: var(--gold); color: #1a1405; border: 0; border-radius: 6px; padding: 5px 12px; font-weight: 700; cursor: pointer; }
@@ -757,9 +756,37 @@ button.link.tw-fract { display: block; margin: 4px 0; color: #c9b27a; }
 body.overlay.scroll { overflow-y: auto; height: 100vh; }
 body.overlay.scroll::-webkit-scrollbar { width: 6px; }
 body.overlay.scroll::-webkit-scrollbar-thumb { background: #3a404c; border-radius: 3px; }
-.tw-roll { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; font-size: 10.5px; color: var(--muted); white-space: nowrap; vertical-align: middle; }
-.tw-roll-bar { display: inline-block; width: 34px; height: 5px; border-radius: 3px; background: #3a404c; overflow: hidden; }
-.tw-roll-bar span { display: block; height: 100%; border-radius: 3px; background: #8a8f99; }
 .tw-roll.hi { color: #8fe0a4; } .tw-roll.hi .tw-roll-bar span { background: #5fc77a; }
 .tw-roll.mid .tw-roll-bar span { background: #c9b27a; }
 .tw-roll.lo { color: #e0a08f; } .tw-roll.lo .tw-roll-bar span { background: #d07a62; }
+/* Price window: the price, big and first. */
+.tw-hero { margin: 6px 0 8px; padding: 10px 12px; border-radius: 10px; background: linear-gradient(135deg, rgba(240,200,90,0.13), rgba(240,200,90,0.04)); border: 1px solid rgba(240,200,90,0.28); }
+.tw-hero.empty { background: rgba(255,255,255,0.04); border-color: var(--line); }
+.tw-hero-main { display: flex; align-items: center; gap: 12px; }
+.tw-hero-price { font-size: 30px; font-weight: 800; line-height: 1.05; color: var(--gold); white-space: nowrap; }
+.tw-hero-price .cur-icon { width: 28px; height: 28px; vertical-align: -5px; margin-left: 3px; }
+.tw-hero-side { display: flex; flex-direction: column; font-size: 12.5px; }
+.tw-hero-label { color: var(--text-2); font-size: 13px; }
+.tw-hero-foot { margin-top: 4px; }
+.tw-hero-foot:empty { display: none; }
+.tw-hero-busy { animation: tw-pulse 1.2s ease-in-out infinite; }
+@keyframes tw-pulse { 50% { opacity: .35; } }
+/* Listings as a table. */
+.tw-table { font-size: 12.5px; margin-bottom: 4px; max-height: 300px; overflow-y: auto; }
+.tw-th, .tw-tr { display: grid; grid-template-columns: 104px 30px 34px 1fr auto; gap: 6px; align-items: center; padding: 3px 2px; }
+.tw-th { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); border-bottom: 1px solid var(--line); position: sticky; top: 0; background: rgba(21,23,28,.98); }
+.tw-tr { border-bottom: 1px solid #22262e; }
+.tw-tr:nth-child(odd) { background: rgba(255,255,255,0.02); }
+.tw-eq { margin-left: 5px; font-size: 11px; font-weight: 400; color: var(--muted); }
+/* Tiers: green (best) through gold to red. */
+.tw-tier.t1 { background: rgba(60,180,90,0.25); color: #8fe0a4; }
+.tw-tier.t2 { background: rgba(140,200,80,0.2); color: #c2e38c; }
+.tw-tier.t3 { background: rgba(201,178,122,0.2); color: #e0c98a; }
+.tw-tier.t45 { background: rgba(217,150,95,0.2); color: #e8ad7d; }
+.tw-tier.t6 { background: rgba(208,122,98,0.2); color: #e89a85; }
+/* Roll: its own line under the mod. */
+.tw-roll { display: flex; align-items: center; gap: 5px; margin-top: 2px; font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+.tw-roll-bar { display: inline-block; width: 40px; height: 5px; border-radius: 3px; background: #3a404c; overflow: hidden; }
+.tw-roll-range { margin-left: 4px; opacity: .85; }
+.tw-roll-bar span { display: block; height: 100%; border-radius: 3px; background: #8a8f99; }
+.tw-roll.mid { color: #e0c98a; }

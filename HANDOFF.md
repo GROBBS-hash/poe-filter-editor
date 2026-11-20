@@ -92,6 +92,15 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Roll bars: `roll_of` in trade.rs reads the advanced copy's "(25-29)" → `StatFilter.roll` 0..1 (within the tier
   for rares, the whole range for uniques), shown as low / mid / high roll. Settings → Price check: `price_compare`
   and `price_rolls` (both on by default).
+- Price window, 20 Nov (3): every Ctrl+D searches trade at once (not only rares). Big price box at the top
+  (`PriceHero`: trade typical price, else exchange / poe.ninja; divines when ≥ 1 div). Listings as a table
+  (price with chaos value for alch etc., ilvl, listed, seller). Tier badges coloured T1 green → T6+ red; roll line
+  shows "T3 range 6–11" (`StatFilter.range`, `range_text` in trade.rs).
+- **Preview page (dev tool):** with the editor running (`npm run tauri dev` serves vite on :1420), open
+  http://localhost:1420/preview.html. It renders the price window in a browser with mocked Tauri calls
+  (`src/preview.tsx`). The app saves every price check and trade result to `%APPDATA%\com.grobbs.poefiltereditor\samples`
+  (newest 60, local only); vite.config.ts serves them to the preview's dropdown. Use it to check layout changes
+  before asking GROBBS to test in game.
 - Wealth page (Endgame → Wealth; `core/src/wealth.rs`, `src-tauri/src/wealth_app.rs`, `src/Wealth.tsx`,
   `src/EarningsWindow.tsx`, window "earnings"): reads the stash via the session API
   (character-window/get-stash-items, Cookie POESESSID, realm pc/poe2, rate-limited as kind "stash", learns
@@ -112,7 +121,8 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] "min: exact / −10% / −20%" buttons change the results, and the picked one stays highlighted.
 - [ ] Your gear's mods in the build box show real numbers, not "(60-80)". (New layout: he said it looks tidier.)
 - [ ] "Search trade" on a tall window (e.g. Duskdawn): prices appear and the window scrolls to them.
-- [ ] Roll bars (low / mid / high roll) on rare and unique mods look right.
+- [ ] Roll bars and "T3 range 6–11" numbers look right; tier badges coloured. (Roll bars confirmed 20 Nov.)
+- [ ] Every Ctrl+D shows a trade price straight away (uniques, corpses, gems too) in the big box at the top.
 - [ ] Settings → Price check: turning off the build comparison / roll bars hides them.
 - [ ] Prices shown in chaos and divines with orb icons; bulk "1 div ≈ N items".
 - [ ] Transfigured gem: searches without "Unknown item base type".

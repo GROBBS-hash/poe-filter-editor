@@ -5,7 +5,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { CurrencyIcon, ItemIcon } from "./icons";
 import { Item, RARITY_COLOUR, itemTitle } from "./types";
 
-type StatFilter = { id: string; label: string; value: number; min: number | null; enabled: boolean; kind: string; tier: number | null; junk?: boolean; roll?: number | null };
+type StatFilter = { id: string; label: string; value: number; min: number | null; enabled: boolean; kind: string; tier: number | null; junk?: boolean; roll?: number | null; range?: string | null };
 type Setup = { item: Item; filters: StatFilter[]; unknown_kinds?: string[]; base_only: boolean; ilvl_min: number | null; links_min: number | null;
   gem_level: number | null; unknown: string[]; category: string | null; raw?: string };
 type MapInfo = { mods: { text: string; warn: string | null }[]; unidentified: boolean; tier: number | null; stats: string[] };
@@ -47,9 +47,8 @@ function Other({ n, cur, divine }: { n: number; cur: string; divine: number | nu
   return null;
 }
 
-/** Whether the trade site is worth asking: poe.ninja already prices currency, cards, etc. */
-const needsTrade = (c: Check) => !!c.setup && !c.bulk && (!c.ninja || ["Rare", "Magic", "Normal", "Gem"].includes(c.setup.item.rarity)
-  || (c.setup.item.rarity === "Unique" && !c.setup.item.name));
+/** Every Ctrl+D searches the trade site straight away (bulk items use the exchange instead). */
+const needsTrade = (c: Check) => !!c.setup && !c.bulk;
 
 type Saved = { id: number; name: string; live: boolean; setup: Setup };
 
@@ -118,15 +117,58 @@ function CompareBlock({ list }: { list: Comparison[] }) {
   );
 }
 
-/** How high a mod rolled: a small bar from its lowest to its highest roll. */
-function Roll({ r, tier }: { r: number; tier: number | null }) {
+/** How high a mod rolled: a small bar from its lowest to its highest roll, and the range itself. */
+function Roll({ r, range, tier }: { r: number; range?: string | null; tier: number | null }) {
   const pct = Math.round(r * 100);
   const cls = pct >= 80 ? "hi" : pct >= 40 ? "mid" : "lo";
   const word = pct >= 80 ? "high roll" : pct >= 40 ? "mid roll" : "low roll";
   return (
     <span className={`tw-roll ${cls}`} title={`${pct}% of the way from the lowest to the highest roll${tier != null ? " for this tier" : ""}`}>
       <span className="tw-roll-bar"><span style={{ width: `${Math.max(4, pct)}%` }} /></span>{word}
+      {range && <span className="tw-roll-range">{tier != null ? `T${tier} range` : "range"} {range}</span>}
     </span>
+  );
+}
+
+/** Tier 1 is the best roll a mod can have: green for top tiers through to red for low ones. */
+const tierClass = (t: number) => (t <= 1 ? "t1" : t === 2 ? "t2" : t === 3 ? "t3" : t <= 5 ? "t45" : "t6");
+
+/** The answer first, big and clear: what this sells for. */
+function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote }: { res: Result | null; bulk: Bulk | null; busy: boolean; err: string;
+  divine: number | null; ninja: [number, string] | null; ninjaNote: string }) {
+  const ninjaChaos = ninja ? (ninja[1] === "divine" && divine ? ninja[0] * divine : ninja[1] === "chaos" ? ninja[0] : null) : null;
+  let main: number | null = null, label = "", sub: React.ReactNode = null;
+  if (res?.summary) {
+    main = res.summary[1]; label = "on trade now";
+    sub = <>cheapest {money(res.summary[0], divine)} · {res.total.toLocaleString()} listed</>;
+  } else if (bulk?.offers[0]) {
+    const o = bulk.offers[0];
+    main = o.pay_currency === "divine" && divine ? o.each * divine : o.each; label = "each, on the exchange";
+    sub = <>{bulk.offers.length} sellers</>;
+  } else if (ninjaChaos != null) {
+    main = ninjaChaos; label = `poe.ninja${ninjaNote}`;
+  }
+  const showDiv = main != null && divine && main >= divine;
+  return (
+    <div className={`tw-hero ${main == null ? "empty" : ""}`}>
+      {main != null ? (
+        <div className="tw-hero-main">
+          <span className="tw-hero-price">{showDiv ? <Price n={main / divine!} cur="divine" /> : <Price n={main} cur="chaos" />}</span>
+          <span className="tw-hero-side">
+            <span className="tw-hero-label">{label}</span>
+            {divine && <span className="muted">{showDiv ? <>= <Price n={main} cur="chaos" /></> : main / divine >= 0.01 ? <>= <Price n={main / divine} cur="divine" /></> : null}</span>}
+          </span>
+        </div>
+      ) : (
+        <div className="tw-hero-main"><span className="tw-hero-label">
+          {busy ? "Checking the trade site…" : res && res.total === 0 ? "None listed like this: untick a stat or two" : res ? `${res.total} listed, none priced` : err ? "No trade price" : "No price yet"}</span></div>
+      )}
+      <div className="tw-hero-foot muted small">
+        {sub}
+        {busy && main != null && <span className="tw-hero-busy"> · checking trade…</span>}
+        {res?.summary && ninjaChaos != null && <span> · poe.ninja {money(ninjaChaos, divine)}</span>}
+      </div>
+    </div>
   );
 }
 
@@ -193,12 +235,6 @@ export default function TradeWindow() {
   const [saving, setSaving] = useState<string | null>(null);
   const [preset, setPreset] = useState<number | null>(0);
   const box = useRef<HTMLDivElement | null>(null);
-  const resBox = useRef<HTMLDivElement | null>(null);
-  // When prices arrive, bring them into view (the window may be scrolled or at full height).
-  useEffect(() => {
-    const t = setTimeout(() => resBox.current?.scrollIntoView({ block: "start", behavior: "smooth" }), 120);
-    return () => clearTimeout(t);
-  }, [res]);
 
   const close = useCallback(() => { setCheck(null); setRes(null); setBulk(null); setAi(null); setErr(""); invoke("hide_trade_window"); }, []);
 
@@ -281,10 +317,9 @@ export default function TradeWindow() {
         </div>
       </div>
 
-      {check.ninja && (
-        <div className="tw-ninja">≈ <b><Price n={check.ninja[0]} cur={check.ninja[1]} /></b> <Other n={check.ninja[0]} cur={check.ninja[1]} divine={divine} />
-          <span className="muted small"> poe.ninja{it.rarity === "Unique" && !it.name ? " (best unique on this base)" : ""}</span></div>
-      )}
+      <PriceHero res={res} bulk={check.bulk ? bulk : null} busy={busy} err={err} divine={divine}
+        ninja={check.ninja} ninjaNote={it.rarity === "Unique" && !it.name ? " (best unique on this base)" : ""} />
+      {err && <div className="qm-warn">{err}</div>}
 
       {check.map && <MapCheck map={check.map} />}
       {check.compare && check.compare.length > 0 && <CompareBlock list={check.compare} />}
@@ -313,8 +348,8 @@ export default function TradeWindow() {
             <label key={f.id + i} className={`tw-stat ${f.enabled ? "on" : ""} ${f.junk ? "junk" : ""}`} title={f.junk ? "Rarely changes the price" : undefined}>
               <input type="checkbox" checked={f.enabled} onChange={(e) => patch(i, { enabled: e.target.checked })} />
               <span className={`tw-label mod-${f.kind}`}>{f.label}{KIND[f.kind] && <span className="tw-kind">{KIND[f.kind]}</span>}
-                {f.tier != null && <span className={`tw-tier ${f.tier <= 2 ? "good" : ""}`}>T{f.tier}</span>}
-                {f.roll != null && <Roll r={f.roll} tier={f.tier} />}</span>
+                {f.tier != null && <span className={`tw-tier ${tierClass(f.tier)}`} title="Tier 1 is the best this mod can roll">T{f.tier}</span>}
+                {f.roll != null && <Roll r={f.roll} range={f.range} tier={f.tier} />}</span>
               <input className="tw-min" type="number" value={f.min ?? ""} placeholder="min" onWheel={(e) => wheel(i, f, e)}
                 onChange={(e) => patch(i, { min: e.target.value === "" ? null : +e.target.value, enabled: true })} />
             </label>
@@ -397,28 +432,24 @@ export default function TradeWindow() {
           {bulk && <button className="link small" onClick={() => invoke("open_url", { url: bulk.url })}>Open on the trade site</button>}
         </div>
       )}
-      {err && <div className="qm-warn">{err}</div>}
-
-      {res && (
-        <div className="tw-res" ref={resBox}>
-          <div className="tw-sec tw-res-sec">Prices on trade</div>
-          <div className="tw-sum">
-            {res.summary ? <>Around <b><Price n={res.summary[1]} cur="chaos" /></b> <Other n={res.summary[1]} cur="chaos" divine={divine} />
-              <span className="muted small"> · cheapest {money(res.summary[0], divine)} · {res.total} listed</span></>
-              : res.total === 0 ? <>None listed like this. Untick a stat or two.</> : <>{res.total} listed</>}
-          </div>
-          <ul className="tw-list">
+      {res && res.listings.length > 0 && (
+        <div className="tw-res">
+          <div className="tw-sec tw-res-sec">Cheapest listed</div>
+          <div className="tw-table">
+            <div className="tw-th"><span>Price</span><span>ilvl</span><span>Listed</span><span>Seller</span><span /></div>
             {res.listings.map((l, i) => (
-              <li key={i}>
-                <span className="tw-price"><Price n={l.amount} cur={l.currency} /></span>
-                <span className="muted small"><Other n={l.amount} cur={l.currency} divine={divine} />{l.ilvl ? ` · ilvl ${l.ilvl}` : ""} · {ago(l.indexed)}</span>
-                <span className="tw-seller muted small">{l.account}</span>
+              <div key={i} className="tw-tr">
+                <span className="tw-price"><Price n={l.amount} cur={l.currency} />
+                  {l.chaos != null && !["chaos", "divine"].includes(l.currency) && <span className="tw-eq">{money(l.chaos, divine)}</span>}</span>
+                <span className="muted">{l.ilvl ?? ""}</span>
+                <span className="muted">{ago(l.indexed)}</span>
+                <span className="tw-seller muted">{l.account}</span>
                 {l.instant ? <span className="tw-instant" title="Instant buyout: buy it straight from the trade site or the in-game market, no whisper">Instant</span>
-                  : l.whisper && <button className="link small" onClick={() => copy(l.whisper, "l" + i)}>
-                  {copied === "l" + i ? "Copied" : "Whisper"}</button>}
-              </li>
+                  : l.whisper ? <button className="link small" onClick={() => copy(l.whisper, "l" + i)}>
+                  {copied === "l" + i ? "Copied" : "Whisper"}</button> : <span />}
+              </div>
             ))}
-          </ul>
+          </div>
           <button className="link small" onClick={() => invoke("open_url", { url: res.url })}>Open on the trade site</button>
         </div>
       )}
