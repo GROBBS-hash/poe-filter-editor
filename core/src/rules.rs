@@ -90,6 +90,11 @@ pub fn quick_rule(item: &Item, action: Action, colour_name: Option<&str>, opts: 
     if !item.base_type.is_empty() {
         conditions.push(format!("BaseType == \"{}\"", item.base_type));
     }
+    // A blighted map's edit only covers blighted maps of that tier, and a plain map's edit leaves blighted ones alone.
+    if item.item_class == "Maps" && item.map_kind_known {
+        conditions.push(format!("BlightedMap {}", if item.blighted { "True" } else { "False" }));
+        if item.uber_blighted { conditions.push("UberBlightedMap True".into()); }
+    }
     if opts.same_rarity && RARITIES.contains(&item.rarity.as_str()) {
         conditions.push(format!("Rarity = {}", item.rarity));
     }
@@ -106,6 +111,7 @@ pub fn quick_rule(item: &Item, action: Action, colour_name: Option<&str>, opts: 
         conditions.push(c.to_string());
     }
     let what = if item.base_type.is_empty() { format!("every {}", item.item_class) } else { item.base_type.clone() };
+    let what = if item.uber_blighted { format!("Blight-ravaged {what}") } else if item.blighted { format!("Blighted {what}") } else { what };
     let mut who = match RARITIES.contains(&item.rarity.as_str()) && opts.same_rarity {
         true => format!("{} {what}", item.rarity),
         false => what,

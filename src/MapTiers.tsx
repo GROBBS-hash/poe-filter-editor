@@ -15,8 +15,10 @@ const MAPS = ["maps"];
 /** Like FilterBlade's map options: from which tier maps show on the floor, a look per band of tiers
  *  (whites / yellows / low reds / high reds), and the special kinds NeverSink handles first.
  *  Everything is saved as tier edits, so it survives NeverSink updates. */
-export default function MapTiers({ profileId, onChange, onOpen }: { profileId: string; onChange: () => void;
-  onOpen: (s: MapSection) => void }) {
+export default function MapTiers({ profileId, onChange, onOpen, focus }: { profileId: string; onChange: () => void;
+  onOpen: (s: MapSection) => void;
+  /** A special map kind to scroll to and make glow ("maps>blighted"), from "Modify this rule". */
+  focus?: string | null }) {
   const [data, setData] = useState<MapData | null>(null);
   const [msg, setMsg] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
@@ -24,6 +26,10 @@ export default function MapTiers({ profileId, onChange, onOpen }: { profileId: s
 
   const load = () => invoke<MapData>("get_map_tiers", { id: profileId }).then(setData).catch((e) => setMsg(String(e)));
   useEffect(() => { load(); }, [profileId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!focus || !data) return;
+    window.setTimeout(() => document.querySelector(`[data-special="${CSS.escape(focus)}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
+  }, [focus, data]);
 
   const change = async (typePath: string[], tiers: string[], patch: { show?: boolean; style?: unknown; reset?: boolean; clear?: boolean }, m: string) => {
     if (tiers.length === 0) return;
@@ -169,7 +175,7 @@ export default function MapTiers({ profileId, onChange, onOpen }: { profileId: s
           const all = s.tiers.every(shown), none = !s.tiers.some(shown);
           const sk = "s:" + s.type_path.join(">");
           return (
-            <div key={s.type_path.join(">")} className={`tier mt-special ${none ? "off" : ""}`}>
+            <div key={s.type_path.join(">")} data-special={s.type_path.join(">")} className={`tier mt-special ${none ? "off" : ""} ${focus === s.type_path.join(">") ? "focus" : ""}`}>
               <div className="tier-head">
                 <label className="tier-name">
                   <input type="checkbox" checked={all} disabled={busy}

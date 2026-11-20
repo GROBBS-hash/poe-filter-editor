@@ -23,6 +23,40 @@ pub struct Item {
     /// 3.30 item tier (1-5), from the ground label or the copied text.
     #[serde(default)]
     pub item_tier: Option<u32>,
+    /// Maps: blighted / blight-ravaged (`BlightedMap` / `UberBlightedMap`), Originator's memory (`ZanaMemory`).
+    #[serde(default)]
+    pub blighted: bool,
+    #[serde(default)]
+    pub uber_blighted: bool,
+    #[serde(default)]
+    pub zana_memory: bool,
+    /// We know the map's special kind (from its name on the label or the copied text), even when read off the screen.
+    #[serde(default)]
+    pub map_kind_known: bool,
+    /// "Shaper", "Elder", "Crusader"… from the copied text's "Shaper Item" lines.
+    #[serde(default)]
+    pub influences: Vec<String>,
+}
+
+/// Map names carry their special kind: "Blighted Map (Tier 3)", "Blight-ravaged Map (Tier 16)".
+/// Takes the prefix off, sets the flags and returns the plain base ("Map (Tier 3)").
+pub fn map_kind(item: &mut Item, name: &str) -> String {
+    let lower = name.to_lowercase();
+    let mut base = name.trim().to_string();
+    for (p, uber) in [("blight-ravaged ", true), ("blight ravaged ", true), ("blighted ", false)] {
+        if let Some(i) = lower.find(p) {
+            base = name[i + p.len()..].trim().to_string();
+            item.blighted = true;
+            item.uber_blighted |= uber;
+            break;
+        }
+    }
+    item.map_kind_known = true;
+    // A magic map's affixes round the base: "Burning Map (Tier 3) of Frenzy" -> "Map (Tier 3)".
+    if let Some(i) = base.to_lowercase().find("map (tier") {
+        if let Some(j) = base[i..].find(')') { base = base[i..i + j + 1].to_string(); }
+    }
+    base
 }
 
 const SEP: &str = "--------";
@@ -57,6 +91,12 @@ pub fn parse_item(text: &str) -> Option<Item> {
         }
         _ => item.base_type = names.last()?.to_string(),
     }
+    if item.item_class == "Maps" {
+        let b = item.base_type.clone();
+        item.base_type = map_kind(&mut item, &b);
+        // Unique and rare maps carry the kind in their base line too.
+        if let Some(n) = item.name.clone() { if n.to_lowercase().contains("blight") { let _ = map_kind(&mut item, &n); } }
+    }
 
     for line in sections.iter().skip(1).flatten() {
         let num = |s: &str| -> Option<u32> {
@@ -76,6 +116,10 @@ pub fn parse_item(text: &str) -> Option<Item> {
             item.memory_strands = num(v);
         } else if let Some(v) = line.strip_prefix("Map Tier: ") {
             item.map_tier = num(v);
+        } else if let Some(inf) = line.strip_suffix(" Item").filter(|i| ["Shaper", "Elder", "Crusader", "Hunter", "Redeemer", "Warlord"].contains(i)) {
+            item.influences.push(inf.to_string());
+        } else if *line == "Originator's Memories" || line.starts_with("Contains memories of") {
+            item.zana_memory = true;
         } else if *line == "Corrupted" {
             item.corrupted = true;
         } else if *line == "Mirrored" {

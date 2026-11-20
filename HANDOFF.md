@@ -272,9 +272,18 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Step 3 "with / without" example labels match what the maps look like in game (colours from NeverSink's
       rules: `MapExtra.border` + `sample_tier`, drawn with the tier's own look).
 - [ ] F2 on a map on the ground: shows "Map (Tier 14)", class Maps, the red tier-14 look and NeverSink's tier 14 map
-      rule (not the pink "anything left over"); "Modify this rule" opens Tiers → Map tiers. Also a blighted map.
-      (`match_base` turns "… MAP (TIER N)" into base "Map (Tier N)"; `ground_item` sets map_tier. Blighted maps
-      still read as plain maps: the item has no blighted flag yet, so NeverSink's blighted rule can't match.)
+      rule (not the pink "anything left over"); "Modify this rule" opens Tiers → Map tiers. (Confirmed 20 Nov.)
+      (`match_base` turns "… MAP (TIER N)" into base "Map (Tier N)"; `ground_item` sets map_tier.)
+- [ ] Special maps, F2 (ground) and Ctrl+C: blighted, blight-ravaged, Valdo, Nightmare, Shaper guardian, Vaal Temple,
+      influenced (Elder / Conqueror, from Ctrl+C) each show NeverSink's own rule for them and its look; "Modify this
+      rule" opens Map tiers with that kind glowing in step 4. Hide/highlight on a blighted map only covers blighted maps.
+      How: Item has `blighted`, `uber_blighted`, `zana_memory`, `influences`, `map_kind_known` (`item::map_kind` strips
+      "Blighted " / "Blight-ravaged " from the name); evaluate checks BlightedMap / UberBlightedMap / ZanaMemory /
+      HasInfluence from them; quick rules on maps add "BlightedMap True/False". Special bases ("Valdo Map"…) come from
+      the filter's own BaseType names, keeping the label's tier. Not verified: the exact label text of these maps in
+      3.30, the Ctrl+C line for Originator's memories (`Originator's Memories` / "Contains memories of" guessed), and
+      unique maps on the ground (read as their base's tier map; the hover box then gives rarity Unique).
+      Editing such an edit again in My edits drops its BlightedMap condition (RuleDetail doesn't carry it).
 
 **Clickable looks (everywhere, 20 Nov)**
 - [ ] Every label preview has a gold outline and "✎ edit look" on hover; clicking opens the look editor for that rule:

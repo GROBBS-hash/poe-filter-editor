@@ -197,8 +197,16 @@ pub fn match_base(text: &str, known: &HashSet<String>) -> Option<GroundMatch> {
     if let Some(n) = tier {
         let w = compact(&without_tier);
         let b = format!("Map (Tier {n})");
-        if w.ends_with("map") && w.len() <= 24 && (known.contains(&b) || base_classes().contains_key(&b)) {
-            return Some(GroundMatch { base: b, stack: None, tier: None, superior: false, unique: None, confidence: 1.0 });
+        if w.ends_with("map") && w.len() <= 24 {
+            // NeverSink's own map bases first ("Valdo Map", "Vaal Temple Map", "Nightmare Map"…): keep the tier.
+            if let Some(special) = known.iter().filter(|k| { let c = compact(k); c.len() > 3 && c.ends_with("map") && !c.contains("blight") && w.ends_with(&c) }).max_by_key(|k| k.len()) {
+                return Some(GroundMatch { base: special.clone(), stack: None, tier: Some(n), superior: false, unique: None, confidence: 1.0 });
+            }
+            if known.contains(&b) || base_classes().contains_key(&b) {
+                // The kind stays on the name ("Blighted Map (Tier 3)"): ground_item turns it into flags.
+                let kind = if w.contains("ravaged") { "Blight-ravaged " } else if w.contains("blight") { "Blighted " } else { "" };
+                return Some(GroundMatch { base: format!("{kind}{b}"), stack: None, tier: None, superior: false, unique: None, confidence: 1.0 });
+            }
         }
     }
     let (stack, rest) = split_stack(&without_tier);
@@ -283,9 +291,17 @@ pub fn known_names(filter_bases: &HashSet<String>) -> HashSet<String> {
 pub fn ground_item(segs: &[Segment], m: &GroundMatch, label: Option<LabelColours>, area_level: u32) -> Item {
     let mut item = Item { base_type: m.base.clone(), stack_size: m.stack, item_tier: m.tier,
         quality: m.superior.then_some(1), ..Default::default() };
+    // Maps: "Blighted Map (Tier 3)" -> base "Map (Tier 3)" + blighted; "Valdo Map" with its tier.
+    let is_map = m.base.contains("Map (Tier ") || (m.base.ends_with(" Map") && m.tier.is_some() && !base_classes().contains_key(&m.base));
+    if is_map {
+        let name = m.base.clone();
+        item.base_type = crate::item::map_kind(&mut item, &name);
+        item.item_class = "Maps".into();
+        item.item_tier = None;
+    }
     fill_class(&mut item);
     if item.item_class == "Maps" {
-        item.map_tier = item.base_type.strip_prefix("Map (Tier ").and_then(|r| r.trim_end_matches(')').parse().ok());
+        item.map_tier = item.base_type.strip_prefix("Map (Tier ").and_then(|r| r.trim_end_matches(')').parse().ok()).or(m.tier);
         // Rarity from the label's colours when the filter draws rarities differently; Normal otherwise.
         item.rarity = "Normal".into();
         if label.is_some() { item.rarity = guess_rarity(segs, &item, label, area_level); }
@@ -408,7 +424,7 @@ mod tests {
         k.insert("Map".into()); // NeverSink also names a plain \"Map\" base
         for (text, n) in [("MAP (TIER 14)", 14), ("Map (Tier 2)", 2), ("BLIGHTED MAP (TIER 3)", 3), ("BLIGHT-RAVAGED MAP (TIER 16)", 16), ("MAP (TIEE 14)", 14)] {
             let m = match_base(text, &k).unwrap_or_else(|| panic!("{text}"));
-            assert_eq!(m.base, format!("Map (Tier {n})"), "{text}");
+            assert!(m.base.ends_with(&format!("Map (Tier {n})")), "{text}: {}", m.base);
             assert_eq!(m.tier, None, "{text}");
         }
         // Read against NeverSink's real filter: tier 14 lands on its tier 14 map rule, not the catch-all.
@@ -419,6 +435,53 @@ mod tests {
         assert_eq!((it.item_class.as_str(), it.map_tier, it.rarity.as_str()), ("Maps", Some(14), "Normal"));
         let v = crate::evaluate::status(&segs, &it, Some(79), true).verdict;
         assert!(v.decided_by.contains("maps_a_t14") || v.decided_by.contains("Tier 14"), "{}", v.decided_by);
+    }
+
+    #[test]
+    fn special_maps_land_on_their_own_rules() {
+        let f = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/poe1-semistrict.filter")).unwrap();
+        let segs = parse_filter(&f);
+        let k = known_names(&crate::rules::known_bases(&segs));
+        let rule = |text: &str| {
+            let m = match_base(text, &k).unwrap_or_else(|| panic!("{text}"));
+            let it = ground_item(&segs, &m, None, 79);
+            assert_eq!(it.item_class, "Maps", "{text}");
+            let v = crate::evaluate::status(&segs, &it, Some(79), true).verdict;
+            (it, v.decided_by)
+        };
+        let (it, by) = rule("BLIGHTED MAP (TIER 3)");
+        assert!(it.blighted && !it.uber_blighted && it.base_type == "Map (Tier 3)" && it.map_tier == Some(3));
+        assert!(by.contains("blighted"), "{by}");
+        let (it, by) = rule("BLIGHT-RAVAGED MAP (TIER 16)");
+        assert!(it.uber_blighted, "{it:?}");
+        assert!(by.contains("blighted") && by.contains("uber"), "{by}");
+        let (_, by) = rule("VALDO MAP (TIER 16)");
+        assert!(by.contains("valdomaps"), "{by}");
+        let (_, by) = rule("VAAL TEMPLE MAP (TIER 16)");
+        assert!(by.contains("vaaltemple"), "{by}");
+        let (_, by) = rule("NIGHTMARE MAP (TIER 16)");
+        assert!(by.contains("nightmaremaps"), "{by}");
+        // A plain map still lands on its tier rule.
+        let (it, by) = rule("MAP (TIER 9)");
+        assert!(!it.blighted && by.contains("maps_c_t9"), "{by}");
+    }
+
+    #[test]
+    fn copied_special_maps() {
+        let f = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/poe1-semistrict.filter")).unwrap();
+        let segs = parse_filter(&f);
+        let by = |t: &str| { let it = crate::item::parse_item(t).unwrap(); (crate::evaluate::status(&segs, &it, Some(79), false).verdict.decided_by, it) };
+        let (b, it) = by("Item Class: Maps\nRarity: Normal\nBlighted Map (Tier 5)\n--------\nMap Tier: 5\n--------\nItem Level: 72\n");
+        assert_eq!(it.base_type, "Map (Tier 5)");
+        assert!(b.contains("blighted"), "{b}");
+        let (b, it) = by("Item Class: Maps\nRarity: Magic\nBurning Blight-ravaged Map (Tier 16) of Frenzy\n--------\nMap Tier: 16\n--------\nItem Level: 83\n");
+        assert_eq!((it.base_type.as_str(), it.uber_blighted), ("Map (Tier 16)", true));
+        assert!(b.contains("uber"), "{b}");
+        let (b, it) = by("Item Class: Maps\nRarity: Rare\nDread Dirge\nMap (Tier 16)\n--------\nMap Tier: 16\n--------\nItem Level: 83\n--------\nElder Item\n");
+        assert_eq!(it.influences, ["Elder"]);
+        assert!(b.contains("infelder"), "{b}");
+        let (b, _) = by("Item Class: Maps\nRarity: Normal\nMap (Tier 12)\n--------\nMap Tier: 12\n--------\nItem Level: 79\n");
+        assert!(b.contains("maps_b_t12"), "{b}");
     }
 
     #[test]

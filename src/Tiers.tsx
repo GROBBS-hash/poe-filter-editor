@@ -70,6 +70,7 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
   const [over, setOver] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
   const [focusTier, setFocusTier] = useState<string | null>(null);
+  const [mapFocus, setMapFocus] = useState<string | null>(null);
   // One of NeverSink's rules that isn't a tier list, opened from "Modify rule".
   const [extra, setExtra] = useState<Section | null>(null);
   const extraKey = extra?.type_path.join(">") ?? "";
@@ -77,7 +78,13 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
   useEffect(() => {
     if (!focus || sections.length === 0) return;
     // NeverSink's plain map tier rule: the Map tiers panel explains it far better than its raw rows.
-    if (focus.type_path.length === 1 && focus.type_path[0] === "maps") { setSel(MAPS_KEY); setQ(""); setEditing(null); return; }
+    // Special maps (blighted, Valdo…) too: the panel's step 4 row glows.
+    if (focus.type_path[0] === "maps") {
+      setSel(MAPS_KEY); setQ(""); setEditing(null);
+      setMapFocus(focus.type_path.length > 1 ? focus.type_path.join(">") : null);
+      window.setTimeout(() => setMapFocus(null), 3500);
+      return;
+    }
     const k = focus.type_path.join(">");
     const glow = () => {
       setSel(k); setQ(""); setEditing(null); setFocusTier(focus.tier);
@@ -191,7 +198,7 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
 
       <div className="tiers-main">
         {sel === MAPS_KEY ? (
-          <MapTiers profileId={profile.id} onChange={onChange}
+          <MapTiers profileId={profile.id} onChange={onChange} focus={mapFocus}
             onOpen={(s: MapSection) => { setExtra({ ...s, group: "Opened rule" }); setSel(s.type_path.join(">")); setEditing(null); }} />
         ) : !section ? <div className="empty">No tier lists found in this filter.</div> : (
           <div className="card">
