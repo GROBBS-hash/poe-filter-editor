@@ -310,7 +310,8 @@ pub fn mods(text: &str) -> Vec<ModLine> {
         }
         for l in &joined {
             // The advanced copy marks fixed numbers: "Has 1 Abyssal Socket — Unscalable Value".
-            let l = l.replace(" — Unscalable Value", "");
+            // ...and puts an invisible zero-width space before granted skills ("Grants Level 20 <here>Aspect of the Spider").
+            let l = l.replace(" — Unscalable Value", "").replace('\u{200b}', "");
             let l = l.as_str();
             if l.starts_with('{') {
                 // { Prefix Modifier "Hale" (Tier: 7) — Life }

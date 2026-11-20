@@ -414,7 +414,8 @@ export default function TradeWindow() {
   // Maps: priced by tier and rarity; their mods are behind a link.
   const showStats = !check.map || mapMods;
   // Maps: their drop bonuses (quantity, atlas drops, pack size…) always; the map mods behind a link.
-  const shown = (x: StatFilter) => showStats || x.kind === "property" || x.kind === "pseudo";
+  // "As a base": only the rows the base search uses (the rest come back on "This item").
+  const shown = (x: StatFilter) => (!asBase || !!setup.base_item?.ids.includes(x.id)) && (showStats || x.kind === "property" || x.kind === "pseudo");
   const mapModCount = setup.filters.filter((x) => !(x.kind === "property" || x.kind === "pseudo")).length;
   const patch = (i: number, p: Partial<StatFilter>) => { if ("min" in p) setPreset(null); return setSetup({ ...setup, filters: setup.filters.map((f, j) => (j === i ? { ...f, ...p } : f)) }); };
   const divine = res?.divine ?? bulk?.divine ?? check?.divine ?? null;
@@ -530,7 +531,7 @@ export default function TradeWindow() {
           })}
         </div>
       )}
-      {setup.unknown.length > 0 && showStats && (
+      {setup.unknown.length > 0 && showStats && !asBase && (
         <div className="tw-unknown">
           {setup.unknown.map((u, i) => {
             const k = setup.unknown_kinds?.[i] ?? "explicit";

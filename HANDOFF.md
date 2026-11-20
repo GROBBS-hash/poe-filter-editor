@@ -312,7 +312,9 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   tab swaps in the base search's ticks (your own search is kept for switching back) and shows "Searching for: Stygian
   Vise · item level 85+ · Fractured · +47 to maximum Energy Shield"; no auto search. Fractured / synthesised items get it
   even with a crafted mod or 20% quality (Awakened wouldn't; his fractured Woe Buckle / Entropy Grasp had crafts).
-  " — Unscalable Value" is cut off copied lines ("Has 1 Abyssal Socket" was "not searchable"). Preview hook:
+  The base tab shows only the rows the base search uses (unknown mods hidden too); "This item" shows them all again.
+  " — Unscalable Value" and the zero-width space before granted skills ("Grants Level 20 ​Aspect of the Spider")
+  are cut off copied lines (both were "not searchable"). Preview hook:
   `window.previewCheck(check)` on preview.html; `BASE_SETUP=<sample name>` on basecheck prints that sample's setup.
   Live 21 Nov on his saved checks: velour boots 2015, magic dagger 121, magic burgonet 1947. Dev check:
   `cargo run -p filter-core --example basecheck -- <data dir>/trade_stats_poe1.json <data dir>/samples`.

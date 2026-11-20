@@ -547,6 +547,8 @@ Fractured Item
         let b = setup(belt, &idx()).unwrap().base_item.expect("fractured: still a base");
         assert_eq!((b.ids.clone(), b.ilvl_min), (vec!["fractured.ms".to_string()], Some(85)));
         assert_eq!(crate::trade::mods(belt)[0].text, "Has 1 Abyssal Socket");
+        assert_eq!(crate::trade::mods("Item Level: 86\n--------\nGrants Level 20 \u{200b}Aspect of the Spider — Unscalable Value\n")[0].text,
+            "Grants Level 20 Aspect of the Spider");
         let plain = "Item Class: Boots\nRarity: Rare\nX\nTwo-Toned Boots\n--------\nItem Level: 70\n--------\n+40 to maximum Life\n";
         assert!(setup(plain, &idx()).unwrap().base_item.is_none());
     }
