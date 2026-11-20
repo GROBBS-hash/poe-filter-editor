@@ -364,7 +364,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
       show with prices at the bottom of the window.
 - [ ] Save search, Saved searches list (Run / Live / delete); a live search pops up new listings with a Whisper button.
 
-- [ ] Build window (F6) / My build: gold "Buy" opens the trade site in your browser with the item's mods filled in, and
+- [x] (Confirmed 21 Nov.) Build window (F6) / My build: gold "Buy" opens the trade site in your browser with the item's mods filled in, and
       says how many are for sale ("any 3 of 4 mods" when it had to loosen). Try a rare, a cluster jewel, Watcher's Eye.
 - [ ] Ctrl+D on a cluster jewel in game finds listings (it searched the wrong category before 21 Nov).
 - [ ] Build window (F6) / My build: "Price" on a gear item, flask or jewel, or a click on a gem, opens the price window for it
