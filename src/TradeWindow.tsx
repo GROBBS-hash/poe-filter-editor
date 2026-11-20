@@ -244,6 +244,7 @@ export default function TradeWindow() {
   const [mapMods, setMapMods] = useState(false);
   const [reporting, setReporting] = useState<string | null>(null);
   const [reported, setReported] = useState("");
+  const [hasSide, setHasSide] = useState(false);
   const box = useRef<HTMLDivElement | null>(null);
 
   const close = useCallback(() => { setCheck(null); setRes(null); setBulk(null); setAi(null); setErr(""); invoke("hide_trade_window"); }, []);
@@ -286,7 +287,9 @@ export default function TradeWindow() {
       const h = Math.ceil(box.current?.getBoundingClientRect().height ?? 300) + 4;
       // As tall as the screen allows; past that the window scrolls.
       const cap = Math.max(400, (window.screen.availHeight || 900) - 40);
-      getCurrentWindow().setSize(new LogicalSize(380, Math.max(100, Math.min(cap, h)))).then(() => invoke("keep_on_screen")).catch(() => {});
+      // Wider when the related-items panel sits beside the prices.
+      const w = Math.ceil(box.current?.getBoundingClientRect().width ?? 370) + 10;
+      getCurrentWindow().setSize(new LogicalSize(Math.max(380, w), Math.max(100, Math.min(cap, h)))).then(() => invoke("keep_on_screen")).catch(() => {});
     });
     ro.observe(box.current);
     return () => ro.disconnect();
@@ -308,6 +311,8 @@ export default function TradeWindow() {
   if (!setup) return <div className="qm tw" ref={box}><div className="qm-fail">{err || "Nothing to price."}</div>{savedBlock}</div>;
 
   const it = setup.item;
+  // Awakened-style side panel: a fragment's set or parts, lifeforce types, what a boss drops (shown when there are any).
+  const relName = (it.rarity === "Unique" ? it.name : it.base_type) || null;
   // Maps: priced by tier and rarity; their mods are behind a link.
   const showStats = !check.map || mapMods;
   // Maps: their drop bonuses (quantity, atlas drops, pack size…) always; the map mods behind a link.
@@ -323,7 +328,8 @@ export default function TradeWindow() {
   };
 
   return (
-    <div className="qm tw" ref={box}>
+    <div className="tw-wrap" ref={box}>
+    <div className="qm tw">
       <div className="qm-head with-icon">
         <ItemIcon name={it.rarity === "Unique" ? it.name : null} base={it.base_type || null} size={36} />
         <div className="qm-head-text">
@@ -479,8 +485,6 @@ export default function TradeWindow() {
           <button className="link small" onClick={() => invoke("open_url", { url: res.url })}>Open on the trade site</button>
         </div>
       )}
-      {/* Awakened-style: a fragment's set / parts and what the boss drops. Below the prices: extra info. */}
-      {(it.rarity === "Unique" ? it.name : it.base_type) && <RelatedItems name={(it.rarity === "Unique" ? it.name : it.base_type)!} divine={divine} />}
       {!check.bulk && savedBlock}
       {reporting == null ? (
         <button className="link small tw-report-toggle" onClick={() => { setReporting(""); setReported(""); }}
@@ -496,6 +500,12 @@ export default function TradeWindow() {
             <button type="button" className="link small" onClick={() => setReporting(null)}>Cancel</button></div>
         </form>
       )}
+    </div>
+    {relName && (
+      <aside className="qm tw-side" hidden={!hasSide}>
+        <RelatedItems name={relName} divine={divine} onData={setHasSide} />
+      </aside>
+    )}
     </div>
   );
 }

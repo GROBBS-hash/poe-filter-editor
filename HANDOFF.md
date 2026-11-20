@@ -152,6 +152,8 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   boss's drops with poe.ninja prices, dearest first. Data `core/data/related_items.json` from Awakened PoE Trade's
   item-drop.json (MIT), rebuilt with `node tools/build_related_items.mjs`; core `related.rs`, command
   `related_items`, `src/RelatedItems.tsx`. Preview page has "Fragment: …" examples using the real price file.
+  20 Nov: merged into main; the panel now sits beside the price window (`.tw-wrap` / `.tw-side`, window widens to fit),
+  e.g. lifeforce shows all four types + "Harvest can make". Price text and orb icons in the window are a bit bigger.
 
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
@@ -167,6 +169,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Every Ctrl+D shows a trade price straight away (uniques, corpses, gems too) in the big box at the top.
       (Confirmed 20 Nov for a unique, a unique belt and a gem.)
 - [ ] Fractured item: "Price as base · ilvl 73–74" gives sensible prices (fractured-only search confirmed 20 Nov).
+- [ ] Related items panel beside the price window: lifeforce, fragments, invitations, boss keys.
 - [ ] New Clean glass look: opens bigger and remembers its size; pages fade in; Wealth tiles look right; nothing broken on other pages.
 - [ ] Unidentified unique (e.g. Karui Sceptre): no false tier 1 / divine sound; the "Could be one of N uniques" list shows in F2 and Ctrl+D.
 - [ ] Jewel "Open prefix/suffix" never says more than 2 free; reduced-mod rolls (curse effect) show the right high/low.

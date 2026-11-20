@@ -135,7 +135,7 @@ const css = document.createElement("style");
 css.textContent = `
   body.main { background: #0d0f13 radial-gradient(circle at 70% 30%, #2a2116, #0d0f13 70%); min-height: 100vh; }
   .pv-controls { display: flex; gap: 10px; align-items: center; padding: 10px 16px; color: #ddd; font: 13px system-ui; }
-  .pv-frame { margin: 8px 16px; width: 380px; max-height: calc(100vh - 70px); overflow-y: auto; }
+  .pv-frame { margin: 8px 16px; width: max-content; max-width: calc(100vw - 32px); max-height: calc(100vh - 70px); overflow: auto; }
 `;
 document.head.appendChild(css);
 

@@ -24,13 +24,14 @@ function Row({ p, divine, label }: { p: Priced; divine?: number | null; label?: 
 
 /** Awakened-style "related items": for a fragment, invitation or boss key, the rest of its set (or the parts it's
  *  made from) with the total, and what the boss drops, most valuable first. Prices from poe.ninja. */
-export default function RelatedItems({ name, divine }: { name: string; divine?: number | null }) {
+export default function RelatedItems({ name, divine, onData }: { name: string; divine?: number | null; onData?: (has: boolean) => void }) {
   const [r, setR] = useState<Related | null>(null);
   const [all, setAll] = useState(false);
   useEffect(() => {
     let live = true;
     setAll(false);
-    invoke<Related | null>("related_items", { name }).then((x) => live && setR(x ?? null)).catch(() => live && setR(null));
+    invoke<Related | null>("related_items", { name }).then((x) => { if (live) { setR(x ?? null); onData?.(!!x); } })
+      .catch(() => { if (live) { setR(null); onData?.(false); } });
     return () => { live = false; };
   }, [name]);
   if (!r) return null;
@@ -73,7 +74,8 @@ export default function RelatedItems({ name, divine }: { name: string; divine?: 
       )}
       {r.drops.length > 0 && (
         <>
-          <div className="bu-title">{r.group.some((p) => p.name.includes(" Piece of ")) ? "Combines into" : "Drops"}</div>
+          <div className="bu-title">{r.group.some((p) => p.name.includes(" Piece of ")) ? "Combines into"
+            : r.group.some((p) => p.name.includes("Lifeforce")) ? "Harvest can make" : "Drops"}</div>
           <ul>{drops.map((p) => <Row key={p.name} p={p} divine={divine} />)}</ul>
           {r.drops.length > 10 && <button className="link small" onClick={() => setAll(!all)}>{all ? "Show fewer" : `Show all ${r.drops.length}`}</button>}
         </>
