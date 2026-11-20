@@ -112,6 +112,8 @@ function Controls() {
     }
     emit("price-check", current.check);
   };
+  // Dev hook: show any check from the browser console / a test script (e.g. one with a base_item).
+  (window as unknown as { previewCheck: (c: unknown) => void }).previewCheck = (c) => { current = { check: c as typeof current.check, result: null }; emit("price-check", c); };
   useEffect(() => {
     // Prices and icons first, so the first window drawn already has them.
     Promise.all([

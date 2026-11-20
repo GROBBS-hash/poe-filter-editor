@@ -9,7 +9,7 @@ import { Item, RARITY_COLOUR, itemTitle } from "./types";
 
 type StatFilter = { id: string; label: string; value: number; min: number | null; enabled: boolean; kind: string; tier: number | null; junk?: boolean; roll?: number | null; range?: string | null; affix?: string | null };
 type Setup = { item: Item; filters: StatFilter[]; unknown_kinds?: string[]; base_only: boolean; ilvl_min: number | null; ilvl_max?: number | null; links_min: number | null;
-  gem_level: number | null; unknown: string[]; category: string | null; raw?: string; misc?: string[];
+  gem_level: number | null; unknown: string[]; category: string | null; raw?: string; misc?: string[]; base?: string;
   /** Awakened-style "search as a base": why it's a crafting base, which mods to keep, item level, influences. */
   base_item?: { why: string[]; ids: string[]; ilvl_min: number | null; misc: string[] } | null };
 type MapInfo = { mods: { text: string; warn: string | null }[]; unidentified: boolean; tier: number | null; stats: string[] };
@@ -320,6 +320,9 @@ export default function TradeWindow() {
   const [showSaved, setShowSaved] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
   const [preset, setPreset] = useState<number | null>(0);
+  // Awakened-style tabs: price this item, or price it as a crafting base. Your own search is kept while you look.
+  const [asBase, setAsBase] = useState(false);
+  const [ownSetup, setOwnSetup] = useState<Setup | null>(null);
   const [mapMods, setMapMods] = useState(false);
   const [reporting, setReporting] = useState<string | null>(null);
   const [reported, setReported] = useState("");
@@ -355,7 +358,7 @@ export default function TradeWindow() {
     const a = listen<Check>("price-check", (e) => {
       const c = e.payload;
       setCheck(c); setSetup(c.setup); setRes(null); setSearched(null); setBulk(null); setAi(null); setErr(c.error ?? ""); setCopied(null); setPay("chaos"); setMinStock(false); setShowFixers(false);
-      setSaving(null); setShowSaved(!c.setup); setPreset(null); setMapMods(false); setReporting(null); setReported(""); window.scrollTo(0, 0);
+      setSaving(null); setShowSaved(!c.setup); setPreset(null); setMapMods(false); setReporting(null); setReported(""); setAsBase(false); setOwnSetup(null); window.scrollTo(0, 0);
       invoke<Saved[]>("saved_list").then(setSaved).catch(() => {});
       if (c.bulk) {
         // Worth half a divine or more: sellers mostly take divines, so ask for those first.
@@ -458,6 +461,32 @@ export default function TradeWindow() {
         <button className="link small tw-mapmods" onClick={() => setMapMods(!mapMods)}>
           {mapMods ? "▾" : "▸"} Search by map mods too ({mapModCount})</button>
       )}
+      {setup.base_item && (() => {
+        const b = setup.base_item;
+        const pick = (base: boolean) => {
+          if (base === asBase) return;
+          if (base) {
+            setOwnSetup(setup);
+            setSetup({ ...setup, base_only: true, ilvl_min: b.ilvl_min, ilvl_max: null, misc: b.misc,
+              filters: setup.filters.map((f) => ({ ...f, enabled: b.ids.includes(f.id), min: b.ids.includes(f.id) ? f.value : f.min })) });
+          } else if (ownSetup) setSetup(ownSetup);
+          setPreset(null); setAsBase(base);
+        };
+        return (
+          <div className="tw-tabs" title={"Awakened PoE Trade's two searches: this item with its stats, or what it's worth as a base to craft on (" + b.why.join(", ") + ")"}>
+            <button className={asBase ? "" : "on"} onClick={() => pick(false)}>This item</button>
+            <button className={asBase ? "on" : ""} onClick={() => pick(true)}>As a base <span className="tw-tab-why">{b.why.join(" · ")}</span></button>
+          </div>
+        );
+      })()}
+      {asBase && (
+        <div className="tw-base-sum">
+          <b>Searching for:</b> {[setup.base || it.base_type, setup.ilvl_min ? `item level ${setup.ilvl_min}+` : null,
+            ...(setup.misc ?? []).map((m) => m.replace("_item", "").replace(/^./, (c) => c.toUpperCase())),
+            ...setup.filters.filter((f) => f.enabled).map((f) => f.label)].filter(Boolean).join(" · ")}
+          {!setup.filters.some((f) => f.enabled) && <span className="muted"> (no mods: just the base)</span>}
+        </div>
+      )}
       {setup.filters.some(shown) && (
         <div className="tw-range">
           <span className="tw-sec">Search for</span>
@@ -501,22 +530,6 @@ export default function TradeWindow() {
           })}
         </div>
       )}
-      {setup.base_item && (() => {
-        const b = setup.base_item;
-        const kept = setup.filters.filter((f) => b.ids.includes(f.id)).map((f) => f.label);
-        return (
-          <div className="tw-fract" title={"Prices it as a crafting base, like Awakened PoE Trade: the same base" +
-            (b.ilvl_min ? `, item level ${b.ilvl_min}+` : "") + (b.misc.length ? ", same influence / fractured / synthesised" : "") +
-            (kept.length ? `, and only: ${kept.join("; ")}` : ", no mods")}>
-            <span className="tw-fract-tag">{b.why.join(" · ")}</span>
-            <button onClick={() => {
-                const s = { ...setup, base_only: true, ilvl_min: b.ilvl_min, ilvl_max: null, misc: b.misc,
-                  filters: setup.filters.map((f) => ({ ...f, enabled: b.ids.includes(f.id) })) };
-                setPreset(null); setSetup(s); run(s); }}>
-              Search as a base{b.ilvl_min ? ` · ilvl ${b.ilvl_min}+` : ""}{kept.length ? ` · ${kept.length} mod${kept.length > 1 ? "s" : ""}` : ""}</button>
-          </div>
-        );
-      })()}
       {setup.unknown.length > 0 && showStats && (
         <div className="tw-unknown">
           {setup.unknown.map((u, i) => {
@@ -529,7 +542,7 @@ export default function TradeWindow() {
 
       {!check.bulk && <div className="tw-opts">
         {setup.category && it.rarity !== "Unique" && (
-          <label><input type="checkbox" checked={setup.base_only} onChange={(e) => setSetup({ ...setup, base_only: e.target.checked })} /> {it.base_type} only</label>
+          <label><input type="checkbox" checked={setup.base_only} onChange={(e) => setSetup({ ...setup, base_only: e.target.checked })} /> {setup.base || it.base_type} only</label>
         )}
         {it.item_level != null && it.rarity !== "Unique" && setup.category && (
           <label title="Bases in the same item-level band: better mod tiers unlock at 75, 82, 84 and 86"><input type="checkbox" checked={setup.ilvl_min != null}

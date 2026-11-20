@@ -529,6 +529,24 @@ mod base_item_tests {
         // Finished items (a crafted mod) and ordinary low-level rares: no base search.
         let crafted = "Item Class: Boots\nRarity: Rare\nX\nTwo-Toned Boots\n--------\nItem Level: 85\n--------\n+40 to maximum Life\n+30% to Fire Resistance (crafted)\n";
         assert!(setup(crafted, &idx()).unwrap().base_item.is_none());
+        // A fractured item with a crafted mod (his Woe Buckle) is still a base: crafted mods come off.
+        let belt = "Item Class: Belts
+Rarity: Rare
+Woe Buckle
+Stygian Vise
+--------
+Item Level: 85
+--------
+            Has 1 Abyssal Socket — Unscalable Value (implicit)
+--------
+30% increased Movement Speed (fractured)
++30% to Fire Resistance (crafted)
+--------
+Fractured Item
+";
+        let b = setup(belt, &idx()).unwrap().base_item.expect("fractured: still a base");
+        assert_eq!((b.ids.clone(), b.ilvl_min), (vec!["fractured.ms".to_string()], Some(85)));
+        assert_eq!(crate::trade::mods(belt)[0].text, "Has 1 Abyssal Socket");
         let plain = "Item Class: Boots\nRarity: Rare\nX\nTwo-Toned Boots\n--------\nItem Level: 70\n--------\n+40 to maximum Life\n";
         assert!(setup(plain, &idx()).unwrap().base_item.is_none());
     }

@@ -541,7 +541,7 @@ fn price_check(app: AppHandle) {
                     let item = p.item;
                     let category = filter_core::trade::category(&item.item_class).map(|c| if item.base_type.ends_with("Cluster Jewel") { "jewel.cluster" } else { c }).map(String::from);
                     let s = filter_core::trade::TradeSetup { item: item.clone(), filters: vec![], base_only: true, ilvl_min: None, ilvl_max: None,
-                        links_min: None, gem_level: None, unknown: vec![], unknown_kinds: vec![], category, raw: String::new(), misc: vec![], base_item: None };
+                        links_min: None, gem_level: None, unknown: vec![], unknown_kinds: vec![], category, raw: String::new(), misc: vec![], base: String::new(), base_item: None };
                     PriceCheck { ninja: ninja_price(&app, &item), setup: Some(s), league, from_ground: true, error: None, bulk: None, map: None, divine: None, compare: vec![], instant_all: false }
                 }
                 Err(e) => PriceCheck { setup: None, ninja: None, league, from_ground: true, error: Some(e), bulk: None, map: None, divine: None, compare: vec![], instant_all: false },

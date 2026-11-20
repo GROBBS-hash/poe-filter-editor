@@ -86,6 +86,9 @@ pub struct TradeSetup {
     /// Extra "yes" switches for the search's misc filters ("shaper_item", "synthesised_item"…).
     #[serde(default)]
     pub misc: Vec<String>,
+    /// The base as the trade site knows it ("Eternal Burgonet" for "Fecund Eternal Burgonet of the Genius").
+    #[serde(default)]
+    pub base: String,
     /// Awakened's "base item" search, when this looks like a crafting base rather than a finished item.
     #[serde(default)]
     pub base_item: Option<BaseItem>,
@@ -306,6 +309,8 @@ pub fn mods(text: &str) -> Vec<ModLine> {
             }
         }
         for l in &joined {
+            // The advanced copy marks fixed numbers: "Has 1 Abyssal Socket — Unscalable Value".
+            let l = l.replace(" — Unscalable Value", "");
             let l = l.as_str();
             if l.starts_with('{') {
                 // { Prefix Modifier "Hale" (Tier: 7) — Life }
@@ -428,6 +433,7 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
     let nothing_picked = !filters.iter().any(|f| f.enabled);
     let gear = category(&item.item_class).is_some();
     let base_item = base_item(text, &item, &lines, &filters);
+    let base = plain_base(&item);
     Some(TradeSetup {
         category: category(&item.item_class).map(|c| if item.base_type.ends_with("Cluster Jewel") { "jewel.cluster" } else { c }).map(String::from),
         base_only: !matches!(item.rarity.as_str(), "Rare" | "Magic") || !gear || nothing_picked,
@@ -435,7 +441,7 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
         ilvl_max: (gear && nothing_picked && item.rarity != "Unique").then_some(item.item_level).flatten().and_then(|l| ilvl_band(l).1),
         links_min: (links >= 5).then_some(links),
         gem_level,
-        filters, unknown, unknown_kinds, item, raw: text.to_string(), misc: vec![], base_item,
+        filters, unknown, unknown_kinds, item, raw: text.to_string(), misc: vec![], base, base_item,
     })
 }
 
@@ -449,12 +455,15 @@ fn base_item(text: &str, item: &Item, lines: &[ModLine], filters: &[StatFilter])
     let has_line = |l: &str| text.lines().any(|x| x.trim() == l);
     let magic = item.rarity == "Magic";
     if !(magic || item.rarity == "Rare") || item.unidentified || cat == "flask" { return None; }
-    let finished = lines.iter().any(|m| m.kind == "crafted") || item.quality == Some(20) || item.corrupted || item.mirrored;
-    if finished { return None; }
-    let cluster = item.base_type.ends_with("Cluster Jewel");
-    let jewel = cat.starts_with("jewel.");
     let fractured = has_line("Fractured Item") || lines.iter().any(|m| m.kind == "fractured");
     let synthesised = has_line("Synthesised Item");
+    if item.corrupted || item.mirrored { return None; }
+    // Awakened counts a crafted mod or exactly 20% quality as "finished"; a fractured or synthesised item is still a
+    // base (crafted mods come off), so those always get the base search.
+    let finished = lines.iter().any(|m| m.kind == "crafted") || item.quality == Some(20);
+    if finished && !fractured && !synthesised { return None; }
+    let cluster = item.base_type.ends_with("Cluster Jewel");
+    let jewel = cat.starts_with("jewel.");
     let ilvl = item.item_level.unwrap_or(0);
     let mut why: Vec<String> = Vec::new();
     if fractured { why.push("Fractured".into()); }

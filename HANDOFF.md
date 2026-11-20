@@ -307,7 +307,13 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Keeps fractured mods + enchants, implicits when not influenced/fractured, magic items' tier 1-2 mods; same base,
   item level min(ilvl, 86)+ (cluster jewels by bracket 1/50/68/75/84, other jewels none), influence / fractured /
   synthesised switches (`TradeSetup.misc` -> misc_filters). Replaces the old fractured-only box ("Fractured · Price as
-  base"); the box names why ("Fractured · Hunter", "Item level 84"). Magic items search their real base (`plain_base`).
+  base"). Magic items search their real base (`plain_base`, also `TradeSetup.base` for the "<base> only" label).
+  21 Nov (2), after his feedback: Awakened-style tabs "This item" / "As a base <why>" at the top of the stats; the base
+  tab swaps in the base search's ticks (your own search is kept for switching back) and shows "Searching for: Stygian
+  Vise · item level 85+ · Fractured · +47 to maximum Energy Shield"; no auto search. Fractured / synthesised items get it
+  even with a crafted mod or 20% quality (Awakened wouldn't; his fractured Woe Buckle / Entropy Grasp had crafts).
+  " — Unscalable Value" is cut off copied lines ("Has 1 Abyssal Socket" was "not searchable"). Preview hook:
+  `window.previewCheck(check)` on preview.html; `BASE_SETUP=<sample name>` on basecheck prints that sample's setup.
   Live 21 Nov on his saved checks: velour boots 2015, magic dagger 121, magic burgonet 1947. Dev check:
   `cargo run -p filter-core --example basecheck -- <data dir>/trade_stats_poe1.json <data dir>/samples`.
 
@@ -346,7 +352,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Roll bars and "T3 range 6–11" numbers look right; tier badges coloured. (Roll bars confirmed 20 Nov.)
 - [ ] Every Ctrl+D shows a trade price straight away (uniques, corpses, gems too) in the big box at the top.
       (Confirmed 20 Nov for a unique, a unique belt and a gem.)
-- [ ] "Search as a base" box (Awakened-style): shows on fractured / influenced / synthesised items, magic jewels, cluster
+- [ ] "This item / As a base" tabs (Awakened-style): "As a base" shows on fractured / influenced / synthesised items, magic jewels, cluster
       jewels and unfinished gear of item level 82+, says why, and the prices look like Awakened's base search. Not on
       finished items (crafted mod, 20% quality, corrupted). Magic items keep only their tier 1-2 mods.
 - [x] Price window rows read in game order (confirmed 20 Nov).
@@ -379,7 +385,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
       show with prices at the bottom of the window.
 - [ ] Save search, Saved searches list (Run / Live / delete); a live search pops up new listings with a Whisper button.
 
-- [ ] (Uniques/jewels confirmed 21 Nov; rares fixed after.) Build window (F6) / My build: gold "Buy" opens the trade site in your browser with the item's mods filled in, and
+- [x] (Confirmed 21 Nov, matches PoEStash.) Build window (F6) / My build: gold "Buy" opens the trade site in your browser with the item's mods filled in, and
       says how many are for sale ("any 3 of 4 mods" when it had to loosen). Try a rare, a cluster jewel, Watcher's Eye.
 - [ ] Ctrl+D on a cluster jewel in game finds listings (it searched the wrong category before 21 Nov).
 - [ ] Build window (F6) / My build: "Price" on a gear item, flask or jewel, or a click on a gem, opens the price window for it

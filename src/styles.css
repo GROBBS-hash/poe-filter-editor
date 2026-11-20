@@ -1295,3 +1295,12 @@ li:hover > .bv-item .bv-price { opacity: 1; }
 .tw-tile2-sub { font-size: 12.5px; color: var(--muted); margin-top: 1px; }
 .tw-perdiv { margin-top: 8px; font-size: 13.5px; color: var(--text-2); }
 .tw-perdiv b { color: #fff; }
+
+/* Price window: Awakened-style "This item / As a base" tabs, and what the base search looks for. */
+.tw-tabs { display: flex; gap: 4px; margin: 10px 0 6px; padding: 3px; border-radius: 9px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); }
+.tw-tabs button { flex: 1; padding: 6px 8px; border-radius: 7px; border: 0; background: transparent; color: #b9b4a6; font-weight: 600; cursor: pointer; font-size: 13px; }
+.tw-tabs button:hover { background: rgba(255,255,255,0.06); }
+.tw-tabs button.on { background: rgba(212,175,55,0.85); color: #1a1408; }
+.tw-tab-why { display: block; font-size: 10.5px; font-weight: 500; opacity: .8; margin-top: 1px; }
+.tw-base-sum { margin: 0 0 8px; padding: 7px 10px; border-radius: 8px; font-size: 12.5px; line-height: 1.4;
+  background: rgba(162,145,98,0.12); border: 1px solid rgba(162,145,98,0.4); color: #eadfbf; }

@@ -12,6 +12,7 @@ fn main() {
         let Ok(v) = serde_json::from_str::<serde_json::Value>(&std::fs::read_to_string(e.path()).unwrap_or_default()) else { continue };
         let Some(raw) = v["setup"]["raw"].as_str().filter(|r| !r.is_empty()) else { continue };
         let Some(mut s) = filter_core::trade::setup(raw, &index) else { continue };
+        if std::env::var("BASE_SETUP").is_ok_and(|w| name.starts_with(&w)) { println!("SETUP	{}", serde_json::to_string(&s).unwrap()); }
         let Some(b) = s.base_item.clone() else { continue };
         let kept: Vec<&str> = s.filters.iter().filter(|f| b.ids.contains(&f.id)).map(|f| f.label.as_str()).collect();
         println!("{name}: {} | ilvl {:?} | {:?} | keeps {:?}", b.why.join(", "), b.ilvl_min, b.misc, kept);
