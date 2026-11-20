@@ -211,6 +211,7 @@ export default function App() {
                 <button key={i.id} className={`menu-item ${tab === i.id ? "on" : ""}`} title={i.hint} onClick={() => setTab(i.id)}>
                   <span className="menu-ico" style={{ "--c": COLOURS[i.id] } as CSSProperties}><Icon d={ICONS[i.id]} /></span><span>{i.name}</span>
                   {i.id === "batch" && ov.batch_on && <span className="menu-dot" title="Batch mode is on" />}
+                  {i.id === "find" && <span className="menu-key" title="Press Ctrl+F anywhere in the editor">Ctrl+F</span>}
                 </button>
               ))}
             </div>

@@ -1400,3 +1400,23 @@ li.bv-newgems { list-style: none; margin: 0 0 8px; }
 .empty-go { margin-top: 12px; }
 /* Card headings in the game lettering need a little more size: its lower case is small capitals. */
 main.content .card h2 { font-size: 19px; font-weight: 500; letter-spacing: .02em; }
+
+/* ---- Polish 5 (21 Nov): every window over the game really the same ---- */
+/* Solid: nothing behind (the game, another of our windows) shows through. */
+.qm, .bo { background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,0) 120px), #12151a; }
+/* The thin gold line along the top edge on F6 / F7 / trades too, not only Ctrl+D and F2. */
+.bo { position: relative; }
+.bo::before { content: ""; position: absolute; left: 18px; right: 18px; top: 0; height: 2px; border-radius: 0 0 2px 2px; z-index: 3;
+  background: linear-gradient(90deg, transparent, rgba(220,178,90,.75), transparent); pointer-events: none; }
+/* F6's tabs like F7's: one compact pill row, the open one gold. */
+.buildview.compact .bv-tabs { display: inline-flex; align-self: flex-start; gap: 4px; padding: 3px; background: var(--input);
+  border: 1px solid var(--line); border-radius: 10px; }
+.buildview.compact .bv-tabs button { flex: none; border: none; border-radius: 7px; padding: 5px 16px; font-size: 13.5px; font-weight: 600;
+  color: var(--text-2); background: none; min-height: 0; }
+.buildview.compact .bv-tabs button.on { color: #1a1405; background: var(--gold); }
+.buildview .bv-tabs button:hover:not(.on) { color: var(--text); background: rgba(255,255,255,.05); }
+/* Only the class name in the game lettering, "level 50 in PoB" in the normal font. */
+.bv-who .muted { font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; letter-spacing: 0; }
+/* Menu shortcut hint ("Ctrl+F" beside Find). */
+.menu-key { margin-left: auto; font-size: 11px; color: var(--muted); padding: 1px 6px; border: 1px solid var(--line); border-radius: 5px; line-height: 1.4; }
+.menu-item.on .menu-key { color: var(--text-2); border-color: var(--line-2); }

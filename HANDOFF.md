@@ -292,6 +292,10 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   `BuildView.tsx` (F6 + My build): a tick per item, key `slot|name|base`, in localStorage `build.have` (shared by both
   windows via the storage event), "Have N of M" bar with "hide what I have" (`build.hideHave`).
 
+- Polish 5, 21 Nov (0.2.9, his screenshots): F6/F7 were see-through (.bo at 97%: another window showed through);
+  .qm and .bo now solid #12151a; gold top line on .bo too; F6 tabs styled like F7's pill row; "level N in PoB" back in
+  the normal font; "Ctrl+F" tag next to Find in the menu.
+
 - Tray menu 21 Nov (0.2.8): Open editor · Check for updates · Restart editor · Quit. "Check for updates" checks now
   (updates::from_tray): installs and restarts if there's one, else shows "Up to date (x)" for 6s; the updater renames
   it "Downloading x…" / "Update to x and restart" when one is found in the background (TrayItem in app state).
