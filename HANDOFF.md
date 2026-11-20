@@ -293,6 +293,13 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   preview-qm.html?editor=1 shows that version. Price box: "Your 732 ≈ …" = the hovered stack's worth (`stack` prop on
   PriceHero, from the item's stack size).
 
+- Build items on trade 21 Nov: every gear item, flask, jewel and gem in F6 / My build has a "Price" button (gems: click the
+  pill) that opens the normal price window for it (command `price_build_item`; no "compared with your build" box).
+  `pob::Gear.copy` is the item written like the game's Ctrl+C (`game_copy`: class from the base, PoB's "Maelstrom" -> the
+  game's "Maelström", magic bases found inside the name, implicit/crafted/fractured tags), `gem_copy` for gems. Also hides
+  PoB bookkeeping ("Has Alt Variant Two", "Intangibility"); Watcher's Eye keeps every alt variant's mod. Dev check:
+  `POB_COPY=1 cargo run -p filter-core --example pobdump -- <pob.txt>` (all 30-odd items of his build read back).
+
 - Price box design 2 (he picked it from five mockups, 20 Nov): with a stack, two tiles "YOUR N" (gold, big) and "EACH",
   both with orb icons; bulk items get "N <item> = 1 [divine]" under them (replaces the old "1 div ≈ …" line lower down).
 
@@ -340,6 +347,9 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Ctrl+D on an invitation / Shaper or Elder fragment / Maven's Writ: the set (with total), parts and boss drops
       show with prices at the bottom of the window.
 - [ ] Save search, Saved searches list (Run / Live / delete); a live search pops up new listings with a Whisper button.
+
+- [ ] Build window (F6) / My build: "Price" on a gear item, flask or jewel, or a click on a gem, opens the price window for it
+      (Duskdawn as Maelström Staff, rares with their mods ready to search). Jewel mods no longer show "Has Alt Variant Two".
 
 **Maps**
 - [ ] Ctrl+D on a map: flags the mods on the "Map check" list; "Suggest from my build" picks sensible mods.

@@ -35,6 +35,9 @@ pub struct Gear {
     pub base: String,
     /// Item lines as PoB has them, tidied (sockets, implicits, mods...).
     pub lines: Vec<String>,
+    /// The item written like the game's Ctrl+C copy, for the price window.
+    #[serde(default)]
+    pub copy: String,
 }
 
 /// A jewel: in a passive tree socket (`node`) or an abyssal socket of an item (`node` None, slot "Belt Abyssal Socket 1").
@@ -122,33 +125,96 @@ fn item_gear(slot: &str, text: &str) -> Gear {
     let base = if two_names && !lines.is_empty() { lines.remove(0) } else { name.clone() };
     // Uniques with variants: PoB lists every variant's lines, tagged {variant:1,3}; keep the chosen one's.
     let pick = |key: &str| lines.iter().find_map(|l| l.strip_prefix(key)).and_then(|v| v.trim().parse::<u32>().ok());
-    let (variant, alt) = (pick("Selected Variant: "), pick("Selected Alt Variant: "));
+    let variant = pick("Selected Variant: ");
+    // "Selected Alt Variant: 3", "Selected Alt Variant Two: 1"… (Watcher's Eye and other multi-variant uniques).
+    let alts: Vec<u32> = lines.iter().filter(|l| l.starts_with("Selected Alt Variant"))
+        .filter_map(|l| l.split(": ").nth(1)?.trim().parse().ok()).collect();
     let lines: Vec<String> = lines.iter().filter(|l| {
         let Some(tag) = l.find("{variant:").map(|i| &l[i + 9..]).and_then(|t| t.split('}').next()) else { return true };
         let ids: Vec<u32> = tag.split(',').filter_map(|v| v.trim().parse().ok()).collect();
-        variant.is_none_or(|v| ids.contains(&v)) || alt.is_some_and(|a| ids.contains(&a))
+        variant.is_none_or(|v| ids.contains(&v)) || alts.iter().any(|a| ids.contains(a))
     }).cloned().collect();
-    // Drop PoB-only bookkeeping ("Prefix: …", "Crafted: true", "ArmourBasePercentile: 1"…), keep what you'd see on the item.
-    const DROP: [&str; 16] = ["Unique ID", "Item Level", "LevelReq", "Implicits", "Prefix", "Suffix", "Crafted", "Variant",
-        "Selected Variant", "Has Alt Variant", "Selected Alt Variant", "Catalyst", "CatalystQuality", "League", "Source", "Talisman Tier"];
-    let lines = lines.into_iter()
-        .filter(|l| {
-            let key = l.split(": ").next().unwrap_or("");
-            !(l.contains(": ") && (DROP.contains(&key) || key.ends_with("BasePercentile")))
-        })
-        .map(|l| {
-            // How far along each "(60-80)" range the roll is: {range:0.25}, or the middle when PoB doesn't say.
-            let range = l.find("{range:").and_then(|i| l[i + 7..].split('}').next()).and_then(|r| r.parse::<f64>().ok()).unwrap_or(0.5);
-            let mut out = String::new();
-            let mut depth = 0;
-            for c in l.chars() { match c { '{' => depth += 1, '}' => depth -= 1, _ if depth == 0 => out.push(c), _ => {} } }
-            roll_ranges(out.trim(), range)
-        })
-        .filter(|l| !l.is_empty())
-        .collect();
+    let shown: Vec<String> = lines.iter().filter(|l| !bookkeeping(l)).map(|l| tidy(l)).filter(|l| !l.is_empty()).collect();
     // PoB calls items you made up "New Item": show the base instead.
     let name = if name == "New Item" { base.clone() } else { name };
-    Gear { slot: slot.to_string(), rarity: rarity.to_lowercase(), name, base, lines }
+    let copy = game_copy(&rarity, &name, &base, &lines);
+    Gear { slot: slot.to_string(), rarity: rarity.to_lowercase(), name, base, lines: shown, copy }
+}
+
+/// A PoB mod line without its {tags}, with "(60-80)" ranges rolled where PoB's {range:0.25} says
+/// (the middle when it doesn't).
+fn tidy(l: &str) -> String {
+    let range = l.find("{range:").and_then(|i| l[i + 7..].split('}').next()).and_then(|r| r.parse::<f64>().ok()).unwrap_or(0.5);
+    let mut out = String::new();
+    let mut depth = 0;
+    for c in l.chars() { match c { '{' => depth += 1, '}' => depth -= 1, _ if depth == 0 => out.push(c), _ => {} } }
+    roll_ranges(out.trim(), range)
+}
+
+/// PoB-only bookkeeping ("Prefix: …", "Crafted: true", "ArmourBasePercentile: 1", "Has Alt Variant Two: true"…),
+/// not something you'd see on the item.
+fn bookkeeping(l: &str) -> bool {
+    const DROP: [&str; 15] = ["Unique ID", "Item Level", "LevelReq", "Implicits", "Prefix", "Suffix", "Crafted", "Variant",
+        "Selected Variant", "Catalyst", "CatalystQuality", "League", "Source", "Talisman Tier", "Intangibility"];
+    let Some((key, _)) = l.split_once(": ") else { return false };
+    DROP.contains(&key) || key.ends_with("BasePercentile") || key.starts_with("Has Alt Variant") || key.starts_with("Selected Alt Variant")
+}
+
+/// A PoB item written like the game's Ctrl+C copy (class, rarity, name, properties, item level, implicits,
+/// mods), so the price window reads it the same way as an item hovered in game.
+fn game_copy(rarity: &str, name: &str, base: &str, lines: &[String]) -> String {
+    let rarity = match rarity { "RARE" => "Rare", "UNIQUE" | "RELIC" => "Unique", "MAGIC" => "Magic", _ => "Normal" };
+    // The game's own spelling ("Maelström Staff", PoB writes "Maelstrom Staff") and class. Magic items only have
+    // a full name ("Perpetual Sapphire Flask of Craft"): their base is the longest one inside it.
+    let fold = |s: &str| s.replace('ö', "o").to_lowercase();
+    let classes = crate::item::base_classes();
+    let found = classes.get_key_value(base).or_else(|| {
+        let b = fold(base);
+        classes.iter().filter(|(k, _)| { let k = fold(k); k == b || (!matches!(rarity, "Rare" | "Unique") && b.contains(&k)) })
+            .max_by_key(|(k, _)| k.len())
+    });
+    let (base, class) = found.map(|(b, c)| (b.as_str(), c.as_str())).unwrap_or((base, ""));
+    let name = if base.contains('ö') { name.replace(&base.replace('ö', "o"), base) } else { name.to_string() };
+    let mut head = vec![format!("Item Class: {class}"), format!("Rarity: {rarity}"), name];
+    if matches!(rarity, "Rare" | "Unique") { head.push(base.to_string()); }
+    let (mut props, mut sockets, mut ilvl) = (vec![], None, None);
+    let (mut implicits, mut mods, mut tail): (Vec<String>, Vec<String>, Vec<String>) = (vec![], vec![], vec![]);
+    let mut implicit_left: Option<usize> = None;
+    for l in lines {
+        if let Some(n) = l.strip_prefix("Implicits: ") { implicit_left = n.trim().parse().ok(); continue; }
+        let Some(left) = implicit_left else {
+            // Before "Implicits: N": the item's properties.
+            if let Some(v) = l.strip_prefix("Item Level: ") { ilvl = Some(v.trim().to_string()); }
+            else if let Some(v) = l.strip_prefix("Sockets: ") { sockets = Some(v.trim().to_string()); }
+            else if let Some(v) = l.strip_prefix("Quality: ") { if v.trim() != "0" { props.push(format!("Quality: +{}% (augmented)", v.trim())); } }
+            else if ["Armour: ", "Evasion Rating: ", "Energy Shield: ", "Ward: ", "Limited to: ", "Radius: "].iter().any(|k| l.starts_with(k)) {
+                props.push(l.clone());
+            } else if l.ends_with(" Item") && !l.contains(": ") { tail.push(l.clone()); }
+            continue;
+        };
+        if bookkeeping(l) { continue; }
+        let t = tidy(l);
+        if t.is_empty() { continue; }
+        if matches!(t.as_str(), "Corrupted" | "Mirrored" | "Split") || (t.ends_with(" Item") && !t.contains(char::is_numeric)) { tail.push(t); continue; }
+        let tag = if l.contains("{enchant}") { " (enchant)" } else if left > 0 { " (implicit)" } else if l.contains("{crafted}") { " (crafted)" }
+            else if l.contains("{fractured}") { " (fractured)" } else { "" };
+        if left > 0 { implicit_left = Some(left - 1); implicits.push(format!("{t}{tag}")); } else { mods.push(format!("{t}{tag}")); }
+    }
+    let mut sections = vec![head.join("\n")];
+    if !props.is_empty() { sections.push(props.join("\n")); }
+    if let Some(s) = sockets { sections.push(format!("Sockets: {s}")); }
+    sections.push(format!("Item Level: {}", ilvl.unwrap_or_else(|| "1".into())));
+    if !implicits.is_empty() { sections.push(implicits.join("\n")); }
+    if !mods.is_empty() { sections.push(mods.join("\n")); }
+    if !tail.is_empty() { sections.push(tail.join("\n")); }
+    sections.join("\n--------\n") + "\n"
+}
+
+/// A gem written like the game's copy, for the price window.
+pub fn gem_copy(g: &Gem) -> String {
+    let class = if g.support { "Support Gems" } else { "Skill Gems" };
+    let q = if g.quality > 0 { format!("\nQuality: +{}% (augmented)", g.quality) } else { String::new() };
+    format!("Item Class: {class}\nRarity: Gem\n{}\n--------\nLevel: {}{q}\n--------\nItem Level: 1\n", g.name, g.level)
 }
 
 /// "(60-80)% increased Spell Damage" at 0.5 -> "70% increased Spell Damage".
@@ -471,5 +537,35 @@ Adds 10 to 20 Lightning Damage to Spells
         assert_eq!(raw_url("https://pobb.in/CuCqXO9ftu49").as_deref(), Some("https://pobb.in/CuCqXO9ftu49/raw"));
         assert_eq!(raw_url("pastebin.com/abc123").as_deref(), Some("https://pastebin.com/raw/abc123"));
         assert_eq!(raw_url("eNrsfWmT20ay4OfHX4G"), None);
+    }
+
+    #[test]
+    fn copy_for_price_window() {
+        // From his build: a fractured ring with a crafted mod and an influence-free "Fractured Item" line.
+        let ring = item_gear("Ring 1", "Rarity: RARE\nMorbid Twirl\nUnset Ring\nIntangibility: 72%\nUnique ID: 2d58\nCatalyst: Fertile\n\
+            CatalystQuality: 20\nItem Level: 83\nSockets: B\nLevelReq: 5\nImplicits: 1\nHas 1 Socket\n+61 to maximum Mana\n\
+            {crafted}Channelling Skills have -3 to Total Mana Cost\n{fractured}+3 to Level of Socketed Gems\n\
+            {tags:resource,mana}{range:0.5}(70-76)% increased Mana Regeneration Rate\nFractured Item");
+        assert_eq!(ring.copy, "Item Class: Rings\nRarity: Rare\nMorbid Twirl\nUnset Ring\n--------\nSockets: B\n--------\nItem Level: 83\n\
+            --------\nHas 1 Socket (implicit)\n--------\n+61 to maximum Mana\nChannelling Skills have -3 to Total Mana Cost (crafted)\n\
+            +3 to Level of Socketed Gems (fractured)\n73% increased Mana Regeneration Rate\n--------\nFractured Item\n");
+        assert!(!ring.lines.iter().any(|l| l.starts_with("Intangibility")));
+        let s = crate::trade::setup(&ring.copy, &Default::default()).expect("the price window reads it");
+        assert_eq!((s.item.item_class.as_str(), s.item.base_type.as_str(), s.item.rarity.as_str(), s.item.item_level), ("Rings", "Unset Ring", "Rare", Some(83)));
+        assert!(s.filters.iter().any(|f| f.kind == "fractured") || s.unknown_kinds.iter().any(|k| k == "fractured"), "fractured mod kept");
+        assert_eq!(crate::trade::mods(&ring.copy).len(), 5);
+
+        // Watcher's Eye style: PoB's "Has Alt Variant Two" bookkeeping hidden, both alt variants' mods kept.
+        let eye = item_gear("", "Rarity: UNIQUE\nWatcher's Eye\nPrismatic Jewel\nVariant: a\nVariant: b\nVariant: c\nSelected Variant: 1\n\
+            Has Alt Variant: true\nSelected Alt Variant: 2\nHas Alt Variant Two: true\nSelected Alt Variant Two: 3\nLimited to: 1\nImplicits: 0\n\
+            {range:0.5}(4-6)% increased maximum Energy Shield\n{variant:1}Gain 25 Energy Shield per Enemy Hit while affected by Discipline\n\
+            {variant:2}Damage Penetrates 13% Lightning Resistance while affected by Wrath\n{variant:3}+1 to Level of Socketed Gems while affected by Zealotry");
+        assert_eq!(eye.lines, ["Limited to: 1", "5% increased maximum Energy Shield", "Gain 25 Energy Shield per Enemy Hit while affected by Discipline",
+            "Damage Penetrates 13% Lightning Resistance while affected by Wrath", "+1 to Level of Socketed Gems while affected by Zealotry"]);
+        assert!(eye.copy.starts_with("Item Class: Jewels\nRarity: Unique\nWatcher's Eye\nPrismatic Jewel\n--------\nLimited to: 1\n--------\nItem Level: 1\n"), "{}", eye.copy);
+
+        let gem = Gem { name: "Arc".into(), level: 20, quality: 20, enabled: true, support: false, colour: "b".into() };
+        let s = crate::trade::setup(&gem_copy(&gem), &Default::default()).unwrap();
+        assert_eq!((s.item.base_type.as_str(), s.gem_level), ("Arc", Some(20)));
     }
 }

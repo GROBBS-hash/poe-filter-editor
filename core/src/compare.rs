@@ -114,7 +114,7 @@ mod tests {
     use super::*;
 
     fn gear(slot: &str, name: &str, lines: &[&str]) -> Gear {
-        Gear { slot: slot.into(), rarity: "rare".into(), name: name.into(), base: "Two-Stone Ring".into(), lines: lines.iter().map(|s| s.to_string()).collect() }
+        Gear { slot: slot.into(), rarity: "rare".into(), name: name.into(), base: "Two-Stone Ring".into(), lines: lines.iter().map(|s| s.to_string()).collect(), copy: String::new() }
     }
 
     #[test]

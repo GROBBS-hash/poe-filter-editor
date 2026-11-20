@@ -531,20 +531,9 @@ fn price_check(app: AppHandle) {
             if !text.is_empty() { break; }
         }
         let _ = app.clipboard().write_text(before);
-        let (poe2, league) = trade_league(&app);
-        let state = app.state::<AppState>();
+        let (_, league) = trade_league(&app);
         let payload = if !text.is_empty() {
-            match trade_api::stats(&state.data_dir, poe2) {
-                Ok(index) => match filter_core::trade::setup(&text, &index) {
-                    Some(s) => PriceCheck { ninja: ninja_price(&app, &s.item), setup: Some(s), league, from_ground: false, error: None, bulk: None, map: None, divine: None, compare: vec![], instant_all: false },
-                    None => PriceCheck { setup: None, ninja: None, league, from_ground: false, error: Some("That doesn't look like an item".into()), bulk: None, map: None, divine: None, compare: vec![], instant_all: false },
-                },
-                Err(e) => match filter_core::trade::setup(&text, &Default::default()) {
-                    Some(s) => PriceCheck { ninja: ninja_price(&app, &s.item), setup: Some(s), league, from_ground: false,
-                        error: Some(format!("Stat list unavailable, searching by name only ({e})")), bulk: None, map: None, divine: None, compare: vec![], instant_all: false },
-                    None => PriceCheck { setup: None, ninja: None, league, from_ground: false, error: Some(e), bulk: None, map: None, divine: None, compare: vec![], instant_all: false },
-                },
-            }
+            text_payload(&app, &text)
         } else {
             // On the ground the game won't copy: read the label for its name.
             match read_from_ground(&app) {
@@ -558,47 +547,85 @@ fn price_check(app: AppHandle) {
                 Err(e) => PriceCheck { setup: None, ninja: None, league, from_ground: true, error: Some(e), bulk: None, map: None, divine: None, compare: vec![], instant_all: false },
             }
         };
-        let mut payload = payload;
-        payload.divine = currency_rates(&app).get("divine").copied();
-        payload.instant_all = state.store.lock().unwrap().settings.price_instant_all;
-        // "Is this an upgrade?" against your PoB build's gear in that slot.
-        if !state.store.lock().unwrap().settings.price_rolls {
-            if let Some(s) = payload.setup.as_mut() { for f in &mut s.filters { f.roll = None; f.range = None; } }
-        }
-        if !payload.from_ground && state.store.lock().unwrap().settings.price_compare {
-            if let (Some(setup), Some(pob)) = (payload.setup.as_ref(), pob_load(&state)) {
-                if let Some(stage) = pob.build.stages.get(pob.stage) {
-                    let lines: Vec<String> = filter_core::trade::mods(&text).into_iter().map(|m| m.text).collect();
-                    payload.compare = filter_core::compare::compare(&lines, &setup.item.item_class, &stage.gear);
-                }
-            }
-        }
-        if let Some(it) = payload.setup.as_ref().map(|s| s.item.clone()) {
-            if filter_core::maps::is_map(&it.item_class) && !payload.from_ground {
-                // One list of mods you can't run: the Maps page's ticks (which start from the map check list).
-                let (mods, _) = map_mods(&state);
-                let s = state.store.lock().unwrap().settings.clone();
-                payload.map = Some(if mods.is_empty() {
-                    filter_core::maps::map_info(&text, s.map_avoid.as_deref())
-                } else {
-                    let bad = s.map_tool.bad.clone().unwrap_or_else(|| filter_core::mapregex::default_bad(&mods, s.map_avoid.as_deref()));
-                    filter_core::maps::map_info_bad(&text, &mods, &bad)
-                });
-            }
-        }
-        if let Some(it) = payload.setup.as_ref().map(|s| s.item.clone()) {
-            if !matches!(it.rarity.as_str(), "Rare" | "Magic" | "Unique") && filter_core::trade::category(&it.item_class).is_none() {
-                payload.bulk = trade_api::statics(&state.data_dir, poe2).ok().and_then(|st| st.id(&it.base_type));
-            }
-        }
-        if let Some(w) = app.get_webview_window("trade") {
-            place_near_cursor(&w, 24);
-            if let Some(s) = payload.setup.as_ref() { save_sample(&state.data_dir, &s.item, "", &payload); }
-            let _ = w.emit("price-check", payload);
-            let _ = w.show();
-            let _ = w.set_focus();
-        }
+        show_price(&app, payload, &text, true);
     });
+}
+
+/// An item's copied text -> what the price window shows (stats picked, poe.ninja price).
+fn text_payload(app: &AppHandle, text: &str) -> PriceCheck {
+    let (poe2, league) = trade_league(app);
+    let state = app.state::<AppState>();
+    let none = |league: String, error: String| PriceCheck { setup: None, ninja: None, league, from_ground: false, error: Some(error), bulk: None,
+        map: None, divine: None, compare: vec![], instant_all: false };
+    match trade_api::stats(&state.data_dir, poe2) {
+        Ok(index) => match filter_core::trade::setup(text, &index) {
+            Some(s) => PriceCheck { ninja: ninja_price(app, &s.item), setup: Some(s), league, from_ground: false, error: None, bulk: None, map: None, divine: None, compare: vec![], instant_all: false },
+            None => none(league, "That doesn't look like an item".into()),
+        },
+        Err(e) => match filter_core::trade::setup(text, &Default::default()) {
+            Some(s) => PriceCheck { ninja: ninja_price(app, &s.item), setup: Some(s), league, from_ground: false,
+                error: Some(format!("Stat list unavailable, searching by name only ({e})")), bulk: None, map: None, divine: None, compare: vec![], instant_all: false },
+            None => none(league, e),
+        },
+    }
+}
+
+/// "Price" on an item or gem in the build window / My build: the price window for it, like Ctrl+D in game.
+#[tauri::command]
+fn price_build_item(app: AppHandle, text: Option<String>, gem: Option<filter_core::pob::Gem>) {
+    let Some(text) = text.filter(|t| !t.is_empty()).or_else(|| gem.as_ref().map(filter_core::pob::gem_copy)) else { return };
+    thread::spawn(move || {
+        let payload = text_payload(&app, &text);
+        // It's your own build's item: no "compared with your build" box.
+        show_price(&app, payload, &text, false);
+    });
+}
+
+/// Fills in the rest (divine rate, build comparison, map check, bulk) and shows the price window.
+fn show_price(app: &AppHandle, payload: PriceCheck, text: &str, compare: bool) {
+    let (poe2, _) = trade_league(app);
+    let state = app.state::<AppState>();
+    let text = text.to_string();
+    let mut payload = payload;
+    payload.divine = currency_rates(app).get("divine").copied();
+    payload.instant_all = state.store.lock().unwrap().settings.price_instant_all;
+    // "Is this an upgrade?" against your PoB build's gear in that slot.
+    if !state.store.lock().unwrap().settings.price_rolls {
+        if let Some(s) = payload.setup.as_mut() { for f in &mut s.filters { f.roll = None; f.range = None; } }
+    }
+    if compare && !payload.from_ground && state.store.lock().unwrap().settings.price_compare {
+        if let (Some(setup), Some(pob)) = (payload.setup.as_ref(), pob_load(&state)) {
+            if let Some(stage) = pob.build.stages.get(pob.stage) {
+                let lines: Vec<String> = filter_core::trade::mods(&text).into_iter().map(|m| m.text).collect();
+                payload.compare = filter_core::compare::compare(&lines, &setup.item.item_class, &stage.gear);
+            }
+        }
+    }
+    if let Some(it) = payload.setup.as_ref().map(|s| s.item.clone()) {
+        if filter_core::maps::is_map(&it.item_class) && !payload.from_ground {
+            // One list of mods you can't run: the Maps page's ticks (which start from the map check list).
+            let (mods, _) = map_mods(&state);
+            let s = state.store.lock().unwrap().settings.clone();
+            payload.map = Some(if mods.is_empty() {
+                filter_core::maps::map_info(&text, s.map_avoid.as_deref())
+            } else {
+                let bad = s.map_tool.bad.clone().unwrap_or_else(|| filter_core::mapregex::default_bad(&mods, s.map_avoid.as_deref()));
+                filter_core::maps::map_info_bad(&text, &mods, &bad)
+            });
+        }
+    }
+    if let Some(it) = payload.setup.as_ref().map(|s| s.item.clone()) {
+        if !matches!(it.rarity.as_str(), "Rare" | "Magic" | "Unique") && filter_core::trade::category(&it.item_class).is_none() {
+            payload.bulk = trade_api::statics(&state.data_dir, poe2).ok().and_then(|st| st.id(&it.base_type));
+        }
+    }
+    if let Some(w) = app.get_webview_window("trade") {
+        place_near_cursor(&w, 24);
+        if let Some(s) = payload.setup.as_ref() { save_sample(&state.data_dir, &s.item, "", &payload); }
+        let _ = w.emit("price-check", payload);
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
 }
 
 #[derive(Serialize)]
@@ -2263,7 +2290,7 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            overview,
+            price_build_item, overview,
             create_profile,
             list_filters,
             set_active,

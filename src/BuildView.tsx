@@ -6,7 +6,7 @@ import TreeView from "./TreeView";
 
 export type PobGem = { name: string; level: number; quality: number; enabled: boolean; support: boolean; colour: string };
 export type PobGroup = { label: string; slot: string; enabled: boolean; gems: PobGem[] };
-export type PobGear = { slot: string; rarity: string; name: string; base: string; lines: string[] };
+export type PobGear = { slot: string; rarity: string; name: string; base: string; lines: string[]; copy?: string };
 /** A jewel in a tree socket (node) or in an item's abyssal socket (node null, slot "Belt Abyssal Socket 1"). */
 export type PobJewel = { node: number | null; item: PobGear; notables: string[] };
 export type PobStage = { title: string; tree: { version: string; nodes: number[]; url: string } | null; groups: PobGroup[]; gear: PobGear[]; jewels?: PobJewel[] };
@@ -18,11 +18,22 @@ const SLOT_ORDER = ["Weapon 1", "Weapon 2", "Helmet", "Body Armour", "Gloves", "
   "Flask 1", "Flask 2", "Flask 3", "Flask 4", "Flask 5"];
 const SLOT_NAME: Record<string, string> = { "Weapon 1": "Weapon", "Weapon 2": "Off hand", "Body Armour": "Body" };
 
-/** PoB's look: socket colours and supports a little smaller. */
+/** Opens the price window for one of the build's items or gems, like Ctrl+D on it in game. */
+const priceItem = (it: PobGear) => invoke("price_build_item", { text: it.copy ?? "" }).catch(() => null);
+const priceGem = (g: PobGem) => invoke("price_build_item", { gem: g }).catch(() => null);
+
+function PriceButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button className="bv-price" title="Price check this on the trade site"
+      onClick={(e) => { e.stopPropagation(); onClick(); }}>Price</button>
+  );
+}
+
+/** PoB's look: socket colours and supports a little smaller. Click = price check. */
 function GemPill({ g, main, fresh }: { g: PobGem; main: boolean; fresh?: boolean }) {
   return (
-    <span className={`gem gem-${g.colour} ${g.support ? "sup" : ""} ${main ? "main" : ""} ${g.enabled ? "" : "off"} ${fresh ? "fresh" : ""}`}
-      title={`${g.name} · level ${g.level}${g.quality ? ` · ${g.quality}% quality` : ""}${g.enabled ? "" : " (switched off in PoB)"}`}>
+    <span onClick={() => priceGem(g)} className={`gem gem-${g.colour} ${g.support ? "sup" : ""} ${main ? "main" : ""} ${g.enabled ? "" : "off"} ${fresh ? "fresh" : ""}`}
+      title={`${g.name} · level ${g.level}${g.quality ? ` · ${g.quality}% quality` : ""}${g.enabled ? "" : " (switched off in PoB)"}\nClick to price check`}>
       <span className="gem-dot" />{g.name}
       {(g.level > 1 || g.quality > 0) && <span className="gem-lvl">{g.level}{g.quality ? `/${g.quality}` : ""}</span>}
     </span>
@@ -99,6 +110,7 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
           <span style={{ color: RARITY[it.rarity] ?? "#ccc" }}>{it.name}</span>
           {it.base !== it.name && <span className="muted small"> {it.base}</span>}
         </span>
+        {it.copy && <PriceButton onClick={() => priceItem(it)} />}
       </div>
       {openItem === key && <ul className="bv-lines">{it.lines.map((l, k) => <li key={k}>{l}</li>)}</ul>}
     </li>
@@ -169,6 +181,7 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
                     <button className="link small bv-onTree" title="Show this jewel's socket on the tree"
                       onClick={(e) => { e.stopPropagation(); setJewelNode(j.node); setView("tree"); }}>on tree</button>
                   )}
+                  {j.item.copy && <PriceButton onClick={() => priceItem(j.item)} />}
                 </div>
                 {openItem === key && <ul className="bv-lines">{j.item.lines.map((l, k) => <li key={k}>{l}</li>)}</ul>}
               </li>
