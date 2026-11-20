@@ -248,6 +248,10 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Bulk fixers: judged against poe.ninja's price when it has one (`bulkTypical(…, market)`), hidden by default with a
   "show" link; our going rate is only shown when poe.ninja has no price.
 
+- Wealth "By tab" card 20 Nov: a scan keeps every priced item (`WealthStore.last_items`, top 3000 by value); the card shows
+  a chip per tab (worth + bar), and the picked tab's items grouped by name, most valuable first, listed ones marked.
+  Scans from before this only have totals (the card says to scan again).
+
 
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
@@ -270,6 +274,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Bulk items (e.g. Stacked Deck): big price = poe.ninja (about 3c), market-price row in the list, fixers marked "low stock",
       "Only sellers with at least N in stock" works; repeat item listings show "× N".
 - [ ] Related items panel beside the price window: lifeforce, fragments, invitations, boss keys.
+- [ ] Wealth "By tab": after a new scan, click a tab (e.g. GEM) to see its items and worth.
 - [ ] Menu icons: each page has its own colour tile (Find blue, Tiers coral, Wealth gold…), page title matches.
 - [ ] New Clean glass look: opens bigger and remembers its size; pages fade in; Wealth tiles look right; nothing broken on other pages.
 - [ ] Unidentified unique (e.g. Karui Sceptre): no false tier 1 / divine sound; the "Could be one of N uniques" list shows in F2 and Ctrl+D.

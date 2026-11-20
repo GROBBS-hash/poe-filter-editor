@@ -203,6 +203,8 @@ pub struct WealthStore {
     pub sessions: Vec<Session>,
     pub current: Option<Session>,
     pub missed: Vec<Valued>,
+    /// Every priced item from the last scan (most valuable first, at most 3000), for the "By tab" breakdown.
+    pub last_items: Vec<Valued>,
     /// Named sets of tabs to scan (like WealthyExile's profiles), and the one in use (None = whole stash).
     pub profiles: Vec<ScanProfile>,
     pub active: Option<String>,

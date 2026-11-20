@@ -83,6 +83,7 @@ pub struct WealthView {
     minutes: u32,
     snapshots: Vec<Snapshot>,
     missed: Vec<Valued>,
+    last_items: Vec<Valued>,
     sessions: Vec<Session>,
     current: Option<Session>,
     strategies: Vec<(String, usize, f64, f64)>,
@@ -101,7 +102,7 @@ fn view(app: &AppHandle) -> WealthView {
         account: s.poe_account, has_sessid: !s.poesessid.trim().is_empty(), league,
         tracked: s.wealth_tabs, min: s.wealth_min, minutes: s.earn_minutes.max(1),
         strategies: wealth::by_strategy(&st.sessions),
-        tabs: st.tabs, snapshots: st.snapshots, missed: st.missed, sessions: st.sessions, current: st.current,
+        tabs: st.tabs, snapshots: st.snapshots, missed: st.missed, last_items: st.last_items, sessions: st.sessions, current: st.current,
         profiles: st.profiles, active: st.active,
         divine: divine(app), now: now(),
     }
@@ -160,7 +161,10 @@ pub async fn wealth_scan(app: AppHandle) -> Result<WealthView, String> {
         let min = state.store.lock().unwrap().settings.wealth_min;
         let mut snap = wealth::snapshot(now(), &league, divine(&app), &valued);
         snap.profile = name;
-        with_store(&state, |s| { s.add_snapshot(snap); s.missed = wealth::missed(&valued, min); });
+        let mut items = valued.clone();
+        items.sort_by(|a, b| b.value.total_cmp(&a.value));
+        items.truncate(3000);
+        with_store(&state, |s| { s.add_snapshot(snap); s.missed = wealth::missed(&valued, min); s.last_items = items; });
         Ok(view(&app))
     }).await.map_err(err)?
 }

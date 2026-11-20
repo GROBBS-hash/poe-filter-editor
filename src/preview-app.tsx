@@ -19,6 +19,8 @@ const wealth = {
   snapshots: [snap(now - 7200, 160), snap(now - 3600, 141), snap(now - 60, 584)],
   missed: [["Blight Thread", 50, 133], ["Legion Thread", 18, 65.7], ["Bestiary Thread", 29, 47.8], ["Summon Carrion Golem of Hordes", 1, 21]]
     .map(([name, stack, value]) => ({ tab: "Frags", name, stack, value, x: 3, y: 2, listed: false, icon: "", places: 1 })),
+  last_items: [["Frags", "Blight Thread", 30, 80], ["Frags", "Blight Thread", 20, 53], ["Frags", "Legion Thread", 18, 65.7], ["GEM", "Summon Carrion Golem of Hordes", 1, 21], ["GEM", "Vaal Grace", 1, 5], ["GEM", "Enlighten Support", 1, 160]]
+    .map(([tab, name, stack, value]) => ({ tab, name, stack, value, x: 2, y: 4, listed: name === "Vaal Grace", icon: "", places: 1 })),
   sessions: [], current: { name: "Strand alch and go", league: "Covens", tabs: [5, 6], start: now - 2400, end: null, start_value: 300, last_value: 445, paused: 0, paused_at: null },
   strategies: [["Strand alch and go", 3, 2.5, 212]],
 };

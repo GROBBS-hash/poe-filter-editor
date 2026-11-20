@@ -12,7 +12,7 @@ export type Session = { name: string; league: string; tabs: number[]; start: num
   paused: number; paused_at: number | null };
 export type WealthView = { account: string; has_sessid: boolean; league: string; tabs: Tab[]; tracked: number[]; min: number; minutes: number;
   snapshots: Snapshot[]; missed: Valued[]; sessions: Session[]; current: Session | null; strategies: [string, number, number, number][];
-  divine: number | null; now: number; profiles?: ScanProfile[]; active?: string | null };
+  divine: number | null; now: number; profiles?: ScanProfile[]; active?: string | null; last_items?: Valued[] };
 
 /** Seconds a session has run (pauses taken out). */
 export function seconds(s: Session, now: number) {
@@ -59,6 +59,59 @@ function History({ snaps, divine }: { snaps: Snapshot[]; divine: number | null }
       <div className="muted small row-between"><span>{new Date(t0 * 1000).toLocaleDateString()}</span>
         <span>low <Worth c={lo} divine={divine} /> · high <Worth c={hi} divine={divine} /></span>
         <span>{new Date(t1 * 1000).toLocaleDateString()}</span></div>
+    </div>
+  );
+}
+
+/** What each tab is worth after a scan; pick one to see its items, most valuable first (same item stacks added up). */
+function ByTab({ tabs, items, divine }: { tabs: [string, number][]; items: Valued[]; divine: number | null }) {
+  const [pick, setPick] = useState<string | null>(null);
+  const tab = pick && tabs.some(([t]) => t === pick) ? pick : tabs[0]?.[0] ?? null;
+  const top = Math.max(...tabs.map(([, c]) => c), 1);
+  const list = useMemo(() => {
+    const groups: (Valued & { places: number })[] = [];
+    for (const it of items.filter((i) => i.tab === tab)) {
+      const g = groups.find((x) => x.name === it.name);
+      if (g) { g.stack += it.stack; g.value += it.value; g.places += 1; g.listed = g.listed && it.listed; }
+      else groups.push({ ...it, places: 1 });
+    }
+    return groups.sort((a, b) => b.value - a.value);
+  }, [items, tab]);
+  const total = tabs.find(([t]) => t === tab)?.[1] ?? 0;
+  return (
+    <div className="card">
+      <h2>By tab</h2>
+      <p className="muted small">What each tab was worth in your last scan. Click a tab to see what's in it.</p>
+      <div className="w-bytab">
+        {tabs.map(([t, c]) => (
+          <button key={t} className={`w-bytab-chip ${t === tab ? "on" : ""}`} onClick={() => setPick(t)}>
+            <span className="w-bytab-name">{t}</span>
+            <span className="w-bytab-val"><Worth c={c} divine={null} /></span>
+            <span className="w-bytab-bar"><span style={{ width: `${Math.max(3, (c / top) * 100)}%` }} /></span>
+          </button>
+        ))}
+      </div>
+      {tab && (
+        <>
+          <div className="row-between w-bytab-head">
+            <b>{tab}</b>
+            <span><Worth c={total} divine={divine} /> <span className="muted small">· {list.length} kinds of item</span></span>
+          </div>
+          {list.length === 0 ? <p className="muted small">Scan again to see this tab's items (older scans only kept the totals).</p> : (
+            <table className="w-table w-missed"><tbody>
+              {list.slice(0, 200).map((m, i) => (
+                <tr key={i}>
+                  <td>{m.icon && <img src={m.icon} alt="" width={24} height={24} />}</td>
+                  <td>{m.name}{m.stack > 1 ? ` ×${m.stack}` : ""}{m.places > 1 && <span className="muted small"> in {m.places} places</span>}
+                    {m.stack > 1 && <div className="muted small">{+(m.value / m.stack).toFixed(2)}c each</div>}</td>
+                  <td className="muted small">{m.listed ? <span className="w-listed">listed</span> : m.places === 1 ? `${m.x + 1},${m.y + 1}` : ""}</td>
+                  <td><Worth c={m.value} divine={divine} /></td>
+                </tr>
+              ))}
+            </tbody></table>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -228,13 +281,10 @@ export default function Wealth() {
           {busy === "scan" && progress && <div className="w-bar"><div style={{ width: `${(progress[0] / Math.max(1, progress[1])) * 100}%` }} /></div>}
           <p className="muted small">pathofexile.com only allows so many requests a minute, so a big stash takes a few minutes. The app waits its turn.</p>
           <History snaps={mine} divine={v.divine} />
-          {last && last.tabs.length > 0 && (
-            <details className="w-tabs"><summary className="small">By tab</summary>
-              <table className="w-table"><tbody>{last.tabs.slice(0, 30).map(([t, c]) => <tr key={t}><td>{t}</td><td><Worth c={c} divine={v.divine} /></td></tr>)}</tbody></table>
-            </details>
-          )}
         </div>
       )}
+
+      {connected && last && last.tabs.length > 0 && <ByTab tabs={last.tabs} items={v.last_items ?? []} divine={v.divine} />}
 
       {connected && (
         <div className="card">
