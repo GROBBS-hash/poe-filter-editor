@@ -4,6 +4,7 @@ import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { CurrencyIcon, ItemIcon } from "./icons";
 import BaseUniques from "./BaseUniques";
+import RelatedItems from "./RelatedItems";
 import { Item, RARITY_COLOUR, itemTitle } from "./types";
 
 type StatFilter = { id: string; label: string; value: number; min: number | null; enabled: boolean; kind: string; tier: number | null; junk?: boolean; roll?: number | null; range?: string | null };
@@ -478,6 +479,8 @@ export default function TradeWindow() {
           <button className="link small" onClick={() => invoke("open_url", { url: res.url })}>Open on the trade site</button>
         </div>
       )}
+      {/* Awakened-style: a fragment's set / parts and what the boss drops. Below the prices: extra info. */}
+      {(it.rarity === "Unique" ? it.name : it.base_type) && <RelatedItems name={(it.rarity === "Unique" ? it.name : it.base_type)!} divine={divine} />}
       {!check.bulk && savedBlock}
       {reporting == null ? (
         <button className="link small tw-report-toggle" onClick={() => { setReporting(""); setReported(""); }}

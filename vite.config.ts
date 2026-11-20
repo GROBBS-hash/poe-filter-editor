@@ -20,7 +20,7 @@ function previewData(): Plugin {
             .map((f) => ({ f, t: fs.statSync(path.join(samples, f)).mtimeMs })).sort((a, b) => b.t - a.t).map((x) => x.f.replace(/\.json$/, "")) : [];
           return send(list);
         }
-        const file = url === "/icons" ? path.join(dir, "icons_poe1.json")
+        const file = url === "/icons" ? path.join(dir, "icons_poe1.json") : url === "/prices" ? path.join(dir, "prices_poe1.json")
           : url.startsWith("/samples/") ? path.join(samples, path.basename(url) + ".json") : "";
         if (!file || !fs.existsSync(file)) return send(null);
         res.setHeader("Content-Type", "application/json");

@@ -147,6 +147,11 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   now falls back to "… (Local)" stats (e.g. local % ES on armour). Live: his Fossilised Spirit Shield → 6 listed.
   Item-level bands (`ilvl_band` / `ilvlBand`): 1–67, 68–74, 75–81, 82–83, 84–85, 86+; base searches use the item's
   level up to its band top (`TradeSetup.ilvl_max`). Fractured box is one row: "Fractured · Price as base · ilvl 73–74".
+- Related items 20 Nov (Awakened-style): Ctrl+D on a fragment, invitation, boss key, Maven's Writ etc. shows the
+  rest of its set with prices and the whole-set total, "made from 10 × Crescent Splinter" (parts vs whole), and the
+  boss's drops with poe.ninja prices, dearest first. Data `core/data/related_items.json` from Awakened PoE Trade's
+  item-drop.json (MIT), rebuilt with `node tools/build_related_items.mjs`; core `related.rs`, command
+  `related_items`, `src/RelatedItems.tsx`. Preview page has "Fragment: …" examples using the real price file.
 
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
@@ -172,6 +177,8 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Prices shown in chaos and divines with orb icons; bulk "1 div ≈ N items".
 - [ ] Transfigured gem: searches without "Unknown item base type".
 - [ ] Foulborn / mutated unique searches correctly.
+- [ ] Ctrl+D on an invitation / Shaper or Elder fragment / Maven's Writ: the set (with total), parts and boss drops
+      show with prices at the bottom of the window.
 - [ ] Save search, Saved searches list (Run / Live / delete); a live search pops up new listings with a Whisper button.
 
 **Maps**
