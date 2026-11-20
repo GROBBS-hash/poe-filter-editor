@@ -1304,3 +1304,13 @@ li:hover > .bv-item .bv-price { opacity: 1; }
 .tw-tab-why { display: block; font-size: 10.5px; font-weight: 500; opacity: .8; margin-top: 1px; }
 .tw-base-sum { margin: 0 0 8px; padding: 7px 10px; border-radius: 8px; font-size: 12.5px; line-height: 1.4;
   background: rgba(162,145,98,0.12); border: 1px solid rgba(162,145,98,0.4); color: #eadfbf; }
+
+/* Price window: "Which stat to untick?" after a search found nothing. */
+.tw-untick-ask { display: block; width: 100%; margin: 6px 0 4px; padding: 7px 10px; border-radius: 8px; cursor: pointer; font-weight: 600;
+  background: rgba(212,175,55,0.12); color: #e6c65c; border: 1px solid rgba(212,175,55,0.4); }
+.tw-untick-ask:hover { background: rgba(212,175,55,0.22); }
+.tw-untick { display: flex; flex-direction: column; gap: 4px; margin: 6px 0 4px; }
+.tw-untick button { display: flex; align-items: baseline; gap: 6px; text-align: left; padding: 6px 10px; border-radius: 7px; cursor: pointer;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #ddd; font-size: 12.5px; }
+.tw-untick button:hover { background: rgba(212,175,55,0.15); border-color: rgba(212,175,55,0.45); }
+.tw-untick-n { margin-left: auto; color: #8fd48f; white-space: nowrap; font-weight: 600; }

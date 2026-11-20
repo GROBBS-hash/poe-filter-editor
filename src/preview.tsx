@@ -40,7 +40,7 @@ const EXAMPLE: { check: Json; result: Json } = {
 };
 
 let current = EXAMPLE;
-let mode: "saved" | "slow" | "error" = "saved";
+let mode: "saved" | "slow" | "error" | "none" = "saved";
 let icons: Json = {};
 let prices: { name: string; value: number }[] = [];
 
@@ -80,8 +80,15 @@ mockIPC(async (cmd, args) => {
   if (cmd === "trade_search") {
     if (mode === "error") throw "Waiting on the trade site's limit: try again in 12s";
     await new Promise((r) => setTimeout(r, mode === "slow" ? 2500 : 400));
+    if (mode === "none") return { listings: [], summary: null, total: 0, url: "", divine: null };
     if (!current.result) throw "No trade result saved for this item (search it in the app once)";
     return current.result;
+  }
+  if (cmd === "trade_untick_one") {
+    // Shaped like his Entropy Grasp: which stat, left out, finds something.
+    await new Promise((r) => setTimeout(r, 1200));
+    const on = (((args as Json).setup as Json).filters as Json[]).filter((f) => f.enabled);
+    return on.map((f, i) => ({ key: f.id, label: f.label, total: [16, 7, 2, 0, 0][i] ?? 0 })).sort((a, b) => b.total - a.total);
   }
   if (cmd === "get_icons") return icons;
   if (cmd === "related_items") return related((args as Json).name);
@@ -133,6 +140,7 @@ function Controls() {
         <option value="saved">Trade: saved result</option>
         <option value="slow">Trade: slow (2.5s)</option>
         <option value="error">Trade: rate-limit error</option>
+        <option value="none">Trade: nothing found</option>
       </select>
       <button onClick={() => load(pick)}>Press Ctrl+D again</button>
       <span className="muted small">{list.length} saved price checks</span>

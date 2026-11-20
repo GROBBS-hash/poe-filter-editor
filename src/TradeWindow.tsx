@@ -180,6 +180,28 @@ function rowGroup(f: StatFilter, max: [number, number]): [string, string] {
   return ["Other mods", ""];
 }
 
+/** A search found nothing: offers to try it without each ticked stat, then lists what each would find. */
+function UntickHelp({ state, onAsk, onPick }: { state: null | "busy" | string | { key: string; label: string; total: number }[];
+  onAsk: () => void; onPick: (key: string) => void }) {
+  if (state === null) return (
+    <button className="tw-untick-ask" onClick={onAsk}
+      title="Searches again once without each ticked stat (one trade search each) and shows how many each would find">
+      Which stat to untick?</button>
+  );
+  if (state === "busy") return <div className="tw-untick muted small">Trying the search without each stat…</div>;
+  if (typeof state === "string") return <div className="tw-untick qm-warn">{state}</div>;
+  const found = state.filter((t) => t.total > 0);
+  return (
+    <div className="tw-untick">
+      {found.length === 0 && <div className="muted small">Still nothing with any one stat unticked: untick two or more.</div>}
+      {found.map((t) => (
+        <button key={t.key} onClick={() => onPick(t.key)} title="Untick it and search">
+          Untick <b>{t.label}</b> <span className="tw-untick-n">{t.total} for sale</span></button>
+      ))}
+    </div>
+  );
+}
+
 /** Awakened's "market ratio" row: poe.ninja's price, placed among the offers so you can see who's under or over it. */
 function MarketRatio({ c, divine }: { c: number; divine: number | null }) {
   return (
@@ -306,6 +328,8 @@ export default function TradeWindow() {
   const [check, setCheck] = useState<Check | null>(null);
   const [setup, setSetup] = useState<Setup | null>(null);
   const [res, setRes] = useState<Result | null>(null);
+  // "Which stat to untick?": the search tried once without each ticked stat (only when you ask).
+  const [untick, setUntick] = useState<null | "busy" | string | { key: string; label: string; total: number }[]>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
@@ -349,7 +373,7 @@ export default function TradeWindow() {
   }, []);
 
   const run = useCallback(async (s: Setup) => {
-    setBusy(true); setErr(""); setRes(null); setSearched(searchKey(s));
+    setBusy(true); setErr(""); setRes(null); setUntick(null); setSearched(searchKey(s));
     try { setRes(await invoke<Result>("trade_search", { setup: s })); } catch (e) { setErr(String(e)); }
     setBusy(false);
   }, []);
@@ -358,7 +382,7 @@ export default function TradeWindow() {
     const a = listen<Check>("price-check", (e) => {
       const c = e.payload;
       setCheck(c); setSetup(c.setup); setRes(null); setSearched(null); setBulk(null); setAi(null); setErr(c.error ?? ""); setCopied(null); setPay("chaos"); setMinStock(false); setShowFixers(false);
-      setSaving(null); setShowSaved(!c.setup); setPreset(null); setMapMods(false); setReporting(null); setReported(""); setAsBase(false); setOwnSetup(null); window.scrollTo(0, 0);
+      setSaving(null); setShowSaved(!c.setup); setPreset(null); setMapMods(false); setReporting(null); setReported(""); setAsBase(false); setOwnSetup(null); setUntick(null); window.scrollTo(0, 0);
       invoke<Saved[]>("saved_list").then(setSaved).catch(() => {});
       if (c.bulk) {
         // Worth half a divine or more: sellers mostly take divines, so ask for those first.
@@ -453,6 +477,14 @@ export default function TradeWindow() {
         waiting={!res && !busy && !check.bulk ? (searched ? "Filters changed: move onto Search again" : "Pick the stats, then move your mouse onto Search") : null}
         ninja={check.ninja} ninjaNote={it.rarity === "Unique" && !it.name ? " (best ground unique on this base)" : ""} stack={it.stack_size ?? undefined} name={it.base_type} />
       {err && <div className="qm-warn">{err}</div>}
+      {res && res.total === 0 && searched === searchKey(setup) && (setup.filters.some((f) => f.enabled) || setup.base_only || setup.ilvl_min) && (
+        <UntickHelp state={untick} onAsk={() => { setUntick("busy");
+            invoke<{ key: string; label: string; total: number }[]>("trade_untick_one", { setup }).then(setUntick).catch((e) => setUntick(String(e))); }}
+          onPick={(key) => {
+            const s = key === "base" ? { ...setup, base_only: false } : key === "ilvl" ? { ...setup, ilvl_min: null, ilvl_max: null }
+              : { ...setup, filters: setup.filters.map((f) => f.id === key ? { ...f, enabled: false } : f) };
+            setUntick(null); setSetup(s); run(s); }} />
+      )}
       {it.rarity === "Unique" && !it.name && it.base_type && <BaseUniques base={it.base_type} divine={divine} />}
 
       {check.map && <MapCheck map={check.map} />}

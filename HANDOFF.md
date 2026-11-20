@@ -321,6 +321,10 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Live 21 Nov on his saved checks: velour boots 2015, magic dagger 121, magic burgonet 1947. Dev check:
   `cargo run -p filter-core --example basecheck -- <data dir>/trade_stats_poe1.json <data dir>/samples`.
 
+- "Which stat to untick?" 21 Nov (he asked): after a search finds nothing, a button under the price box runs
+  `trade_untick_one`: the search again without each ticked stat (and without "<base> only" / item level), one search
+  request each, at most 8, stopping early if the trade site's limit is near; lists "Untick <stat> · N for sale", most first;
+  click = untick + search. Preview: "Trade: nothing found" mode mocks it.
 - Prefix / suffix limits 21 Nov: `trade_rules::affix_limits` reads implicits like the Cogwork Ring's "-1 Prefix Modifier
   allowed" / "+1 Suffix Modifier allowed" (jewels 2/2, other rares 3/3); open-slot rows and the "Prefixes · up to N on this
   item" headings use it (`TradeSetup.affix_max`). His Dragon Turn: 2/4, so 1 free prefix + 1 free suffix (was "2 free prefixes").
@@ -362,6 +366,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Roll bars and "T3 range 6–11" numbers look right; tier badges coloured. (Roll bars confirmed 20 Nov.)
 - [ ] Every Ctrl+D shows a trade price straight away (uniques, corpses, gems too) in the big box at the top.
       (Confirmed 20 Nov for a unique, a unique belt and a gem.)
+- [ ] A search with nothing listed: "Which stat to untick?" lists what each stat left out would find; clicking one searches.
 - [ ] Cogwork Ring: "Prefixes · up to 2", "Suffixes · up to 4", open prefix / suffix counts right.
 - [ ] "This item / As a base" tabs (Awakened-style): "As a base" shows on fractured / influenced / synthesised items, magic jewels, cluster
       jewels and unfinished gear of item level 82+, says why, and the prices look like Awakened's base search. Not on

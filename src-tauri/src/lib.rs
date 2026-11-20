@@ -697,6 +697,49 @@ fn trade_search(app: AppHandle, setup: filter_core::trade::TradeSetup) -> Result
     Ok(r)
 }
 
+#[derive(Serialize)]
+struct UntickTry {
+    /// A filter id, or "base" (same base only) / "ilvl" (item level).
+    key: String,
+    label: String,
+    total: u64,
+}
+
+/// A search found nothing: tries it once without each ticked stat (and without "same base only" / item level),
+/// most hopeful first, so the window can say which one to untick. One search request per try (no listings
+/// fetched); stops early, keeping what it has, if the trade site's limit gets close. At most 8 tries.
+#[tauri::command(async)]
+fn trade_untick_one(app: AppHandle, setup: filter_core::trade::TradeSetup) -> Result<Vec<UntickTry>, String> {
+    *LAST_MANUAL.lock().unwrap() = Some(std::time::Instant::now());
+    let (poe2, league) = trade_league(&app);
+    let mut tries: Vec<(String, String, filter_core::trade::TradeSetup)> = Vec::new();
+    for (i, f) in setup.filters.iter().enumerate().filter(|(_, f)| f.enabled) {
+        let mut s = setup.clone();
+        s.filters[i].enabled = false;
+        tries.push((f.id.clone(), f.label.clone(), s));
+    }
+    if setup.base_only && setup.category.is_some() {
+        let mut s = setup.clone();
+        s.base_only = false;
+        tries.push(("base".into(), format!("{} only", if setup.base.is_empty() { &setup.item.base_type } else { &setup.base }), s));
+    }
+    if setup.ilvl_min.is_some() {
+        let mut s = setup.clone();
+        s.ilvl_min = None; s.ilvl_max = None;
+        tries.push(("ilvl".into(), "Item level".into(), s));
+    }
+    let mut out = Vec::new();
+    for (key, label, s) in tries.into_iter().take(8) {
+        match trade_api::search(poe2, &league, &trade_query(&app, poe2, &s)) {
+            Ok((_, _, total)) => out.push(UntickTry { key, label, total }),
+            Err(e) if out.is_empty() => return Err(e),
+            Err(_) => break,
+        }
+    }
+    out.sort_by(|a, b| b.total.cmp(&a.total));
+    Ok(out)
+}
+
 // ---------- saved & live searches ----------
 
 #[derive(Serialize)]
@@ -2313,7 +2356,7 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            price_build_item, buy_build_item, overview,
+            price_build_item, buy_build_item, trade_untick_one, overview,
             create_profile,
             list_filters,
             set_active,
