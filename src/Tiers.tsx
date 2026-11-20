@@ -6,6 +6,41 @@ import StyleEditor, { CurrentStyle, CustomStyle, LookButton, Preview, fromCurren
 import { ItemIcon } from "./icons";
 import MapTiers, { MapSection } from "./MapTiers";
 
+const CDN = "https://web.poecdn.com/image/Art/2DItems/";
+/** The picture next to each section in the menu: an item from the game ("×3" etc. for stacks). Sections not listed
+ *  here use their first item; ones with no items and no picture get none. */
+const SECTION_ICON: Record<string, { item?: string; url?: string; badge?: string }> = {
+  "Map tiers": { item: "Map (Tier 16)" },
+  "Currency": { item: "Chaos Orb" }, "Stacks of 3+": { item: "Chaos Orb", badge: "×3" }, "Stacks of 6+": { item: "Chaos Orb", badge: "×6" },
+  "Wisdom scroll stacks": { item: "Scroll of Wisdom" }, "Portal scroll stacks": { item: "Portal Scroll" },
+  "Gold": { url: CDN + "Currency/Ruthless/CoinPileTier3.png" },
+  "Campaign currency": { item: "Orb of Transmutation" }, "Campaign currency stacks": { item: "Orb of Transmutation", badge: "×3" },
+  "Life flasks": { url: CDN + "Flasks/lifeflask11.png" }, "Mana flasks": { url: CDN + "Flasks/manaflask11.png" }, "Hybrid flasks": { url: CDN + "Flasks/hybridflask1.png" },
+  "Utility flasks": { url: CDN + "Flasks/sprint.png" }, "Wand upgrades": { item: "Kinetic Wand" }, "Weapon upgrades": { item: "Graceful Sword" },
+  "First areas": { item: "Astral Plate" }, "Act 1 gear": { item: "Iron Ring" }, "R-G-B linked items": { item: "Chromatic Orb" },
+  "4-linked items": { item: "Orb of Fusing" }, "Other magic items": { item: "Orb of Alteration" },
+  "Divination cards": { url: CDN + "Divination/InventoryIcon.png" },
+  "Uniques": { item: "Headhunter" }, "Replica uniques": { item: "Replica Headhunter" }, "Foulborn uniques": { item: "Foulborn Exalted Orb" },
+  "Fragments": { item: "Fragment of the Phoenix" }, "Simulacrum splinters": { item: "Simulacrum Splinter" },
+  "Essences": { item: "Deafening Essence of Greed" }, "Fossils": { item: "Dense Fossil" }, "Oils": { item: "Golden Oil" },
+  "Delirium orbs": { item: "Fine Delirium Orb" }, "Omens": { item: "Omen of Amelioration" }, "Tattoos": { item: "Tattoo of the Arohongui Warrior" },
+  "Lifeforce": { item: "Vivid Crystallised Lifeforce" }, "Runegrafts": { item: "Runegraft of Blasphemy" },
+  "Rare gear by item tier": { item: "Hubris Circlet" }, "Fractured bases": { item: "Fractured Fossil" }, "Veiled items": { item: "Veiled Chaos Orb" },
+};
+
+/** A menu entry's picture (fixed size, so names line up even when there's no picture). */
+function SectionIcon({ title, first }: { title: string; first?: string }) {
+  const pick = SECTION_ICON[title];
+  const [broken, setBroken] = useState(false);
+  return (
+    <span className="tiers-ico">
+      {pick?.url && !broken ? <img src={pick.url} alt="" width={22} height={22} onError={() => setBroken(true)} />
+        : <ItemIcon base={pick?.item ?? first ?? null} size={22} />}
+      {pick?.badge && <span className="tiers-ico-badge">{pick.badge}</span>}
+    </span>
+  );
+}
+
 const MAPS_KEY = "__maps";
 
 type TierRow = { tier: string; name: string; visibility: string; style: CurrentStyle; bases: string[]; note: string; min_stack: number | null; min_item_tier?: number | null };
@@ -183,14 +218,15 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
         )}
         <div className="tiers-group">
           <div className="tiers-gname">Maps</div>
-          <button className={"tiers-sec " + (sel === MAPS_KEY ? "on" : "")} onClick={() => { setSel(MAPS_KEY); setEditing(null); }}>Map tiers</button>
+          <button className={"tiers-sec " + (sel === MAPS_KEY ? "on" : "")} onClick={() => { setSel(MAPS_KEY); setEditing(null); }}><SectionIcon title="Map tiers" />Map tiers</button>
         </div>
         {groups.map(([g, list]) => (
           <div key={g} className="tiers-group">
             <div className="tiers-gname">{g}</div>
             {list.map((s) => {
               const k = s.type_path.join(">");
-              return <button key={k + (s === extra ? "*" : "")} className={`tiers-sec ${sel === k ? "on" : ""}`} onClick={() => { setSel(k); setEditing(null); }}>{s.title}</button>;
+              return <button key={k + (s === extra ? "*" : "")} className={`tiers-sec ${sel === k ? "on" : ""}`} onClick={() => { setSel(k); setEditing(null); }}>
+                <SectionIcon title={s.title} first={s.tiers.find((t) => t.bases.length)?.bases[0]} />{s.title}</button>;
             })}
           </div>
         ))}
@@ -206,9 +242,13 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
               <div className="note">This is one of NeverSink's own rules (not a tier list). <b>Untick</b> a row to hide what it
                 catches, <b>click its look</b> to restyle it, <b>Reset</b> to undo your change. Your change survives NeverSink updates.</div>
             )}
-            {section.shared_bases && !isExtra && (
+            {section.shared_bases && !isExtra && section.group !== "Before maps" && (
               <div className="note">Each base sits in several rows here (one per item tier), so dragging is off: use the
                 item tier boxes, ticks and looks instead. Top bases are the most valuable to pick up.</div>
+            )}
+            {section.group === "Before maps" && (
+              <div className="note">Rules for the campaign, before maps: each row is one step NeverSink shows while you level
+                (most only up to a certain area level). <b>Untick</b> a step to hide it, or change how it looks.</div>
             )}
             <h2>{section.title} <Tip>NeverSink sorts items into tiers, best at the top. <b>Untick</b> a tier to hide everything in it.
               <b> Click the label</b> to change how the whole tier looks. <b>Drag</b> an item onto another tier to move it there

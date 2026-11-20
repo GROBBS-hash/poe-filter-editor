@@ -329,6 +329,14 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   "Item Level: 1". Live: Lightning Tendrils of Eccentricity 21/20 uncorrupted 0, corrupted 13. (Confirmed in game.)
   Support gems get " Support" on the end (PoB's "Arcane Surge" = trade "Arcane Surge Support"; was "Unknown item base type").
   "Open on the trade site" now shows after every search, also when nothing is listed.
+- Tiers menu 21 Nov (he asked): item pictures before every section (`SECTION_ICON` in Tiers.tsx: game icons by name, GGG's
+  CDN art for flasks / gold / cards, "×3" / "×6" badges on stacks; else the section's first item). Transmutation and
+  augmentation stacks are no longer listed. New group "Before maps" (`tiers::LEVELLING`): campaign currency (+ stacks),
+  life / mana / hybrid / utility flasks (named "Small life flask"…), wand and weapon upgrades ("Step N"), first areas,
+  Act 1 gear, R-G-B and 4-linked items, other magic items. Steps without item lists come from `section_at`, so every step
+  shows (tick = show/hide, look editable); plain names in `levelling_tier_name`. R-G-B is commented out in his Very
+  Strict filter, so it doesn't show there. Dev: `tierdump` example (`--json` > public/_tiers.json, git-ignored) feeds the
+  app preview's Tiers page; preview-app now loads real icons from the running editor.
 - Prefix / suffix limits 21 Nov: `trade_rules::affix_limits` reads implicits like the Cogwork Ring's "-1 Prefix Modifier
   allowed" / "+1 Suffix Modifier allowed" (jewels 2/2, other rares 3/3); open-slot rows and the "Prefixes · up to N on this
   item" headings use it (`TradeSetup.affix_max`). His Dragon Turn: 2/4, so 1 free prefix + 1 free suffix (was "2 free prefixes").
@@ -413,6 +421,10 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 
 - [x] (Confirmed 21 Nov.) Price check on gear with resistances: "total Elemental Resistance" and "total to Chaos Resistance" ticked, fire /
       cold / lightning totals there to tick, no single resistance mods left in the list.
+
+**Tiers menu (21 Nov)**
+- [ ] Pictures next to every section; Transmutation / Augmentation stacks gone.
+- [ ] "Before maps" group: hiding a step (e.g. Act 1 boots, or small life flasks) works in game after F4; looks change.
 
 **Maps**
 - [ ] Ctrl+D on a map: flags the mods on the "Map check" list; "Suggest from my build" picks sensible mods.

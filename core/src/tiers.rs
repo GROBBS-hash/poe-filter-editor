@@ -36,6 +36,29 @@ pub struct Section {
     pub shared_bases: bool,
 }
 
+/// The group of levelling rules (the campaign, before maps): flasks, weapon upgrades, links, magic items…
+/// Many aren't item lists, just show / hide and a look per step; they're listed anyway, with plain names.
+pub const LEVELLING: &str = "Before maps";
+
+/// NeverSink's step names in the levelling rules, in plain words ("r03" -> "Step 3", "earlybodyarmours" -> …).
+fn levelling_tier_name(t: &str) -> Option<String> {
+    let step = |prefix: char| t.strip_prefix(prefix).and_then(|n| n.trim_end_matches("bas").parse::<u32>().ok()).map(|n| format!("Step {n}"));
+    if let Some(s) = step('r').or_else(|| step('w')).or_else(|| step('l')) { return Some(s); }
+    Some(match t {
+        "earlybodyarmours" => "Early body armours", "threesocketedgear" => "Gear with 3 sockets", "firstareas" => "Anything in the first areas",
+        "casterweapons" => "Caster weapons", "castercraftrings" => "Rings to craft (casters)", "general" => "General", "boots" => "Boots",
+        "quivers" => "Quivers", "physical" => "Physical (attack) bases", "jewellery" => "Jewellery",
+        "largemagicblocker" => "Big magic items", "mediummagicblocker" => "Medium magic items", "rest" => "Everything else",
+        "act1" => "Act 1", "act2" => "Act 2", "untilmudflats" => "Until the Mud Flats", "firstlevels" => "First levels",
+        "quicksilver" => "Quicksilver", "asortedutility" => "Other utility flasks",
+        "rgblarge" => "Big R-G-B items", "rgbmedium" => "Medium R-G-B items", "rgbsmall1" | "rgbsmall2" => "Small R-G-B items",
+        "essences" => "Essences", "t2chance" => "Orb of Alteration", "t3transearly" => "Transmutation (early acts)",
+        "t3trans" => "Transmutation", "t4misc" => "Scraps and whetstones", "t5aug" => "Augmentation", "portal" => "Portal scrolls",
+        "wisdom" => "Wisdom scrolls",
+        _ => return None,
+    }.to_string())
+}
+
 /// Known sections: (type path, group, title). Order here is the order shown.
 const KNOWN: &[(&str, &str, &str)] = &[
     ("currency", "Currency", "Currency"),
@@ -43,10 +66,20 @@ const KNOWN: &[(&str, &str, &str)] = &[
     ("currency->stackedsix", "Currency", "Stacks of 6+"),
     ("currency->stackedsupplieswisdom", "Currency", "Wisdom scroll stacks"),
     ("currency->stackedsuppliesportal", "Currency", "Portal scroll stacks"),
-    ("currency->stackedsupplieshigh", "Currency", "Transmutation stacks"),
-    ("currency->stackedsupplieslow", "Currency", "Augmentation stacks"),
-    ("currency->leveling", "Currency", "Campaign currency"),
-    ("currency->levelingstacked", "Currency", "Campaign currency stacks"),
+    // Transmutation / augmentation stacks are left out (he found them not worth a menu entry).
+    ("currency->leveling", LEVELLING, "Campaign currency"),
+    ("currency->levelingstacked", LEVELLING, "Campaign currency stacks"),
+    ("leveling->flasks->life", LEVELLING, "Life flasks"),
+    ("leveling->flasks->mana", LEVELLING, "Mana flasks"),
+    ("leveling->flasks->hybrid", LEVELLING, "Hybrid flasks"),
+    ("leveling->flasks->utility", LEVELLING, "Utility flasks"),
+    ("leveling->wandprogression", LEVELLING, "Wand upgrades"),
+    ("leveling->weaponprogression", LEVELLING, "Weapon upgrades"),
+    ("leveling->firstlevels", LEVELLING, "First areas"),
+    ("leveling->normalmagic->act1", LEVELLING, "Act 1 gear"),
+    ("leveling->normalmagic->rgb", LEVELLING, "R-G-B linked items"),
+    ("leveling->normalmagic->4l", LEVELLING, "4-linked items"),
+    ("leveling->magic->remaining", LEVELLING, "Other magic items"),
     ("divination", "Divination cards", "Divination cards"),
     ("uniques", "Uniques", "Uniques"),
     ("uniques->replicas", "Uniques", "Replica uniques"),
@@ -169,6 +202,25 @@ pub fn sections(segs: &[Segment]) -> Vec<Section> {
     for s in found.iter_mut() {
         let mut seen = std::collections::HashSet::new();
         s.shared_bases = s.tiers.iter().flat_map(|t| t.bases.iter()).any(|b| !seen.insert(b.clone()));
+    }
+    // Levelling rules that aren't item lists (weapon steps, first areas…) still get their section.
+    // Every step, with or without an item list (Act 1 gear's boots / quivers / jewellery steps have none).
+    for (key, group, title) in KNOWN.iter().filter(|k| k.1 == LEVELLING) {
+        let path: Vec<String> = key.split("->").map(String::from).collect();
+        let Some(mut sec) = section_at(segs, &path) else { continue };
+        sec.group = group.to_string(); sec.title = title.to_string();
+        // Item lists still allow dragging when no item sits in two rows.
+        let mut seen = std::collections::HashSet::new();
+        sec.shared_bases = sec.tiers.iter().flat_map(|t| t.bases.iter()).any(|b| !seen.insert(b.clone()));
+        match found.iter().position(|s| s.type_path == path) { Some(i) => found[i] = sec, None => found.push(sec) }
+    }
+    for s in found.iter_mut().filter(|s| s.group == LEVELLING) {
+        // Flask steps are one size each ("Small" in the filter): name them by it, e.g. "Small life flask".
+        let kind = s.title.strip_suffix(" flasks").map(str::to_lowercase);
+        for t in &mut s.tiers {
+            if let (Some(k), [b]) = (&kind, t.bases.as_slice()) { if !b.contains("Flask") { t.name = format!("{b} {k} flask"); continue; } }
+            if let Some(n) = levelling_tier_name(&t.tier) { t.name = n; }
+        }
     }
     let rank = |s: &Section| KNOWN.iter().position(|k| k.0 == s.type_path.join("->")).unwrap_or(usize::MAX);
     // Unknown sections only when none are known (e.g. PoE 2's different names).
@@ -452,8 +504,11 @@ mod tests {
         let segs = crate::filter::parse_filter(f);
         let tp: Vec<String> = ["leveling", "normalmagic", "4l"].iter().map(|s| s.to_string()).collect();
         let s = super::section_at(&segs, &tp).unwrap();
-        assert_eq!(s.title, "Levelling › White & blue › 4-links");
+        assert_eq!(s.title, "4-linked items"); // listed under "Before maps" now
         assert_eq!(s.tiers[0].note, "4+ links, normal & magic, area level <= 67");
+        // ...and the Tiers tab lists it under "Before maps" even though it has no item list.
+        let all = super::sections(&segs);
+        assert!(all.iter().any(|x| x.title == "4-linked items" && x.group == super::LEVELLING && x.tiers[0].name == "General"));
     }
     use super::*;
     use crate::filter::{parse_filter, render_filter};

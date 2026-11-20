@@ -95,7 +95,8 @@ mockIPC((cmd, args) => {
     mods: [{ id: 1, text: "Monsters reflect 18% of Elemental Damage", token: "s def", scary: 900, nightmare: false, trade_id: null, danger: "Elemental reflect" },
       { id: 2, text: "Players cannot Regenerate Life, Mana or Energy Shield", token: "t reg", scary: 800, nightmare: false, trade_id: null, danger: "No regen" }] };
   if (cmd === "map_tool_regex") return "\"!s def\"";
-  if (cmd === "get_icons") return {};
+  // Real icons when the editor is running (vite serves the app's icon list), else none.
+  if (cmd === "get_icons") return fetch("/preview-data/icons").then((r) => r.json()).catch(() => ({}));
   if (cmd === "get_settings") return { key_atlas: "F7" };
   if (cmd === "atlas_list") return atlas;
   if (cmd === "atlas_use") { const a = args as { id: number; variant: number }; atlas = { ...atlas, active: a.id, variant: a.variant }; return atlas; }
@@ -106,7 +107,8 @@ mockIPC((cmd, args) => {
   if (cmd === "pob_get") return pob();
   if (cmd === "build_tree_opt") return [true, "P"];
   if (cmd === "list_sounds") return [];
-  if (cmd === "get_tiers") return [];
+  // Tiers sections: public/_tiers.json when present (tierdump --json from a real filter), else none.
+  if (cmd === "get_tiers") return fetch("/_tiers.json").then((r) => r.ok ? r.json() : []).catch(() => []);
   if (cmd === "get_map_tiers") return mapTiers();
   if (cmd === "set_tiers") { const a = args as { tiers: string[]; show: boolean | null; clearStyle?: boolean; reset?: boolean }; for (const t of a.tiers) { if (a.clearStyle) extrasOff.add(t); else if (a.reset) extrasOff.delete(t); } for (const t of a.tiers) { if (a.show === false) mapHidden.add(t); else if (a.show) mapHidden.delete(t); } return []; }
   return null;
