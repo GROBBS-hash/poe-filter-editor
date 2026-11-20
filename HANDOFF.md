@@ -579,7 +579,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 ## Left to do (agreed order)
 1. **GROBBS to work through "Still to check in game" above**; fix what he reports.
 2. Wealth tracker follow-ups (real account tested and rares priced via the trade site, 21 Nov):
-   PoeStash-style "search every tab" and guild stash; crafting planner (parked).
+   "search every tab" done 21 Nov; guild stash next; crafting planner (parked).
 3. Price check polish ideas (any resistance, trend line done 21 Nov; same seller + price already shows once with "× N";
    prices already in chaos and divines; maps already search by tier).
 4. Deferred earlier: installer + auto-update, batch mode tidy-up, PoE 2 coverage.
