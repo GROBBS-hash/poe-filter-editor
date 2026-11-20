@@ -31,7 +31,7 @@ const mapStyle = (b: string) => ({ font_size: 45, muted: false, text: b === "d" 
 const extrasOff = new Set<string>();
 const mapTiers = () => ({
   extras: [["upgrade", "Upgrade borders", "A red border on maps above the tier you're running now, so upgrades stand out."], ["bands", "Tier group borders", "A dark border on red maps and a light one on lower maps."], ["implicit", "Implicit borders", "A gold border on maps with implicit mods (e.g. from the atlas)."]]
-    .map(([key, title, what]) => ({ key, title, what, tiers: [key], on: !extrasOff.has(key) })),
+    .map(([key, title, what]) => ({ key, title, what, tiers: [key], on: !extrasOff.has(key), border: key === "upgrade" ? [220, 50, 0, 255] : key === "bands" ? [0, 0, 0, 255] : [255, 180, 0, 255], sample_tier: key === "implicit" ? 10 : 14 })),
   tiers: Array.from({ length: 16 }, (_, i) => { const t = i + 1; const b = t >= 14 ? "a" : t >= 11 ? "b" : t >= 6 ? "c" : "d"; const tier = `maps_${b}_t${t}`;
     return { map_tier: t, band: b, tier, name: `Maps ${b} t${t}`, visibility: mapHidden.has(tier) ? "Hide" : "Show", style: mapStyle(b), bases: [], note: "", min_stack: null }; }),
   special: [["influenced", "Influenced maps (Shaper, Elder, Conquerors, Zana)", 4], ["blighted", "Blighted maps", 3], ["nightmare", "Valdo's, nightmare & guardian maps", 3]]

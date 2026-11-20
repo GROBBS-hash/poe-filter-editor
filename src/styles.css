@@ -1089,3 +1089,38 @@ button:focus-visible, select:focus-visible, .text:focus-visible, input:focus-vis
 .ao-stepbar { padding: 8px 10px 0; }
 .ao-stepbar .atv-stepbar { margin-bottom: 0; }
 .ao .atv-steps { font-size: 14px; }
+.map-tiers .mt-demo { display: flex; gap: 14px; align-items: center; flex: none; }
+.map-tiers .mt-demo-one { display: inline-flex; flex-direction: column; align-items: center; gap: 3px; }
+.map-tiers .mt-demo .se-preview { border-width: 2px; border-style: solid; }
+.map-tiers .mt-special-rules { padding: 0 0 2px 30px; margin-top: -4px; }
+
+/* Atlas window (F7), 21 Nov: same look as the build window; steps beside the tree; nothing scrolls the
+   whole window (the tree fits, lists scroll in their own panel with a scrollbar that shows on hover). */
+.ao { font-weight: 500; }
+.ao .bo-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.ao .bo-title::before { display: inline-block; vertical-align: -2px; margin-right: 9px; }
+.ao .ao-hint { margin-left: auto; white-space: nowrap; }
+.ao-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.ao-head select { max-width: 220px; font-size: 13.5px; padding: 5px 8px; }
+.ao-tabs { display: inline-flex; gap: 4px; padding: 3px; background: var(--input); border: 1px solid var(--line); border-radius: 10px; }
+.ao-tabs button { border: none; border-radius: 7px; padding: 5px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: none; min-height: 0; }
+.ao-tabs button.on { color: #1a1405; background: var(--gold); }
+.ao-body { flex: 1; min-height: 0; padding: 12px 14px 14px; display: flex; flex-direction: column; }
+.ao-empty { padding: 16px; }
+.ao-split { flex: 1; min-height: 0; display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 12px; }
+.ao-split.solo { grid-template-columns: minmax(0, 1fr); }
+.ao-steps { min-height: 0; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); overflow: hidden; }
+.ao-steps-head { display: flex; justify-content: space-between; align-items: center; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+.ao-steps .ao-scroll { padding: 6px; }
+.ao-treecol { min-height: 0; min-width: 0; display: flex; flex-direction: column; }
+.ao-treecol .atv-stepbar { margin-bottom: 8px; }
+.ao-treebox { flex: 1; min-height: 0; }
+.ao-treebox .tv-svg { border-radius: 12px; border-color: #2a3240; }
+.ao-scroll { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: transparent transparent; }
+.ao-scroll:hover { scrollbar-color: #36404e transparent; }
+.ao-scroll::-webkit-scrollbar { width: 6px; }
+.ao-scroll::-webkit-scrollbar-track { background: transparent; }
+.ao-scroll::-webkit-scrollbar-thumb { background: transparent; border-radius: 3px; }
+.ao-scroll:hover::-webkit-scrollbar-thumb { background: #36404e; }
+.ao-notes { padding-right: 4px; }
+.ao .atv-step { padding: 7px 8px; }

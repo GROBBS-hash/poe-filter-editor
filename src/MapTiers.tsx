@@ -6,7 +6,7 @@ import StyleEditor, { CurrentStyle, Preview, fromCurrent } from "./StyleEditor";
 type Row = { tier: string; name: string; visibility: string; style: CurrentStyle; note: string; bases: string[]; min_stack: number | null; min_item_tier?: number | null };
 type MapRow = Row & { map_tier: number; band: string };
 export type MapSection = { type_path: string[]; title: string; group: string; tiers: Row[]; shared_bases?: boolean };
-type MapExtra = { key: string; title: string; what: string; tiers: string[]; on: boolean };
+type MapExtra = { key: string; title: string; what: string; tiers: string[]; on: boolean; border?: number[]; sample_tier?: number };
 type MapData = { tiers: MapRow[]; special: MapSection[]; extras?: MapExtra[] };
 
 const BAND_NAMES: Record<string, string> = { a: "red maps, top", b: "red maps", c: "yellow maps", d: "white maps" };
@@ -135,6 +135,19 @@ export default function MapTiers({ profileId, onChange, onOpen }: { profileId: s
                 <span>{x.title}</span>
               </label>
               <span className="muted small mt-extra-what">{x.what}</span>
+              {(() => {
+                // Example: a map of that tier with this border, and the same map without it.
+                const t = data.tiers.find((r) => r.map_tier === (x.sample_tier ?? 14)) ?? data.tiers[data.tiers.length - 1];
+                if (!t || !x.border) return null;
+                const base = fromCurrent(t.style, "Maps");
+                const text = `Map (Tier ${t.map_tier})`;
+                return (
+                  <span className="mt-demo">
+                    <span className="mt-demo-one"><Preview s={{ ...base, border: x.border }} text={text} /><span className="muted small">with</span></span>
+                    <span className="mt-demo-one"><Preview s={{ ...base, border: null }} text={text} /><span className="muted small">without</span></span>
+                  </span>
+                );
+              })()}
             </div>
           </div>
         ))}
@@ -153,13 +166,13 @@ export default function MapTiers({ profileId, onChange, onOpen }: { profileId: s
                     ref={(el) => { if (el) el.indeterminate = !all && !none; }}
                     onChange={(e) => change(s.type_path, s.tiers.map((r) => r.tier), { show: e.target.checked }, `${s.title} ${e.target.checked ? "shown" : "hidden"}.`)} />
                   <span>{s.title}</span>
-                  <span className="muted small">{s.tiers.map((r) => r.name).join(" · ")}</span>
                 </label>
                 <span className="tier-look"><Preview s={fromCurrent(s.tiers[0].style, "Maps")} text="Map" /></span>
                 <span className="tier-tools">
                   <button className="link small" onClick={() => onOpen(s)}>Open</button>
                 </span>
               </div>
+              <div className="muted small mt-special-rules">{s.tiers.map((r) => r.name).join(" · ")}</div>
             </div>
           );
         })}

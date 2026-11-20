@@ -252,6 +252,8 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Band look (e.g. make tier 14–16 bigger) shows in game; Reset puts it back.
 - [ ] The panel makes sense now (numbered steps with plain explanations); F2 → "Modify this rule" on a map opens it.
 - [ ] Unticking "Upgrade borders" drops the red border on higher-tier maps; ticking puts it back.
+- [ ] Step 3 "with / without" example labels match what the maps look like in game (colours from NeverSink's
+      rules: `MapExtra.border` + `sample_tier`, drawn with the tier's own look).
 
 **Build window (F6, new look 20 Nov)**
 - [ ] Opens bigger and easier to read; the tree fills the window.

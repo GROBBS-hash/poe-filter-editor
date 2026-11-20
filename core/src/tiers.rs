@@ -304,6 +304,10 @@ pub struct MapExtra {
     pub tiers: Vec<String>,
     /// Still draws something (not switched off).
     pub on: bool,
+    /// The border colour it draws (from NeverSink's rule, or its usual one when switched off), for the preview.
+    pub border: [u8; 4],
+    /// A map tier it applies to, to show an example label.
+    pub sample_tier: u32,
 }
 
 /// NeverSink's map rule names in plain words ("maps_a_t16" → "Tier 16 maps").
@@ -375,14 +379,22 @@ pub fn map_tiers(segs: &[Segment]) -> MapTiers {
     for (key, title, what, test) in groups {
         let mut names = vec![];
         let mut on = false;
+        let mut border: Option<[u8; 4]> = None;
         for s in segs {
             let Segment::Block(b) = s else { continue };
             let Some(t) = b.tier.as_deref() else { continue };
             if b.type_path != maps || !test(t) || names.iter().any(|n| n == t) { continue; }
             names.push(t.to_string());
+            if border.is_none() {
+                border = b.lines.iter().find_map(|l| l.trim().strip_prefix("SetBorderColor").map(|v| {
+                    let n: Vec<u8> = v.split_whitespace().filter_map(|x| x.parse().ok()).collect();
+                    [n.first().copied().unwrap_or(0), n.get(1).copied().unwrap_or(0), n.get(2).copied().unwrap_or(0), n.get(3).copied().unwrap_or(255)]
+                }));
+            }
             on |= b.lines.iter().any(|l| { let l = l.trim_start(); l.starts_with("Set") || l.starts_with("Play") || l.starts_with("MinimapIcon") });
         }
-        if !names.is_empty() { extras.push(MapExtra { key: key.into(), title: title.into(), what: what.into(), tiers: names, on }); }
+        if !names.is_empty() { let (usual, sample_tier) = match key { "upgrade" => ([220, 50, 0, 255], 14), "bands" => ([0, 0, 0, 255], 14), _ => ([255, 180, 0, 255], 10) };
+            extras.push(MapExtra { key: key.into(), title: title.into(), what: what.into(), tiers: names, on, border: border.unwrap_or(usual), sample_tier }); }
     }
     MapTiers { tiers, special, extras }
 }
@@ -400,6 +412,7 @@ mod tests {
         assert_eq!(m.tiers[15].row.name, "Tier 16 maps");
         assert_eq!(m.extras.iter().map(|e| e.key.as_str()).collect::<Vec<_>>(), ["upgrade", "bands", "implicit", "corrupted"]);
         assert!(m.extras.iter().all(|e| e.on));
+        assert_eq!(m.extras[0].border, [220, 50, 0, 255]);
         // Switching the upgrade borders off empties their look but keeps them as pass-through rules.
         let up = m.extras[0].tiers.clone();
         let mut off = crate::filter::parse_filter(&fixture());
