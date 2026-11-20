@@ -4,6 +4,7 @@ mod trade_api;
 mod wealth_app;
 mod atlas_app;
 mod win_place;
+mod updates;
 
 use filter_core::{
     evaluate::{status_with_fallback, Status},
@@ -2259,6 +2260,7 @@ pub fn run() {
         .manage(load_state())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         // Remembers the main window's size and position between runs (the pop-ups place themselves).
         .plugin(tauri_plugin_window_state::Builder::default()
             .with_denylist(&["overlay", "build", "trade", "trades", "earnings", "atlas"]).build())
@@ -2322,6 +2324,7 @@ pub fn run() {
             start_live_searches(app.handle().clone());
             wealth_app::start_session_timer(app.handle().clone());
             win_place::start_main(app.handle());
+            updates::start(app.handle().clone());
 
             // Tray icon: the app lives here so hotkeys work while you play.
             use tauri::menu::{Menu, MenuItem};
@@ -2392,7 +2395,7 @@ pub fn run() {
             list_farm_presets,
             apply_farm_preset,
             list_level_presets,
-            get_tiers, get_rule_section, get_map_tiers, set_tiers, build_tree_opt, set_build_tree, trade_search, trade_bulk, map_dangers, map_suggest, map_tool_get, map_tool_save, map_tool_regex, map_regex_copy, map_tool_trade, trade_action, hide_trades_window, wealth_app::wealth_get, wealth_app::wealth_setup, wealth_app::wealth_prefs, wealth_app::wealth_scan, wealth_app::wealth_profile_save, wealth_app::wealth_profile_delete, wealth_app::wealth_profile_use, wealth_app::wealth_tabs_refresh, wealth_app::wealth_price_rares, wealth_app::wealth_find, wealth_app::session_start, wealth_app::session_check, wealth_app::session_pause, wealth_app::session_stop, wealth_app::session_delete, wealth_app::earnings_overlay, saved_list, saved_add, saved_delete, saved_live, report_problem, send_whisper, copy_text, hide_trade_window, keep_on_screen,
+            get_tiers, get_rule_section, get_map_tiers, set_tiers, build_tree_opt, set_build_tree, trade_search, trade_bulk, map_dangers, map_suggest, map_tool_get, map_tool_save, map_tool_regex, map_regex_copy, map_tool_trade, trade_action, hide_trades_window, wealth_app::wealth_get, wealth_app::wealth_setup, wealth_app::wealth_prefs, wealth_app::wealth_scan, wealth_app::wealth_profile_save, wealth_app::wealth_profile_delete, wealth_app::wealth_profile_use, wealth_app::wealth_tabs_refresh, wealth_app::wealth_price_rares, wealth_app::wealth_find, updates::update_status, updates::update_install, wealth_app::session_start, wealth_app::session_check, wealth_app::session_pause, wealth_app::session_stop, wealth_app::session_delete, wealth_app::earnings_overlay, saved_list, saved_add, saved_delete, saved_live, report_problem, send_whisper, copy_text, hide_trade_window, keep_on_screen,
             move_tier_item,
             stack_choices,
             gear_setup,

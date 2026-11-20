@@ -126,6 +126,23 @@
     "icon": [
       "icons/icon.ico",
       "icons/icon.png"
-    ]
+    ],
+    "createUpdaterArtifacts": true,
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDIzREEwMjhBN0I0MTNFRkMKUldUOFBrRjdpZ0xhSThVaVhjSDZsRlFnL0N1MmpZQUJVZzB5SzhxSzduVlYzS3h1cS9ZMytyUEQK",
+      "endpoints": [
+        "https://github.com/GROBBS-hash/poe-filter-editor/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

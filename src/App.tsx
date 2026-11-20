@@ -82,6 +82,31 @@ function Icon({ d }: { d: string }) {
   return <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>;
 }
 
+type UpdateInfo = { version: string; current: string; notes: string };
+
+/** A new version was downloaded in the background: it only installs when he clicks (never mid-game by itself). */
+function UpdateBar() {
+  const [u, setU] = useState<UpdateInfo | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    invoke<UpdateInfo | null>("update_status").then(setU).catch(() => {});
+    const a = listen<UpdateInfo>("update-ready", (e) => setU(e.payload));
+    return () => { a.then((f) => f()); };
+  }, []);
+  if (!u) return null;
+  return (
+    <div className="update-bar">
+      <span><b>Version {u.version} is ready</b> <span className="muted small">(you have {u.current})</span>
+        {u.notes && <span className="muted small"> · {u.notes}</span>}</span>
+      <button className="primary" disabled={busy} onClick={() => { setBusy(true); setErr("");
+        invoke("update_install").catch((e) => { setErr(String(e)); setBusy(false); }); }}>
+        {busy ? "Updating…" : "Restart to update"}</button>
+      {err && <span className="danger-text small">{err}</span>}
+    </div>
+  );
+}
+
 export default function App() {
   const [ov, setOv] = useState<Overview | null>(null);
   const [tab, setTabRaw] = useState<Tab>(() => {
@@ -152,6 +177,7 @@ export default function App() {
       </aside>
 
       <main className="content">
+        <UpdateBar />
         <ErrorBoundary key={tab}>
         <div key={tab} className="page-in">
         <div className="content-head">
