@@ -4,6 +4,19 @@ Read this first in a new session. The owner (GROBBS) is non-technical: keep upda
 He tests on Windows by running `Start editor.bat`, which pulls from GitHub every 30s and rebuilds (`npm run tauri dev`),
 so **commit and push after every change** (end commits with the attribution lines the session gives you).
 
+## Installer and updates (from 21 Nov 2026)
+- `tools/release.ps1 -Notes "…"` (PowerShell 7) bumps the patch version, builds the NSIS installer (per-user, no admin),
+  signs it with `%USERPROFILE%\.tauri\poe-filter-editor.key` (no password; **never commit it, losing it means installed
+  editors can't take updates**), commits "Release x.y.z", and publishes GitHub release `vx.y.z` with the installer and
+  `latest.json`. First release: 0.2.0.
+- The installed editor (`src-tauri/src/updates.rs`, release builds only) checks
+  `releases/latest/download/latest.json` 20s after start and every 3 hours, downloads a newer version in the
+  background, and shows "Version x is ready · Restart to update" at the top of the main window (`UpdateBar` in App.tsx).
+  It never installs or restarts by itself (he hated pop-ups mid-game).
+- Once he has switched to the installed editor: release after each finished change he should get (a few small
+  changes can share one release). `Start editor.bat` / `npm run tauri dev` stays the dev way; don't run both at
+  once (hotkeys clash, both write the same settings folder).
+
 ## What the app is
 Tauri 2 + React/TS desktop app with a Rust core crate (`core/`, `filter-core`) for Path of Exile loot filters, plus
 in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), user changes stored as rules that survive updates.
@@ -463,6 +476,11 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Ctrl+D on a timeless jewel (Brutal Restraint): seed line ticked, prices for that exact seed; "any conqueror" row works.
 - [ ] Price window: "This week" line with ▲/▼ % under the price for currency, cards, uniques… (after the price file updates).
 
+**Installer (21 Nov, release 0.2.0)**
+- [ ] Close the Start editor window, install from the 0.2.0 release page: the editor starts, settings and edits are
+      all still there, hotkeys work in game.
+- [ ] When 0.2.1 is out: "Version 0.2.1 is ready · Restart to update" shows at the top; clicking it updates and reopens.
+
 **Editor restarts (21 Nov)**
 - [ ] When the editor restarts by itself (new version pulled) while you play, it stays on the taskbar instead of
       popping up in the middle of the screen; starting it with "Start editor.bat" still opens it normally.
@@ -582,7 +600,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
    "search every tab" done 21 Nov; guild stash next; crafting planner (parked).
 3. Price check polish ideas (any resistance, trend line done 21 Nov; same seller + price already shows once with "× N";
    prices already in chaos and divines; maps already search by tier).
-4. Deferred earlier: installer + auto-update, batch mode tidy-up, PoE 2 coverage.
+4. Deferred earlier: batch mode tidy-up, PoE 2 coverage. (Installer + auto-update done 21 Nov: see "Installer and updates".)
 
 ## Known caveats
 - This cloud workspace can't reach pathofexile.com / poe.ninja / poeprices.info, so network code is only tested by
