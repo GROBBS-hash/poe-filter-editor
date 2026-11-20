@@ -182,8 +182,8 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 **Wealth page (Endgame → Wealth)**
 - [x] Connected with account name + POESESSID (20 Nov). Still check: clear message if the POESESSID is wrong.
 - [ ] Scan whole stash: total, by-tab breakdown and history chart look right; "Worth selling" lists unlisted items.
-- [ ] Scan profiles: make one (e.g. dump tabs), scan it, switch back to Whole stash; each keeps its own total/history.
-- [ ] "Worth selling" adds up the same item across stacks (e.g. 10 Blight threads in a few stacks).
+- [x] Scan profiles: made one, scanned it, own total and history (confirmed 20 Nov). Still check: switching back to Whole stash.
+- [x] "Worth selling" adds up stacks; threads and gems now priced (confirmed 20 Nov: 50 Blight threads = 133c).
 - [ ] Earnings session: tick dump tabs, start, overlay shows time / made / per hour, pause, stop & save,
       "Best strategies" ranks runs.
 
