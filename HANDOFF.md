@@ -491,7 +491,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 **Installer (21 Nov, release 0.2.0)**
 - [x] (21 Nov: installed, "everything's there".) Still check: hotkeys work in game with the installed editor.
 - [ ] When 0.2.1 is out: "Version 0.2.1 is ready · Restart to update" shows at the top; clicking it updates and reopens.
-- [ ] 0.2.3: F6 / My build "Gear and gems" tab: each item shows its socket colours and links with its gems under it;
+- [x] (Confirmed 21 Nov, "works for now, will refine more".) 0.2.3: F6 / My build "Gear and gems" tab: each item shows its socket colours and links with its gems under it;
       gems not in an item under "Other gems"; clicking a gem still price checks it.
 - [ ] 0.2.2: restart (update) while using the editor: it comes back in front; while it was behind other windows: stays on the taskbar.
 - [ ] 0.2.1: Wealth "Count rares in my worth" tick box: unticked, the total drops by the rares at once; ticked, back.
