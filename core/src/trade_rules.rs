@@ -225,6 +225,8 @@ pub fn property_query(id: &str) -> Option<(&'static str, &'static str)> {
         "prop.ar" => ("armour_filters", "ar"), "prop.ev" => ("armour_filters", "ev"), "prop.es" => ("armour_filters", "es"),
         "prop.ward" => ("armour_filters", "ward"), "prop.pdps" => ("weapon_filters", "pdps"), "prop.edps" => ("weapon_filters", "edps"),
         "prop.dps" => ("weapon_filters", "dps"),
+        "prop.map_iiq" => ("map_filters", "map_iiq"), "prop.map_iir" => ("map_filters", "map_iir"),
+        "prop.map_bonus" => ("map_filters", "map_bonus"), "prop.map_packsize" => ("map_filters", "map_packsize"),
         _ => return None,
     })
 }
@@ -319,4 +321,34 @@ mod tests {
         assert!(s.filters.iter().all(|f| f.kind != "pseudo"));
         assert!(s.filters.iter().any(|f| f.id == "explicit.life"));
     }
+}
+
+/// What sells a map, like Awakened PoE Trade: its drop bonuses (Item Quantity, Atlas Drops, Item Rarity,
+/// Pack Size, More Currency / Scarabs / Div Cards / Maps) and whether it has all 8 mods. Ticked as Awakened
+/// does: Rarity is left off when the map has a "More …" drop bonus, and More Maps is never ticked for you.
+pub fn map_props(text: &str, item: &Item) -> Vec<StatFilter> {
+    if item.item_class != "Maps" || item.rarity == "Unique" { return vec![]; }
+    let text = text.replace('\r', "");
+    let read = |key: &str| text.lines().map(str::trim).find_map(|l| l.strip_prefix(key))
+        .and_then(|v| v.trim().trim_start_matches('+').split('%').next()?.trim().parse::<f64>().ok());
+    let more = |k: &str| read(&format!("More {k}: "));
+    let valuable = more("Scarabs").is_some() || more("Currency").is_some() || more("Divination Cards").is_some();
+    let f = |id: &str, label: String, v: f64, on: bool| StatFilter {
+        id: id.into(), label, value: v, min: Some(v), enabled: on, kind: "property".into(), tier: None, junk: false, roll: None, range: None };
+    let mut out = Vec::new();
+    for (key, id, on) in [("Item Quantity: ", "prop.map_iiq", true), ("Atlas Drops: ", "prop.map_bonus", true),
+        ("Item Rarity: ", "prop.map_iir", !valuable), ("Monster Pack Size: ", "prop.map_packsize", true)] {
+        if let Some(v) = read(key) { out.push(f(id, format!("{key}+{v}%"), v, on)); }
+    }
+    for (k, id, on) in [("Currency", "pseudo.pseudo_map_more_currency_drops", true), ("Scarabs", "pseudo.pseudo_map_more_scarab_drops", true),
+        ("Divination Cards", "pseudo.pseudo_map_more_card_drops", true), ("Maps", "pseudo.pseudo_map_more_map_drops", false)] {
+        if let Some(v) = more(k) { out.push(StatFilter { kind: "pseudo".into(), ..f(id, format!("More {k}: +{v}%"), v, on) }); }
+    }
+    // Eight-mod maps sell for more: counted from the advanced copy's mod headings.
+    let mods = text.lines().map(str::trim).filter(|l| l.starts_with('{') && {
+        let low = l.to_lowercase();
+        low.contains("prefix modifier") || low.contains("suffix modifier")
+    }).count();
+    if mods >= 8 { out.push(StatFilter { kind: "pseudo".into(), ..f("pseudo.pseudo_number_of_affix_mods", format!("{mods} mods"), mods as f64, true) }); }
+    out
 }

@@ -303,6 +303,9 @@ export default function TradeWindow() {
   const it = setup.item;
   // Maps: priced by tier and rarity; their mods are behind a link.
   const showStats = !check.map || mapMods;
+  // Maps: their drop bonuses (quantity, atlas drops, pack size…) always; the map mods behind a link.
+  const shown = (x: StatFilter) => showStats || x.kind === "property" || x.kind === "pseudo";
+  const mapModCount = setup.filters.filter((x) => !(x.kind === "property" || x.kind === "pseudo")).length;
   const patch = (i: number, p: Partial<StatFilter>) => { if ("min" in p) setPreset(null); return setSetup({ ...setup, filters: setup.filters.map((f, j) => (j === i ? { ...f, ...p } : f)) }); };
   const divine = res?.divine ?? bulk?.divine ?? check?.divine ?? null;
   const copy = (text: string, key: string) => { invoke("copy_text", { text }); setCopied(key); };
@@ -329,11 +332,11 @@ export default function TradeWindow() {
       {check.map && <MapCheck map={check.map} />}
       {check.compare && check.compare.length > 0 && <CompareBlock list={check.compare} />}
 
-      {check.map && setup.filters.length > 0 && (
+      {check.map && mapModCount > 0 && (
         <button className="link small tw-mapmods" onClick={() => setMapMods(!mapMods)}>
-          {mapMods ? "▾" : "▸"} Search by map mods too ({setup.filters.length}): priced by tier and rarity otherwise</button>
+          {mapMods ? "▾" : "▸"} Search by map mods too ({mapModCount})</button>
       )}
-      {setup.filters.length > 0 && showStats && (
+      {setup.filters.some(shown) && (
         <div className="tw-range">
           <span className="tw-sec">Search for</span>
           <span className="tw-range-btns" title="Set every minimum relative to this item's rolls">
@@ -351,9 +354,9 @@ export default function TradeWindow() {
           </span>
         </div>
       )}
-      {setup.filters.length > 0 && showStats && (
+      {setup.filters.some(shown) && (
         <div className="tw-stats">
-          {setup.filters.map((f, i) => (
+          {setup.filters.map((f, i) => !shown(f) ? null : (
             <label key={f.id + i} className={`tw-stat ${f.enabled ? "on" : ""} ${f.junk ? "junk" : ""}`} title={f.junk ? "Rarely changes the price" : undefined}>
               <input type="checkbox" checked={f.enabled} onChange={(e) => patch(i, { enabled: e.target.checked })} />
               <span className={`tw-label mod-${f.kind}`}>{f.label}{KIND[f.kind] && <span className="tw-kind">{KIND[f.kind]}</span>}

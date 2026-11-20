@@ -313,7 +313,8 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
         let min = if m.values.is_empty() { None } else { Some(min_for(value)) };
         filters.push(StatFilter { id, label: m.text.clone(), value, min, enabled, kind, tier: m.tier, junk, roll: m.roll, range: m.range.clone() });
     }
-    filters.extend(crate::trade_rules::open_affixes(text, &item, index));
+    if is_map(&item) { filters.splice(0..0, crate::trade_rules::map_props(text, &item)); }
+    else { filters.extend(crate::trade_rules::open_affixes(text, &item, index)); }
     let links = item.sockets.as_deref().map(crate::item::max_links).unwrap_or(0);
     let gem_level = text.replace('\r', "").split("--------").nth(1)
         .and_then(|s| s.lines().find_map(|l| l.trim().strip_prefix("Level: ")))
@@ -380,7 +381,7 @@ pub fn query(s: &TradeSetup) -> Value {
     if is_map(it) && it.rarity != "Unique" {
         if it.base_type.starts_with("Map (Tier") { q["type"] = json!({ "option": "Map", "discriminator": "map" }); }
         if let Some(t) = map_tier_of(it) { filters["map_filters"] = json!({ "filters": { "map_tier": { "min": t, "max": t } } }); }
-        filters["type_filters"] = json!({ "filters": { "rarity": { "option": it.rarity.to_lowercase() } } });
+        filters["type_filters"] = json!({ "filters": { "rarity": { "option": "nonunique" } } });
     }
     // Weapon DPS / defences go in their own filter groups, not the stat list.
     for f in s.filters.iter().filter(|f| f.enabled) {
@@ -646,17 +647,24 @@ Item Level: 75
 
     #[test]
     fn rare_map_by_tier() {
-        let t = "Item Class: Maps\nRarity: Rare\nRemote Grind\nMap (Tier 2)\n--------\nItem Rarity: +46% (augmented)\n--------\nItem Level: 70\n--------\nMonster Level: 69\n--------\n\
-{ Prefix Modifier \"Resistant\" (Tier: 1) — Elemental, Chaos, Resistance }\n+15% Monster Chaos Resistance\n+20% Monster Elemental Resistances\n--------\nTravel to a Map of this tier or lower by using this in a personal Map Device.\n";
+        let t = concat!("Item Class: Maps\nRarity: Rare\nRemote Grind\nMap (Tier 2)\n--------\n",
+            "Atlas Drops: +78% (augmented)\nItem Rarity: +46% (augmented)\nMonster Pack Size: +30% (augmented)\nMore Currency: +12% (augmented)\n",
+            "--------\nItem Level: 70\n--------\nMonster Level: 69\n--------\n",
+            "{ Prefix Modifier \"Resistant\" (Tier: 1) — Elemental, Chaos, Resistance }\n+15% Monster Chaos Resistance\n+20% Monster Elemental Resistances\n",
+            "--------\nTravel to a Map of this tier or lower by using this in a personal Map Device.\n");
         let s = setup(t, &index()).unwrap();
-        assert!(s.filters.iter().all(|f| !f.enabled), "map mods aren't ticked: {:?}", s.filters);
+        let on: Vec<&str> = s.filters.iter().filter(|f| f.enabled).map(|f| f.id.as_str()).collect();
+        // Like Awakened: drop bonuses ticked, Rarity left off when there's a More Currency bonus; map mods never.
+        assert_eq!(on, ["prop.map_bonus", "prop.map_packsize", "pseudo.pseudo_map_more_currency_drops"]);
         let q = query(&s);
         assert_eq!(q["query"]["type"]["option"], "Map");
         assert_eq!(q["query"]["type"]["discriminator"], "map");
         assert_eq!(q["query"]["filters"]["map_filters"]["filters"]["map_tier"]["max"], 2);
-        assert_eq!(q["query"]["filters"]["type_filters"]["filters"]["rarity"]["option"], "rare");
-        assert_eq!(q["query"]["stats"][0]["filters"].as_array().unwrap().len(), 0);
+        assert_eq!(q["query"]["filters"]["map_filters"]["filters"]["map_bonus"]["min"], 78.0);
+        assert_eq!(q["query"]["filters"]["type_filters"]["filters"]["rarity"]["option"], "nonunique");
+        assert_eq!(q["query"]["stats"][0]["filters"][0]["id"], "pseudo.pseudo_map_more_currency_drops");
     }
+
     #[test]
     fn plain_copy_and_unique() {
         let t = "Item Class: Helmets\nRarity: Unique\nGoldrim\nLeather Cap\n--------\nEvasion Rating: 30\n--------\nItem Level: 40\n--------\n+38% to all Elemental Resistances\n--------\nNo metal slips as easily through the fingers.\n";

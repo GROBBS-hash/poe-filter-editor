@@ -104,6 +104,11 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 - Map price check, 20 Nov: maps were searched as type "Map (Tier 2)" with every T1 map mod ticked (hidden in the
   window), so nothing matched. Now: type `{option:"Map", discriminator:"map"}` for "Map (Tier N)" bases, `map_tier`
   min=max, rarity filter, no mods ticked; mods behind "Search by map mods too" in the window. Gems: empty ilvl hidden.
+  Then, like Awakened (`renderer/src/web/price-check/filters/pseudo/maps.ts`): `map_props` in trade_rules.rs adds
+  Item Quantity / Atlas Drops / Pack Size (ticked), Item Rarity (ticked unless a More Currency/Scarabs/Div Cards bonus),
+  More Currency/Scarabs/Div Cards (ticked), More Maps (not ticked), "8 mods" (ticked when 8 mod headings). They
+  go to `map_filters` (map_iiq/map_bonus/map_iir/map_packsize) or the pseudo map stats. Rarity filter = nonunique.
+  Live check: his tier 2 map (78% atlas, 46% rarity, 30% pack) → 24 listed.
 - **"Something's wrong?" button** (price window): saves his note plus check/setup/result/error to
   `%APPDATA%\com.grobbs.poefiltereditor\reports\<unix time>.json` (`report_problem`). Read these when he says he
   reported something.
@@ -130,7 +135,8 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Roll bars and "T3 range 6–11" numbers look right; tier badges coloured. (Roll bars confirmed 20 Nov.)
 - [ ] Every Ctrl+D shows a trade price straight away (uniques, corpses, gems too) in the big box at the top.
       (Confirmed 20 Nov for a unique, a unique belt and a gem.)
-- [ ] Rare/magic map (e.g. "Map (Tier 2)") gets a trade price by tier and rarity.
+- [ ] Rare/magic map: priced by tier + drop bonuses (Atlas Drops, Rarity, Pack Size, More Currency…), shown as
+      tick boxes; the price looks sensible next to Awakened's. (Tier-only price confirmed 20 Nov.)
 - [ ] "Something's wrong?" saves a report (he'll mention it in chat; check the reports folder).
 - [ ] Settings → Price check: turning off the build comparison / roll bars hides them.
 - [ ] Prices shown in chaos and divines with orb icons; bulk "1 div ≈ N items".
