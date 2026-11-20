@@ -160,18 +160,19 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   league-mechanic groups (Expedition: Ancient Orb + Astragali + keys) show only drops ("Can reroll a unique into").
   The preview page's mock of `related_items` is a rough JS copy; trust the Rust tests.
 
-- Tiers → **Map tiers** (20 Nov, FilterBlade-style; , core , commands
-   / ): "Show maps from tier N and up" (hides NeverSink's   blocks below N), one chip per tier to toggle, one look per band (d = T1–5 whites, c = T6–10, b = T11–13, a = T14–16),
-  and the special kinds () with a tick and "Open".
+- Tiers → **Map tiers** (20 Nov, FilterBlade-style; `src/MapTiers.tsx`, core `tiers::map_tiers`, commands
+  `get_map_tiers` / `set_tiers`): "Show maps from tier N and up" (hides NeverSink's `$type->maps $tier->maps_<band>_t<N>`
+  blocks below N), one chip per tier to toggle, one look per band (d = T1–5 whites, c = T6–10, b = T11–13, a = T14–16),
+  and the special kinds (`maps->influenced/blighted/nightmare/vaaltemple/specialmods/enchanted`) with a tick and "Open".
   All saved as normal Tier rules, so they survive NeverSink updates. Searching "map" on the Tiers page offers it.
   Not done: rarity-specific map hiding (e.g. only hide white maps), which would need an Override block.
 - Ground reader 20 Nov: a label stacked right under another (grey "MAP (TIER 4)" under a dark "SPINY ROUND SHIELD")
   was joined into one text and picked the shield. Stacked lines now also need the same background colour
-  ( in screen.rs). The game's hover highlight wasn't used: the little squares at the end of labels in his
+  (`other_label` in screen.rs). The game's hover highlight wasn't used: the little squares at the end of labels in his
   screenshot look like socket colours, not a hover marker.
 - Build window (F6) 20 Nov: opens 780×900, Clean glass look (gold heading bar, card header, pill tabs, tree fills the
-  window height). "Open with the passive tree (P)" tick box in the window and in Settings (,
-  ):  in lib.rs polls the key with GetAsyncKeyState (does NOT take the key from the
+  window height). "Open with the passive tree (P)" tick box in the window and in Settings (`build_with_tree`,
+  `key_tree`): `start_tree_watcher` in lib.rs polls the key with GetAsyncKeyState (does NOT take the key from the
   game), only while the game is in front; opens on the Tree tab without taking focus; P or Esc closes it if it opened
   that way. Enter toggles a "chat may be open" guard so typing P in chat doesn't open it.
   Preview: http://localhost:1420/preview-app.html?build renders the window with a sample build.
