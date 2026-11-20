@@ -567,7 +567,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 **Wealth page (Endgame → Wealth)**
 - [x] Connected with account name + POESESSID (20 Nov). Still check: clear message if the POESESSID is wrong.
 - [ ] Scan whole stash: total, by-tab breakdown and history chart look right; "Worth selling" lists unlisted items.
-- [ ] 21 Nov: Find in stash (after a fresh scan): typing finds items in any tab (names, "rare", mods like
+- [x] (Confirmed 21 Nov.) Find in stash (after a fresh scan): typing finds items in any tab (names, "rare", mods like
       "maximum life", "-unique"); tab and spot right; click shows mods; Copy + Ctrl+F in the stash lights it up.
 - [x] (Confirmed 21 Nov.) After a scan, "Price N rares" prices his rares (about 10 a minute, progress shown); the total goes up,
       rares show "rare · trade guess" in By tab / Worth selling, and the prices look sensible next to Ctrl+D.
