@@ -102,6 +102,9 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   (`src/preview.tsx`). The app saves every price check and trade result to `%APPDATA%\com.grobbs.poefiltereditor\samples`
   (newest 60, local only); vite.config.ts serves them to the preview's dropdown. Use it to check layout changes
   before asking GROBBS to test in game.
+- **F2 pop-up preview (dev tool):** http://localhost:1420/preview-qm.html?state=hide|icon|show renders ItemPanel with a sample
+  item (`src/preview-qm.tsx`). If the running editor seems to show an old version after a bad edit, the dev server may
+  have kept a stale copy: `touch` the file (seen 20 Nov with ItemPanel.tsx).
 - **App preview (dev tool):** http://localhost:1420/preview-app.html renders the main window with sample data
   (`src/preview-app.tsx`, mocks `overview` and `wealth_get`; opens on Wealth). Other pages show their loading state.
 - **Clean glass look (20 Nov, he picked it from three mockups):** new colour tokens and card style, gold bar on the
