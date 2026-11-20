@@ -243,7 +243,10 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 - Stat rows in game order 20 Nov: defences/DPS, totals, enchants, implicits, prefixes, suffixes, open-affix rows last
   (`ModLine.affix` / `StatFilter.affix` from the advanced copy's heading; stable sort at the end of `setup` in trade.rs).
-  Rows show a blue P / purple S badge with a tooltip.
+  Rows sit under small headings in full words (`rowGroup` in TradeWindow.tsx): Defences/Damage, Totals, Enchant,
+  Implicit, Prefixes / Suffixes ("up to 3 on an item", jewels 2), Open slots. (P/S badges tried first; he found them unclear.)
+  Bulk fixers: judged against poe.ninja's price when it has one (`bulkTypical(…, market)`), hidden by default with a
+  "show" link; our going rate is only shown when poe.ninja has no price.
 
 
 ## Still to check in game (keep this list current)
@@ -261,7 +264,8 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
       (Confirmed 20 Nov for a unique, a unique belt and a gem.)
 - [ ] Fractured item: "Price as base · ilvl 73–74" gives sensible prices (fractured-only search confirmed 20 Nov).
 - [x] Price window rows read in game order (confirmed 20 Nov).
-- [ ] P / S badges on prefix and suffix rows in the price window.
+- [ ] Price window: small headings "Prefixes · up to 3 on an item", "Suffixes", "Totals", "Implicit", "Open slots".
+- [ ] Bulk: likely price fixers hidden ("N likely price fixers hidden · show"), judged against poe.ninja's price.
 - [ ] Rares wait for Search: move the mouse onto Search to search; changing a stat clears the prices. Uniques/currency still instant.
 - [ ] Bulk items (e.g. Stacked Deck): big price = poe.ninja (about 3c), market-price row in the list, fixers marked "low stock",
       "Only sellers with at least N in stock" works; repeat item listings show "× N".
