@@ -134,6 +134,21 @@ impl StatIndex {
     pub fn pseudo_id(&self, text: &str) -> Option<String> { self.by_text.get(&("pseudo".to_string(), text.to_lowercase())).cloned() }
     pub fn is_empty(&self) -> bool { self.by_text.is_empty() }
 
+    /// A timeless jewel's seed stat and its siblings: the same words under every conqueror of that jewel
+    /// ("Denoted service of # dekhara in the akhara of Balbala" / "… of Nasima" / "… of Asenath" / "… of Deshret"),
+    /// as (id, conqueror) pairs, sorted by name.
+    pub fn timeless_family(&self, id: &str) -> Vec<(String, String)> {
+        let Some(((_, text), _)) = self.by_text.iter().find(|(_, v)| v.as_str() == id) else { return vec![] };
+        let Some((stem, _)) = text.rsplit_once(' ') else { return vec![] };
+        let mut out: Vec<(String, String)> = self.by_text.iter()
+            .filter(|((_, t), v)| v.starts_with("explicit.pseudo_timeless_jewel_") && t.rsplit_once(' ').is_some_and(|(s, _)| s == stem))
+            .map(|((_, t), v)| { let who = t.rsplit(' ').next().unwrap_or(""); (v.clone(), who[..1].to_uppercase() + &who[1..]) })
+            .collect();
+        out.sort_by(|a, b| a.1.cmp(&b.1));
+        out.dedup();
+        out
+    }
+
     /// The trade id for a mod line, and the value to search with. Tries the
     /// mod's own kind first, then explicit; "reduced" is searched as negative "increased".
     pub fn find(&self, m: &ModLine) -> Option<(String, f64)> {
@@ -414,6 +429,22 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
         filters.push(StatFilter { id, label: m.text.clone(), value, min, enabled, kind, tier: m.tier, junk, roll: m.roll, range: m.range.clone(), affix: m.affix.clone() });
     }
     if is_map(&item) { filters.splice(0..0, crate::trade_rules::map_props(text, &item)); }
+    // Timeless jewels (Awakened's rule): the seed decides which passives change, the conqueror the keystone. The jewel's
+    // own line is ticked with the exact seed; one more row, unticked, takes the same seed under any of its conquerors.
+    if let Some(i) = filters.iter().position(|f| f.id.starts_with("explicit.pseudo_timeless_jewel_")) {
+        filters[i].enabled = true;
+        filters[i].min = Some(filters[i].value);
+        let family = index.timeless_family(&filters[i].id);
+        if family.len() > 1 {
+            let names: Vec<&str> = family.iter().map(|(_, n)| n.as_str()).collect();
+            filters.insert(i + 1, StatFilter {
+                id: format!("timeless_any:{}", family.iter().map(|(id, _)| id.as_str()).collect::<Vec<_>>().join(",")),
+                label: format!("Seed {} under any conqueror ({})", filters[i].value, names.join(", ")),
+                value: filters[i].value, min: Some(filters[i].value), enabled: false, kind: "explicit".into(),
+                tier: None, junk: false, roll: None, range: None, affix: None,
+            });
+        }
+    }
     else { filters.extend(crate::trade_rules::open_affixes(text, &item, index)); }
     // The game's own order: defences / damage first, then totals, enchants, implicits, prefixes, suffixes,
     // and the "open prefix / suffix" rows last. Same-group rows keep the item's order.
@@ -572,13 +603,24 @@ pub fn query(s: &TradeSetup) -> Value {
     // A fractured mod only has to be fractured when pricing the item as a base (fractured switch on); otherwise any item
     // with that mod counts, so it's searched as the normal mod (the trade site gives both the same number).
     let as_base = s.misc.iter().any(|m| m == "fractured_item");
-    let stats: Vec<Value> = s.filters.iter().filter(|f| f.enabled && !f.id.starts_with("prop.")).map(|f| {
+    // A timeless jewel's seed is searched exactly; "any conqueror" is a group needing one of them.
+    let seed = |v: f64| json!({ "min": v, "max": v });
+    let mut groups: Vec<Value> = Vec::new();
+    for f in s.filters.iter().filter(|f| f.enabled) {
+        if let Some(ids) = f.id.strip_prefix("timeless_any:") {
+            let v = f.min.unwrap_or(f.value);
+            groups.push(json!({ "type": "count", "value": { "min": 1 },
+                "filters": ids.split(',').map(|id| json!({ "id": id, "value": seed(v) })).collect::<Vec<_>>() }));
+        }
+    }
+    let stats: Vec<Value> = s.filters.iter().filter(|f| f.enabled && !f.id.starts_with("prop.") && !f.id.starts_with("timeless_any:")).map(|f| {
         let id = match f.id.strip_prefix("fractured.") { Some(rest) if !as_base => format!("explicit.{rest}"), _ => f.id.clone() };
         let mut v = stat_json(&id);
         if let (Some(m), None) = (f.min, v.get("value")) { v["value"] = json!({ "min": m }); }
+        if f.id.starts_with("explicit.pseudo_timeless_jewel_") { v["value"] = seed(f.min.unwrap_or(f.value)); }
         v
     }).collect();
-    q["stats"] = json!([{ "type": "and", "filters": stats }]);
+    q["stats"] = json!([json!({ "type": "and", "filters": stats })].into_iter().chain(groups).collect::<Vec<_>>());
     json!({ "query": q, "sort": { "price": "asc" } })
 }
 
@@ -804,16 +846,18 @@ pub fn buy_query(text: &str, index: &StatIndex) -> Option<(Value, usize)> {
     let local_first = cat.is_some_and(|c| c.starts_with("armour.") || c.starts_with("weapon."));
     let mut stats: Vec<Value> = Vec::new();
     for m in mods(text) {
-        // A unique's fixed mods come with the name; only mods that differ between copies are worth asking for.
-        if unique && !m.text.contains("while affected by") { continue; }
         let local = || index.find(&ModLine { text: format!("{} (Local)", m.text), ..m.clone() }).filter(|_| local_first);
         let Some((id, value)) = local().or_else(|| index.find(&m)) else { continue };
+        // A unique's fixed mods come with the name; only mods that differ between copies are worth asking for
+        // (Watcher's Eye auras, a timeless jewel's seed).
+        let timeless = id.starts_with("explicit.pseudo_timeless_jewel_");
+        if unique && !m.text.contains("while affected by") && !timeless { continue; }
         if stats.iter().any(|v| v["id"] == id.as_str()) { continue; }
         let mut v = stat_json(&id);
         // Crafted mods: you can craft them yourself, so they're on the page but not required.
         if m.kind == "crafted" { v["disabled"] = json!(true); }
         // "Adds 8 Passive Skills" / "2 Added Passive Skills are Jewel Sockets": that number is the jewel.
-        if m.kind == "enchant" && m.text.contains("Passive Skill") && value.is_finite() && v.get("value").is_none() { v["value"] = json!({ "min": value, "max": value }); }
+        if (timeless || m.kind == "enchant" && m.text.contains("Passive Skill")) && value.is_finite() && v.get("value").is_none() { v["value"] = json!({ "min": value, "max": value }); }
         stats.push(v);
     }
     // The base as the trade site knows it: magic items only have a full name ("Perpetual Sapphire Flask of Craft").

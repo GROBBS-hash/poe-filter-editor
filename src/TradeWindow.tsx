@@ -552,7 +552,8 @@ export default function TradeWindow() {
           {[0, 10, 20].map((p) => (
             <button key={p} className={preset === p ? "on" : ""} title={p ? `Every minimum ${p}% below this item's roll` : "Every minimum at this item's roll"}
               onClick={() => { setPreset(p); setSetup({ ...setup, filters: setup.filters.map((f) => {
-                if (f.min == null || f.id.includes("empty")) return f;
+                // Open-slot counts and timeless jewel seeds are exact: never lowered.
+                if (f.min == null || f.id.includes("empty") || f.id.includes("timeless")) return f;
                 if (p === 0 || Math.abs(f.value) <= 3) return { ...f, min: f.value };
                 const v = f.value * (1 - p / 100);
                 return { ...f, min: Math.abs(f.value) >= 10 ? Math.floor(v) : Math.floor(v * 10) / 10 };

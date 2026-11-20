@@ -596,3 +596,43 @@ mod affix_limit_tests {
         assert_eq!(open, ["Open prefix (1 free)", "Open suffix (1 free)"]);
     }
 }
+
+#[cfg(test)]
+mod timeless_tests {
+    use crate::trade::{query, setup, StatIndex};
+    use serde_json::json;
+
+    #[test]
+    fn brutal_restraint_by_seed() {
+        let idx = StatIndex::from_json(&json!({ "result": [ { "label": "Explicit", "entries": [
+            { "id": "explicit.pseudo_timeless_jewel_balbala", "text": "Denoted service of # dekhara in the akhara of Balbala", "type": "explicit" },
+            { "id": "explicit.pseudo_timeless_jewel_nasima", "text": "Denoted service of # dekhara in the akhara of Nasima", "type": "explicit" },
+            { "id": "explicit.pseudo_timeless_jewel_asenath", "text": "Denoted service of # dekhara in the akhara of Asenath", "type": "explicit" },
+            { "id": "explicit.pseudo_timeless_jewel_kaom", "text": "Commanded leadership over # warriors under Kaom", "type": "explicit" } ] } ] }));
+        // His build's jewel, as the game copies it.
+        let text = "Item Class: Jewels\nRarity: Unique\nBrutal Restraint\nTimeless Jewel\n--------\nLimited to: 1 Historic\nRadius: Large\n--------\n\
+            Item Level: 84\n--------\nDenoted service of 7000 dekhara in the akhara of Balbala\nPassives in radius are Conquered by the Maraketh\n\
+            Historic\n--------\nThey belonged to the land.\n";
+        let s = setup(text, &idx).unwrap();
+        let own = s.filters.iter().find(|f| f.id == "explicit.pseudo_timeless_jewel_balbala").unwrap();
+        assert!(own.enabled && own.min == Some(7000.0), "own seed ticked");
+        let any = s.filters.iter().find(|f| f.id.starts_with("timeless_any:")).unwrap();
+        assert!(!any.enabled);
+        assert_eq!(any.label, "Seed 7000 under any conqueror (Asenath, Balbala, Nasima)");
+        // Default search: name + the exact seed under Balbala.
+        let q = query(&s);
+        assert_eq!(q["query"]["name"], "Brutal Restraint");
+        assert_eq!(q["query"]["stats"][0]["filters"][0], json!({ "id": "explicit.pseudo_timeless_jewel_balbala", "value": { "min": 7000.0, "max": 7000.0 } }));
+        // "Any conqueror": a group where one of the three must have seed 7000.
+        let mut s2 = s.clone();
+        for f in &mut s2.filters { f.enabled = f.id.starts_with("timeless_any:"); }
+        let q = query(&s2);
+        assert_eq!(q["query"]["stats"][1]["type"], "count");
+        assert_eq!(q["query"]["stats"][1]["filters"].as_array().unwrap().len(), 3);
+        assert_eq!(q["query"]["stats"][1]["filters"][0]["value"], json!({ "min": 7000.0, "max": 7000.0 }));
+        // Buy from the build: the same jewel by name and its exact seed.
+        let (q, n) = crate::trade::buy_query(text, &idx).unwrap();
+        assert_eq!((q["query"]["name"].as_str(), n), (Some("Brutal Restraint"), 1));
+        assert_eq!(q["query"]["stats"][0]["filters"][0]["value"], json!({ "min": 7000.0, "max": 7000.0 }));
+    }
+}

@@ -78,8 +78,8 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Price window: "Minimums: exact / −10% / −20%" buttons. Foulborn = name without "Foulborn " + misc mutated,
   mods looked up as "mutated" first; two-line mods joined; numberless mods kept under headings; minimums start
   at the item's roll; status "available" (instant buyout + in person).
-- Awakened ideas NOT done yet: roll-quality bar per mod (where in its tier range it rolled), cluster jewel passive
-  count rules, flask rules, timeless jewel / anointment / heist / sentinel handling, influence + ilvl bracket
+- Awakened ideas NOT done yet (roll bars, timeless jewels, influence/ilvl base search since done): cluster jewel passive
+  count rules, flask rules, anointment / heist / sentinel handling, influence + ilvl bracket
   filters, "hidden filters" toggle, roll ranges as min..max for uniques (± % of roll range, exact on perfect rolls).
 
 - Price check "Compared with your build (PoB)" (`core/src/compare.rs`): checked item vs the PoB stage's gear in the
@@ -329,6 +329,11 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   "Item Level: 1". Live: Lightning Tendrils of Eccentricity 21/20 uncorrupted 0, corrupted 13. (Confirmed in game.)
   Support gems get " Support" on the end (PoB's "Arcane Surge" = trade "Arcane Surge Support"; was "Unknown item base type").
   "Open on the trade site" now shows after every search, also when nothing is listed.
+- Timeless jewels 21 Nov (next price-check extra, from Awakened's pseudo/timeless-jewel.ts): the seed line ("Denoted service of
+  7000 dekhara in the akhara of Balbala", trade id explicit.pseudo_timeless_jewel_<conqueror>) is ticked and searched exactly
+  (min = max); a row "Seed N under any conqueror (…)" (id `timeless_any:<ids>`, `StatIndex::timeless_family`) searches a
+  count group needing one of them. −10%/−20% leave seeds alone. Buy from the build also searches the seed. Live with his
+  Brutal Restraint 7000 Balbala: 2 listed; any conqueror: 5.
 - Price trend 21 Nov (next price-check extra): tools/fetch_prices.py keeps poe.ninja's 7-day sparkline per item (`trend`: %
   change each day from a week ago, `change`: the week's total; exchange "sparkline", stash "sparkLine"). `prices::trend_of`
   (same item as price_of, not gems) -> `PriceCheck.trend` -> "This week ▲/▼ N%" line under the price box (`TrendLine`).
@@ -426,6 +431,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [x] (Confirmed 21 Nov.) Price check on gear with resistances: "total Elemental Resistance" and "total to Chaos Resistance" ticked, fire /
       cold / lightning totals there to tick, no single resistance mods left in the list.
 
+- [ ] Ctrl+D on a timeless jewel (Brutal Restraint): seed line ticked, prices for that exact seed; "any conqueror" row works.
 - [ ] Price window: "This week" line with ▲/▼ % under the price for currency, cards, uniques… (after the price file updates).
 
 **Tiers menu (21 Nov)**
