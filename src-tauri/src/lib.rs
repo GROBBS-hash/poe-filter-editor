@@ -2024,6 +2024,9 @@ pub fn run() {
         .manage(load_state())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
+        // Remembers the main window's size and position between runs (the pop-ups place themselves).
+        .plugin(tauri_plugin_window_state::Builder::default()
+            .with_denylist(&["overlay", "build", "trade", "trades", "earnings"]).build())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(move |app, sc, ev| {

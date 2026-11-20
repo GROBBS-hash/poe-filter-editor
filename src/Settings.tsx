@@ -1,3 +1,4 @@
+import { PageLoading } from "./Loading";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -75,7 +76,7 @@ export default function SettingsPage() {
   const [dirty, setDirty] = useState(false);
   const [msg, setMsg] = useState("");
   useEffect(() => { invoke<Settings>("get_settings").then(setS).catch((e) => setMsg(String(e))); }, []);
-  if (!s) return <div className="card">{msg || "Loading…"}</div>;
+  if (!s) return msg ? <div className="card">{msg}</div> : <PageLoading />;
   const set = (patch: Partial<Settings>) => { setS({ ...s, ...patch }); setDirty(true); setMsg(""); };
   const save = async () => {
     try { await invoke("save_settings", { settings: s }); setDirty(false); setMsg("Saved. New keys work straight away."); }

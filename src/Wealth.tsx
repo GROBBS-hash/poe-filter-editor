@@ -1,3 +1,4 @@
+import { PageLoading } from "./Loading";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useMemo, useState } from "react";
@@ -147,7 +148,7 @@ export default function Wealth() {
   };
   const names = useMemo(() => [...new Set((v?.sessions ?? []).map((s) => s.name))], [v]);
 
-  if (!v) return <div className="card">{err || "Loading…"}</div>;
+  if (!v) return err ? <div className="card">{err}</div> : <PageLoading />;
   const connected = v.has_sessid && v.account && v.tabs.length > 0;
   // History and totals for the profile in use ("" = whole stash) in this league.
   const mine = v.snapshots.filter((s) => s.league === v.league && (s.profile ?? "") === (v.active ?? ""));
@@ -181,6 +182,32 @@ export default function Wealth() {
         </div>
       )}
       {err && <div className="card note warn-text">{err}</div>}
+      {connected && last && (
+        <div className="tiles">
+          <div className="tile gold">
+            <div className="tile-lab">{v.active ? v.active : "Stash"} worth</div>
+            <div className="tile-val">{Math.round(last.total).toLocaleString()}<CurrencyIcon id="chaos" /></div>
+            {(v.divine ?? last.divine) ? <div className="tile-sub">= {+(last.total / (v.divine ?? last.divine)!).toFixed(2)} div</div> : null}
+          </div>
+          <div className="tile">
+            <div className="tile-lab">Since the scan before</div>
+            {prev ? <div className={`tile-val ${last.total >= prev.total ? "up" : "down"}`}>{last.total >= prev.total ? "+" : "−"}{Math.round(Math.abs(last.total - prev.total)).toLocaleString()}<CurrencyIcon id="chaos" /></div>
+              : <div className="tile-val muted">–</div>}
+            <div className="tile-sub">scanned {new Date(last.time * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</div>
+          </div>
+          <div className="tile">
+            <div className="tile-lab">Worth selling</div>
+            <div className="tile-val">{v.missed.length}</div>
+            <div className="tile-sub">{Math.round(v.missed.reduce((a, m) => a + m.value, 0)).toLocaleString()}c not listed yet</div>
+          </div>
+          <div className="tile">
+            <div className="tile-lab">Earning now</div>
+            {cur ? <div className="tile-val">{Math.round(perHour(cur, now)).toLocaleString()}<CurrencyIcon id="chaos" /><span className="tile-sub"> /h</span></div>
+              : <div className="tile-val muted">–</div>}
+            <div className="tile-sub">{cur ? `${cur.name} · ${clock(seconds(cur, now))}` : "Start a session below"}</div>
+          </div>
+        </div>
+      )}
 
       {connected && (
         <div className="card">
@@ -191,8 +218,6 @@ export default function Wealth() {
           <Profiles v={v} setV={setV} setErr={setErr} busy={!!busy} />
           {last ? (
             <div className="w-total">
-              <Worth c={last.total} divine={v.divine ?? last.divine} big />
-              {prev && <span className={`small ${last.total >= prev.total ? "up" : "down"}`}> {last.total >= prev.total ? "▲" : "▼"} <Worth c={last.total - prev.total} divine={v.divine} /> since the scan before</span>}
               <div className="muted small">Scanned {new Date(last.time * 1000).toLocaleString()} · counts what poe.ninja prices (currency, uniques, cards, maps, fragments, gems…), not rares.</div>
             </div>
           ) : <p className="muted">Scan your stash to see what it's worth.</p>}

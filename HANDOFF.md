@@ -101,6 +101,13 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   (`src/preview.tsx`). The app saves every price check and trade result to `%APPDATA%\com.grobbs.poefiltereditor\samples`
   (newest 60, local only); vite.config.ts serves them to the preview's dropdown. Use it to check layout changes
   before asking GROBBS to test in game.
+- **App preview (dev tool):** http://localhost:1420/preview-app.html renders the main window with sample data
+  (`src/preview-app.tsx`, mocks `overview` and `wealth_get`; opens on Wealth). Other pages show their loading state.
+- **Clean glass look (20 Nov, he picked it from three mockups):** new colour tokens and card style, gold bar on the
+  current menu item, page title icons, page/card fade-in (`.page-in`, keyed on the tab), springy buttons, focus rings,
+  shimmering placeholders (`LoadingShell` in App.tsx, `PageLoading` in Loading.tsx), stat tiles (`.tiles`) on Wealth.
+  All in the "Clean glass" block at the end of styles.css; motion is off when Windows asks for reduced motion.
+  Main window opens at 1240×860 and remembers size/position (tauri-plugin-window-state; pop-ups are on its denylist).
 - Map price check, 20 Nov: maps were searched as type "Map (Tier 2)" with every T1 map mod ticked (hidden in the
   window), so nothing matched. Now: type `{option:"Map", discriminator:"map"}` for "Map (Tier N)" bases, `map_tier`
   min=max, rarity filter, no mods ticked; mods behind "Search by map mods too" in the window. Gems: empty ilvl hidden.
@@ -154,7 +161,8 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Roll bars and "T3 range 6–11" numbers look right; tier badges coloured. (Roll bars confirmed 20 Nov.)
 - [ ] Every Ctrl+D shows a trade price straight away (uniques, corpses, gems too) in the big box at the top.
       (Confirmed 20 Nov for a unique, a unique belt and a gem.)
-- [ ] Fractured item: "Search <base> ilvl N+ with only its fractured mods" gives sensible prices.
+- [ ] Fractured item: "Price as base · ilvl 73–74" gives sensible prices (fractured-only search confirmed 20 Nov).
+- [ ] New Clean glass look: opens bigger and remembers its size; pages fade in; Wealth tiles look right; nothing broken on other pages.
 - [ ] Unidentified unique (e.g. Karui Sceptre): no false tier 1 / divine sound; the "Could be one of N uniques" list shows in F2 and Ctrl+D.
 - [ ] Jewel "Open prefix/suffix" never says more than 2 free; reduced-mod rolls (curse effect) show the right high/low.
 - [ ] Rare/magic map: priced by tier + drop bonuses (Atlas Drops, Rarity, Pack Size, More Currency…), shown as

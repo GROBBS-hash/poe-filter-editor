@@ -815,3 +815,89 @@ body.overlay.scroll::-webkit-scrollbar-thumb { background: #3a404c; border-radiu
 .bu-price { white-space: nowrap; font-weight: 600; color: var(--text-2); }
 .bu li.mid .bu-price { color: #e0c98a; }
 .bu li.hi .bu-name, .bu li.hi .bu-price { color: #ffb070; }
+
+/* ================= Clean glass (20 Nov 2026) =================
+   Calmer graphite, soft raised cards, gold only for "you are here", prices and the main action.
+   Motion is short and springy; it switches off for people who ask their PC for less motion. */
+:root {
+  --bg: #0f1216; --side: #0b0d11; --panel: #151920; --raised: #1c212a; --input: #0e1115;
+  --line: #222833; --line-2: #313a48; --text: #eef1f5; --text-2: #c4cbd6; --muted: #7e8796;
+  --ease: cubic-bezier(.2, .8, .2, 1); --spring: cubic-bezier(.34, 1.4, .64, 1);
+}
+body.main { background: radial-gradient(1100px 520px at 85% -10%, rgba(220,178,90,.055), transparent 60%), var(--bg); background-attachment: fixed; }
+body.main ::-webkit-scrollbar { width: 10px; height: 10px; }
+body.main ::-webkit-scrollbar-thumb { background: #29303b; border-radius: 6px; border: 2px solid var(--bg); }
+body.main ::-webkit-scrollbar-thumb:hover { background: #36404e; }
+body.main ::-webkit-scrollbar-track { background: transparent; }
+
+/* Cards: raised panes with a faint top light, and a clear heading. */
+.card { background: linear-gradient(180deg, rgba(255,255,255,.028), rgba(255,255,255,0) 60%), var(--panel);
+  border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; margin-bottom: 14px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 10px 28px rgba(0,0,0,.22); }
+.card > h2:first-child, .card > .row-between:first-child > h2, .card > .row:first-child > h2 {
+  display: flex; align-items: center; gap: 9px; font-size: 15.5px; font-weight: 600; letter-spacing: -.01em; margin: 0 0 10px; }
+.card > h2:first-child::before, .card > .row-between:first-child > h2::before, .card > .row:first-child > h2::before {
+  content: ""; width: 3px; height: 15px; border-radius: 2px; background: var(--gold); flex: none; }
+.card h3 { font-size: 13.5px; font-weight: 600; color: var(--text-2); margin: 16px 0 6px; }
+
+/* Page header and width. */
+.content { padding: 26px 32px 56px; max-width: 1100px; }
+.content-head { margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.content-head h1 { font-size: 24px; font-weight: 650; letter-spacing: -.02em; display: flex; align-items: center; gap: 10px; }
+.content-head h1 .head-icon { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 9px;
+  background: var(--gold-bg); color: var(--gold); border: 1px solid rgba(220,178,90,.25); }
+
+/* Side menu: a gold bar marks where you are. */
+.side { background: linear-gradient(180deg, #0d1014, var(--side)); }
+.menu-item { position: relative; transition: background .16s var(--ease), color .16s var(--ease); }
+.menu-item svg { transition: color .16s, opacity .16s, transform .2s var(--spring); }
+.menu-item:hover:not(:disabled) svg { transform: translateX(1px); opacity: 1; }
+.menu-item.on { background: rgba(255,255,255,.055); color: #fff; }
+.menu-item.on svg { color: var(--gold); opacity: 1; }
+.menu-item::before { content: ""; position: absolute; left: -12px; top: 50%; width: 3px; height: 0; border-radius: 0 3px 3px 0;
+  background: var(--gold); transform: translateY(-50%); transition: height .22s var(--spring); }
+.menu-item.on::before { height: 18px; }
+
+/* Buttons and fields: quick, springy feedback. */
+button { transition: background .15s var(--ease), border-color .15s, color .15s, transform .14s var(--spring), box-shadow .18s; }
+button:active:not(:disabled) { transform: scale(.97); }
+button.primary { background: var(--gold); border-color: var(--gold); color: #1a1405; font-weight: 600; box-shadow: 0 2px 12px rgba(220,178,90,.16); }
+button.primary:hover:not(:disabled) { background: #e7c272; border-color: #e7c272; box-shadow: 0 4px 18px rgba(220,178,90,.28); }
+button.link:active:not(:disabled) { transform: none; }
+select, .text, .num, input[type="number"] { transition: border-color .15s, box-shadow .15s; }
+select:hover, .text:hover { border-color: var(--line-2); }
+button:focus-visible, select:focus-visible, .text:focus-visible, input:focus-visible {
+  outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px rgba(220,178,90,.5); }
+
+/* Page changes: content rises in, cards one after another. */
+.page-in { animation: page-in .26s var(--ease) both; }
+.page-in .card { animation: card-in .34s var(--ease) both; }
+.page-in .card:nth-of-type(2) { animation-delay: .035s; } .page-in .card:nth-of-type(3) { animation-delay: .07s; }
+.page-in .card:nth-of-type(4) { animation-delay: .1s; } .page-in .card:nth-of-type(n+5) { animation-delay: .12s; }
+@keyframes page-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes card-in { from { opacity: 0; transform: translateY(8px) scale(.995); } to { opacity: 1; transform: none; } }
+
+/* Loading placeholders instead of jumping text. */
+.skel { display: block; border-radius: 8px; background: linear-gradient(90deg, var(--raised) 0%, #272d38 45%, var(--raised) 90%);
+  background-size: 220% 100%; animation: skel 1.3s linear infinite; }
+@keyframes skel { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+.skel-shell { display: grid; grid-template-columns: 200px minmax(0, 1fr); min-height: 100vh; }
+.skel-shell .side { gap: 10px; }
+.skel-shell .content { display: flex; flex-direction: column; gap: 14px; }
+
+/* Stat tiles at the top of a page. */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.tile { position: relative; overflow: hidden; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,0)), var(--panel); animation: card-in .34s var(--ease) both; }
+.tile:nth-child(2) { animation-delay: .04s; } .tile:nth-child(3) { animation-delay: .08s; } .tile:nth-child(4) { animation-delay: .12s; }
+.tile-lab { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.tile-val { font-size: 23px; font-weight: 650; letter-spacing: -.02em; margin-top: 4px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tile-val .cur-icon { width: 20px; height: 20px; vertical-align: -3px; }
+.tile-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.tile.gold .tile-val { color: var(--gold); }
+.tile .up { color: var(--green); } .tile .down { color: var(--red); }
+
+@media (prefers-reduced-motion: reduce) {
+  .page-in, .page-in .card, .tile, .skel { animation: none !important; }
+  button, .menu-item, .menu-item::before { transition: none !important; }
+}

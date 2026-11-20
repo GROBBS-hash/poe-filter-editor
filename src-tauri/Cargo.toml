@@ -16,6 +16,7 @@ tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-dialog = "2"
+tauri-plugin-window-state = "2"
 enigo = "0.5"
 dirs = "6"
 serde = { version = "1", features = ["derive"] }

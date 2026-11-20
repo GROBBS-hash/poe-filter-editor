@@ -100,7 +100,7 @@ export default function App() {
     return () => { a.then((f) => f()); c.then((f) => f()); d.then((f) => f()); g.then((f) => f()); window.removeEventListener("focus", onFocus); };
   }, [refresh]);
 
-  if (!ov) return <div className="page">{error || "Loading…"}</div>;
+  if (!ov) return error ? <div className="page">{error}</div> : <LoadingShell />;
   if (ov.profiles.length === 0 || adding) {
     return <Setup ov={ov} onDone={() => { setAdding(false); refresh(); }} onCancel={ov.profiles.length ? () => setAdding(false) : undefined} />;
   }
@@ -136,8 +136,9 @@ export default function App() {
       </aside>
 
       <main className="content">
+        <div key={tab} className="page-in">
         <div className="content-head">
-          <h1>{current?.name}</h1>
+          <h1><span className="head-icon"><Icon d={ICONS[tab]} /></span>{current?.name}</h1>
           <div className="muted small">{current?.hint}</div>
         </div>
       {tab === "edits" && <Edits profile={active} onChange={refresh} focus={focus?.kind === "edit" ? focus : null} />}
@@ -154,6 +155,26 @@ export default function App() {
       {tab === "presets" && <Find key="presets" view="presets" onChange={refresh} />}
       {tab === "batch" && <Batch on={ov.batch_on} onChange={refresh} />}
       {tab === "profiles" && <Profiles ov={ov} active={active} onChange={refresh} onNew={() => setAdding(true)} />}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+/** While the app starts: the shape of the page, gently shimmering, instead of a blank "Loading…". */
+function LoadingShell() {
+  return (
+    <div className="skel-shell">
+      <aside className="side">
+        <span className="skel" style={{ height: 18, width: "70%", margin: "0 8px 10px" }} />
+        <span className="skel" style={{ height: 34 }} />
+        {Array.from({ length: 9 }, (_, i) => <span key={i} className="skel" style={{ height: 26, opacity: 1 - i * 0.07 }} />)}
+      </aside>
+      <main className="content">
+        <span className="skel" style={{ height: 30, width: 220 }} />
+        <span className="skel" style={{ height: 14, width: 340 }} />
+        <span className="skel" style={{ height: 150, borderRadius: 14 }} />
+        <span className="skel" style={{ height: 220, borderRadius: 14 }} />
       </main>
     </div>
   );
