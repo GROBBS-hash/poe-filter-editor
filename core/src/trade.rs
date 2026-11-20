@@ -651,8 +651,8 @@ pub fn buy_setup(mut s: TradeSetup) -> TradeSetup {
             f.label.contains("while affected by")
         } else {
             match f.kind.as_str() {
-                // Totals, but not "open prefix" or the any-resistance one (the elemental and chaos totals cover it).
-                "pseudo" => !f.id.contains("empty") && f.id != "pseudo.pseudo_total_resistance",
+                // Totals, but not "open prefix" or each element's own resistance total (the elemental total covers them).
+                "pseudo" => !f.id.contains("empty") && !["fire", "cold", "lightning"].iter().any(|e| f.id == format!("pseudo.pseudo_total_{e}_resistance")),
                 // Defences in a PoB item are base rolls, not the item's real numbers.
                 "property" => false,
                 "crafted" => false,
@@ -758,9 +758,9 @@ Item Level: 75
     fn picks_what_matters() {
         let s = setup(BOOTS, &index()).unwrap();
         let on: Vec<&str> = s.filters.iter().filter(|f| f.enabled).map(|f| f.id.as_str()).collect();
-        // Life 28 + 10 from strength = 38 (not enough to tick); res 34 (no); T1 movement speed: yes;
+        // Life 28 + 10 from strength = 38 (not enough to tick); elemental res always ticked, like Awakened; T1 movement speed: yes;
         // evasion-only boots: evasion at 20% quality, ticked.
-        assert_eq!(on, ["prop.ev", "explicit.stat_ms"]);
+        assert_eq!(on, ["prop.ev", "pseudo.pseudo_total_elemental_resistance", "explicit.stat_ms"]);
         let life = s.filters.iter().find(|f| f.id == "pseudo.pseudo_total_life").unwrap();
         assert_eq!(life.value, 38.0);
         let res = s.filters.iter().find(|f| f.id == "pseudo.pseudo_total_elemental_resistance").unwrap();
@@ -769,9 +769,9 @@ Item Level: 75
         assert_eq!(s.category.as_deref(), Some("armour.boots"));
         let q = query(&s);
         assert_eq!(q["query"]["filters"]["type_filters"]["filters"]["category"]["option"], "armour.boots");
-        assert_eq!(q["query"]["stats"][0]["filters"][0]["id"], "explicit.stat_ms");
+        assert_eq!(q["query"]["stats"][0]["filters"][1]["id"], "explicit.stat_ms");
         assert!(q["query"]["filters"]["armour_filters"]["filters"]["ev"]["min"].is_number());
-        assert_eq!(q["query"]["stats"][0]["filters"][0]["value"]["min"], 30.0);
+        assert_eq!(q["query"]["stats"][0]["filters"][1]["value"]["min"], 30.0);
         assert!(q["query"].get("type").is_none());
     }
 

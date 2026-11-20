@@ -27,29 +27,36 @@ struct Rule {
     tick_at: Option<f64>,
 }
 
+// Resistances like Awakened PoE Trade (pseudo/index.ts): elemental total always ticked, chaos total ticked (dropped
+// when its only source is a crafted chaos mod), each element's own total there to tick. On rares every resistance mod
+// is folded into these totals (their `keep` is false); uniques keep their mods anyway.
 const ELE_RES: &[Source] = &[
-    src("+#% to all resistances", 3.0, true), src("+#% to all elemental resistances", 3.0, false),
+    src("+#% to all resistances", 3.0, false), src("+#% to all elemental resistances", 3.0, false),
     src("+#% to fire resistance", 1.0, false), src("+#% to cold resistance", 1.0, false), src("+#% to lightning resistance", 1.0, false),
     src("+#% to fire and lightning resistances", 2.0, false), src("+#% to fire and cold resistances", 2.0, false),
     src("+#% to cold and lightning resistances", 2.0, false),
-    src("+#% to fire and chaos resistances", 1.0, true), src("+#% to cold and chaos resistances", 1.0, true),
-    src("+#% to lightning and chaos resistances", 1.0, true),
+    src("+#% to fire and chaos resistances", 1.0, false), src("+#% to cold and chaos resistances", 1.0, false),
+    src("+#% to lightning and chaos resistances", 1.0, false),
+];
+const FIRE_RES: &[Source] = &[
+    src("+#% to all resistances", 1.0, false), src("+#% to all elemental resistances", 1.0, false), src("+#% to fire resistance", 1.0, false),
+    src("+#% to fire and lightning resistances", 1.0, false), src("+#% to fire and cold resistances", 1.0, false),
+    src("+#% to fire and chaos resistances", 1.0, false),
+];
+const COLD_RES: &[Source] = &[
+    src("+#% to all resistances", 1.0, false), src("+#% to all elemental resistances", 1.0, false), src("+#% to cold resistance", 1.0, false),
+    src("+#% to fire and cold resistances", 1.0, false), src("+#% to cold and lightning resistances", 1.0, false),
+    src("+#% to cold and chaos resistances", 1.0, false),
+];
+const LIGHTNING_RES: &[Source] = &[
+    src("+#% to all resistances", 1.0, false), src("+#% to all elemental resistances", 1.0, false), src("+#% to lightning resistance", 1.0, false),
+    src("+#% to fire and lightning resistances", 1.0, false), src("+#% to cold and lightning resistances", 1.0, false),
+    src("+#% to lightning and chaos resistances", 1.0, false),
 ];
 const CHAOS_RES: &[Source] = &[
-    src("+#% to chaos resistance", 1.0, false), src("+#% to all resistances", 1.0, true),
-    src("+#% to fire and chaos resistances", 1.0, true), src("+#% to cold and chaos resistances", 1.0, true),
-    src("+#% to lightning and chaos resistances", 1.0, true),
-];
-/// Every resistance counted (chaos too): "any resistance", when you don't mind which element. Only shown, never
-/// replaces the mods (the elemental and chaos totals do that).
-const ANY_RES: &[Source] = &[
-    src("+#% to all resistances", 4.0, true), src("+#% to all elemental resistances", 3.0, true),
-    src("+#% to fire resistance", 1.0, true), src("+#% to cold resistance", 1.0, true), src("+#% to lightning resistance", 1.0, true),
-    src("+#% to chaos resistance", 1.0, true),
-    src("+#% to fire and lightning resistances", 2.0, true), src("+#% to fire and cold resistances", 2.0, true),
-    src("+#% to cold and lightning resistances", 2.0, true),
-    src("+#% to fire and chaos resistances", 2.0, true), src("+#% to cold and chaos resistances", 2.0, true),
-    src("+#% to lightning and chaos resistances", 2.0, true),
+    src("+#% to chaos resistance", 1.0, false), src("+#% to all resistances", 1.0, false),
+    src("+#% to fire and chaos resistances", 1.0, false), src("+#% to cold and chaos resistances", 1.0, false),
+    src("+#% to lightning and chaos resistances", 1.0, false),
 ];
 const LIFE: &[Source] = &[
     src("+# to maximum life", 1.0, false), src("+# to strength", 0.5, true), src("+# to all attributes", 0.5, true),
@@ -68,9 +75,11 @@ const INT: &[Source] = &[src("+# to intelligence", 1.0, true), src("+# to all at
 
 const RULES: &[Rule] = &[
     Rule { text: "+# total maximum Life", fallback_id: Some("pseudo.pseudo_total_life"), sources: LIFE, required: Some("+# to maximum life"), needs_two: false, tick_at: Some(40.0) },
-    Rule { text: "+#% total Elemental Resistance", fallback_id: Some("pseudo.pseudo_total_elemental_resistance"), sources: ELE_RES, required: None, needs_two: false, tick_at: Some(36.0) },
-    Rule { text: "+#% total to Chaos Resistance", fallback_id: Some("pseudo.pseudo_total_chaos_resistance"), sources: CHAOS_RES, required: None, needs_two: false, tick_at: Some(15.0) },
-    Rule { text: "+#% total Resistance", fallback_id: Some("pseudo.pseudo_total_resistance"), sources: ANY_RES, required: None, needs_two: true, tick_at: None },
+    Rule { text: "+#% total Elemental Resistance", fallback_id: Some("pseudo.pseudo_total_elemental_resistance"), sources: ELE_RES, required: None, needs_two: false, tick_at: Some(0.0) },
+    Rule { text: "+#% total to Fire Resistance", fallback_id: Some("pseudo.pseudo_total_fire_resistance"), sources: FIRE_RES, required: None, needs_two: false, tick_at: None },
+    Rule { text: "+#% total to Cold Resistance", fallback_id: Some("pseudo.pseudo_total_cold_resistance"), sources: COLD_RES, required: None, needs_two: false, tick_at: None },
+    Rule { text: "+#% total to Lightning Resistance", fallback_id: Some("pseudo.pseudo_total_lightning_resistance"), sources: LIGHTNING_RES, required: None, needs_two: false, tick_at: None },
+    Rule { text: "+#% total to Chaos Resistance", fallback_id: Some("pseudo.pseudo_total_chaos_resistance"), sources: CHAOS_RES, required: None, needs_two: false, tick_at: Some(0.0) },
     Rule { text: "+# total maximum Mana", fallback_id: None, sources: MANA, required: Some("+# to maximum mana"), needs_two: false, tick_at: None },
     Rule { text: "+# total to Strength", fallback_id: None, sources: STR, required: None, needs_two: true, tick_at: None },
     Rule { text: "+# total to Dexterity", fallback_id: None, sources: DEX, required: None, needs_two: true, tick_at: None },
@@ -110,9 +119,11 @@ pub fn totals(mods: &[ModLine], item: &Item, index: &StatIndex, skip: &[usize]) 
         }
         // A unique's fixed mods are searched one by one; a total only helps when two of its mods add up.
         if (rule.needs_two || unique) && (if unique { explicit_sources } else { used.len() }) < 2 { continue; }
+        // Chaos resistance from one crafted mod alone is anyone's bench craft: no total (the mod keeps its own row).
+        if std::ptr::eq(rule.sources, CHAOS_RES) && used.len() == 1 && mods[used[0].0].kind == "crafted" { continue; }
         let total = total.floor();
         out.push(StatFilter {
-            id, label: rule.text.replace('#', &total.to_string()) + if std::ptr::eq(rule.sources, ANY_RES) { " (any, chaos too)" } else { "" }, value: total, min: Some(total),
+            id, label: rule.text.replace('#', &total.to_string()), value: total, min: Some(total),
             enabled: !unique && rule.tick_at.map(|t| total >= t).unwrap_or(false),
             kind: "pseudo".into(), tier: None, junk: false, roll: None, range: None, affix: None,
         });
@@ -304,12 +315,14 @@ mod tests {
         assert_eq!(get("pseudo.pseudo_total_life").unwrap().value, 70.0); // 60 + 20 Str / 2
         assert_eq!(get("pseudo.pseudo_total_elemental_resistance").unwrap().value, 55.0);
         assert_eq!(get("pseudo.pseudo_total_chaos_resistance").unwrap().value, 15.0);
-        // Any resistance: 40 fire + 15 fire + 15 chaos, shown but not ticked; the mods it counts stay.
-        let any = get("pseudo.pseudo_total_resistance").unwrap();
-        assert_eq!((any.value, any.enabled, any.label.as_str()), (70.0, false, "+70% total Resistance (any, chaos too)"));
-        // Folded into totals: gone from the list. Fire+chaos and Strength also give other things: kept.
-        assert!(get("explicit.life").is_none() && get("explicit.fire").is_none());
-        assert!(get("explicit.firechaos").is_some() && get("explicit.str").is_some());
+        // Like Awakened: elemental and chaos totals ticked, fire's own total (40 + 15) there to tick, no cold/lightning.
+        assert!(get("pseudo.pseudo_total_elemental_resistance").unwrap().enabled && get("pseudo.pseudo_total_chaos_resistance").unwrap().enabled);
+        let fire = get("pseudo.pseudo_total_fire_resistance").unwrap();
+        assert_eq!((fire.value, fire.enabled), (55.0, false));
+        assert!(get("pseudo.pseudo_total_cold_resistance").is_none() && get("pseudo.pseudo_total_resistance").is_none());
+        // Folded into totals: gone from the list, fire+chaos too (both totals count it). Strength also gives life: kept.
+        assert!(get("explicit.life").is_none() && get("explicit.fire").is_none() && get("explicit.firechaos").is_none());
+        assert!(get("explicit.str").is_some());
         // Energy shield at 20% quality replaces the local ES mod: 150 * 120/110.
         let es = get("prop.es").unwrap();
         assert_eq!((es.value, es.enabled), (163.0, true));
@@ -398,7 +411,20 @@ mod buy_tests {
         assert!(on.contains(&("pseudo.pseudo_total_life", Some(72.0))), "{on:?}");
         assert!(on.contains(&("pseudo.pseudo_total_elemental_resistance", Some(63.0))), "{on:?}");
         assert!(on.contains(&("explicit.ms", Some(27.0))), "{on:?}");
-        assert!(!on.iter().any(|(id, _)| *id == "explicit.dex" || *id == "pseudo.pseudo_total_resistance"), "{on:?}");
+        assert!(!on.iter().any(|(id, _)| *id == "explicit.dex" || id.ends_with("fire_resistance") || id.ends_with("cold_resistance")), "{on:?}");
+
+        // A crafted chaos mod on its own gets no chaos total (Awakened hides it): the mod keeps its own row.
+        let crafted = "Item Class: Rings
+Rarity: Rare
+X
+Iron Ring
+--------
+Item Level: 80
+--------
++20% to Chaos Resistance (crafted)
+";
+        let c = setup(crafted, &idx).unwrap();
+        assert!(!c.filters.iter().any(|f| f.id == "pseudo.pseudo_total_chaos_resistance"));
         assert!(!s.base_only && s.ilvl_min.is_none());
         let q = buy_query(&s, 0);
         assert_eq!(q["query"]["stats"][0]["type"], "and");

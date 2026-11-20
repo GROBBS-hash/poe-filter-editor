@@ -311,8 +311,10 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   nothing), and notables like "1 Added Passive Skill is Overshock" are matched word for word (`StatIndex::find`).
   Dev check: `POB_STAGE="Endgame" POB_BUY=<data dir>/trade_stats_poe1.json cargo run -p filter-core --example pobdump -- <pob.txt>`.
 
-- Any resistance 21 Nov: items with 2+ resistance mods get an unticked Totals row "+N% total Resistance (any, chaos too)"
-  (`ANY_RES` rule in trade_rules.rs, trade id pseudo.pseudo_total_resistance) for searches that don't mind which element.
+- Resistances like Awakened 21 Nov (he asked; read in its pseudo/index.ts): elemental total always ticked, chaos total ticked
+  (left out when its only source is a crafted chaos mod), fire / cold / lightning totals unticked; on rares every
+  resistance mod is folded into them (fire+chaos mods too). The "any resistance, chaos too" row is gone. Buy uses the
+  elemental + chaos totals only.
 
 - Price box design 2 (he picked it from five mockups, 20 Nov): with a stack, two tiles "YOUR N" (gold, big) and "EACH",
   both with orb icons; bulk items get "N <item> = 1 [divine]" under them (replaces the old "1 div ≈ …" line lower down).
@@ -368,8 +370,8 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Build window (F6) / My build: "Price" on a gear item, flask or jewel, or a click on a gem, opens the price window for it
       (Duskdawn as Maelström Staff, rares with their mods ready to search). Jewel mods no longer show "Has Alt Variant Two".
 
-- [ ] Price check on gear with two or more resistances: a "total Resistance (any, chaos too)" row under Totals; ticking it
-      instead of the elemental total finds items with the resistances spread differently.
+- [ ] Price check on gear with resistances: "total Elemental Resistance" and "total to Chaos Resistance" ticked, fire /
+      cold / lightning totals there to tick, no single resistance mods left in the list.
 
 **Maps**
 - [ ] Ctrl+D on a map: flags the mods on the "Map check" list; "Suggest from my build" picks sensible mods.
