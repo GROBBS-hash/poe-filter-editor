@@ -9,7 +9,7 @@ import { Item, RARITY_COLOUR, itemTitle } from "./types";
 
 type StatFilter = { id: string; label: string; value: number; min: number | null; enabled: boolean; kind: string; tier: number | null; junk?: boolean; roll?: number | null; range?: string | null; affix?: string | null };
 type Setup = { item: Item; filters: StatFilter[]; unknown_kinds?: string[]; base_only: boolean; ilvl_min: number | null; ilvl_max?: number | null; links_min: number | null;
-  gem_level: number | null; unknown: string[]; category: string | null; raw?: string; misc?: string[]; base?: string;
+  gem_level: number | null; unknown: string[]; category: string | null; raw?: string; misc?: string[]; base?: string; affix_max?: [number, number] | null;
   /** Awakened-style "search as a base": why it's a crafting base, which mods to keep, item level, influences. */
   base_item?: { why: string[]; ids: string[]; ilvl_min: number | null; misc: string[] } | null };
 type MapInfo = { mods: { text: string; warn: string | null }[]; unidentified: boolean; tier: number | null; stats: string[] };
@@ -169,14 +169,14 @@ function bulkTypical(offers: Offer[], divine: number | null, market: number | nu
 }
 
 /** The heading a stat row sits under, and a short hint: [title, hint]. */
-function rowGroup(f: StatFilter, jewel: boolean): [string, string] {
-  const most = jewel ? "2" : "3";
+/** The small heading over a row. `max` = how many prefixes / suffixes the item can hold (Cogwork Ring 2 / 4). */
+function rowGroup(f: StatFilter, max: [number, number]): [string, string] {
   if (f.id.startsWith("prop.")) return [f.id.includes("dps") ? "Damage" : "Defences", "at 20% quality"];
   if (f.kind === "pseudo") return f.id.includes("empty") ? ["Open slots", "room for another mod"] : ["Totals", "added up from all its mods"];
   if (f.kind === "enchant") return ["Enchant", ""];
   if (f.kind === "implicit") return ["Implicit", "comes with the base"];
-  if (f.affix === "prefix") return ["Prefixes", `up to ${most} on an item`];
-  if (f.affix === "suffix") return ["Suffixes", `up to ${most} on an item`];
+  if (f.affix === "prefix") return ["Prefixes", `up to ${max[0]} on this item`];
+  if (f.affix === "suffix") return ["Suffixes", `up to ${max[1]} on this item`];
   return ["Other mods", ""];
 }
 
@@ -512,9 +512,10 @@ export default function TradeWindow() {
             if (!shown(f)) return null;
             // A small heading where the kind of row changes (rows are already in the game's order), with the full
             // words "Prefixes" / "Suffixes" and how many an item can have, so players learn how mods split.
-            const g = rowGroup(f, setup.category === "jewel.base" || setup.category === "jewel.abyss");
+            const jewel = setup.category === "jewel.base" || setup.category === "jewel.abyss";
+            const g = rowGroup(f, setup.affix_max ?? (jewel ? [2, 2] : [3, 3]));
             const prev = setup.filters.slice(0, i).filter(shown).pop();
-            const head = !prev || rowGroup(prev, false)[0] !== g[0];
+            const head = !prev || rowGroup(prev, [3, 3])[0] !== g[0];
             return (
               <React.Fragment key={f.id + i}>
                 {head && <div className="tw-group"><span>{g[0]}</span>{g[1] && <span className="tw-group-hint">{g[1]}</span>}</div>}

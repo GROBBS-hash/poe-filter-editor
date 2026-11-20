@@ -321,6 +321,12 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Live 21 Nov on his saved checks: velour boots 2015, magic dagger 121, magic burgonet 1947. Dev check:
   `cargo run -p filter-core --example basecheck -- <data dir>/trade_stats_poe1.json <data dir>/samples`.
 
+- Prefix / suffix limits 21 Nov: `trade_rules::affix_limits` reads implicits like the Cogwork Ring's "-1 Prefix Modifier
+  allowed" / "+1 Suffix Modifier allowed" (jewels 2/2, other rares 3/3); open-slot rows and the "Prefixes · up to N on this
+  item" headings use it (`TradeSetup.affix_max`). His Dragon Turn: 2/4, so 1 free prefix + 1 free suffix (was "2 free prefixes").
+  His Entropy Grasp "none listed" was real: the 5 ticked stats together aren't for sale; without Aspect of the Spider 16.
+  Dev tools: `BASE_SETUP=<sample>` on basecheck prints a sample's setup; `queryof` example turns a setup into its search.
+
 - **Buy from your build** 21 Nov (he wants PoB's mods -> trade site in one click): gold "Buy" on each item / jewel in F6
   and My build. After two tries he showed PoEStash's build links and we copied that shape (`trade::buy_query`): exact
   base, rarity rare/magic, every mod the item has as "has this mod" with no numbers (crafted ones on the page but
@@ -356,6 +362,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Roll bars and "T3 range 6–11" numbers look right; tier badges coloured. (Roll bars confirmed 20 Nov.)
 - [ ] Every Ctrl+D shows a trade price straight away (uniques, corpses, gems too) in the big box at the top.
       (Confirmed 20 Nov for a unique, a unique belt and a gem.)
+- [ ] Cogwork Ring: "Prefixes · up to 2", "Suffixes · up to 4", open prefix / suffix counts right.
 - [ ] "This item / As a base" tabs (Awakened-style): "As a base" shows on fractured / influenced / synthesised items, magic jewels, cluster
       jewels and unfinished gear of item level 82+, says why, and the prices look like Awakened's base search. Not on
       finished items (crafted mod, 20% quality, corrupted). Magic items keep only their tier 1-2 mods.

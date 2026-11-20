@@ -255,6 +255,21 @@ pub fn property_query(id: &str) -> Option<(&'static str, &'static str)> {
 }
 
 /// "Has an open prefix / suffix" (from the advanced copy's mod headings), for crafting.
+/// How many prefixes and suffixes the item can hold: jewels (abyss and cluster too) two of each, other rares three,
+/// changed by implicits like the Cogwork Ring's "-1 Prefix Modifier allowed" / "+1 Suffix Modifier allowed".
+pub fn affix_limits(text: &str, item: &Item) -> (u32, u32) {
+    let base: i32 = if item.item_class.contains("Jewel") { 2 } else { 3 };
+    let (mut pre, mut suf) = (base, base);
+    for l in text.lines().map(str::trim) {
+        let l = l.trim_end_matches(" (implicit)");
+        let Some((n, rest)) = l.split_once(' ') else { continue };
+        let Ok(n) = n.trim_start_matches('+').parse::<i32>() else { continue };
+        if rest.starts_with("Prefix Modifier") && rest.contains("allowed") { pre += n; }
+        if rest.starts_with("Suffix Modifier") && rest.contains("allowed") { suf += n; }
+    }
+    (pre.max(0) as u32, suf.max(0) as u32)
+}
+
 pub fn open_affixes(text: &str, item: &Item, index: &StatIndex) -> Vec<StatFilter> {
     if item.rarity != "Rare" || item.corrupted || text.contains("\nMirrored") { return vec![]; }
     let (mut pre, mut suf) = (0, 0);
@@ -264,10 +279,9 @@ pub fn open_affixes(text: &str, item: &Item, index: &StatIndex) -> Vec<StatFilte
         if low.contains("suffix modifier") { suf += 1; }
     }
     if pre + suf == 0 { return vec![]; } // plain copy: can't tell
-    // Jewels (abyss and cluster too) hold two prefixes and two suffixes; other rares three of each.
-    let max = if item.item_class.contains("Jewel") { 2 } else { 3 };
+    let (max_pre, max_suf) = affix_limits(text, item);
     let mut out = Vec::new();
-    for (n, text_id, label) in [(max - pre.min(max), "# Empty Prefix Modifiers", "prefix"), (max - suf.min(max), "# Empty Suffix Modifiers", "suffix")] {
+    for (n, text_id, label) in [(max_pre.saturating_sub(pre), "# Empty Prefix Modifiers", "prefix"), (max_suf.saturating_sub(suf), "# Empty Suffix Modifiers", "suffix")] {
         if n == 0 { continue; }
         let Some(id) = index.pseudo_id(text_id) else { continue };
         out.push(StatFilter { id, label: format!("Open {label} ({n} free)"), value: n as f64, min: Some(1.0), enabled: false,
@@ -556,5 +570,29 @@ Fractured Item
             "Grants Level 20 Aspect of the Spider");
         let plain = "Item Class: Boots\nRarity: Rare\nX\nTwo-Toned Boots\n--------\nItem Level: 70\n--------\n+40 to maximum Life\n";
         assert!(setup(plain, &idx()).unwrap().base_item.is_none());
+    }
+}
+
+#[cfg(test)]
+mod affix_limit_tests {
+    use crate::trade::{setup, StatIndex};
+    use serde_json::json;
+
+    #[test]
+    fn cogwork_ring() {
+        // His Dragon Turn: Cogwork Ring holds 2 prefixes and 4 suffixes; it has 1 and 3, so one of each is free.
+        let text = "Item Class: Rings\nRarity: Rare\nDragon Turn\nCogwork Ring\n--------\nItem Level: 84\n--------\n{ Implicit Modifier }\n\
+            -1 Prefix Modifier allowed\n+1 Suffix Modifier allowed\nImplicit Modifiers Cannot Be Changed — Unscalable Value\n--------\n\
+            { Prefix Modifier \"Mazarine\" (Tier: 4) — Mana }\n+60(60-64) to maximum Mana\n\
+            { Suffix Modifier \"of the Rainbow\" (Tier: 1) — Elemental, Resistance  — 25% Increased }\n+15(15-16)% to all Elemental Resistances\n\
+            { Suffix Modifier \"of the Virtuoso\" (Tier: 2) — Attribute  — 25% Increased }\n+46(43-50) to Intelligence\n\
+            { Suffix Modifier \"of Haast\" (Tier: 1) — Elemental, Cold, Resistance  — 25% Increased }\n+46(46-48)% to Cold Resistance\n";
+        let idx = StatIndex::from_json(&json!({ "result": [ { "label": "Pseudo", "entries": [
+            { "id": "pseudo.pseudo_number_of_empty_prefix_mods", "text": "# Empty Prefix Modifiers", "type": "pseudo" },
+            { "id": "pseudo.pseudo_number_of_empty_suffix_mods", "text": "# Empty Suffix Modifiers", "type": "pseudo" } ] } ] }));
+        let s = setup(text, &idx).unwrap();
+        assert_eq!(s.affix_max, Some((2, 4)));
+        let open: Vec<&str> = s.filters.iter().filter(|f| f.id.contains("empty")).map(|f| f.label.as_str()).collect();
+        assert_eq!(open, ["Open prefix (1 free)", "Open suffix (1 free)"]);
     }
 }

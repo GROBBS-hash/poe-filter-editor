@@ -89,6 +89,9 @@ pub struct TradeSetup {
     /// The base as the trade site knows it ("Eternal Burgonet" for "Fecund Eternal Burgonet of the Genius").
     #[serde(default)]
     pub base: String,
+    /// How many prefixes and suffixes this item can hold (3 / 3 on most gear, 2 / 2 on jewels, Cogwork Ring 2 / 4).
+    #[serde(default)]
+    pub affix_max: Option<(u32, u32)>,
     /// Awakened's "base item" search, when this looks like a crafting base rather than a finished item.
     #[serde(default)]
     pub base_item: Option<BaseItem>,
@@ -435,6 +438,7 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
     let gear = category(&item.item_class).is_some();
     let base_item = base_item(text, &item, &lines, &filters);
     let base = plain_base(&item);
+    let affix_max = Some(crate::trade_rules::affix_limits(text, &item));
     Some(TradeSetup {
         category: category(&item.item_class).map(|c| if item.base_type.ends_with("Cluster Jewel") { "jewel.cluster" } else { c }).map(String::from),
         base_only: !matches!(item.rarity.as_str(), "Rare" | "Magic") || !gear || nothing_picked,
@@ -442,7 +446,7 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
         ilvl_max: (gear && nothing_picked && item.rarity != "Unique").then_some(item.item_level).flatten().and_then(|l| ilvl_band(l).1),
         links_min: (links >= 5).then_some(links),
         gem_level,
-        filters, unknown, unknown_kinds, item, raw: text.to_string(), misc: vec![], base, base_item,
+        filters, unknown, unknown_kinds, item, raw: text.to_string(), misc: vec![], base, base_item, affix_max,
     })
 }
 
