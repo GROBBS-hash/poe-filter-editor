@@ -229,6 +229,12 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   sellers). Bulk exchange shows a stock-weighted going rate (`bulkTypical` in TradeWindow.tsx), poe.ninja beside it,
   and marks offers well under it with little stock as "low stock" (likely fixers). His Stacked Deck: 3c, not 1c.
 
+- Search like Awakened 20 Nov (checked in its source, CheckedItem.vue): Ctrl+D searches at once only for uniques,
+  unidentified items, ground reads and items with no gear category (gems, corpses…); bulk uses the exchange. Rares,
+  gear, jewels and maps wait: moving the mouse onto Search from inside the window searches (or click). Changing a
+  filter afterwards clears the prices until you search again (`searchKey`). Settings → Price check →
+  "Search every item straight away" (`price_instant_all`, off by default) brings back the old behaviour.
+
 
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
@@ -244,6 +250,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Every Ctrl+D shows a trade price straight away (uniques, corpses, gems too) in the big box at the top.
       (Confirmed 20 Nov for a unique, a unique belt and a gem.)
 - [ ] Fractured item: "Price as base · ilvl 73–74" gives sensible prices (fractured-only search confirmed 20 Nov).
+- [ ] Rares wait for Search: move the mouse onto Search to search; changing a stat clears the prices. Uniques/currency still instant.
 - [ ] Bulk items (e.g. Stacked Deck) show the going rate (3c), not a price fixer's 1c; fixers marked "low stock".
 - [ ] Related items panel beside the price window: lifeforce, fragments, invitations, boss keys.
 - [ ] New Clean glass look: opens bigger and remembers its size; pages fade in; Wealth tiles look right; nothing broken on other pages.

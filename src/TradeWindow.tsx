@@ -11,7 +11,7 @@ type StatFilter = { id: string; label: string; value: number; min: number | null
 type Setup = { item: Item; filters: StatFilter[]; unknown_kinds?: string[]; base_only: boolean; ilvl_min: number | null; ilvl_max?: number | null; links_min: number | null;
   gem_level: number | null; unknown: string[]; category: string | null; raw?: string };
 type MapInfo = { mods: { text: string; warn: string | null }[]; unidentified: boolean; tier: number | null; stats: string[] };
-type Check = { setup: Setup | null; ninja: [number, string] | null; league: string; from_ground: boolean; error: string | null; bulk?: string | null; map?: MapInfo | null; divine?: number | null; compare?: Comparison[] };
+type Check = { setup: Setup | null; ninja: [number, string] | null; league: string; from_ground: boolean; error: string | null; bulk?: string | null; map?: MapInfo | null; divine?: number | null; compare?: Comparison[]; instant_all?: boolean };
 type Comparison = { slot: string; current: string; rows: { stat: string; now: number; this: number }[]; gain: string[]; lose: string[] };
 type Offer = { pay: number; pay_currency: string; get: number; get_currency: string; each: number; stock: number; account: string; whisper: string };
 type Bulk = { offers: Offer[]; url: string; divine: number | null };
@@ -50,7 +50,17 @@ function Other({ n, cur, divine }: { n: number; cur: string; divine: number | nu
 }
 
 /** Every Ctrl+D searches the trade site straight away (bulk items use the exchange instead). */
-const needsTrade = (c: Check) => !!c.setup && !c.bulk;
+/** Like Awakened: search straight away when the filters barely matter (uniques, unidentified items, gems,
+ *  corpses and other items without a gear category, items read off the ground); rares, gear, jewels and maps wait
+ *  for Search so you can pick the stats first. Bulk items use the exchange. Settings can make every item instant. */
+const needsTrade = (c: Check) => {
+  if (!c.setup || c.bulk) return false;
+  const it = c.setup.item;
+  return !!c.instant_all || it.rarity === "Unique" || it.unidentified || c.from_ground
+    || (!c.setup.category && !c.map && it.item_class !== "Maps");
+};
+/** What a search depends on: when this changes after a search, the old prices no longer match the filters. */
+const searchKey = (s: Setup) => JSON.stringify([s.filters.map((f) => [f.enabled, f.min]), s.base_only, s.ilvl_min, s.ilvl_max ?? null, s.links_min]);
 
 /** Item-level band where base prices jump (75, 82, 84, 86 unlock better mod tiers): [low, high or null]. */
 const ilvlBand = (l: number): [number, number | null] => l <= 67 ? [1, 67] : l <= 74 ? [68, 74] : l <= 81 ? [75, 81] : l <= 83 ? [82, 83] : l <= 85 ? [84, 85] : [86, null];
@@ -155,7 +165,7 @@ function bulkTypical(offers: Offer[], divine: number | null) {
 }
 
 /** The answer first, big and clear: what this sells for. */
-function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote }: { res: Result | null; bulk: Bulk | null; busy: boolean; err: string;
+function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote, waiting }: { res: Result | null; bulk: Bulk | null; busy: boolean; err: string; waiting?: string | null;
   divine: number | null; ninja: [number, string] | null; ninjaNote: string }) {
   const ninjaChaos = ninja ? (ninja[1] === "divine" && divine ? ninja[0] * divine : ninja[1] === "chaos" ? ninja[0] : null) : null;
   let main: number | null = null, label = "", sub: React.ReactNode = null;
@@ -184,7 +194,7 @@ function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote }: { res: Re
         </div>
       ) : (
         <div className="tw-hero-main"><span className="tw-hero-label">
-          {busy ? "Checking the trade site…" : res && res.total === 0 ? "None listed like this: untick a stat or two" : res ? `${res.total} listed, none priced` : err ? "No trade price" : "No price yet"}</span></div>
+          {busy ? "Checking the trade site…" : res && res.total === 0 ? "None listed like this: untick a stat or two" : res ? `${res.total} listed, none priced` : err ? "No trade price" : waiting ?? "No price yet"}</span></div>
       )}
       <div className="tw-hero-foot muted small">
         {sub}
@@ -261,6 +271,9 @@ export default function TradeWindow() {
   const [reporting, setReporting] = useState<string | null>(null);
   const [reported, setReported] = useState("");
   const [hasSide, setHasSide] = useState(false);
+  const [searched, setSearched] = useState<string | null>(null);
+  // Like Awakened: change a filter after a search and the old prices go, until you search again.
+  useEffect(() => { if (res && setup && searched && searchKey(setup) !== searched) setRes(null); }, [setup, res, searched]);
   const box = useRef<HTMLDivElement | null>(null);
 
   const close = useCallback(() => { setCheck(null); setRes(null); setBulk(null); setAi(null); setErr(""); invoke("hide_trade_window"); }, []);
@@ -272,7 +285,7 @@ export default function TradeWindow() {
   }, []);
 
   const run = useCallback(async (s: Setup) => {
-    setBusy(true); setErr(""); setRes(null);
+    setBusy(true); setErr(""); setRes(null); setSearched(searchKey(s));
     try { setRes(await invoke<Result>("trade_search", { setup: s })); } catch (e) { setErr(String(e)); }
     setBusy(false);
   }, []);
@@ -280,7 +293,7 @@ export default function TradeWindow() {
   useEffect(() => {
     const a = listen<Check>("price-check", (e) => {
       const c = e.payload;
-      setCheck(c); setSetup(c.setup); setRes(null); setBulk(null); setAi(null); setErr(c.error ?? ""); setCopied(null); setPay("chaos");
+      setCheck(c); setSetup(c.setup); setRes(null); setSearched(null); setBulk(null); setAi(null); setErr(c.error ?? ""); setCopied(null); setPay("chaos");
       setSaving(null); setShowSaved(!c.setup); setPreset(null); setMapMods(false); setReporting(null); setReported(""); window.scrollTo(0, 0);
       invoke<Saved[]>("saved_list").then(setSaved).catch(() => {});
       if (c.bulk) runBulk(c.bulk, "chaos");
@@ -356,6 +369,7 @@ export default function TradeWindow() {
       </div>
 
       <PriceHero res={res} bulk={check.bulk ? bulk : null} busy={busy} err={err} divine={divine}
+        waiting={!res && !busy && !check.bulk ? (searched ? "Filters changed: move onto Search again" : "Pick the stats, then move your mouse onto Search") : null}
         ninja={check.ninja} ninjaNote={it.rarity === "Unique" && !it.name ? " (best ground unique on this base)" : ""} />
       {err && <div className="qm-warn">{err}</div>}
       {it.rarity === "Unique" && !it.name && it.base_type && <BaseUniques base={it.base_type} divine={divine} />}
@@ -428,7 +442,13 @@ export default function TradeWindow() {
             onChange={(e) => setSetup({ ...setup, ilvl_min: e.target.checked ? it.item_level ?? null : null, ilvl_max: e.target.checked && it.item_level ? ilvlBand(it.item_level)[1] : null })} /> ilvl {ilvlText(it.item_level)}</label>
         )}
         <button className="link small" onClick={() => setSaving(saving == null ? itemTitle(it) : null)} title="Keep this search to run again or watch live">Save search</button>
-        <button className="tw-search" disabled={busy} onClick={() => run(setup)}>{busy ? "Searching…" : res ? "Search again" : "Search trade"}</button>
+        <button className="tw-search" disabled={busy} onClick={() => run(setup)}
+          title="Move your mouse onto this button to search (or click)"
+          onMouseEnter={(e) => {
+            // Hover to search, like Awakened, but only when coming from inside the window (not when it opens under the mouse).
+            const from = e.relatedTarget as Node | null;
+            if (!busy && !res && from && box.current?.contains(from)) run(setup);
+          }}>{busy ? "Searching…" : searched ? "Search again" : "Search trade"}</button>
       </div>}
       {saving != null && (
         <form className="tw-save" onSubmit={(e) => { e.preventDefault();
