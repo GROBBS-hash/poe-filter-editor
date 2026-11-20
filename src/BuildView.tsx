@@ -176,7 +176,10 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
   }, []);
   useEffect(() => { try { localStorage.setItem("build.view", view); } catch { /* not kept */ } }, [view]);
 
-  if (!st) return <div className="empty">No build yet. Paste your Path of Building link in the app (Levelling → My build).</div>;
+  if (!st) return compact
+    ? <div className="empty">No build yet. Paste your Path of Building link on the My build page.<br />
+        <button className="primary empty-go" onClick={() => invoke("open_editor", { tab: "build" })}>Open My build</button></div>
+    : <div className="empty">No build yet. Paste your Path of Building link in the box above.</div>;
   const { build, stage } = st;
   const s = build.stages[stage];
   const setStage = (i: number) => { setSt({ ...st, stage: i, follow: false }); invoke("pob_set_stage", { stage: i }); };

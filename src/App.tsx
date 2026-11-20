@@ -132,6 +132,8 @@ export default function App() {
     const a = listen("batch-mode", (e) => { if (e.payload) setTab("batch"); refresh(); });
     const c = listen("active-changed", () => refresh());
     const d = listen("neversink-updated", () => refresh());
+    // "Open the editor" in a window over the game: show that page.
+    const o = listen<string>("open-tab", (e) => setTab(e.payload as Tab));
     const g = listen<Source>("goto-rule", (e) => {
       const src = e.payload;
       setTab(src.kind === "neversink" ? "tiers" : src.kind === "edit" ? "edits" : src.kind === "preset" ? "presets" : src.kind === "price" ? "prices" : "find");
@@ -143,7 +145,7 @@ export default function App() {
     window.addEventListener("goto-tab", onGoto);
     const onFocus = () => refresh();
     window.addEventListener("focus", onFocus);
-    return () => { a.then((f) => f()); c.then((f) => f()); d.then((f) => f()); g.then((f) => f()); window.removeEventListener("focus", onFocus); window.removeEventListener("goto-tab", onGoto); };
+    return () => { a.then((f) => f()); c.then((f) => f()); d.then((f) => f()); o.then((f) => f()); g.then((f) => f()); window.removeEventListener("focus", onFocus); window.removeEventListener("goto-tab", onGoto); };
   }, [refresh]);
 
   // Keyboard: Ctrl+F jumps to Find and into its search box; Ctrl+1…9 opens the menu's pages in order;

@@ -1397,3 +1397,6 @@ li.bv-newgems { list-style: none; margin: 0 0 8px; }
 .qm-name { font-size: 19px; letter-spacing: .02em; line-height: 1.15; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
 /* Gem pictures in the gem pills. */
 .gem-pic { width: 18px; height: 18px; flex: none; margin: -2px 0; image-rendering: auto; }
+.empty-go { margin-top: 12px; }
+/* Card headings in the game lettering need a little more size: its lower case is small capitals. */
+main.content .card h2 { font-size: 19px; font-weight: 500; letter-spacing: .02em; }

@@ -292,6 +292,11 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   `BuildView.tsx` (F6 + My build): a tick per item, key `slot|name|base`, in localStorage `build.have` (shared by both
   windows via the storage event), "Have N of M" bar with "hide what I have" (`build.hideHave`).
 
+- Polish 4, 21 Nov (0.2.7, tidy-up): F6 with no build and F7 with no strategy get an "Open My build" / "Open the
+  Atlas page" button (open_editor command: shows the main window and emits open-tab to it); card headings 19px in
+  the game lettering (an older rule had them at 15.5px). Pages without preview data (Presets, Themes, Prices, My
+  edits, Batch, Filters, Levelling gear) weren't looked at in the preview: check them in the real app.
+
 - Polish 3, 21 Nov (0.2.6, feel): main window keys (App.tsx): Ctrl+F = Find with the cursor in its box, Ctrl+1–9 =
   menu pages in order, Alt+← = previous page; each page's scroll position kept (localStorage scroll.<tab>, the window
   scrolls, restored a few times while data loads); Find and Find-in-stash keep their text (usePersist.ts); Wealth
@@ -511,6 +516,8 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
       gem pictures in F6 / My build.
 - [ ] 0.2.6: Ctrl+F, Ctrl+1–9, Alt+← in the editor; pages come back scrolled where you left them; Find text stays;
       Wealth scan goes on to price new rares (tick box).
+- [ ] 0.2.7: F6 / F7 with nothing loaded show an "Open …" button that brings up the editor on that page; card
+      headings readable; every page looks even (say which one looks off).
 
 **Installer (21 Nov, release 0.2.0)**
 - [x] (21 Nov: installed, "everything's there".) Still check: hotkeys work in game with the installed editor.
