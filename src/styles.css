@@ -1,9 +1,11 @@
+@import "@fontsource/alegreya-sc/400.css";
+@import "@fontsource/alegreya-sc/500.css";
 :root {
   /* Graphite surfaces, one muted gold accent (PoE's currency gold) for "you are here" and main actions. */
   --bg: #15171c; --side: #111317; --panel: #1b1e25; --raised: #22262f; --input: #13151a;
   --line: #2b303a; --line-2: #3b4250; --text: #e6e8ed; --text-2: #c2c7d1; --muted: #8b92a1;
   --gold: #dcb25a; --gold-bg: rgba(220, 178, 90, .13); --red: #f0857c; --green: #62cf80; --blue: #79b4ff;
-  --game-font: "Fontin SmallCaps", "Fontin", Georgia, serif;
+  --game-font: "Fontin SmallCaps", "Fontin", "Alegreya SC", Georgia, serif;
   font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
   font-size: 14px; line-height: 1.45; color: var(--text);
   -webkit-font-smoothing: antialiased;
@@ -1380,3 +1382,18 @@ li.bv-newgems { list-style: none; margin: 0 0 8px; }
 /* Errors: calm amber note, not a wall of red. */
 .qm-warn { border-radius: 8px; line-height: 1.45; }
 @media (prefers-reduced-motion: reduce) { #root.pop-in > *, .spin { animation: none; } }
+
+/* ---- Polish 2 (21 Nov): the game's look ---- */
+/* Headings and item names in the game's lettering (Fontin when installed, else Alegreya SC, bundled). */
+.content-head h1, .card h2, .bo-title, .bv-iname > span:first-child, .qm-name, .w-table td:nth-child(2) > :first-child,
+.bv-who, .tw-sec { font-family: var(--game-font); }
+.content-head h1 { font-weight: 500; letter-spacing: .01em; }
+.card h2 { font-size: 17px; font-weight: 500; letter-spacing: .02em; }
+.bo-bar .bo-title { font-weight: 500; letter-spacing: .02em; }
+/* Pop-up headers like the game's item tooltip: a dark band, name centred-left in the item's colour, gold rule under it. */
+.qm-head { margin: -12px -12px 10px; padding: 12px 12px 10px; border-radius: 12px 12px 0 0;
+  background: linear-gradient(180deg, rgba(0,0,0,.35), rgba(0,0,0,.1)); border-bottom: 1px solid transparent;
+  border-image: linear-gradient(90deg, transparent, rgba(220,178,90,.55), transparent) 1; }
+.qm-name { font-size: 19px; letter-spacing: .02em; line-height: 1.15; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+/* Gem pictures in the gem pills. */
+.gem-pic { width: 18px; height: 18px; flex: none; margin: -2px 0; image-rendering: auto; }

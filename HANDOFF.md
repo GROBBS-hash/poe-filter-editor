@@ -292,6 +292,11 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   `BuildView.tsx` (F6 + My build): a tick per item, key `slot|name|base`, in localStorage `build.have` (shared by both
   windows via the storage event), "Have N of M" bar with "hide what I have" (`build.hideHave`).
 
+- Polish 2, 21 Nov (0.2.5, game look): Fontin isn't installable from GGG (Cloudflare blocks), so --game-font falls
+  back to Alegreya SC (npm @fontsource/alegreya-sc, @import at the top of styles.css). Page titles, card headings,
+  item names, F6 headings use it; pop-up headers look like the game tooltip (dark band, gold rule); gem pills show the
+  gem's picture (GemPic: icons[name] or "name Support").
+
 - Polish 1, 21 Nov (0.2.4, windows over the game): one frame for every pop-up (.qm and .bo share glass, edge, shadow;
   thin gold line on .qm), fade-and-settle each time a window appears (main.tsx: visibilitychange + price-check /
   item-picked / build-shown re-trigger #root.pop-in), Spinner + counting big price (useCountUp) in the price window,
@@ -496,6 +501,8 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 **Polish (21 Nov)**
 - [ ] 0.2.4: pop-ups (Ctrl+D, F2, F6, F7, trades) fade in quickly and share one look; price window shows a spinner
       while it checks and the big price counts up; errors read in plain English.
+- [ ] 0.2.5: headings and item names in the game-style lettering; Ctrl+D / F2 header looks like the game tooltip;
+      gem pictures in F6 / My build.
 
 **Installer (21 Nov, release 0.2.0)**
 - [x] (21 Nov: installed, "everything's there".) Still check: hotkeys work in game with the installed editor.

@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef, useState } from "react";
-import { ItemIcon } from "./icons";
+import { ItemIcon, useIcons } from "./icons";
 import TreeView from "./TreeView";
 
 export type PobGem = { name: string; level: number; quality: number; enabled: boolean; support: boolean; colour: string };
@@ -53,12 +53,19 @@ function BuyButton({ it }: { it: PobGear }) {
   );
 }
 
+/** The gem's picture from the game (its colour dot when there's none). */
+function GemPic({ g }: { g: PobGem }) {
+  const icons = useIcons();
+  const url = icons[g.name] || icons[`${g.name} Support`];
+  return url ? <img className="gem-pic" src={url} alt="" width={18} height={18} loading="lazy" /> : <span className="gem-dot" />;
+}
+
 /** PoB's look: socket colours and supports a little smaller. Click = price check. */
 function GemPill({ g, main, fresh }: { g: PobGem; main: boolean; fresh?: boolean }) {
   return (
     <span onClick={() => priceGem(g)} className={`gem gem-${g.colour} ${g.support ? "sup" : ""} ${main ? "main" : ""} ${g.enabled ? "" : "off"} ${fresh ? "fresh" : ""}`}
       title={`${g.name} · level ${g.level}${g.quality ? ` · ${g.quality}% quality` : ""}${g.enabled ? "" : " (switched off in PoB)"}\nClick to price check`}>
-      <span className="gem-dot" />{g.name}
+      <GemPic g={g} />{g.name}
       {(g.level > 1 || g.quality > 0) && <span className="gem-lvl">{g.level}{g.quality ? `/${g.quality}` : ""}</span>}
     </span>
   );
