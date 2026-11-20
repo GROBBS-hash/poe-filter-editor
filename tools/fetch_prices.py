@@ -25,9 +25,10 @@ UA = "poe-filter-editor price cache (github.com/GROBBS-hash/poe-filter-editor)"
 BASE = "https://poe.ninja"
 
 POE1_EXCHANGE = ["Currency", "Fragment", "DivinationCard", "Scarab", "Essence", "Fossil", "Resonator", "Oil",
-                 "DeliriumOrb", "Omen", "Tattoo", "Runegraft", "AllflameEmber", "Artifact", "Astrolabe", "Ducat"]
+                 "DeliriumOrb", "Omen", "Tattoo", "Runegraft", "AllflameEmber", "Artifact", "Astrolabe", "Ducat", "Thread"]
 POE1_STASH = ["UniqueWeapon", "UniqueArmour", "UniqueAccessory", "UniqueFlask", "UniqueJewel", "UniqueTincture",
-              "UniqueRelic", "Incubator", "Invitation", "Memory", "Vial", "Corpse", "Wombgift"]
+              "UniqueRelic", "Incubator", "Invitation", "Memory", "Vial", "Corpse", "Wombgift",
+              "Map", "BlightedMap", "BlightRavagedMap", "Beast", "SkillGem"]
 POE2_EXCHANGE = ["Currency", "Fragments", "Abyss", "UncutGems", "LineageSupportGems", "Essences", "SoulCores",
                  "Idols", "Runes", "Ritual", "Expedition", "Delirium", "Breach"]
 POE2_STASH = ["UniqueWeapons", "UniqueArmours", "UniqueAccessories", "UniqueFlasks", "UniqueCharms", "UniqueJewels"]
@@ -131,6 +132,13 @@ def stash_items(game, league, typ):
             continue
         out.append({"name": name, "base": line.get("baseType") or name, "cat": typ, "value": round(value, 4),
                     "variant": line.get("variant"), "listings": line.get("listingCount")})
+    if typ == "SkillGem":
+        # Thousands of level/quality versions: keep each gem's cheapest (what a stash scan counts), so the file stays small.
+        cheapest = {}
+        for o in out:
+            if o["name"] not in cheapest or o["value"] < cheapest[o["name"]]["value"]:
+                cheapest[o["name"]] = {**o, "variant": None}
+        out = list(cheapest.values())
     return out
 
 

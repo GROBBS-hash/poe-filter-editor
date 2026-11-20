@@ -83,7 +83,8 @@ pub fn value_item(item: &Value, tab: &str, lookup: Lookup) -> Option<Valued> {
     Some(Valued {
         tab: tab.to_string(), name: shown, stack, value: each * stack as f64,
         x: item["x"].as_u64().unwrap_or(0) as u32, y: item["y"].as_u64().unwrap_or(0) as u32,
-        listed: item["note"].as_str().map(|n| n.starts_with("~price") || n.starts_with("~b/o")).unwrap_or(false),
+        // A price note on the item, or on the whole tab (a tab named "~price 5 chaos" prices everything in it).
+        listed: [item["note"].as_str().unwrap_or(""), tab].iter().any(|n| n.starts_with("~price") || n.starts_with("~b/o")),
         icon: item["icon"].as_str().unwrap_or("").to_string(), places: 1,
     })
 }
@@ -264,6 +265,9 @@ mod tests {
         assert_eq!(v[1].value, 40.0);
         assert!((v[2].value - 3.0).abs() < 1e-9);
         assert_eq!((v[3].name.as_str(), v[3].listed), ("Headhunter Leather Belt", true));
+        // Everything in a tab named "~price 5 chaos" is up for sale.
+        let priced_tab = value_tab(&json!([{ "frameType": 5, "typeLine": "Divine Orb", "baseType": "Divine Orb", "stackSize": 1, "x": 0, "y": 0 }]), "~price 5 chaos", &f);
+        assert!(priced_tab[0].listed);
         let snap = snapshot(100, "Covens", Some(210.0), &v);
         assert!((snap.total - 30680.0).abs() < 1e-6);
         assert_eq!(snap.tabs, vec![("Dump".to_string(), snap.total)]);

@@ -127,6 +127,10 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   comparing with the threshold (`Valued.places`), and the page shows "×10 in 3 places · 1.2c each".
 - Price check 20 Nov (4): jewels have max 2 prefixes / 2 suffixes in "Open prefix/suffix"; reversed ranges like
   "29(30-25)% reduced …" count the bigger number as the better roll and show "25–30".
+- Wealth scan 20 Nov (2): price file lacked threads (poe.ninja exchange type "Thread"), maps, blighted maps,
+  beasts and gems, so they counted as 0. Added to tools/fetch_prices.py (gems cut to each gem's cheapest version).
+  Scarabs are gone this league (Covens; threads replaced them). New groups are scan-only (`Group::of` → None) and
+  gems are skipped by `price_of` (cheapest version would undersell). Items in a tab named "~price …" count as listed.
 
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off

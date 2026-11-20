@@ -50,6 +50,8 @@ impl Group {
         match cat {
             "DivinationCard" => Some(Group::DivinationCards),
             "Incubator" | "Invitation" | "Memory" | "Vial" | "Corpse" | "Wombgift" => Some(Group::Other),
+            // Priced for the stash scan only, not for filter price tiers.
+            "SkillGem" | "Map" | "BlightedMap" | "BlightRavagedMap" | "Beast" => None,
             // Everything else poe.ninja prices on its exchange.
             _ => Some(Group::Currency),
         }
@@ -186,7 +188,8 @@ pub fn price_of(file: &PriceFile, name: Option<&str>, base: &str, rarity: &str) 
         }
         return values_by_base(file, Group::Uniques).get(base).copied();
     }
-    file.items.iter().filter(|i| i.name == base && !i.cat.starts_with("Unique")).map(|i| i.value).reduce(f64::max)
+    // Gems are kept at their cheapest version (for stash totals), which would undersell a 20/20 gem here.
+    file.items.iter().filter(|i| i.name == base && !i.cat.starts_with("Unique") && i.cat != "SkillGem").map(|i| i.value).reduce(f64::max)
 }
 
 #[cfg(test)]
