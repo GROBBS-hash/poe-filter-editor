@@ -925,3 +925,19 @@ button:focus-visible, select:focus-visible, .text:focus-visible, input:focus-vis
 .bu li { font-size: 13.5px; padding: 3px 0; }
 .bu-price { font-size: 14px; }
 .tw-list li { font-size: 13.5px; }
+/* Price window, one more size up (he reads it mid-game). */
+.qm.tw .cur-icon, .tw-side .cur-icon { width: 21px; height: 21px; vertical-align: -5px; }
+.tw-table, .tw-list li { font-size: 14.5px; }
+.tw-th { font-size: 11px; }
+.tw-th, .tw-tr { grid-template-columns: 120px 32px 38px 1fr auto; padding: 5px 2px; }
+.tw-price { font-size: 15px; }
+.tw-sum, .tw-bulkhead { font-size: 15px; }
+.tw-ratio { font-size: 13px; }
+.tw-side { width: 310px; padding: 12px; }
+.bu-title { font-size: 12px; }
+.bu li { font-size: 15px; padding: 4px 0; gap: 8px; }
+.bu li .item-icon { width: 28px; height: 28px; }
+.bu-price { font-size: 15.5px; }
+.tw-hero-side, .tw-hero-label { font-size: 15px; }
+.tw-hero-foot { font-size: 13.5px; }
+.tw-stat { font-size: 13.5px; }
