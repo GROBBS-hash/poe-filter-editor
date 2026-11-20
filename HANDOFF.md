@@ -292,6 +292,11 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   `BuildView.tsx` (F6 + My build): a tick per item, key `slot|name|base`, in localStorage `build.have` (shared by both
   windows via the storage event), "Have N of M" bar with "hide what I have" (`build.hideHave`).
 
+- Worth line 21 Nov (0.2.10, his Ritual idea): Tiers → Divination cards / Uniques have "Hide … worth under N c"
+  (WorthLine.tsx). It's the price settings' hide_below for that group (same box as on the Prices page), and
+  price_blocks now writes hide rules even with price tiers off. Cards count a stack at its total worth: hide blocks
+  grouped by the stack size that reaches the line ("StackSize < k"). price_count_below gives "hides N of M".
+
 - Polish 5, 21 Nov (0.2.9, his screenshots): F6/F7 were see-through (.bo at 97%: another window showed through);
   .qm and .bo now solid #12151a; gold top line on .bo too; F6 tabs styled like F7's pill row; "level N in PoB" back in
   the normal font; "Ctrl+F" tag next to Find in the menu.
@@ -517,6 +522,10 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 
 - [ ] Ctrl+D on a timeless jewel (Brutal Restraint): seed line ticked, prices for that exact seed; "any conqueror" row works.
 - [ ] Price window: "This week" line with ▲/▼ % under the price for currency, cards, uniques… (after the price file updates).
+
+**Worth line (21 Nov, 0.2.10)**
+- [ ] Tiers → Divination cards: tick "Hide cards worth under", set e.g. 5c, F4 in game: cheap single cards hidden,
+      a stack worth 5c+ (e.g. Rain of Chaos ×17) still shows; good cards look as before. Same on Uniques.
 
 **Tray menu (21 Nov, 0.2.8)**
 - [ ] Tray icon menu: "Restart editor" restarts it and it comes back in front; "Check for updates" says "Up to date (0.2.8)";

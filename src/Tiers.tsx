@@ -1,3 +1,4 @@
+import WorthLine from "./WorthLine";
 import { invoke } from "@tauri-apps/api/core";
 import { Tip } from "./Help";
 import { useEffect, useMemo, useState } from "react";
@@ -254,6 +255,9 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
               <b> Click the label</b> to change how the whole tier looks. <b>Drag</b> an item onto another tier to move it there
               (e.g. drag Chaos Orb up a tier). <b>+ Add item</b> puts any item in a tier, e.g. add a currency to “Stacks of 6+” to give its stacks that look while single drops keep their normal one. <b>Copy/Paste</b> gives one tier another tier's look. <b>Reset</b> puts a tier back
               to NeverSink's. Your changes survive NeverSink updates and strictness changes.</Tip></h2>
+            {!isExtra && (section.title === "Divination cards" || section.title === "Uniques") && (
+              <WorthLine profileId={profile.id} group={section.title === "Uniques" ? "Uniques" : "DivinationCards"} onChange={onChange} />
+            )}
             {section.tiers.map((t) => {
               const key = t.tier;
               const shown = t.visibility !== "Hide";

@@ -1934,6 +1934,17 @@ struct PriceInfo { league: String, updated: String, unit: String, count: usize }
 #[derive(Serialize)]
 struct PricePage { settings: PriceSettings, info: Option<PriceInfo>, game: Game }
 
+/// Tiers page "Hide if worth under": how many of this group's priced items (one per base) are under the line.
+#[tauri::command]
+fn price_count_below(state: State<AppState>, id: String, group: filter_core::prices::Group, limit: f64) -> Result<(usize, usize), String> {
+    let store = state.store.lock().unwrap();
+    let p = store.profiles.get(&id).ok_or("Profile not found")?;
+    let prices = state.prices.lock().unwrap();
+    let Some(file) = prices.get(&p.game) else { return Ok((0, 0)) };
+    let values = filter_core::prices::values_by_base(file, group);
+    Ok((values.values().filter(|v| **v < limit).count(), values.len()))
+}
+
 /// The Prices screen: this filter's tier settings and the latest price data.
 #[tauri::command]
 fn get_price_settings(state: State<AppState>, id: String) -> Result<PricePage, String> {
@@ -2411,7 +2422,7 @@ pub fn run() {
             list_farm_presets,
             apply_farm_preset,
             list_level_presets,
-            get_tiers, get_rule_section, get_map_tiers, set_tiers, build_tree_opt, set_build_tree, trade_search, trade_bulk, map_dangers, map_suggest, map_tool_get, map_tool_save, map_tool_regex, map_regex_copy, map_tool_trade, trade_action, hide_trades_window, wealth_app::wealth_get, wealth_app::wealth_setup, wealth_app::wealth_prefs, wealth_app::wealth_scan, wealth_app::wealth_profile_save, wealth_app::wealth_profile_delete, wealth_app::wealth_profile_use, wealth_app::wealth_tabs_refresh, wealth_app::wealth_price_rares, wealth_app::wealth_find, wealth_app::wealth_count_rares, updates::update_status, open_editor, updates::update_install, wealth_app::session_start, wealth_app::session_check, wealth_app::session_pause, wealth_app::session_stop, wealth_app::session_delete, wealth_app::earnings_overlay, saved_list, saved_add, saved_delete, saved_live, report_problem, send_whisper, copy_text, hide_trade_window, keep_on_screen,
+            get_tiers, get_rule_section, get_map_tiers, set_tiers, build_tree_opt, set_build_tree, trade_search, trade_bulk, map_dangers, map_suggest, map_tool_get, map_tool_save, map_tool_regex, map_regex_copy, map_tool_trade, trade_action, hide_trades_window, wealth_app::wealth_get, wealth_app::wealth_setup, wealth_app::wealth_prefs, wealth_app::wealth_scan, wealth_app::wealth_profile_save, wealth_app::wealth_profile_delete, wealth_app::wealth_profile_use, wealth_app::wealth_tabs_refresh, wealth_app::wealth_price_rares, wealth_app::wealth_find, wealth_app::wealth_count_rares, updates::update_status, open_editor, price_count_below, updates::update_install, wealth_app::session_start, wealth_app::session_check, wealth_app::session_pause, wealth_app::session_stop, wealth_app::session_delete, wealth_app::earnings_overlay, saved_list, saved_add, saved_delete, saved_live, report_problem, send_whisper, copy_text, hide_trade_window, keep_on_screen,
             move_tier_item,
             stack_choices,
             gear_setup,

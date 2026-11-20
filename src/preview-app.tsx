@@ -95,6 +95,9 @@ mockWindows(atlasWindow ? "atlas" : buildWin ? "build" : "main");
 mockIPC((cmd, args) => {
   if (cmd === "overview") return { profiles: [{ id: "mid", name: "Mid-Game", game: "Poe1", base_file: "", output_file: "", rules: [] }], active: "mid", poe1_dir: "", poe2_dir: "", batch_on: false };
   if (cmd === "wealth_get") return wealth;
+  if (cmd === "get_price_settings") return { settings: { enabled: false, groups: [{ group: "DivinationCards", enabled: true, tiers: [], hide_below: null }, { group: "Uniques", enabled: true, tiers: [], hide_below: null }] }, info: { unit: "chaos" } };
+  if (cmd === "price_count_below") return [Math.round(Math.min(480, (args as { limit: number }).limit * 60)), 512];
+  if (cmd === "set_price_settings") return [];
   if (cmd === "wealth_find") {
     const all = [
       { tab_index: 28, tab: "TENDY", name: "Woe Buckle Stygian Vise", kind: "Rare", stack: 1, x: 3, y: 1, icon: "", ilvl: 84, note: "", value: 210,

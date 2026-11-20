@@ -185,13 +185,18 @@ pub fn unit_short(unit: &str) -> &'static str {
 }
 
 /// Filter blocks for your price tiers (empty if switched off).
+/// The price rules for the filter: tiers (when price tiers are on) and "hide if worth under" (a group's own
+/// setting, which also works with price tiers off: the Tiers page sets it for divination cards and uniques).
 pub fn price_blocks(settings: &PriceSettings, file: &PriceFile, nl: &str) -> String {
-    if !settings.enabled {
+    let hides = settings.groups.iter().any(|g| g.hide_below.is_some() && g.group != Group::Currency);
+    if !settings.enabled && !hides {
         return String::new();
     }
     let u = unit_short(&file.unit);
     let mut out = format!("# Price tiers from poe.ninja ({}, {}). Rebuilt when prices update.{nl}{nl}", file.league, file.updated);
-    for g in settings.groups.iter().filter(|g| g.enabled) {
+    for g in &settings.groups {
+        let tiers_on = settings.enabled && g.enabled;
+        if !tiers_on && g.hide_below.is_none() { continue; }
         let values = values_by_base(file, g.group);
         let mut tiers = g.tiers.clone();
         tiers.sort_by(|a, b| b.min.partial_cmp(&a.min).unwrap_or(std::cmp::Ordering::Equal));
@@ -203,7 +208,7 @@ pub fn price_blocks(settings: &PriceSettings, file: &PriceFile, nl: &str) -> Str
             let mixed = cheapest.get(base).is_some_and(|c| *c < tiers[0].min);
             Some(if i == 0 && mixed && tiers.len() > 1 { 1 } else { i })
         };
-        for (i, t) in tiers.iter().enumerate() {
+        for (i, t) in tiers.iter().enumerate().filter(|_| tiers_on) {
             let names: Vec<&String> = values.iter().filter(|(k, v)| tier_of(k, **v) == Some(i)).map(|(k, _)| k).collect();
             if names.is_empty() { continue; }
             out.push_str(&format!("Show # Price tier {}: {} worth {}{u}+{nl}", i + 1, g.group.title(), t.min));
@@ -213,10 +218,17 @@ pub fn price_blocks(settings: &PriceSettings, file: &PriceFile, nl: &str) -> Str
             out.push_str(nl);
         }
         if let Some(limit) = g.hide_below.filter(|_| g.group != Group::Currency) {
-            let names: Vec<&String> = values.iter().filter(|(_, v)| **v < limit).map(|(k, _)| k).collect();
-            if !names.is_empty() {
+            // Divination cards drop in stacks (Ritual, Harvest...): a stack counts at its total worth, so 3 x 2c
+            // cards stay when the line is 5c. Cards are grouped by how big a stack it takes to reach the line.
+            let mut by_stack: BTreeMap<u32, Vec<&String>> = BTreeMap::new();
+            for (k, v) in values.iter().filter(|(_, v)| **v < limit) {
+                let need = if g.group == Group::DivinationCards && *v > 0.0 { (limit / v).ceil().min(1000.0) as u32 } else { 0 };
+                by_stack.entry(need).or_default().push(k);
+            }
+            for (need, names) in by_stack {
                 out.push_str(&format!("Hide # Price: {} worth under {limit}{u}{nl}", g.group.title()));
                 for c in g.group.conditions() { out.push_str(&format!("    {c}{nl}")); }
+                if need > 1 { out.push_str(&format!("    StackSize < {need}{nl}")); }
                 out.push_str(&format!("    BaseType == {}{nl}", base_list(&names)));
                 out.push_str(&format!("    DisableDropSound True{nl}{nl}"));
             }
@@ -310,6 +322,26 @@ mod tests {
         assert_eq!(st("Item Class: Helmets\nRarity: Unique\nGoldrim\nLeather Cap\n").visibility, "Hide");
         assert_eq!(st("Item Class: Body Armours\nRarity: Unique\nKaom's Heart\nGlorious Plate\n").style.font_size, Some(42));
         let _ = apply; // plain apply still exists for profiles without prices
+    }
+
+    #[test]
+    fn card_threshold_without_price_tiers() {
+        // Price tiers off, only "hide divination cards under 5c" (the Tiers page's box).
+        let mut s = default_settings("chaos");
+        s.groups.iter_mut().find(|g| g.group == Group::DivinationCards).unwrap().hide_below = Some(5.0);
+        let blocks = price_blocks(&s, &file(), "\n");
+        assert!(!blocks.contains("Show # Price tier"), "no tier looks: {blocks}");
+        let mut segs = parse_filter("Show\n    Class == \"Divination Cards\"\n    SetFontSize 30\n");
+        crate::rules::apply_with_extra(&mut segs, &[], &blocks, "\n");
+        let segs = parse_filter(&crate::filter::render_filter(&segs));
+        let card = |name: &str, n: u32| status(&segs, &parse_item(&format!(
+            "Item Class: Divination Cards\nRarity: Normal\n{name}\n--------\nStack Size: {n}/8\n")).unwrap(), Some(83), false).verdict.visibility;
+        let cheap: Vec<(String, f64)> = values_by_base(&file(), Group::DivinationCards).into_iter().filter(|(_, v)| *v < 5.0 && *v > 0.0).collect();
+        let (name, v) = cheap.first().expect("a cheap card in the test prices").clone();
+        let need = (5.0 / v).ceil() as u32;
+        assert_eq!(card(&name, 1), "Hide", "{name} at {v}c alone");
+        assert_eq!(card(&name, need), "Show", "{need} x {name} is worth the line");
+        assert_eq!(card("The Doctor", 1), "Show");
     }
 
     #[test]

@@ -1420,3 +1420,9 @@ main.content .card h2 { font-size: 19px; font-weight: 500; letter-spacing: .02em
 /* Menu shortcut hint ("Ctrl+F" beside Find). */
 .menu-key { margin-left: auto; font-size: 11px; color: var(--muted); padding: 1px 6px; border: 1px solid var(--line); border-radius: 5px; line-height: 1.4; }
 .menu-item.on .menu-key { color: var(--text-2); border-color: var(--line-2); }
+/* Tiers page: "Hide cards worth under N chaos" */
+.worth-line { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.worth-line.on { border-color: rgba(220,178,90,.45); background: rgba(220,178,90,.06); }
+.worth-line label { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; cursor: pointer; }
+.worth-line .num { width: 70px; }
