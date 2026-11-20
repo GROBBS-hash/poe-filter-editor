@@ -22,6 +22,8 @@ pub struct ModLine {
     pub roll: Option<f64>,
     /// Its range as shown, "25–29" (several numbers: "8–12 / 18–25").
     pub range: Option<String>,
+    /// "prefix" or "suffix", from the advanced copy's "{ Prefix Modifier … }" heading.
+    pub affix: Option<String>,
 }
 
 /// One stat to search on, with a tick box and a minimum.
@@ -221,6 +223,7 @@ pub fn mods(text: &str) -> Vec<ModLine> {
         }
         let mut header_kind: Option<String> = None;
         let mut header_tier: Option<u32> = None;
+        let mut header_affix: Option<String> = None;
         // A mod written over two lines: the second starts in lower case ("…in Radius" / "also grant…").
         let mut joined: Vec<String> = Vec::new();
         for l in sec {
@@ -238,6 +241,7 @@ pub fn mods(text: &str) -> Vec<ModLine> {
                 header_kind = Some(if low.contains("implicit") { "implicit" } else if low.contains("crafted") { "crafted" }
                     else if low.contains("enchant") { "enchant" } else if low.contains("fractured") { "fractured" }
                     else if low.contains("foulborn") || low.contains("mutated") { "mutated" } else { "explicit" }.to_string());
+                header_affix = if low.contains("prefix") { Some("prefix".into()) } else if low.contains("suffix") { Some("suffix".into()) } else { None };
                 header_tier = low.find("tier:").or_else(|| low.find("rank:")).and_then(|i| {
                     low[i + 5..].trim_start().chars().take_while(|c| c.is_ascii_digit()).collect::<String>().parse().ok()
                 });
@@ -254,7 +258,7 @@ pub fn mods(text: &str) -> Vec<ModLine> {
             if t.is_empty() || !t.chars().any(|c| c.is_ascii_digit()) && !numberless_ok { continue; }
             let (_, values) = template(&t);
             let (roll, range) = (roll_of(l, &values), range_text(l));
-            out.push(ModLine { text: t, kind, tier: header_tier, values, roll, range });
+            out.push(ModLine { text: t, kind, tier: header_tier, values, roll, range, affix: header_affix.clone() });
         }
     }
     out
@@ -324,6 +328,18 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
     }
     if is_map(&item) { filters.splice(0..0, crate::trade_rules::map_props(text, &item)); }
     else { filters.extend(crate::trade_rules::open_affixes(text, &item, index)); }
+    // The game's own order: defences / damage first, then totals, enchants, implicits, prefixes, suffixes,
+    // and the "open prefix / suffix" rows last. Same-group rows keep the item's order.
+    let affix_of = |label: &str| lines.iter().find(|m| m.text == label).and_then(|m| m.affix.clone());
+    let group = |f: &StatFilter| -> u8 {
+        if f.id.starts_with("prop.") { return 0 }
+        if f.kind == "pseudo" { return if f.id.contains("empty") { 9 } else { 1 } }
+        match f.kind.as_str() {
+            "enchant" => 2, "implicit" => 3,
+            _ => match affix_of(&f.label).as_deref() { Some("prefix") => 4, Some("suffix") => 5, _ => 6 },
+        }
+    };
+    filters.sort_by_key(|f| group(f));
     let links = item.sockets.as_deref().map(crate::item::max_links).unwrap_or(0);
     let gem_level = text.replace('\r', "").split("--------").nth(1)
         .and_then(|s| s.lines().find_map(|l| l.trim().strip_prefix("Level: ")))
@@ -644,7 +660,7 @@ Item Level: 75
     fn reads_advanced_copy() {
         let m = mods(BOOTS);
         assert_eq!(m.len(), 5);
-        assert_eq!(m[0], ModLine { text: "+8% to Cold Resistance".into(), kind: "implicit".into(), tier: None, values: vec![8.0], roll: None, range: None });
+        assert_eq!(m[0], ModLine { text: "+8% to Cold Resistance".into(), kind: "implicit".into(), tier: None, values: vec![8.0], roll: None, range: None, affix: None });
         assert_eq!((m[1].text.as_str(), m[1].tier, m[1].values[0]), ("+28 to maximum Life", Some(7), 28.0));
         assert_eq!(m[3].tier, Some(1));
         assert!(m[1].roll.is_some(), "life has a range: {:?}", m[1]);
@@ -706,6 +722,19 @@ Item Level: 75
         let fr: Vec<&StatFilter> = s.filters.iter().filter(|f| f.kind == "fractured").collect();
         assert!(fr.iter().any(|f| f.label == "+19 to maximum Life"), "{:?}", s.filters);
         assert!(fr.iter().all(|f| !f.enabled), "counted in the life total, so not ticked twice");
+    }
+
+    #[test]
+    fn rows_in_game_order() {
+        // Boots sample: a suffix (Rainstorm) is listed before the prefix (Cheetah's) in the copy; rows come out as
+        // defences, totals, then the movement speed prefix.
+        let s = setup(BOOTS, &index()).unwrap();
+        let ids: Vec<&str> = s.filters.iter().map(|f| f.id.as_str()).collect();
+        let pos = |p: &str| ids.iter().position(|i| i.starts_with(p)).unwrap();
+        assert!(pos("prop.") < pos("pseudo.") && pos("pseudo.") < pos("explicit.stat_ms"), "{ids:?}");
+        let m = mods(BOOTS);
+        assert_eq!(m.iter().find(|l| l.text.contains("Movement Speed")).unwrap().affix.as_deref(), Some("prefix"));
+        assert_eq!(m.iter().find(|l| l.text.contains("Strength")).unwrap().affix.as_deref(), Some("suffix"));
     }
     #[test]
     fn plain_copy_and_unique() {

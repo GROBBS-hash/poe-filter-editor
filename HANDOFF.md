@@ -241,6 +241,9 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   exchange `minimum` (off by default, like Awakened); "fills N" / ⚠ per offer. Item listings: same seller + same price
   in a row shows once with "× N". The preview mocks `trade_bulk` with his deck offers.
 
+- Stat rows in game order 20 Nov: defences/DPS, totals, enchants, implicits, prefixes, suffixes, open-affix rows last
+  (`ModLine.affix` from the advanced copy's heading; stable sort at the end of `setup` in trade.rs).
+
 
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
@@ -256,6 +259,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Every Ctrl+D shows a trade price straight away (uniques, corpses, gems too) in the big box at the top.
       (Confirmed 20 Nov for a unique, a unique belt and a gem.)
 - [ ] Fractured item: "Price as base · ilvl 73–74" gives sensible prices (fractured-only search confirmed 20 Nov).
+- [ ] Price window rows read in game order: defences, totals, implicits, prefixes, suffixes.
 - [ ] Rares wait for Search: move the mouse onto Search to search; changing a stat clears the prices. Uniques/currency still instant.
 - [ ] Bulk items (e.g. Stacked Deck): big price = poe.ninja (about 3c), market-price row in the list, fixers marked "low stock",
       "Only sellers with at least N in stock" works; repeat item listings show "× N".
