@@ -419,14 +419,21 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
               }}>{item.base_type}</span></LookButton>
             )}
           </div>
-          <Why v={v} onEditHere={v.by_user_edit && !replacing && v.source?.kind === "edit" ? () => openRule(v.decided_by) : undefined} />
-          {shown(v.visibility) && (
-            <div className="qm-facts">
-              {st?.muted ? "No drop sound" : st?.sound ? `🔊 ${st.sound}` : "Default drop sound"}
-              {st?.beam ? ` · ${st.beam} beam` : ""}
-              {st?.minimap ? ` · map icon` : ""}
-            </div>
-          )}
+          {(() => {
+            // Plain words, no filter jargon: what it does as chips, and one button to change it.
+            const src = v.source;
+            const canOpen = !!src && src.kind !== "none" && (src.kind !== "neversink" || src.type_path.length > 0);
+            const change = () => (v.by_user_edit && !replacing && src?.kind === "edit" ? openRule(v.decided_by) : invoke("open_rule", { source: src }));
+            const chips = shown(v.visibility)
+              ? [st?.muted ? "No sound" : st?.sound ? `🔊 ${st.sound}` : "Default sound", st?.beam ? `${st.beam} beam` : "", st?.minimap ? "Map icon" : ""]
+              : ["Hidden on the ground"];
+            return (
+              <>
+                <div className="qm-chips">{chips.filter(Boolean).map((c) => <span key={c} className="qm-chip">{c}</span>)}</div>
+                {canOpen && <button className="qm-change" onClick={change}>{shown(v.visibility) ? "Change this look" : "Change this rule"}</button>}
+              </>
+            );
+          })()}
           {status!.by_stack.length > 0 && <div className="qm-facts">Stacks: {stackLine(status!.by_stack)}</div>}
           {(v.uncertain.length > 0 || status!.assumptions.length > 0 || extra?.area_level != null) && (
             <div className="qm-unsure" title={[

@@ -1238,3 +1238,8 @@ body.main ::-webkit-scrollbar-thumb:hover { background: #4a5566; }
 .qm-more-toggle { display: block; width: 100%; text-align: left; margin: 8px 0 2px; padding: 6px 2px; background: none; border: none; color: var(--text-2); font-size: 13px; }
 .qm-more-toggle:hover:not(:disabled) { background: none; color: #fff; }
 .qm-more { padding: 6px 0 2px; border-top: 1px solid var(--line); animation: card-in .25s var(--ease) both; }
+/* F2 status card (option B): chips for what it does, one button to change it. */
+.qm-chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0 2px; }
+.qm-chip { font-size: 12px; padding: 2px 8px; border-radius: 6px; background: #2a303b; color: var(--text-2); }
+.qm-change { margin-top: 8px; padding: 7px 14px; border-radius: 8px; border: 0; background: var(--gold); color: #1a1405; font-weight: 600; }
+.qm-change:hover:not(:disabled) { background: #e7c272; }

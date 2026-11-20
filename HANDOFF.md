@@ -284,6 +284,10 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 - F2 Show on an item NeverSink hides (e.g. single Orb of Unmaking, $tier->t5alchemy is a Hide block in his Red-Maps)
   now uses that hiding block's own look (it keeps its colours), not a plain default look.
 
+- F2 status card "option B" 20 Nov (he picked it from three mockups): pill + label preview, chips (sound, beam, icon /
+  "Hidden on the ground"), one "Change this look" / "Change this rule" button (opens your edit or the NeverSink rule).
+  The "Shown by NeverSink · Maps (low value) · NeverSink › maps › restex" box is gone (`Why` is no longer used).
+
 
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
@@ -311,6 +315,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Unidentified rares like "Fated Composite Ring" price as "Composite Ring" (no "Unknown item base type").
 - [ ] Maven's chisels: side panel lists the other chisels; offers show (paid in divines).
 - [x] F2: Show / Hide / Minimap work; Show brings items back with NeverSink's look (confirmed 20 Nov), "More options" fold works (design may change).
+- [ ] F2 card: chips and "Change this look" button; no NeverSink jargon box.
 - [ ] Menu icons: each page has its own colour tile (Find blue, Tiers coral, Wealth gold…), page title matches.
 - [ ] New Clean glass look: opens bigger and remembers its size; pages fade in; Wealth tiles look right; nothing broken on other pages.
 - [ ] Unidentified unique (e.g. Karui Sceptre): no false tier 1 / divine sound; the "Could be one of N uniques" list shows in F2 and Ctrl+D.
