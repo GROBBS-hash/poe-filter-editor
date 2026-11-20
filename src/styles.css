@@ -941,3 +941,7 @@ button:focus-visible, select:focus-visible, .text:focus-visible, input:focus-vis
 .tw-hero-side, .tw-hero-label { font-size: 15px; }
 .tw-hero-foot { font-size: 13.5px; }
 .tw-stat { font-size: 13.5px; }
+/* Price window: bolder text, easier to read over the game. Grey helper text stays a little lighter. */
+.qm.tw, .tw-side { font-weight: 600; }
+.qm.tw .muted, .tw-side .muted, .qm.tw .small, .tw-th, .tw-hero-foot, .tw-eq, .tw-kind { font-weight: 500; }
+.tw-price, .bu-price, .tw-hero-price { font-weight: 700; }
