@@ -13,7 +13,7 @@ export type Session = { name: string; league: string; tabs: number[]; start: num
 export type WealthView = { account: string; has_sessid: boolean; league: string; tabs: Tab[]; tracked: number[]; min: number; minutes: number;
   snapshots: Snapshot[]; missed: Valued[]; sessions: Session[]; current: Session | null; strategies: [string, number, number, number][];
   divine: number | null; now: number; profiles?: ScanProfile[]; active?: string | null; last_items?: Valued[];
-  rares?: number; rares_priced?: number; rares_todo?: number };
+  rares?: number; rares_priced?: number; rares_todo?: number; count_rares?: boolean };
 
 /** Seconds a session has run (pauses taken out). */
 export function seconds(s: Session, now: number) {
@@ -330,7 +330,8 @@ export default function Wealth() {
           {last ? (
             <div className="w-total">
               <div className="muted small">Scanned {new Date(last.time * 1000).toLocaleString()} · counts what poe.ninja prices (currency, uniques, cards, maps, fragments, gems…)
-                {(v.rares ?? 0) > 0 ? `, plus ${v.rares_priced ?? 0} of your ${v.rares} rares priced on the trade site` : ", not rares"}.</div>
+                {(v.rares ?? 0) === 0 || v.count_rares === false ? ", not rares"
+                  : `, plus ${v.rares_priced ?? 0} of your ${v.rares} rares priced on the trade site`}.</div>
             </div>
           ) : <p className="muted">Scan your stash to see what it's worth.</p>}
           <div className="row">
@@ -348,6 +349,12 @@ export default function Wealth() {
                 : <span className="muted small">{v.rares_priced ?? 0} of {v.rares} rares priced{(v.rares_todo ?? 0) > 40 ? " · 40 at a time" : ""}.
                   About 10 a minute (the trade site's limit); your own Ctrl+D checks still go first.</span>}
             </div>
+          )}
+          {(v.rares ?? 0) > 0 && (
+            <label className="row small" title="Rare prices are rough guesses from similar items for sale. Unticked, they stay out of your worth, tabs and earnings, but still show in Worth selling and Find in stash.">
+              <input type="checkbox" checked={v.count_rares ?? true} disabled={!!busy}
+                onChange={(e) => invoke<WealthView>("wealth_count_rares", { count: e.target.checked }).then(setV).catch((x) => setErr(String(x)))} />
+              Count rares in my worth</label>
           )}
           {busy === "rares" && progress && <div className="w-bar"><div style={{ width: `${(progress[0] / Math.max(1, progress[1])) * 100}%` }} /></div>}
           {busy === "scan" && progress && <div className="w-bar"><div style={{ width: `${(progress[0] / Math.max(1, progress[1])) * 100}%` }} /></div>}

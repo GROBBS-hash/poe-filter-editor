@@ -85,13 +85,17 @@ fn scan(app: &AppHandle, only: Option<&[usize]>) -> Result<(Vec<Valued>, Vec<Rar
     let _ = app.emit("wealth-progress", (pick.len(), pick.len(), String::new()));
     let t = now();
     let mut rare_values = Vec::new();
-    with_store(&state, |s| for r in &rares {
-        if let Some(p) = s.rare_prices.get(&r.id).filter(|p| p.chaos > 0.0 && t.saturating_sub(p.time) < RARE_KEEP) {
-            rare_values.push(wealth::rare_valued(r, p.chaos));
+    let skip = with_store(&state, |s| {
+        for r in &rares {
+            if let Some(p) = s.rare_prices.get(&r.id).filter(|p| p.chaos > 0.0 && t.saturating_sub(p.time) < RARE_KEEP) {
+                rare_values.push(wealth::rare_valued(r, p.chaos));
+            }
         }
+        s.skip_rares
     });
     attach_values(&mut found, &rare_values);
-    out.extend(rare_values);
+    // "Count rares in my worth" unticked: totals and earnings leave them out ("Worth selling" still lists them).
+    if !skip { out.extend(rare_values); }
     // "Find in stash": these tabs' items replace what the index had for them.
     let scanned: Vec<usize> = pick.iter().map(|t| t.index).collect();
     with_index(&state, |ix| {
@@ -173,6 +177,8 @@ pub struct WealthView {
     rares: usize,
     rares_priced: usize,
     rares_todo: usize,
+    /// "Count rares in my worth" ticked.
+    count_rares: bool,
     divine: Option<f64>,
     now: u64,
 }
@@ -187,7 +193,7 @@ fn view(app: &AppHandle) -> WealthView {
     let rares_priced = st.rares.iter().filter(|r| fresh(r, RARE_KEEP).is_some_and(|p| p.chaos > 0.0)).count();
     let rares_todo = st.rares.iter().filter(|r| fresh(r, RARE_STALE).is_none()).count();
     WealthView {
-        rares: st.rares.len(), rares_priced, rares_todo,
+        rares: st.rares.len(), rares_priced, rares_todo, count_rares: !st.skip_rares,
         account: s.poe_account, has_sessid: !s.poesessid.trim().is_empty(), league,
         tracked: s.wealth_tabs, min: s.wealth_min, minutes: s.earn_minutes.max(1),
         strategies: wealth::by_strategy(&st.sessions),
@@ -259,6 +265,8 @@ pub async fn wealth_scan(app: AppHandle) -> Result<WealthView, String> {
             // Forget prices of rares that are gone (sold, vendored) once they're old.
             s.rare_prices.retain(|id, p| t.saturating_sub(p.time) < RARE_KEEP || rares.iter().any(|r| &r.id == id));
             s.rares = rares;
+            // Rares in or out of the total as ticked, and always in "Worth selling".
+            add_rares(s, min);
         });
         Ok(view(&app))
     }).await.map_err(err)?
@@ -319,19 +327,23 @@ pub async fn wealth_price_rares(app: AppHandle) -> Result<WealthView, String> {
     }).await.map_err(err)?
 }
 
-/// Puts the rares' trade prices into the last scan: its total and tabs, "By tab" and "Worth selling".
+/// Puts the rares' trade prices into the last scan: its total and tabs and "By tab" (unless "Count rares in my
+/// worth" is unticked), and "Worth selling" (always).
 fn add_rares(s: &mut WealthStore, min: f64) {
     let t = now();
     let old: Vec<Valued> = s.last_items.iter().filter(|v| v.rare).cloned().collect();
     s.last_items.retain(|v| !v.rare);
     let new: Vec<Valued> = s.rares.iter().filter_map(|r| s.rare_prices.get(&r.id)
         .filter(|p| p.chaos > 0.0 && t.saturating_sub(p.time) < RARE_KEEP).map(|p| wealth::rare_valued(r, p.chaos))).collect();
-    s.last_items.extend(new.iter().cloned());
+    let counted: &[Valued] = if s.skip_rares { &[] } else { &new };
+    s.last_items.extend(counted.iter().cloned());
     s.last_items.sort_by(|a, b| b.value.total_cmp(&a.value));
     s.last_items.truncate(3000);
-    s.missed = wealth::missed(&s.last_items, min);
+    let mut sellable = s.last_items.clone();
+    if s.skip_rares { sellable.extend(new.iter().cloned()); }
+    s.missed = wealth::missed(&sellable, min);
     if let Some(last) = s.snapshots.last_mut() {
-        for (v, sign) in old.iter().map(|v| (v, -1.0)).chain(new.iter().map(|v| (v, 1.0))) {
+        for (v, sign) in old.iter().map(|v| (v, -1.0)).chain(counted.iter().map(|v| (v, 1.0))) {
             last.total += sign * v.value;
             match last.tabs.iter_mut().find(|x| x.0 == v.tab) {
                 Some(x) => x.1 += sign * v.value,
@@ -343,6 +355,15 @@ fn add_rares(s: &mut WealthStore, min: f64) {
     }
 }
 
+
+/// "Count rares in my worth": takes the rares in or out of the last scan's totals straight away.
+#[tauri::command]
+pub fn wealth_count_rares(app: AppHandle, count: bool) -> WealthView {
+    let state = app.state::<AppState>();
+    let min = state.store.lock().unwrap().settings.wealth_min;
+    with_store(&state, |s| { s.skip_rares = !count; add_rares(s, min); });
+    view(&app)
+}
 
 /// Saves a scan profile (a named set of tabs); `old` renames an existing one. The saved one becomes the one in use.
 #[tauri::command]
@@ -494,4 +515,33 @@ pub fn start_session_timer(app: AppHandle) {
             if let Err(e) = check_session(&app) { let _ = app.emit("earn-error", e); }
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rares_in_and_out_of_the_total() {
+        let r = Rare { id: "a".into(), tab: "TENDY".into(), name: "Woe Buckle Stygian Vise".into(), text: String::new(),
+            icon: String::new(), x: 0, y: 0, listed: false };
+        let mut s = WealthStore { rares: vec![r], ..Default::default() };
+        s.rare_prices.insert("a".into(), RarePrice { chaos: 40.0, time: now(), found: 5 });
+        s.add_snapshot(wealth::snapshot(1, "Covens", None, &[]));
+        s.snapshots[0].total = 100.0;
+        s.snapshots[0].tabs = vec![("$$$".into(), 100.0)];
+        add_rares(&mut s, 10.0);
+        assert_eq!(s.snapshots[0].total, 140.0);
+        assert_eq!(s.last_items.len(), 1);
+        // Twice in a row doesn't count it twice.
+        add_rares(&mut s, 10.0);
+        assert_eq!(s.snapshots[0].total, 140.0);
+        s.skip_rares = true;
+        add_rares(&mut s, 10.0);
+        assert_eq!((s.snapshots[0].total, s.snapshots[0].tabs.len(), s.last_items.len()), (100.0, 1, 0));
+        assert_eq!(s.missed.len(), 1, "still worth selling");
+        s.skip_rares = false;
+        add_rares(&mut s, 10.0);
+        assert_eq!(s.snapshots[0].total, 140.0);
+    }
 }

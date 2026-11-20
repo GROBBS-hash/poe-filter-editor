@@ -402,6 +402,8 @@ pub struct WealthStore {
     /// Rares from the last scan, and what the trade site said they're worth (by item id).
     pub rares: Vec<Rare>,
     pub rare_prices: std::collections::BTreeMap<String, RarePrice>,
+    /// "Count rares in my worth" unticked (rares stay in "Worth selling" and "Find in stash").
+    pub skip_rares: bool,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
