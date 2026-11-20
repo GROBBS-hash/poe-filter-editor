@@ -1124,3 +1124,28 @@ button:focus-visible, select:focus-visible, .text:focus-visible, input:focus-vis
 .ao-scroll:hover::-webkit-scrollbar-thumb { background: #36404e; }
 .ao-notes { padding-right: 4px; }
 .ao .atv-step { padding: 7px 8px; }
+
+/* Windows over the game, 21 Nov: one title bar (WinBar) and resize grips (ResizeGrips) for all of them. */
+.bo { position: relative; }
+.win-bar { display: flex; align-items: center; min-width: 0; }
+.win-bar .bo-title { flex: 0 1 auto; min-width: 0; }
+.win-bar .win-hint { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.win-bar .win-extra { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; flex: none; }
+.win-bar .win-extra:empty { display: none; }
+.win-bar .win-extra:empty + .bo-close, .win-bar .bo-title + .bo-close { margin-left: auto; }
+.win-bar .win-extra .bo-tree { margin-left: 0; }
+.win-bar.compact { margin: -12px -12px 8px; padding: 7px 8px 7px 12px; border-radius: 12px 12px 0 0; gap: 8px; }
+.win-bar.compact .bo-title { font-size: 13.5px; }
+.win-bar.compact .bo-title::before { height: 13px; }
+.win-bar.compact .bo-close { font-size: 14px; padding: 0 6px; }
+.earn .win-bar.compact { margin: -8px -10px 6px; }
+/* Resize: grab the left, right or bottom edge, or the grip in the bottom-right corner (both ways at once). */
+.rg { position: absolute; z-index: 40; }
+.rg-e, .rg-w { top: 44px; bottom: 20px; width: 8px; cursor: ew-resize; }
+.rg-e { right: 0; } .rg-w { left: 0; }
+.rg-s { left: 20px; right: 20px; bottom: 0; height: 8px; cursor: ns-resize; }
+.rg-sw { left: 0; bottom: 0; width: 20px; height: 20px; cursor: nesw-resize; }
+.rg-se { right: 0; bottom: 0; width: 22px; height: 22px; cursor: nwse-resize; display: grid; place-items: end; padding: 0 3px 3px 0;
+  border-radius: 0 0 14px 0; }
+.rg-se svg { fill: none; stroke: #8b95a6; stroke-width: 1.8; stroke-linecap: round; transition: stroke .15s; }
+.rg-se:hover svg, .rg-se:active svg { stroke: var(--gold); }

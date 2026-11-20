@@ -39,6 +39,8 @@
         "title": "Build",
         "width": 780,
         "height": 900,
+        "minWidth": 420,
+        "minHeight": 420,
         "decorations": false,
         "alwaysOnTop": true,
         "skipTaskbar": true,

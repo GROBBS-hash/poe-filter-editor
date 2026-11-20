@@ -211,6 +211,13 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   open and pulled onto a screen). Steps list on the left and the tree on the right in one view (list hidden when the
   window is under 560px wide; arrows stay); Tree / Notes tabs. No scrollbar on the window: the tree is sized to the
   space, lists scroll in their own panel with a thin scrollbar that shows on hover. Preview `?atlas-window` fills the page.
+- Windows over the game, 21 Nov ("consistency is key"): one title bar for all (`WinBar` in `src/WinFrame.tsx`: drag
+  to move, ✕ hides) in F7 atlas, F6 build, trades list and earnings box; resize grips (`ResizeGrips`: left/right/bottom
+  edges and a diagonal-lines grip in the bottom-right corner, `startResizeDragging`, capability
+  `core:window:allow-start-resize-dragging`) on F6 and F7. Place memory in one module (`src-tauri/src/win_place.rs`,
+  windows.json in the data folder): build + atlas keep place and size, trades + earnings keep place (they size
+  themselves). Shown windows go through `win_place::show_over_game` / `restore`. The Ctrl+D price window still places
+  itself by the mouse.
 
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
@@ -277,6 +284,10 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
       (Steps confirmed working 21 Nov.)
 - [ ] 21 Nov (2): F7 opens big enough (like F6), steps list beside the tree, no scrollbar on the window's edge;
       move and resize it, hide and reopen (and restart the editor): it comes back in the same place and size.
+      (Size memory confirmed 21 Nov.)
+- [ ] 21 Nov: corner grip (bottom right) resizes F6 and F7 both ways at once; left/right/bottom edges resize too.
+      F6 now remembers its place and size like F7. Trades list and earnings box: same title bar, and they come back
+      where you dragged them.
 
 **Ground reader (F2)**
 - [ ] 20 Nov: two labels on top of each other (e.g. a map right under a shield): F2 on the lower one picks it, not the upper one.

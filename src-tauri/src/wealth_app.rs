@@ -292,11 +292,8 @@ pub fn earnings_overlay(app: AppHandle, show: bool) {
 }
 
 fn show_overlay(app: &AppHandle) {
-    if let Some(w) = app.get_webview_window("earnings") {
-        let front = game_in_front();
-        let _ = w.show();
-        if front { focus_game(); } // never take focus from the game
-    }
+    // Where you left it; never takes focus from the game.
+    if let Some(w) = app.get_webview_window("earnings") { crate::win_place::show_over_game(app, &w); }
 }
 
 /// Tells the page and the overlay the latest numbers.

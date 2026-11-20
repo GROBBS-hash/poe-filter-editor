@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useRef, useState } from "react";
+import { ResizeGrips, WinBar } from "./WinFrame";
 import AtlasTreeView, { AtlasStore, StepBar, StepList, StrategyNotes, currentStrategy, useStep } from "./AtlasTreeView";
 
 type View = "tree" | "notes";
@@ -55,11 +55,8 @@ export default function AtlasOverlay() {
 
   return (
     <div className="bo ao">
-      <div className="bo-bar" onMouseDown={(e) => { if (e.button === 0 && (e.target as HTMLElement).closest("button,select") == null) getCurrentWindow().startDragging(); }}>
-        <span className="bo-title" title={s?.name}>{s ? s.name : "Atlas strategy"}</span>
-        <span className="muted small ao-hint">drag to move · Esc / {key} to hide</span>
-        <button className="link bo-close" title="Hide" onClick={() => invoke("hide_atlas_window")}>✕</button>
-      </div>
+      <WinBar title={<span title={s?.name}>{s ? s.name : "Atlas strategy"}</span>} hint={`drag to move · Esc / ${key} to hide`}
+        onClose={() => invoke("hide_atlas_window")} />
       {!s ? (
         <div className="ao-empty"><div className="empty">No atlas strategy yet. In the editor go to <b>Endgame → Atlas</b> and paste a maxroll or pathofexile.com link.</div></div>
       ) : (
@@ -104,6 +101,7 @@ export default function AtlasOverlay() {
           </div>
         </>
       )}
+      <ResizeGrips />
     </div>
   );
 }

@@ -3,6 +3,7 @@ mod screen;
 mod trade_api;
 mod wealth_app;
 mod atlas_app;
+mod win_place;
 
 use filter_core::{
     evaluate::{status_with_fallback, Status},
@@ -721,11 +722,7 @@ fn start_live_searches(app: AppHandle) {
                 if listings.is_empty() { continue; }
                 if let Some(w) = app.get_webview_window("trades") {
                     let _ = w.emit("live-hit", LiveHit { search: name, listings, url: trade_api::site_url(poe2, &league, &sid) });
-                    if !w.is_visible().unwrap_or(false) {
-                        let front = game_in_front();
-                        let _ = w.show();
-                        if front { focus_game(); }
-                    }
+                    if !w.is_visible().unwrap_or(false) { win_place::show_over_game(&app, &w); }
                 }
             }
         }
@@ -1003,11 +1000,7 @@ fn start_whisper_watcher(app: AppHandle) {
                 let is_trade = matches!(&ev, filter_core::whispers::LogEvent::Whisper(w) if w.item.is_some());
                 let Some(w) = app.get_webview_window("trades") else { continue };
                 let _ = w.emit("trade-event", &ev);
-                if is_trade && !w.is_visible().unwrap_or(false) {
-                    let front = game_in_front();
-                    let _ = w.show();
-                    if front { focus_game(); } // never steal focus from the game
-                }
+                if is_trade && !w.is_visible().unwrap_or(false) { win_place::show_over_game(&app, &w); } // never steals focus from the game
             }
         }
     });
@@ -1299,6 +1292,7 @@ fn toggle_build_window(app: &AppHandle) {
             let _ = w.hide();
         } else {
             let _ = w.emit("build-shown", ());
+            win_place::restore(app, &w);
             let _ = w.show();
             let _ = w.set_focus();
         }
@@ -1374,6 +1368,7 @@ fn start_tree_watcher(app: AppHandle) {
                 if !shown {
                     let _ = w.emit_to("build", "build-tree", ());
                     let _ = w.emit("build-shown", ());
+                    win_place::restore(&app, &w);
                     let _ = w.show();
                     focus_game(); // keep the keyboard on the game
                     opened = true;
@@ -2247,7 +2242,7 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            if window.label() == "atlas" { atlas_app::on_window_event(window, event); }
+            win_place::on_window_event(window, event);
             // Closing the main window just hides it; the hotkeys keep working.
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if window.label() == "main" {

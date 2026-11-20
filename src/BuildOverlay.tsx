@@ -1,10 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useState } from "react";
 import BuildView from "./BuildView";
+import { ResizeGrips, WinBar } from "./WinFrame";
 
-/** The F6 window over the game: drag the top bar to move it, Esc or F6 to hide.
+/** The F6 window over the game: drag the top bar to move it, the corner or edges to resize, Esc or F6 to hide.
  *  Can also open by itself when the game's passive tree key is pressed. */
 export default function BuildOverlay() {
   const [tree, setTree] = useState<[boolean, string]>([false, "P"]);
@@ -20,16 +20,14 @@ export default function BuildOverlay() {
   const setOn = (on: boolean) => { setTree([on, tree[1]]); invoke("set_build_tree", { on }).catch(() => {}); };
   return (
     <div className="bo">
-      <div className="bo-bar" onMouseDown={(e) => { if (e.button === 0 && (e.target as HTMLElement).closest("button, label") == null) getCurrentWindow().startDragging(); }}>
-        <span className="bo-title">Build</span>
-        <span className="muted small">drag to move · Esc / F6 to hide</span>
+      <WinBar title="Build" hint="drag to move · Esc / F6 to hide" onClose={() => invoke("hide_build_window")}>
         <label className="bo-tree" title={`Opens this window on the Tree tab when you press ${tree[1]} in game (the passive skill tree). ${tree[1]} or Esc closes it. Change the key in Settings.`}>
           <input type="checkbox" checked={tree[0]} onChange={(e) => setOn(e.target.checked)} />
           Open with the passive tree ({tree[1]})
         </label>
-        <button className="link bo-close" title="Hide" onClick={() => invoke("hide_build_window")}>✕</button>
-      </div>
+      </WinBar>
       <div className="bo-body"><BuildView compact /></div>
+      <ResizeGrips />
     </div>
   );
 }

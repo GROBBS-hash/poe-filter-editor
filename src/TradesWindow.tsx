@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { useEffect, useRef, useState } from "react";
+import { WinBar } from "./WinFrame";
 
 type Whisper = { time: string; from: string; message: string; item: string | null; price: string | null; league: string | null;
   tab: string | null; left: number | null; top: number | null };
@@ -77,10 +78,9 @@ export default function TradesWindow() {
   if (list.length === 0 && hits.length === 0) return null;
   return (
     <div className="qm th" ref={box}>
-      <div className="th-head" data-tauri-drag-region>
-        <span data-tauri-drag-region>Trades</span>
+      <WinBar compact title="Trades" onClose={() => invoke("hide_trades_window")} closeTip="Hide (new trades show it again)">
         <button className="link small" onClick={() => { setList([]); setHits([]); }} title="Clear the list">Clear all</button>
-      </div>
+      </WinBar>
       {hits.map((h) => (
         <div key={h.id} className="th-row th-live">
           <div className="th-top">
