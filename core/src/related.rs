@@ -61,8 +61,16 @@ const FAMILY_CATS: &[&str] = &["Thread", "DeliriumOrb", "Fossil", "Resonator", "
 /// The other items of the same kind, dearest first (at most 12, always including this one), or None.
 fn family(file: &PriceFile, name: &str) -> Option<Vec<Priced>> {
     let me = file.items.iter().find(|i| i.name == name)?;
-    let same = |i: &crate::prices::PriceItem| if name.ends_with(" Catalyst") { i.name.ends_with(" Catalyst") } else { i.cat == me.cat };
-    if !(name.ends_with(" Catalyst") || FAMILY_CATS.contains(&me.cat.as_str())) { return None; }
+    // Families told apart by name (they share a poe.ninja category with unrelated currency): "… Catalyst",
+    // "Maven's Chisel of …".
+    let by_name = |n: &str| -> Option<fn(&str) -> bool> {
+        if n.ends_with(" Catalyst") { Some(|x| x.ends_with(" Catalyst")) }
+        else if n.starts_with("Maven's Chisel of ") { Some(|x| x.starts_with("Maven's Chisel of ")) }
+        else { None }
+    };
+    let named = by_name(name);
+    let same = |i: &crate::prices::PriceItem| match named { Some(f) => f(&i.name), None => i.cat == me.cat };
+    if named.is_none() && !FAMILY_CATS.contains(&me.cat.as_str()) { return None; }
     let mut all: Vec<Priced> = Vec::new();
     for i in file.items.iter().filter(|i| same(i)) {
         if !all.iter().any(|p| p.name == i.name) { all.push(priced(file, &i.name, 1, i.name == name)); }
@@ -176,7 +184,8 @@ mod tests {
     fn families_and_mechanic_mixes() {
         let mut f = file();
         let it = |name: &str, cat: &str, value: f64| PriceItem { name: name.into(), base: name.into(), cat: cat.into(), value, variant: None, listings: Some(10) };
-        f.items.extend([it("Bestiary Thread", "Thread", 1.6), it("Abyss Thread", "Thread", 4.8), it("Legion Thread", "Thread", 3.6),
+        f.items.extend([it("Maven's Chisel of Avarice", "Currency", 183.0), it("Maven's Chisel of Threads", "Currency", 9.0),
+            it("Bestiary Thread", "Thread", 1.6), it("Abyss Thread", "Thread", 4.8), it("Legion Thread", "Thread", 3.6),
             it("Wild Crystallised Lifeforce", "Currency", 0.02), it("Sacred Crystallised Lifeforce", "Currency", 16.0),
             it("Ancient Orb", "Currency", 13.0), it("Astragali", "Currency", 0.1), it("Headhunter", "UniqueAccessory", 48000.0)]);
         // Threads: only other threads, dearest first.
@@ -189,5 +198,8 @@ mod tests {
         // Ancient Orb: what it rerolls into, not the rest of Expedition's currency.
         let a = related(&f, "Ancient Orb").unwrap();
         assert!(a.group.is_empty() && a.drops.iter().any(|p| p.name == "Headhunter"));
+        // Maven's chisels: the other chisels, not every other currency.
+        let c = related(&f, "Maven's Chisel of Avarice").unwrap();
+        assert_eq!(c.group.iter().map(|p| p.name.as_str()).collect::<Vec<_>>(), ["Maven's Chisel of Avarice", "Maven's Chisel of Threads"]);
     }
 }

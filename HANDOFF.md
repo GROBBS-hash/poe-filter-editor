@@ -264,6 +264,10 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 - Unidentified rares 20 Nov: "Unidentified (Tier N)" counts as unidentified; a name with extra words in front of the base
   ("Fated Composite Ring") is cut down to a base the trade site knows (`ItemTypes.bases` + `fix_query`). Live: 91 listed.
 
+- Bulk 20 Nov: items worth ≥ half a divine on poe.ninja search the exchange paying in divines first, and a chaos search with
+  no offers retries in divines (Maven's Chisel of Avarice: 0 chaos sellers, 3 divine). Side panel families now also
+  match by name: "Maven's Chisel of …" (and catalysts), in `family` in related.rs.
+
 
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
@@ -289,6 +293,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [x] Wealth "By tab" works (confirmed 20 Nov).
 - [x] Maps: a mod ticked on the Maps page shows in red on Ctrl+D and the stash search hides those maps (confirmed 20 Nov).
 - [ ] Unidentified rares like "Fated Composite Ring" price as "Composite Ring" (no "Unknown item base type").
+- [ ] Maven's chisels: side panel lists the other chisels; offers show (paid in divines).
 - [ ] Menu icons: each page has its own colour tile (Find blue, Tiers coral, Wealth gold…), page title matches.
 - [ ] New Clean glass look: opens bigger and remembers its size; pages fade in; Wealth tiles look right; nothing broken on other pages.
 - [ ] Unidentified unique (e.g. Karui Sceptre): no false tier 1 / divine sound; the "Could be one of N uniques" list shows in F2 and Ctrl+D.

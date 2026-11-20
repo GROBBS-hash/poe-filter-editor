@@ -312,7 +312,15 @@ export default function TradeWindow() {
 
   const runBulk = useCallback(async (want: string, p: "chaos" | "divine", minimum: number | null = null) => {
     setBusy(true); setErr(""); setBulk(null);
-    try { setBulk(await invoke<Bulk>("trade_bulk", { want, pay: p, minimum })); } catch (e) { setErr(String(e)); }
+    try {
+      let b = await invoke<Bulk>("trade_bulk", { want, pay: p, minimum });
+      // Pricier items are usually only sold for divines: when chaos finds nobody, try divines.
+      if (b.offers.length === 0 && p === "chaos") {
+        const d = await invoke<Bulk>("trade_bulk", { want, pay: "divine", minimum }).catch(() => null);
+        if (d && d.offers.length) { b = d; setPay("divine"); }
+      }
+      setBulk(b);
+    } catch (e) { setErr(String(e)); }
     setBusy(false);
   }, []);
 
@@ -328,7 +336,12 @@ export default function TradeWindow() {
       setCheck(c); setSetup(c.setup); setRes(null); setSearched(null); setBulk(null); setAi(null); setErr(c.error ?? ""); setCopied(null); setPay("chaos"); setMinStock(false); setShowFixers(false);
       setSaving(null); setShowSaved(!c.setup); setPreset(null); setMapMods(false); setReporting(null); setReported(""); window.scrollTo(0, 0);
       invoke<Saved[]>("saved_list").then(setSaved).catch(() => {});
-      if (c.bulk) runBulk(c.bulk, "chaos");
+      if (c.bulk) {
+        // Worth half a divine or more: sellers mostly take divines, so ask for those first.
+        const nin = c.ninja ? (c.ninja[1] === "divine" && c.divine ? c.ninja[0] * c.divine : c.ninja[1] === "chaos" ? c.ninja[0] : 0) : 0;
+        const p = c.divine && nin >= c.divine * 0.5 ? "divine" : "chaos";
+        setPay(p); runBulk(c.bulk, p);
+      }
       else if (c.setup && needsTrade(c)) run(c.setup);
       // A rough second opinion on rares from poeprices.info.
       if (c.setup?.item.rarity === "Rare" && c.setup.raw && !c.setup.item.unidentified)
