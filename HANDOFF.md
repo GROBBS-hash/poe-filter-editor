@@ -300,6 +300,9 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   PoB bookkeeping ("Has Alt Variant Two", "Intangibility"); Watcher's Eye keeps every alt variant's mod. Dev check:
   `POB_COPY=1 cargo run -p filter-core --example pobdump -- <pob.txt>` (all 30-odd items of his build read back).
 
+- Any resistance 21 Nov: items with 2+ resistance mods get an unticked Totals row "+N% total Resistance (any, chaos too)"
+  (`ANY_RES` rule in trade_rules.rs, trade id pseudo.pseudo_total_resistance) for searches that don't mind which element.
+
 - Price box design 2 (he picked it from five mockups, 20 Nov): with a stack, two tiles "YOUR N" (gold, big) and "EACH",
   both with orb icons; bulk items get "N <item> = 1 [divine]" under them (replaces the old "1 div ≈ …" line lower down).
 
@@ -350,6 +353,9 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 
 - [ ] Build window (F6) / My build: "Price" on a gear item, flask or jewel, or a click on a gem, opens the price window for it
       (Duskdawn as Maelström Staff, rares with their mods ready to search). Jewel mods no longer show "Has Alt Variant Two".
+
+- [ ] Price check on gear with two or more resistances: a "total Resistance (any, chaos too)" row under Totals; ticking it
+      instead of the elemental total finds items with the resistances spread differently.
 
 **Maps**
 - [ ] Ctrl+D on a map: flags the mods on the "Map check" list; "Suggest from my build" picks sensible mods.
@@ -456,7 +462,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 1. **GROBBS to work through "Still to check in game" above**; fix what he reports.
 2. Wealth tracker follow-ups: test with GROBBS's real account; price rares via the trade site (slow) or poeprices;
    PoeStash-style "search every tab" and guild stash; crafting planner (parked).
-3. Price check polish ideas: group resistances "any resistance" (count group), collapse duplicate sellers, show price
+3. Price check polish ideas (any resistance done 21 Nov; same seller + price already shows once with "× N"): show price
    in divines toggle, currency trend chart; map tier filter when price checking maps.
 4. Deferred earlier: installer + auto-update, batch mode tidy-up, PoE 2 coverage.
 

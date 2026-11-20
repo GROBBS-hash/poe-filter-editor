@@ -40,6 +40,17 @@ const CHAOS_RES: &[Source] = &[
     src("+#% to fire and chaos resistances", 1.0, true), src("+#% to cold and chaos resistances", 1.0, true),
     src("+#% to lightning and chaos resistances", 1.0, true),
 ];
+/// Every resistance counted (chaos too): "any resistance", when you don't mind which element. Only shown, never
+/// replaces the mods (the elemental and chaos totals do that).
+const ANY_RES: &[Source] = &[
+    src("+#% to all resistances", 4.0, true), src("+#% to all elemental resistances", 3.0, true),
+    src("+#% to fire resistance", 1.0, true), src("+#% to cold resistance", 1.0, true), src("+#% to lightning resistance", 1.0, true),
+    src("+#% to chaos resistance", 1.0, true),
+    src("+#% to fire and lightning resistances", 2.0, true), src("+#% to fire and cold resistances", 2.0, true),
+    src("+#% to cold and lightning resistances", 2.0, true),
+    src("+#% to fire and chaos resistances", 2.0, true), src("+#% to cold and chaos resistances", 2.0, true),
+    src("+#% to lightning and chaos resistances", 2.0, true),
+];
 const LIFE: &[Source] = &[
     src("+# to maximum life", 1.0, false), src("+# to strength", 0.5, true), src("+# to all attributes", 0.5, true),
     src("+# to strength and intelligence", 0.5, true), src("+# to strength and dexterity", 0.5, true),
@@ -59,6 +70,7 @@ const RULES: &[Rule] = &[
     Rule { text: "+# total maximum Life", fallback_id: Some("pseudo.pseudo_total_life"), sources: LIFE, required: Some("+# to maximum life"), needs_two: false, tick_at: Some(40.0) },
     Rule { text: "+#% total Elemental Resistance", fallback_id: Some("pseudo.pseudo_total_elemental_resistance"), sources: ELE_RES, required: None, needs_two: false, tick_at: Some(36.0) },
     Rule { text: "+#% total to Chaos Resistance", fallback_id: Some("pseudo.pseudo_total_chaos_resistance"), sources: CHAOS_RES, required: None, needs_two: false, tick_at: Some(15.0) },
+    Rule { text: "+#% total Resistance", fallback_id: Some("pseudo.pseudo_total_resistance"), sources: ANY_RES, required: None, needs_two: true, tick_at: None },
     Rule { text: "+# total maximum Mana", fallback_id: None, sources: MANA, required: Some("+# to maximum mana"), needs_two: false, tick_at: None },
     Rule { text: "+# total to Strength", fallback_id: None, sources: STR, required: None, needs_two: true, tick_at: None },
     Rule { text: "+# total to Dexterity", fallback_id: None, sources: DEX, required: None, needs_two: true, tick_at: None },
@@ -100,7 +112,7 @@ pub fn totals(mods: &[ModLine], item: &Item, index: &StatIndex, skip: &[usize]) 
         if (rule.needs_two || unique) && (if unique { explicit_sources } else { used.len() }) < 2 { continue; }
         let total = total.floor();
         out.push(StatFilter {
-            id, label: rule.text.replace('#', &total.to_string()), value: total, min: Some(total),
+            id, label: rule.text.replace('#', &total.to_string()) + if std::ptr::eq(rule.sources, ANY_RES) { " (any, chaos too)" } else { "" }, value: total, min: Some(total),
             enabled: !unique && rule.tick_at.map(|t| total >= t).unwrap_or(false),
             kind: "pseudo".into(), tier: None, junk: false, roll: None, range: None, affix: None,
         });
@@ -287,6 +299,9 @@ mod tests {
         assert_eq!(get("pseudo.pseudo_total_life").unwrap().value, 70.0); // 60 + 20 Str / 2
         assert_eq!(get("pseudo.pseudo_total_elemental_resistance").unwrap().value, 55.0);
         assert_eq!(get("pseudo.pseudo_total_chaos_resistance").unwrap().value, 15.0);
+        // Any resistance: 40 fire + 15 fire + 15 chaos, shown but not ticked; the mods it counts stay.
+        let any = get("pseudo.pseudo_total_resistance").unwrap();
+        assert_eq!((any.value, any.enabled, any.label.as_str()), (70.0, false, "+70% total Resistance (any, chaos too)"));
         // Folded into totals: gone from the list. Fire+chaos and Strength also give other things: kept.
         assert!(get("explicit.life").is_none() && get("explicit.fire").is_none());
         assert!(get("explicit.firechaos").is_some() && get("explicit.str").is_some());
