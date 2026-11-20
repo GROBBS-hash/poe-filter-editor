@@ -153,6 +153,17 @@ fn far_apart(a: Option<([u8; 3], [u8; 3])>, b: Option<([u8; 3], [u8; 3])>) -> bo
     }
 }
 
+/// Two lines sit on different label boxes: their backgrounds clearly differ (a grey
+/// "MAP (TIER 4)" box right under a dark "SPINY ROUND SHIELD" one), or their text does.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn other_label(a: Option<([u8; 3], [u8; 3])>, b: Option<([u8; 3], [u8; 3])>) -> bool {
+    let bg = match (a, b) {
+        (Some((_, a)), Some((_, b))) => a.iter().zip(b).map(|(x, y)| (*x as i32 - y as i32).pow(2)).sum::<i32>() > 3 * 40 * 40,
+        _ => false,
+    };
+    bg || far_apart(a, b)
+}
+
 /// Turns the reader's lines (each a list of words with boxes) into pieces of text:
 /// a line is cut where there's a wide gap or the colour changes (two labels side by
 /// side, "OPAL SCEPTRE" next to "TYRANT'S SEKHEM"), and pieces the reader split
@@ -238,7 +249,7 @@ fn pick_label(merged: &[Piece], cx: f32, cy: f32) -> Option<Piece> {
             && (r[3] - r0[3]).abs() < r0[3] * 0.35
     };
     let mut block: Vec<&Piece> = merged.iter().enumerate()
-        .filter(|(i, p)| *i == bi || (stacked(&p.1) && !far_apart(p.2, merged[bi].2))).map(|(_, x)| x).collect();
+        .filter(|(i, p)| *i == bi || (stacked(&p.1) && !other_label(p.2, merged[bi].2))).map(|(_, x)| x).collect();
     block.sort_by(|a, b| a.1[1].partial_cmp(&b.1[1]).unwrap_or(std::cmp::Ordering::Equal));
     let text = block.iter().map(|x| x.0.as_str()).collect::<Vec<_>>().join(" ");
     Some((text, r0, merged[bi].2))
@@ -560,6 +571,22 @@ mod tests {
         // A word the reader split in two is joined back.
         let ps = super::pieces(vec![vec![w("KARUI", 100.0, 50.0), w("CH", 155.0, 20.0)], vec![w("OPPER", 176.0, 50.0)]], &|_| white);
         assert_eq!(ps[0].0, "KARUI CHOPPER");
+    }
+
+    #[test]
+    fn label_right_under_another_is_not_joined() {
+        // "SPINY ROUND SHIELD (TIER 4)" (yellow on dark) with "MAP (TIER 4)" (light grey on grey)
+        // right under it; the mouse is on the map.
+        let shield = Some(([240, 235, 150], [20, 20, 22]));
+        let map = Some(([225, 225, 225], [110, 110, 110]));
+        let ps = vec![("SPINY ROUNDSHIELD (TIEE4)-t".to_string(), [100.0, 100.0, 700.0, 36.0], shield),
+            ("MAP (TIER 4)".to_string(), [320.0, 145.0, 280.0, 36.0], map)];
+        assert_eq!(super::pick_label(&ps, 450.0, 165.0).unwrap().0, "MAP (TIER 4)");
+        assert_eq!(super::pick_label(&ps, 450.0, 118.0).unwrap().0, "SPINY ROUNDSHIELD (TIEE4)-t");
+        // A real two-line label (same box) is still joined.
+        let ps = vec![("BLOOD PRICE".to_string(), [300.0, 100.0, 200.0, 30.0], shield),
+            ("REAVER HELMET".to_string(), [290.0, 135.0, 220.0, 30.0], shield)];
+        assert_eq!(super::pick_label(&ps, 400.0, 150.0).unwrap().0, "BLOOD PRICE REAVER HELMET");
     }
 
     #[test]
