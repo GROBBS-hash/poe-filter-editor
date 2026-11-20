@@ -211,7 +211,7 @@ fn check(key: &str, op: &str, vals: &[String], c: &Ctx) -> Tri {
         // Maps whose kind we know from their name (label or copied text).
         "BlightedMap" if it.map_kind_known || !c.from_screen => cmp_bool(Some(it.blighted), vals),
         "UberBlightedMap" if it.map_kind_known || !c.from_screen => cmp_bool(Some(it.uber_blighted), vals),
-        "ZanaMemory" if !c.from_screen => cmp_bool(Some(it.zana_memory), vals),
+        "ZanaMemory" if it.map_kind_known || !c.from_screen => cmp_bool(Some(it.zana_memory), vals),
         "HasInfluence" if !it.influences.is_empty() => {
             let any = vals.iter().any(|v| it.influences.iter().any(|i| i.eq_ignore_ascii_case(v)));
             if any { Tri::Yes } else { Tri::No }

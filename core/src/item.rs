@@ -118,7 +118,7 @@ pub fn parse_item(text: &str) -> Option<Item> {
             item.map_tier = num(v);
         } else if let Some(inf) = line.strip_suffix(" Item").filter(|i| ["Shaper", "Elder", "Crusader", "Hunter", "Redeemer", "Warlord"].contains(i)) {
             item.influences.push(inf.to_string());
-        } else if *line == "Originator's Memories" || line.starts_with("Contains memories of") {
+        } else if line.contains("Originator's Memories") || *line == "Originator Item" || line.starts_with("Contains memories of") {
             item.zana_memory = true;
         } else if *line == "Corrupted" {
             item.corrupted = true;

@@ -81,7 +81,7 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
     // Special maps (blighted, Valdo…) too: the panel's step 4 row glows.
     if (focus.type_path[0] === "maps") {
       setSel(MAPS_KEY); setQ(""); setEditing(null);
-      setMapFocus(focus.type_path.length > 1 ? focus.type_path.join(">") : null);
+      setMapFocus(focus.type_path.length > 1 ? focus.type_path.join(">") + (focus.tier?.startsWith("zana") ? ">zana" : "") : null);
       window.setTimeout(() => setMapFocus(null), 3500);
       return;
     }

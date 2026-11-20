@@ -173,9 +173,12 @@ export default function MapTiers({ profileId, onChange, onOpen, focus }: { profi
         <p className="mt-what">NeverSink shows these before the tier rules, so they show even when their tier is hidden. Untick a kind to hide it; Open shows its separate rules.</p>
         {data.special.map((s) => {
           const all = s.tiers.every(shown), none = !s.tiers.some(shown);
-          const sk = "s:" + s.type_path.join(">");
+          // Originator maps share NeverSink's "influenced" rules but get their own row ("maps>influenced>zana").
+          const zana = s.tiers.every((t) => t.tier.startsWith("zana"));
+          const rk = s.type_path.join(">") + (zana ? ">zana" : "");
+          const sk = "s:" + rk;
           return (
-            <div key={s.type_path.join(">")} data-special={s.type_path.join(">")} className={`tier mt-special ${none ? "off" : ""} ${focus === s.type_path.join(">") ? "focus" : ""}`}>
+            <div key={rk} data-special={rk} className={`tier mt-special ${none ? "off" : ""} ${focus === rk ? "focus" : ""}`}>
               <div className="tier-head">
                 <label className="tier-name">
                   <input type="checkbox" checked={all} disabled={busy}
@@ -183,13 +186,39 @@ export default function MapTiers({ profileId, onChange, onOpen, focus }: { profi
                     onChange={(e) => change(s.type_path, s.tiers.map((r) => r.tier), { show: e.target.checked }, `${s.title} ${e.target.checked ? "shown" : "hidden"}.`)} />
                   <span>{s.title}</span>
                 </label>
-                <LookButton className="tier-look" title={`Change the look of every rule in ${s.title}`} onClick={() => setEditing(editing === sk ? null : sk)}>
-                  <Preview s={fromCurrent(s.tiers[0].style, "Maps")} text="Map" /></LookButton>
+                {!zana && <LookButton className="tier-look" title={`Change the look of every rule in ${s.title}`} onClick={() => setEditing(editing === sk ? null : sk)}>
+                  <Preview s={fromCurrent(s.tiers[0].style, "Maps")} text="Map" /></LookButton>}
                 <span className="tier-tools">
                   <button className="link small" onClick={() => onOpen(s)}>Open</button>
                 </span>
               </div>
-              <div className="muted small mt-special-rules">{s.tiers.map((r) => r.name).join(" · ")}</div>
+              {!zana && <div className="muted small mt-special-rules">{s.tiers.map((r) => r.name).join(" · ")}</div>}
+              {zana && <p className="mt-what mt-special-rules">Maps from the Originator's memories. Their label only says
+                "Map (Tier N)"; NeverSink gives them this look instead of the plain tier look. Click a look to change it.</p>}
+              {zana && s.tiers.map((r) => {
+                // Example: this rule's look ("with") next to the plain map look of a tier it covers ("without").
+                const t = r.tier === "zanamap" ? 16 : 10;
+                const plain = data.tiers.find((x) => x.map_tier === t);
+                const text = `Map (Tier ${t})`;
+                const ek = "z:" + r.tier;
+                return (
+                  <div key={r.tier} className={`mt-zana ${shown(r) ? "" : "off"}`}>
+                    <span className="mt-zana-name">{r.name}</span>
+                    <span className="mt-demo">
+                      <span className="mt-demo-one"><LookButton title={`Change the look of ${r.name}`} onClick={() => setEditing(editing === ek ? null : ek)}>
+                        <Preview s={fromCurrent(r.style, "Maps")} text={text} /></LookButton><span className="muted small">Originator</span></span>
+                      {plain && <span className="mt-demo-one"><Preview s={fromCurrent(plain.style, "Maps")} text={text} /><span className="muted small">plain map</span></span>}
+                    </span>
+                    {editing === ek && (
+                      <div className="qm tier-edit">
+                        <StyleEditor start={fromCurrent(r.style, "Maps")} label={text}
+                          onCancel={() => setEditing(null)}
+                          onSave={(st) => { setEditing(null); change(s.type_path, [r.tier], { style: st }, `${r.name} restyled.`); }} />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
               {editing === sk && (
                 <div className="qm tier-edit">
                   <StyleEditor start={fromCurrent(s.tiers[0].style, "Maps")} label="Map"

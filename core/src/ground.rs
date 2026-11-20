@@ -304,6 +304,14 @@ pub fn ground_item(segs: &[Segment], m: &GroundMatch, label: Option<LabelColours
         item.map_tier = item.base_type.strip_prefix("Map (Tier ").and_then(|r| r.trim_end_matches(')').parse().ok()).or(m.tier);
         // Rarity from the label's colours when the filter draws rarities differently; Normal otherwise.
         item.rarity = "Normal".into();
+        // Originator (Zana memory) maps say only "Map (Tier 16)" on the label, but the filter draws them in
+        // their own colours: when the label looks like that rule and not like the plain map rule, it's one.
+        if let (Some(seen), false) = (label, item.blighted) {
+            let zana = Item { zana_memory: true, ..item.clone() };
+            let dz = label_distance(segs, &zana, seen, area_level, "Normal", None);
+            let dp = label_distance(segs, &item, seen, area_level, "Normal", None);
+            if dz < 3 * 40 * 40 && dz * 3 < dp { item.zana_memory = true; }
+        }
         if label.is_some() { item.rarity = guess_rarity(segs, &item, label, area_level); }
         return item;
     }
@@ -464,6 +472,42 @@ mod tests {
         // A plain map still lands on its tier rule.
         let (it, by) = rule("MAP (TIER 9)");
         assert!(!it.blighted && by.contains("maps_c_t9"), "{by}");
+    }
+
+    #[test]
+    fn originator_map_by_its_colours() {
+        let f = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/poe1-semistrict.filter")).unwrap();
+        let segs = parse_filter(&f);
+        let k = known_names(&crate::rules::known_bases(&segs));
+        let read = |text: &str, seen: Option<LabelColours>| {
+            let it = ground_item(&segs, &match_base(text, &k).unwrap(), seen, 83);
+            let by = crate::evaluate::status(&segs, &it, Some(83), true).verdict.decided_by;
+            (it, by)
+        };
+        // NeverSink's zanamap look: purple text on white. The label just says "Map (Tier 16)".
+        let (it, by) = read("MAP (TIER 16)", Some(LabelColours { text: [100, 0, 122], background: [255, 255, 255] }));
+        assert!(it.zana_memory && by.contains("zanamap"), "{by}");
+        // zanamaplow: light purple on grey, a lower tier.
+        let (it, by) = read("MAP (TIER 9)", Some(LabelColours { text: [145, 30, 220], background: [200, 200, 200] }));
+        assert!(it.zana_memory && by.contains("zanamaplow"), "{by}");
+        // A plain tier 16 map's own look (black on light grey) stays a plain map.
+        let (it, by) = read("MAP (TIER 16)", Some(LabelColours { text: [0, 0, 0], background: [235, 235, 235] }));
+        assert!(!it.zana_memory && by.contains("maps_a_t16"), "{by}");
+        // No colours: plain.
+        assert!(!read("MAP (TIER 16)", None).0.zana_memory);
+        // Copied text with the Originator marker.
+        let it = crate::item::parse_item("Item Class: Maps
+Rarity: Normal
+Map (Tier 16)
+--------
+Map Tier: 16
+--------
+Item Level: 83
+--------
+Originator's Memories
+").unwrap();
+        assert!(it.zana_memory);
+        assert!(crate::evaluate::status(&segs, &it, Some(83), false).verdict.decided_by.contains("zanamap"));
     }
 
     #[test]

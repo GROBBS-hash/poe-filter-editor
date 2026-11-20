@@ -38,7 +38,10 @@ const mapTiers = () => ({
     return { map_tier: t, band: b, tier, name: `Maps ${b} t${t}`, visibility: mapHidden.has(tier) ? "Hide" : "Show", style: mapStyle(b), bases: [], note: "", min_stack: null }; }),
   special: [["influenced", "Influenced maps (Shaper, Elder, Conquerors, Zana)", 4], ["blighted", "Blighted maps", 3], ["nightmare", "Valdo's, nightmare & guardian maps", 3]]
     .map(([k, title, n]) => ({ type_path: ["maps", k], title, group: "Maps", shared_bases: true,
-      tiers: Array.from({ length: n as number }, (_, i) => ({ tier: "t" + i, name: "Tier " + i, visibility: "Show", style: mapStyle("a"), bases: [], note: "", min_stack: null })) })),
+      tiers: Array.from({ length: n as number }, (_, i) => ({ tier: "t" + i, name: "Tier " + i, visibility: "Show", style: mapStyle("a"), bases: [], note: "", min_stack: null })) }))
+    .concat([{ type_path: ["maps", "influenced"], title: "Originator maps (Zana memories)", group: "Maps", shared_bases: true, tiers: [
+      { tier: "zanamap", name: "Originator maps, tier 14+", visibility: "Show", style: { font_size: 45, muted: false, text: [100, 0, 122, 255], border: [100, 0, 122, 255], background: [255, 255, 255, 255], beam: "Red", minimap_parts: [0, "Red", "Square"] }, bases: [], note: "", min_stack: null },
+      { tier: "zanamaplow", name: "Originator maps, lower tiers", visibility: "Show", style: { font_size: 45, muted: false, text: [145, 30, 220, 255], border: [145, 30, 220, 255], background: [200, 200, 200, 255], beam: "Purple", minimap_parts: [1, "Purple", "Square"] }, bases: [], note: "", min_stack: null }] }]),
 });
 // ?build shows the F6 build window instead, with a sample build.
 const buildWin = location.search.includes("build");

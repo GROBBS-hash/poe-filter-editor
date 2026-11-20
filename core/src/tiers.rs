@@ -320,7 +320,7 @@ fn map_rule_name(t: &str) -> Option<String> {
     Some(match t {
         "decor_implicit" => "Gold border: maps with implicit mods",
         "deco_corruptedmod" => "Gold border: maps with corrupted mods",
-        "zanamap" => "Zana / Originator maps (best)", "zanamaplow" => "Zana / Originator maps (others)",
+        "zanamap" => "Originator maps, tier 14+", "zanamaplow" => "Originator maps, lower tiers",
         "zanacorrupthider" => "Corrupted Zana maps (hidden)",
         "infelder" => "Shaper / Elder influenced maps", "infconquerors" => "Conqueror influenced maps",
         "valdomaps" => "Valdo's maps", "nightmaremaps" => "Nightmare maps", "shaperguardianmaps" => "Shaper guardian maps",
@@ -340,7 +340,7 @@ fn map_tier_of(tier: &str) -> Option<(String, u32)> {
 
 fn map_kind(p: &str) -> String {
     match p {
-        "influenced" => "Influenced maps (Shaper, Elder, Conquerors, Zana)".into(),
+        "influenced" => "Influenced maps (Shaper, Elder, Conquerors)".into(),
         "nightmare" => "Valdo's, nightmare & guardian maps".into(),
         "blighted" => "Blighted maps".into(),
         "vaaltemple" => "Vaal Temple maps".into(),
@@ -363,11 +363,21 @@ pub fn map_tiers(segs: &[Segment]) -> MapTiers {
         let Segment::Block(b) = s else { continue };
         if b.type_path.len() >= 2 && b.type_path[0] == "maps" && !paths.contains(&b.type_path) { paths.push(b.type_path.clone()); }
     }
-    let special = paths.iter().filter_map(|p| section_at(segs, p).map(|mut s| {
+    let mut special: Vec<Section> = vec![];
+    for p in &paths {
+        let Some(mut s) = section_at(segs, p) else { continue };
         s.title = map_kind(&p[1..].join("->"));
         s.group = "Maps".into();
-        s
-    })).collect();
+        // Originator (Zana memory) maps get their own row: they look very different from other influenced maps.
+        let (zana, rest): (Vec<TierRow>, Vec<TierRow>) = s.tiers.iter().cloned().partition(|t| t.tier.starts_with("zana"));
+        if !zana.is_empty() {
+            special.push(Section { title: "Originator maps (Zana memories)".into(), tiers: zana, ..s.clone() });
+            if rest.is_empty() { continue; }
+            s.tiers = rest;
+            s.title = "Influenced maps (Shaper, Elder, Conquerors)".into();
+        }
+        special.push(s);
+    }
     // Highlights: blocks under "maps" that aren't tier rules, grouped by what they do.
     let groups: [(&str, &str, &str, fn(&str) -> bool); 4] = [
         ("upgrade", "Upgrade borders", "A red border on maps above the tier you're running now, so upgrades stand out.", |t| t.starts_with("deco_mapup_")),
@@ -409,6 +419,9 @@ mod tests {
         assert_eq!(m.tiers[15].band, "a");
         assert_eq!(m.tiers[0].band, "d");
         assert!(m.special.iter().any(|s| s.title == "Blighted maps"));
+        let z = m.special.iter().find(|s| s.title.starts_with("Originator")).unwrap();
+        assert_eq!(z.tiers.iter().map(|t| t.tier.as_str()).collect::<Vec<_>>(), ["zanamap", "zanamaplow"]);
+        assert!(m.special.iter().any(|s| s.title.starts_with("Influenced") && s.tiers.iter().all(|t| !t.tier.starts_with("zana"))));
         assert_eq!(m.tiers[15].row.name, "Tier 16 maps");
         assert_eq!(m.extras.iter().map(|e| e.key.as_str()).collect::<Vec<_>>(), ["upgrade", "bands", "implicit", "corrupted"]);
         assert!(m.extras.iter().all(|e| e.on));

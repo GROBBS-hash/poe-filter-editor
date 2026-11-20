@@ -335,6 +335,13 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
       3.30, the Ctrl+C line for Originator's memories (`Originator's Memories` / "Contains memories of" guessed), and
       unique maps on the ground (read as their base's tier map; the hover box then gives rarity Unique).
       Editing such an edit again in My edits drops its BlightedMap condition (RuleDetail doesn't carry it).
+- [ ] Originator (Zana memory) maps: F2 on one on the ground shows NeverSink's Originator rule (purple on white for
+      tier 14+, purple on grey below) instead of the pink "Maps (low value)", and "Modify this rule" opens Map tiers
+      with the new "Originator maps" row glowing. That row shows both looks next to the plain map look; click one to
+      change it. How: the label only says "Map (Tier N)", so `ground_item` compares the label's colours with the
+      filter's look for a Zana map vs a plain map (`label_distance`) and sets `zana_memory` when the Zana look fits
+      far better. `map_tiers` splits NeverSink's `maps->influenced` rules into "Originator maps" (zanamap, zanamaplow)
+      and the other influenced maps. Ctrl+C: "Originator's Memories" / "Originator Item" lines (guessed, unverified).
 
 **Clickable looks (everywhere, 20 Nov)**
 - [ ] Every label preview has a gold outline and "✎ edit look" on hover; clicking opens the look editor for that rule:
