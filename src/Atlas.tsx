@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
-import AtlasTreeView, { AtlasStore, AtlasStrategy, StrategyNotes } from "./AtlasTreeView";
+import AtlasTreeView, { AtlasStore, AtlasStrategy, StepBar, StepList, StrategyNotes, useStep } from "./AtlasTreeView";
 import { PageLoading } from "./Loading";
 
 const SITE: Record<string, string> = { maxroll: "maxroll", official: "pathofexile.com" };
@@ -114,6 +114,8 @@ function Preview({ s, store, run }: { s: AtlasStrategy; store: AtlasStore; run: 
   const [own, setOwn] = useState(s.own_notes);
   const [saved, setSaved] = useState(true);
   const v = s.variants[vi];
+  const steps = v?.steps ?? [];
+  const [step, setStep] = useStep(`${s.id}-${vi}`, steps.length);
   const pick = (i: number) => { setVi(i); if (store.active === s.id) run("atlas_use", { id: s.id, variant: i }); };
   const openOfficial = async () => {
     try { invoke("open_url", { url: await invoke<string>("atlas_official_link", { id: s.id, variant: vi }) }); } catch { /* shown nowhere */ }
@@ -133,7 +135,18 @@ function Preview({ s, store, run }: { s: AtlasStrategy; store: AtlasStore; run: 
             {s.variants.map((x, i) => <button key={i} className={`chip ${i === vi ? "on" : ""}`} onClick={() => pick(i)}>{x.name}</button>)}
           </div>
         )}
-        {v && <AtlasTreeView key={vi} nodes={v.nodes} choices={v.choices} height={560} />}
+        {v && steps.length > 0 ? (
+          <div className="at-stepgrid">
+            <div className="at-stepcol">
+              <div className="at-stephead"><b>Step by step</b><span className="muted small">{steps[steps.length - 1].total} points</span></div>
+              <StepList steps={steps} step={step} onStep={setStep} />
+            </div>
+            <div>
+              <StepBar steps={steps} step={step} onStep={setStep} />
+              <AtlasTreeView key={vi} nodes={v.nodes} choices={v.choices} steps={steps} step={step} height={540} />
+            </div>
+          </div>
+        ) : v && <AtlasTreeView key={vi} nodes={v.nodes} choices={v.choices} height={560} />}
       </div>
       <div className="card">
         <h2>Notes</h2>

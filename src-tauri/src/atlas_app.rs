@@ -27,12 +27,39 @@ fn with_store<T>(app: &AppHandle, save: bool, f: impl FnOnce(&mut AtlasStore) ->
 fn now() -> u64 { std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0) }
 
 #[tauri::command]
-pub fn atlas_list(app: AppHandle) -> Result<AtlasStore, String> { with_store(&app, false, |s| s.clone()) }
+pub fn atlas_list(app: AppHandle) -> Result<AtlasStore, String> {
+    add_missing_steps(&app);
+    with_store(&app, false, |s| s.clone())
+}
 
-/// Reads a strategy from a link (one request to maxroll; official links need none) and saves it.
-#[tauri::command(async)]
-pub fn atlas_import(app: AppHandle, link: String, name: String) -> Result<AtlasStore, String> {
-    let mut strat: Strategy = match atlas::parse_link(&link)? {
+/// Strategies saved before trees had steps: work them out (maxroll ones are read again, once,
+/// because the old save lost the order the points were taken in).
+fn add_missing_steps(app: &AppHandle) {
+    static DONE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    if DONE.swap(true, Ordering::Relaxed) { return; }
+    let Ok(old) = with_store(app, false, |s| s.list.iter()
+        .filter(|x| x.variants.iter().any(|v| v.steps.is_empty() && v.nodes.len() > 1))
+        .map(|x| (x.id, x.site.clone(), x.link.clone())).collect::<Vec<_>>()) else { return };
+    if old.is_empty() { return; }
+    let app = app.clone();
+    thread::spawn(move || {
+        for (id, site, link) in old {
+            let fresh = if site == "maxroll" { fetch(&link).ok() } else { None };
+            let _ = with_store(&app, true, |s| {
+                let Some(x) = s.list.iter_mut().find(|x| x.id == id) else { return };
+                match fresh {
+                    Some(f) if f.variants.len() == x.variants.len() => { x.variants = f.variants; x.notes = f.notes; x.device = f.device; }
+                    _ => { for v in &mut x.variants { if v.steps.is_empty() { v.steps = atlas::graph().steps(&v.nodes); } } }
+                }
+            });
+            thread::sleep(Duration::from_secs(1));
+        }
+    });
+}
+
+/// Reads a strategy from a link: one request to maxroll; official links need none.
+fn fetch(link: &str) -> Result<Strategy, String> {
+    Ok(match atlas::parse_link(link)? {
         Link::Official(code) => atlas::from_official(&code, link.trim())?,
         Link::Maxroll(id) => {
             let resp = ureq::get(&atlas::maxroll_api_url(&id)).set("User-Agent", UA).set("Accept", "application/json")
@@ -46,7 +73,13 @@ pub fn atlas_import(app: AppHandle, link: String, name: String) -> Result<AtlasS
             let page = if link.contains("maxroll.gg/poe/") { link.trim().to_string() } else { format!("https://maxroll.gg/poe/farming-strategy-planner/{id}") };
             atlas::from_maxroll(&v, &page)?
         }
-    };
+    })
+}
+
+/// Imports a strategy from a link and saves it.
+#[tauri::command(async)]
+pub fn atlas_import(app: AppHandle, link: String, name: String) -> Result<AtlasStore, String> {
+    let mut strat = fetch(&link)?;
     strat.imported = now();
     with_store(&app, true, |s| { s.add(strat, &name); s.clone() })
 }

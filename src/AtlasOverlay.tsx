@@ -2,19 +2,23 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useState } from "react";
-import AtlasTreeView, { AtlasStore, StrategyNotes, currentStrategy } from "./AtlasTreeView";
+import AtlasTreeView, { AtlasStore, StepBar, StepList, StrategyNotes, currentStrategy, useStep } from "./AtlasTreeView";
 
-/** The atlas strategy window over the game (F7): tree and notes. Opens without taking the game's focus. */
+type View = "tree" | "steps" | "notes";
+
+/** The atlas strategy window over the game (F7): tree step by step, the steps list, and notes. Opens without taking the game's focus. */
 export default function AtlasOverlay() {
   const [store, setStore] = useState<AtlasStore | null>(null);
-  const [view, setView] = useState<"tree" | "notes">(() => { try { return localStorage.getItem("atlas-view") === "notes" ? "notes" : "tree"; } catch { return "tree"; } });
+  const [view, setView] = useState<View>(() => {
+    try { const v = localStorage.getItem("atlas-view"); return v === "notes" || v === "steps" ? v : "tree"; } catch { return "tree"; }
+  });
   const [key, setKey] = useState("F7");
   const [h, setH] = useState(window.innerHeight);
   useEffect(() => { const r = () => setH(window.innerHeight); window.addEventListener("resize", r); return () => window.removeEventListener("resize", r); }, []);
 
   const load = () => {
     invoke<AtlasStore>("atlas_list").then(setStore).catch(() => setStore(null));
-    invoke<{ key_atlas?: string }>("get_settings").then((s) => setKey(s.key_atlas || "F7")).catch(() => {});
+    invoke<{ key_atlas?: string }>("get_settings").then((s) => setKey(s?.key_atlas || "F7")).catch(() => {});
   };
   useEffect(() => {
     load();
@@ -23,11 +27,13 @@ export default function AtlasOverlay() {
     window.addEventListener("keydown", onKey);
     return () => { un.then((f) => f()); window.removeEventListener("keydown", onKey); };
   }, []);
-  const pick = (v: "tree" | "notes") => { setView(v); try { localStorage.setItem("atlas-view", v); } catch { /* fine */ } };
+  const pick = (v: View) => { setView(v); try { localStorage.setItem("atlas-view", v); } catch { /* fine */ } };
 
   const s = currentStrategy(store);
-  const vi = s && store ? Math.min(store.active === s.id ? store.variant : 0, s.variants.length - 1) : 0;
+  const vi = s && store ? Math.max(0, Math.min(store.active === s.id ? store.variant : 0, s.variants.length - 1)) : 0;
   const v = s?.variants[vi];
+  const steps = v?.steps ?? [];
+  const [step, setStep] = useStep(`${s?.id ?? 0}-${vi}`, steps.length);
 
   return (
     <div className="bo ao">
@@ -54,11 +60,15 @@ export default function AtlasOverlay() {
             <span className="grow" />
             <div className="seg">
               <button className={view === "tree" ? "on" : ""} onClick={() => pick("tree")}>Tree</button>
+              {steps.length > 0 && <button className={view === "steps" ? "on" : ""} onClick={() => pick("steps")}>Steps</button>}
               <button className={view === "notes" ? "on" : ""} onClick={() => pick("notes")}>Notes</button>
             </div>
           </div>
+          {view !== "notes" && steps.length > 0 && <div className="ao-stepbar"><StepBar steps={steps} step={step} onStep={setStep} /></div>}
           <div className="bo-body">
-            {view === "tree" && v && <AtlasTreeView key={`${s.id}-${vi}`} nodes={v.nodes} choices={v.choices} height={Math.max(240, h - 140)} compact />}
+            {view === "tree" && v && <AtlasTreeView key={`${s.id}-${vi}`} nodes={v.nodes} choices={v.choices} steps={steps} step={step}
+              height={Math.max(240, h - (steps.length ? 190 : 140))} compact />}
+            {view === "steps" && <StepList steps={steps} step={step} onStep={(i) => { setStep(i); pick("tree"); }} />}
             {view === "notes" && <StrategyNotes s={s} v={v} />}
           </div>
         </>

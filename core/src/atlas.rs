@@ -52,25 +52,14 @@ impl Graph {
     pub fn kind(&self, id: u32) -> u8 { self.info.get(&id).map(|i| i.0).unwrap_or(0) }
     pub fn name(&self, id: u32) -> &str { self.info.get(&id).map(|i| i.1.as_str()).unwrap_or("") }
 
-    /// Every node the targets need: the targets plus the shortest paths joining them to the
-    /// start (never through `exclude`). Like maxroll's auto-pathing, where a strategy only
-    /// stores the nodes picked by hand. Already-joined trees come back unchanged.
-    /// The start node is included (points spent = len - 1).
+    /// Every node the targets need, in the order you'd take them: each target in turn, after
+    /// the shortest path joining it to what's taken so far (never through `exclude`). Like
+    /// maxroll's auto-pathing, where a strategy only stores the nodes picked by hand; a tree
+    /// listed in the order it was taken comes back unchanged. Start node first (points = len - 1).
     pub fn fill_paths(&self, targets: &[u32], exclude: &HashSet<u32>) -> Vec<u32> {
         let wanted: Vec<u32> = targets.iter().copied().filter(|t| self.has(*t)).collect();
-        let want_set: HashSet<u32> = wanted.iter().copied().collect();
         let mut have: HashSet<u32> = HashSet::from([self.start]);
         let mut order = vec![self.start];
-        // Takes in every wanted node already touching what we have.
-        let absorb = |have: &mut HashSet<u32>, order: &mut Vec<u32>, from: Vec<u32>| {
-            let mut queue: VecDeque<u32> = from.into();
-            while let Some(n) = queue.pop_front() {
-                for &m in self.adj.get(&n).into_iter().flatten() {
-                    if want_set.contains(&m) && have.insert(m) { order.push(m); queue.push_back(m); }
-                }
-            }
-        };
-        absorb(&mut have, &mut order, vec![self.start]);
         for &t in &wanted {
             if have.contains(&t) { continue; }
             // Breadth-first from everything we have to t.
@@ -92,10 +81,38 @@ impl Graph {
             while !have.contains(&cur) { path.push(cur); cur = prev[&cur]; }
             path.reverse();
             for &p in &path { have.insert(p); order.push(p); }
-            absorb(&mut have, &mut order, path);
         }
         order
     }
+
+    /// The tree in steps, like maxroll's "Leveling Path": a step ends at each notable or keystone,
+    /// or where the next point isn't joined to this one (a new branch). Named after its last point.
+    pub fn steps(&self, nodes: &[u32]) -> Vec<Step> {
+        let mut out = vec![];
+        let mut cur: Vec<u32> = vec![];
+        let pts: Vec<u32> = nodes.iter().copied().filter(|n| *n != self.start).collect();
+        let mut total = 0;
+        for (i, &n) in pts.iter().enumerate() {
+            cur.push(n);
+            let next = pts.get(i + 1);
+            let joined = next.is_some_and(|m| self.adj.get(&n).is_some_and(|a| a.contains(m)));
+            if next.is_none() || !joined || matches!(self.kind(n), 1 | 2) {
+                total += cur.len();
+                out.push(Step { name: self.name(n).to_string(), node: n, nodes: std::mem::take(&mut cur), total });
+            }
+        }
+        out
+    }
+}
+
+/// One step of a tree: the points to take, ending at `node` (usually a notable).
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub struct Step {
+    pub name: String,
+    pub node: u32,
+    pub nodes: Vec<u32>,
+    /// Points spent once this step is done.
+    pub total: usize,
 }
 
 // ---------- saved strategies ----------
@@ -139,6 +156,9 @@ pub struct Variant {
     pub choices: Vec<(u32, u32)>,
     /// Notes for this variant (setup, atlas tips, loot).
     pub notes: Vec<Notes>,
+    /// What to take in order (empty in strategies saved before 20 Nov: refreshed on load).
+    #[serde(default)]
+    pub steps: Vec<Step>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
@@ -320,7 +340,7 @@ pub fn from_official(code: &str, link: &str) -> Result<Strategy, String> {
     if known * 2 < nodes.len() { return Err("That atlas tree is from a different version of the game (most of its points aren't on today's atlas)".into()); }
     let all = g.fill_paths(&nodes, &HashSet::new());
     Ok(Strategy { site: "official".into(), link: link.to_string(), name: String::new(),
-        variants: vec![Variant { name: "Atlas tree".into(), nodes: all, choices, notes: vec![] }], ..Default::default() })
+        variants: vec![Variant { name: "Atlas tree".into(), steps: g.steps(&all), nodes: all, choices, notes: vec![] }], ..Default::default() })
 }
 
 // ---------- maxroll ----------
@@ -369,7 +389,7 @@ pub fn from_maxroll(v: &Value, link: &str) -> Result<Strategy, String> {
             let mut notes = vec![];
             push_notes(&mut notes, "This step", &s["notes"]);
             notes.extend(pnotes.iter().cloned());
-            variants.push(Variant { name: if name.is_empty() { format!("Tree {}", variants.len() + 1) } else { name }, nodes, choices, notes });
+            variants.push(Variant { name: if name.is_empty() { format!("Tree {}", variants.len() + 1) } else { name }, steps: g.steps(&nodes), nodes, choices, notes });
         }
     }
     if variants.iter().all(|x| x.nodes.len() <= 1) {
@@ -546,6 +566,15 @@ mod tests {
         assert_eq!(pts(1), 105);
         assert_eq!(s.variants[1].choices, vec![(12887, 20818), (28029, 36379)]);
         for x in [36137, 55117, 57739, 64048, 8132] { assert!(!s.variants[0].nodes.contains(&x)); }
+        // Same steps as maxroll's "Leveling Path" for variant 2.
+        let st = &s.variants[1].steps;
+        let first: Vec<(&str, usize, usize)> = st.iter().take(13).map(|x| (x.name.as_str(), x.nodes.len(), x.total)).collect();
+        assert_eq!(first, vec![("Supplication", 5, 5), ("Shaping the Mountains", 8, 13), ("Shaping the Skies", 8, 21),
+            ("Shaping the World", 8, 29), ("Path of Worship", 6, 35), ("Drawn to Power", 5, 40), ("Syncretism", 2, 42),
+            ("False Prophets", 11, 53), ("Deep Bloodlines", 5, 58), ("Group Solidarity", 6, 64), ("Magic Monsters", 1, 65),
+            ("Shrine Chance", 3, 68), ("Blended Realities", 4, 72)]);
+        assert_eq!(st.last().unwrap().total, 105);
+        assert_eq!(s.variants[0].steps.last().unwrap().name, "Cassia's Pride");
     }
 
     #[test]
@@ -596,5 +625,6 @@ fn sample() {
     for n in &s.notes { println!("## {} ({} lines) {:?}", n.title, n.lines.len(), n.lines.first()); }
     for x in &s.variants {
         println!("{}: {} points, {} picks, notes {:?}", x.name, x.nodes.len() - 1, x.choices.len(), x.notes.iter().map(|n| n.title.clone()).collect::<Vec<_>>());
+        println!("  steps: {}", x.steps.iter().map(|s| format!("{} {}/{}", s.name, s.nodes.len(), s.total)).collect::<Vec<_>>().join(", "));
     }
 }

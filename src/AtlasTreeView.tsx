@@ -3,7 +3,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 // Saved atlas strategies (core/src/atlas.rs).
 export type NoteLine = { kind: "h" | "p" | "li"; depth: number; text: string };
 export type AtlasNotes = { title: string; lines: NoteLine[] };
-export type AtlasVariant = { name: string; nodes: number[]; choices: [number, number][]; notes: AtlasNotes[] };
+/** One step of a tree (like maxroll's "Leveling Path"): the points to take, ending at `node`. */
+export type AtlasStep = { name: string; node: number; nodes: number[]; total: number };
+export type AtlasVariant = { name: string; nodes: number[]; choices: [number, number][]; notes: AtlasNotes[]; steps?: AtlasStep[] };
 export type AtlasDevice = { maps: string[]; threads: string[]; rolls: string[]; text: string };
 export type AtlasStrategy = { id: number; name: string; site: string; link: string; author: string; imported: number;
   device: AtlasDevice | null; notes: AtlasNotes[]; variants: AtlasVariant[]; own_notes: string };
@@ -23,39 +25,115 @@ export type AtlasData = { version: string; bounds: [number, number, number, numb
 let cache: Promise<AtlasData> | null = null;
 export const loadAtlas = () => (cache ??= fetch("/atlas_poe1.json").then((r) => r.json()));
 
-const RADIUS: Record<number, number> = { 0: 34, 1: 56, 2: 76, 4: 46, 5: 80 };
+/**
+ * Which step you're on, remembered per strategy tree (so the F7 window opens where you left off).
+ * Starts on the last step (the whole tree).
+ */
+export function useStep(key: string, count: number): [number, (i: number) => void] {
+  const read = () => {
+    try { const v = localStorage.getItem(`atlas-step:${key}`); if (v != null) return Math.min(Math.max(0, Number(v)), Math.max(0, count - 1)); } catch { /* fine */ }
+    return Math.max(0, count - 1);
+  };
+  const [step, setStep] = useState(read);
+  useEffect(() => { setStep(read()); }, [key, count]); // eslint-disable-line react-hooks/exhaustive-deps
+  const set = (i: number) => {
+    const v = Math.min(Math.max(0, i), Math.max(0, count - 1));
+    setStep(v);
+    try { localStorage.setItem(`atlas-step:${key}`, String(v)); } catch { /* fine */ }
+  };
+  // Other windows (page ↔ F7 window) see the change too.
+  useEffect(() => {
+    const on = (e: StorageEvent) => { if (e.key === `atlas-step:${key}`) setStep(read()); };
+    window.addEventListener("storage", on);
+    return () => window.removeEventListener("storage", on);
+  }); // eslint-disable-line react-hooks/exhaustive-deps
+  return [step, set];
+}
+
+// Dot sizes in tree units: taken notables and keystones stand out.
+const R_OFF: Record<number, number> = { 0: 20, 1: 38, 2: 52, 4: 30, 5: 60 };
+const R_ON: Record<number, number> = { 0: 44, 1: 80, 2: 100, 4: 50, 5: 70 };
 type Box = { x: number; y: number; w: number; h: number };
 
-/** The atlas passive tree with a strategy's points lit up. Scroll to zoom, drag to move. */
-export default function AtlasTreeView({ nodes, choices = [], height = 520, compact }: {
-  nodes: number[]; choices?: [number, number][]; height?: number; compact?: boolean;
+/** "‹ 2 · Shaping the Mountains · 8 points   13/105 ›" */
+export function StepBar({ steps, step, onStep }: { steps: AtlasStep[]; step: number; onStep: (i: number) => void }) {
+  const s = steps[step];
+  if (!s) return null;
+  const all = steps[steps.length - 1].total;
+  return (
+    <div className="atv-stepbar">
+      <button className="atv-arrow" disabled={step <= 0} onClick={() => onStep(step - 1)} title="Previous step">‹</button>
+      <div className="atv-stepname">
+        <span className="atv-stepno">{step + 1}</span>
+        <span className="atv-steptext"><b title={s.name}>{s.name}</b><span className="small">{s.nodes.length} point{s.nodes.length === 1 ? "" : "s"} this step</span></span>
+      </div>
+      <span className="atv-count">{s.total}/{all}</span>
+      <button className="atv-arrow" disabled={step >= steps.length - 1} onClick={() => onStep(step + 1)} title="Next step">›</button>
+    </div>
+  );
+}
+
+/** The numbered list of steps; click one to jump to it. */
+export function StepList({ steps, step, onStep }: { steps: AtlasStep[]; step: number; onStep: (i: number) => void }) {
+  const cur = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => { cur.current?.scrollIntoView({ block: "nearest" }); }, [step]);
+  return (
+    <div className="atv-steps">
+      {steps.map((s, i) => (
+        <button key={i} ref={i === step ? cur : undefined} className={`atv-step ${i === step ? "on" : i < step ? "done" : ""}`} onClick={() => onStep(i)}>
+          <span className="atv-stepno">{i + 1}</span>
+          <span className="atv-steptext"><b>{s.name}</b><span className="small">{s.nodes.length} point{s.nodes.length === 1 ? "" : "s"}, {s.total} total</span></span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * The atlas passive tree: what you take in gold, the current step bright green with its name,
+ * the rest of the atlas faint. Hover any point for its name. Scroll to zoom, drag to move.
+ */
+export default function AtlasTreeView({ nodes, choices = [], steps, step, height = 520, compact }: {
+  nodes: number[]; choices?: [number, number][]; steps?: AtlasStep[]; step?: number; height?: number; compact?: boolean;
 }) {
   const [tree, setTree] = useState<AtlasData | null>(null);
   const [box, setBox] = useState<Box | null>(null);
+  const [px, setPx] = useState(600); // the drawing's width on screen, for text sizes
   const [hover, setHover] = useState<{ id: string; x: number; y: number } | null>(null);
-  const [q, setQ] = useState("");
+  const [areas, setAreas] = useState(false);
   const svg = useRef<SVGSVGElement | null>(null);
-  const drag = useRef<{ x: number; y: number; box: Box; moved: boolean } | null>(null);
+  const drag = useRef<{ x: number; y: number; box: Box } | null>(null);
 
   useEffect(() => { loadAtlas().then(setTree).catch(() => setTree(null)); }, []);
-  const have = useMemo(() => new Set(nodes.map(String)), [nodes]);
+  useEffect(() => {
+    const el = svg.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setPx(el.getBoundingClientRect().width || 600));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [tree, box != null]);
+
+  const stepping = !!steps && steps.length > 0 && step != null;
+  // Taken so far (up to this step) and this step's points.
+  const have = useMemo(() => {
+    if (!stepping) return new Set(nodes.map(String));
+    const s = new Set<string>(tree ? [String(tree.start)] : []);
+    steps!.slice(0, step! + 1).forEach((x) => x.nodes.forEach((n) => s.add(String(n))));
+    return s;
+  }, [nodes, steps, step, stepping, tree]);
+  const now = useMemo(() => new Set(stepping ? steps![step!].nodes.map(String) : []), [steps, step, stepping]);
   const picked = useMemo(() => new Map(choices.map(([n, e]) => [String(n), String(e)])), [choices]);
-  const needle = q.trim().toLowerCase();
-  const found = useMemo(() => {
-    if (!tree || needle.length < 3) return new Set<string>();
-    return new Set(Object.entries(tree.nodes).filter(([, n]) => n[3].toLowerCase().includes(needle) || n[4].some((s) => s.toLowerCase().includes(needle))).map(([id]) => id));
-  }, [tree, needle]);
 
   const fit = (all = false) => {
     if (!tree) return;
-    const pts = all ? [] : [...have].map((id) => tree.nodes[id]).filter(Boolean);
+    const pts = all ? [] : nodes.map((id) => tree.nodes[String(id)]).filter(Boolean);
     if (pts.length < 2) {
       const [x0, y0, x1, y1] = tree.bounds;
       setBox({ x: x0 - 400, y: y0 - 400, w: x1 - x0 + 800, h: y1 - y0 + 800 });
       return;
     }
     const xs = pts.map((n) => n[0]), ys = pts.map((n) => n[1]);
-    const pad = 700;
+    const pad = 600;
     setBox({ x: Math.min(...xs) - pad, y: Math.min(...ys) - pad, w: Math.max(...xs) - Math.min(...xs) + pad * 2, h: Math.max(...ys) - Math.min(...ys) + pad * 2 });
   };
   useEffect(() => { fit(); }, [tree, nodes.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -76,28 +154,27 @@ export default function AtlasTreeView({ nodes, choices = [], height = 520, compa
   };
   const on = (id: string) => have.has(id);
   const hovered = hover && tree.nodes[hover.id];
-  // The big passives you take, for the list under the tree.
-  const majors = [...have].map((id) => [id, tree.nodes[id]] as const).filter(([, n]) => n && (n[2] === 1 || n[2] === 2))
-    .sort((a, b) => b[1][2] - a[1][2] || a[1][3].localeCompare(b[1][3]));
   const choiceText = (id: string) => { const e = picked.get(id); return e ? tree.choices[id]?.[e] : undefined; };
-  // Text is sized for the view, so labels stay readable when zoomed out.
-  const labelSize = Math.max(150, box.w / 38) * (compact ? 1.6 : 1);
+  // Tree units per screen pixel (the drawing keeps its shape, so the tighter side decides).
+  const upp = Math.max(box.w / px, box.h / height);
+  // Names: only this step's notables/keystones (and its last point), so the tree stays readable.
+  const named = stepping ? [...now].filter((id) => { const n = tree.nodes[id]; return n && (n[2] === 1 || n[2] === 2 || Number(id) === steps![step!].node); }) : [];
+  const edgeClass = (a: string, b: string) => (on(a) && on(b) ? (now.has(a) || now.has(b) ? "e-now" : "e-on") : "e-off");
 
   return (
     <div className={`treeview atlas-tv ${compact ? "compact" : ""}`}>
       <div className="tv-tools">
-        {!compact && <input placeholder="Find on the atlas (e.g. scarab, essence)…" value={q} onChange={(e) => setQ(e.target.value)} />}
-        {!compact && needle.length >= 3 && <span className="muted small">{found.size} found</span>}
-        <span className="muted small">{have.size > 0 ? have.size - 1 : 0} points</span>
+        {!stepping && <span className="muted small">{Math.max(0, have.size - 1)} points</span>}
         <span className="grow" />
+        <button className={`link small ${areas ? "atv-on" : ""}`} onClick={() => setAreas(!areas)} title="Show the names of the atlas areas (Breach, Delirium…)">Area names</button>
         <button className="link small" onClick={() => zoom(0.7)} title="Zoom in">＋</button>
         <button className="link small" onClick={() => zoom(1.4)} title="Zoom out">－</button>
         <button className="link small" onClick={() => fit()}>My points</button>
         <button className="link small" onClick={() => fit(true)}>Whole atlas</button>
       </div>
-      <svg ref={svg} className="tv-svg" style={{ height }} viewBox={`${box.x} ${box.y} ${box.w} ${box.h}`}
+      <svg ref={svg} className="tv-svg atv-svg" style={{ height }} viewBox={`${box.x} ${box.y} ${box.w} ${box.h}`}
         onWheel={(e) => zoom(e.deltaY > 0 ? 1.18 : 0.85, e.clientX, e.clientY)}
-        onMouseDown={(e) => { drag.current = { x: e.clientX, y: e.clientY, box, moved: false }; }}
+        onMouseDown={(e) => { drag.current = { x: e.clientX, y: e.clientY, box }; }}
         onMouseMove={(e) => {
           if (!drag.current) return;
           const r = svg.current!.getBoundingClientRect();
@@ -105,16 +182,18 @@ export default function AtlasTreeView({ nodes, choices = [], height = 520, compa
           setBox({ ...drag.current.box, x: drag.current.box.x - (e.clientX - drag.current.x) * scale, y: drag.current.box.y - (e.clientY - drag.current.y) * scale });
         }}
         onMouseUp={() => { drag.current = null; }} onMouseLeave={() => { drag.current = null; setHover(null); }}>
-        <g className="atv-labels">
-          {tree.labels.map(([x, y, name], i) => <text key={i} x={x} y={y} textAnchor="middle" style={{ fontSize: labelSize * 0.55 }}>{name}</text>)}
-        </g>
-        <g className="tv-edges">
+        {areas && (
+          <g className="atv-labels">
+            {tree.labels.map(([x, y, name], i) => <text key={i} x={x} y={y} textAnchor="middle" style={{ fontSize: 11 * upp }}>{name}</text>)}
+          </g>
+        )}
+        <g className="atv-edges" style={{ ["--w" as string]: `${Math.max(6, 1.3 * upp)}px` }}>
           {tree.edges.map((e, i) => {
             if (e.length === 3) return null; // gateway pairs: no line
             const a = String(e[0]), b = String(e[1]);
             const na = tree.nodes[a], nb = tree.nodes[b];
             if (!na || !nb) return null;
-            const cls = on(a) && on(b) ? "e-on" : "e-off";
+            const cls = edgeClass(a, b);
             if (e.length === 5) {
               const [, , cx, cy, r] = e;
               const a1 = Math.atan2(na[1] - cy, na[0] - cx), a2 = Math.atan2(nb[1] - cy, nb[0] - cx);
@@ -124,40 +203,32 @@ export default function AtlasTreeView({ nodes, choices = [], height = 520, compa
             return <line key={i} className={cls} x1={na[0]} y1={na[1]} x2={nb[0]} y2={nb[1]} />;
           })}
         </g>
-        <g className="tv-nodes">
+        <g className="atv-nodes">
           {Object.entries(tree.nodes).map(([id, n]) => {
-            const cls = `k${n[2]} ${on(id) ? "on" : ""} ${found.has(id) ? "found" : ""}`;
-            const r = RADIUS[n[2]] ?? 34;
+            const taken = on(id);
+            const r = (taken ? R_ON : R_OFF)[n[2]] ?? 24;
+            const cls = `k${n[2]} ${taken ? (now.has(id) ? "now" : "on") : ""}`;
             return (
               <g key={id}>
-                <circle cx={n[0]} cy={n[1]} r={r} className={cls} />
-                <circle cx={n[0]} cy={n[1]} r={Math.max(r, 60)} className="hit"
+                <circle cx={n[0]} cy={n[1]} r={Math.max(r, taken ? (n[2] === 1 || n[2] === 2 ? 5 : 3) * upp : 0)} className={cls} />
+                <circle cx={n[0]} cy={n[1]} r={Math.max(r, 7 * upp)} className="hit"
                   onMouseEnter={(e) => setHover({ id, x: e.clientX, y: e.clientY })} onMouseLeave={() => setHover(null)} />
               </g>
             );
           })}
         </g>
-        <g className="atv-names">
-          {majors.map(([id, n]) => (
-            <text key={id} x={n[0]} y={n[1] + RADIUS[n[2]] + labelSize * 0.75} textAnchor="middle" className={n[2] === 2 ? "k2" : ""}
-              style={{ fontSize: labelSize * 0.62 }}>{n[3]}</text>
-          ))}
+        <g className="atv-names" style={{ fontSize: 13 * upp, strokeWidth: 4 * upp }}>
+          {named.map((id) => {
+            const n = tree.nodes[id];
+            return <text key={id} x={n[0]} y={n[1] - (R_ON[n[2]] ?? 34) - 5 * upp} textAnchor="middle">{n[3]}</text>;
+          })}
         </g>
       </svg>
       {hovered && hover && (
         <div className="tv-tip" style={{ left: Math.min(hover.x + 14, window.innerWidth - 290), top: hover.y + 14 }}>
           <b>{hovered[3] || "Passive"}</b>
           {choiceText(hover.id) ? <div className="tv-pick">Pick: {choiceText(hover.id)}</div> : hovered[4].map((s, i) => <div key={i}>{s}</div>)}
-          {on(hover.id) && <div className="tv-tag new">Taken</div>}
-        </div>
-      )}
-      {!compact && majors.length > 0 && (
-        <div className="atv-majors">
-          {majors.map(([id, n]) => (
-            <span key={id} className={`atv-major k${n[2]}`} title={(choiceText(id) ?? n[4].join("\n"))}>
-              {n[3]}{choiceText(id) && <span className="atv-pick"> · {choiceText(id)}</span>}
-            </span>
-          ))}
+          {now.has(hover.id) ? <div className="tv-tag new">This step</div> : on(hover.id) && <div className="tv-tag on">Taken</div>}
         </div>
       )}
     </div>

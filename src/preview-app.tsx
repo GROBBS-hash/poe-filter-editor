@@ -6,6 +6,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import AtlasOverlay from "./AtlasOverlay";
 import maxrollSample from "../core/data/test_maxroll_vg1ga30g.json";
+import atlasData from "../public/atlas_poe1.json";
 import BuildOverlay from "./BuildOverlay";
 import "./styles.css";
 
@@ -51,16 +52,30 @@ const pob = async () => {
 // Atlas strategies: maxroll's "Leaguestart Shrine/Magic Atlas" (variant 2 is a full tree) with sample notes.
 // Add ?atlas-window to the address to see the F7 window instead of the main window.
 const mxVariant = JSON.parse((maxrollSample as { data: string }).data).profiles[1].atlas.variants[0];
+// Steps the way core/src/atlas.rs makes them (a step ends at a notable/keystone or where the next point isn't joined).
+const atlasSteps = (pts: number[]) => {
+  const nodes = atlasData.nodes as unknown as Record<string, [number, number, number, string]>;
+  const adj = new Map<number, Set<number>>();
+  for (const e of atlasData.edges as number[][]) { for (const [a, b] of [[e[0], e[1]], [e[1], e[0]]]) { if (!adj.has(a)) adj.set(a, new Set()); adj.get(a)!.add(b); } }
+  const out: { name: string; node: number; nodes: number[]; total: number }[] = [];
+  let cur: number[] = [], total = 0;
+  pts.forEach((n, i) => {
+    cur.push(n);
+    const next = pts[i + 1];
+    if (next === undefined || !adj.get(n)?.has(next) || [1, 2].includes(nodes[n]?.[2])) { total += cur.length; out.push({ name: nodes[n]?.[3] ?? "", node: n, nodes: cur, total }); cur = []; }
+  });
+  return out;
+};
 const note = (title: string, lines: [string, string][]) => ({ title, lines: lines.map(([kind, text]) => ({ kind, depth: 0, text })) });
 let atlas = { active: 1, variant: 0, list: [
   { id: 1, name: "Leaguestart Shrine/Magic Atlas", site: "maxroll", link: "https://maxroll.gg/poe/farming-strategy-planner/vg1ga30g", author: "palsteron", imported: now,
     device: { maps: ["City Square Map"], threads: ["Ritual ×8", "Breach", "Incursion"], rolls: ["30% increased Pack size"], text: "Activate the Sacred Flora before doing ritual." },
     notes: [note("About", [["p", "Shrines and magic packs early in the league, cheap to run."]]), note("How to play", [["h", "Maps"], ["li", "Run any tier 16 with 30% pack size."], ["li", "Click every shrine."]])],
-    variants: [{ name: "Shrines", nodes: [29045, ...mxVariant.history], choices: Object.entries(mxVariant.masteries).map(([n, e]) => [Number(n), e]),
+    variants: [{ name: "Shrines", nodes: [29045, ...mxVariant.history], steps: atlasSteps(mxVariant.history), choices: Object.entries(mxVariant.masteries).map(([n, e]) => [Number(n), e]),
       notes: [note("Map device & setup", [["li", "Breach Thread · Ritual Thread · Abyss Thread"]])] }],
     own_notes: "Sell shrine maps in bulk." },
   { id: 2, name: "My essence tree", site: "official", link: "", author: "", imported: now, device: null, notes: [], own_notes: "",
-    variants: [{ name: "Atlas tree", nodes: [29045, ...mxVariant.history.slice(0, 40)], choices: [], notes: [] }] },
+    variants: [{ name: "Atlas tree", nodes: [29045, ...mxVariant.history.slice(0, 40)], steps: atlasSteps(mxVariant.history.slice(0, 40)), choices: [], notes: [] }] },
 ] };
 const atlasWindow = location.search.includes("atlas-window");
 mockWindows(atlasWindow ? "atlas" : buildWin ? "build" : "main");

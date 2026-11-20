@@ -198,6 +198,14 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   pickers. Tree data: `public/atlas_poe1.json` (3.30.0, rebuild with tools/build_atlas_data.mjs for a new patch).
   Preview: http://localhost:1420/preview-app.html (Atlas page) and `?atlas-window` for the F7 window.
   Dev check of a saved maxroll reply: `ATLAS_SAMPLE=<file> cargo test -p filter-core --lib atlas::sample -- --ignored --nocapture`.
+  21 Nov, after his first look ("a good start"): steps like maxroll's "Leveling Path" (`Graph::steps`: points in the
+  order taken, a step ends at a notable/keystone or where the next point isn't joined; matches maxroll's list exactly
+  for vg1ga30g). `fill_paths` now keeps the picks' order. Strategies saved earlier get steps on first load
+  (`add_missing_steps`: maxroll ones re-read once). Arrows step through ("13/105"); the tree shows only points up to
+  that step, this step green and named; Steps list on the page (left of the tree) and a Steps tab in F7; the step is
+  remembered per tree (localStorage, shared by page and window). Tree decluttered: area names off (button "Area
+  names"), no notable names except the current step's, rest of the atlas faint, bigger taken notables, text sized
+  to the window.
 
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
@@ -256,6 +264,9 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] F7 in game shows the window without taking the game's focus (you can keep moving); F7 again hides it.
 - [ ] The window's Tree / Notes tabs, tree picker, dragging it, and resizing it from its edges.
 - [ ] The tree matches the site's (points count and the big notables), and "Open on pathofexile.com" shows the same tree.
+- [ ] 21 Nov: steps: ‹ › arrows walk through the tree like maxroll's Leveling Path (same order and counts), the Steps
+      tab jumps to a step, and F7 reopens on the step you were on. Tree is readable at the window's size (no area names
+      unless "Area names" is on). His already-saved strategy gets its steps by itself after the editor restarts.
 
 **Ground reader (F2)**
 - [ ] 20 Nov: two labels on top of each other (e.g. a map right under a shield): F2 on the lower one picks it, not the upper one.

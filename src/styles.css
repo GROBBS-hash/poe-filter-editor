@@ -1043,3 +1043,49 @@ button:focus-visible, select:focus-visible, .text:focus-visible, input:focus-vis
 .map-tiers .mt-extra .tier-head { flex-wrap: wrap; }
 .map-tiers .mt-extra-what { flex: 1 1 260px; }
 .map-tiers .mt-special .tier-name .muted { white-space: normal; }
+
+/* Atlas tree, 21 Nov: quiet tree, bright gold path, the current step green and named; steps like maxroll's Leveling Path. */
+.atv-svg { background: #07080a; }
+.atv-edges line, .atv-edges path { fill: none; stroke-linecap: round; }
+.atv-edges .e-off { stroke: #1d2027; stroke-width: var(--w); }
+.atv-edges .e-on { stroke: #d9ad55; stroke-width: calc(var(--w) * 2.4) !important; }
+.atv-edges .e-now { stroke: #5ee06a; stroke-width: calc(var(--w) * 3) !important; }
+.atv-nodes circle { fill: #20242b; stroke: none; }
+.atv-nodes circle.k1, .atv-nodes circle.k2 { fill: #2a2f38; }
+.atv-nodes circle.k5 { fill: #8a7440; }
+.atv-nodes circle.on { fill: #e3b75c; stroke: #fff1c4; stroke-width: 8; }
+.atv-nodes circle.on.k1, .atv-nodes circle.on.k2 { fill: #f3c76a; stroke: #fff6da; stroke-width: 12; }
+.atv-nodes circle.now { fill: #5ee06a; stroke: #e2ffe2; stroke-width: 12; filter: drop-shadow(0 0 40px rgba(94,224,106,.8)); }
+.atv-nodes circle.hit { fill: transparent; stroke: none; cursor: pointer; }
+.atv-nodes circle.hit:hover { fill: rgba(255,255,255,.08); }
+.atv-names text { fill: #eaffea; font-weight: 700; paint-order: stroke; stroke: #07080a; pointer-events: none; }
+.atv-labels text { fill: rgba(170,180,200,.22); font-weight: 600; letter-spacing: .05em; text-transform: uppercase; pointer-events: none; }
+.link.atv-on { color: var(--gold); }
+.tv-tag.on { color: var(--gold); }
+/* Step bar: ‹ 2 Shaping the Mountains · 8 points   13/105 › */
+.atv-stepbar { display: flex; align-items: center; gap: 8px; padding: 6px 8px; margin-bottom: 8px; border: 1px solid var(--line-2);
+  border-radius: 10px; background: var(--raised); }
+.atv-arrow { min-width: 38px; height: 34px; font-size: 22px; line-height: 1; padding: 0 8px; border-radius: 8px; }
+.atv-arrow:not(:disabled) { color: var(--gold); }
+.atv-stepname { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; }
+.atv-stepname b { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #8ff09a; }
+.atv-stepno { flex: none; display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 5px; border-radius: 12px;
+  background: var(--gold-bg); color: var(--gold); font-size: 12.5px; font-weight: 700; }
+.atv-count { font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; color: var(--text); }
+.atv-steps { display: flex; flex-direction: column; gap: 3px; }
+.atv-step { display: flex; align-items: center; gap: 10px; text-align: left; padding: 7px 10px; min-height: 44px; border-radius: 9px; background: transparent; border: 1px solid transparent; }
+.atv-step:hover:not(:disabled) { background: var(--raised); border-color: var(--line); }
+.atv-step.on { background: rgba(94,224,106,.1); border-color: rgba(94,224,106,.45); }
+.atv-step.on b { color: #8ff09a; }
+.atv-step.done .atv-stepno { background: rgba(220,178,90,.28); }
+.atv-step:not(.on):not(.done) { opacity: .62; }
+.atv-steptext { display: flex; flex-direction: column; gap: 2px; min-width: 0; line-height: 1.25; }
+.atv-steptext b { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.atv-steptext .small { color: var(--muted); }
+.at-stepgrid { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 14px; align-items: start; }
+.at-stepcol { border: 1px solid var(--line); border-radius: 10px; background: var(--input); overflow: hidden; }
+.at-stephead { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.at-stepcol .atv-steps { max-height: 560px; overflow-y: auto; padding: 6px; }
+.ao-stepbar { padding: 8px 10px 0; }
+.ao-stepbar .atv-stepbar { margin-bottom: 0; }
+.ao .atv-steps { font-size: 14px; }
