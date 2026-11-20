@@ -325,7 +325,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [x] F2: Show / Hide / Minimap work; Show brings items back with NeverSink's look (confirmed 20 Nov), "More options" fold works (design may change).
 - [ ] F2 card: chips and "Change this look" button; no NeverSink jargon box.
 - [ ] Main window item panel (Find): one sheet, two columns, nothing folded.
-- [ ] Price check on a stack: "YOUR 732" and "EACH" tiles with orb icons; bulk items show "N items = 1 divine".
+- [x] Price box tiles "YOUR N" / "EACH" with orb icons and "N items = 1 divine" (confirmed 20 Nov).
 - [ ] Menu icons: each page has its own colour tile (Find blue, Tiers coral, Wealth gold…), page title matches.
 - [ ] New Clean glass look: opens bigger and remembers its size; pages fade in; Wealth tiles look right; nothing broken on other pages.
 - [ ] Unidentified unique (e.g. Karui Sceptre): no false tier 1 / divine sound; the "Could be one of N uniques" list shows in F2 and Ctrl+D.
