@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import Help from "./Help";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -22,6 +22,15 @@ import Atlas from "./Atlas";
 type Tab = "help" | "find" | "presets" | "tiers" | "gear" | "build" | "maps" | "atlas" | "wealth" | "edits" | "prices" | "themes" | "batch" | "profiles" | "settings";
 
 /** Small line icons for the side menu. */
+/** Each page's colour: a tinted tile behind its menu icon (and page title) so the menu is easy to scan. */
+const COLOURS: Record<Tab, string> = {
+  find: "#6aa8ff", tiers: "#ff8a65", presets: "#b48cff", themes: "#ff7eb6", prices: "#5fd38a",
+  edits: "#4fd1c5", batch: "#ffa95a",
+  build: "#7ad0ff", gear: "#f0b45a",
+  maps: "#8bd67a", atlas: "#a78bfa", wealth: "#f5c542",
+  profiles: "#9fb0c8", settings: "#9fb0c8", help: "#6aa8ff",
+};
+
 const ICONS: Record<Tab, string> = {
   find: "M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zm10 17-5.2-5.2",
   tiers: "M4 6h16M4 12h16M4 18h16M7 4v4M12 10v4M17 16v4",
@@ -128,7 +137,7 @@ export default function App() {
               <div className="menu-gname">{g.group}</div>
               {g.items.map((i) => (
                 <button key={i.id} className={`menu-item ${tab === i.id ? "on" : ""}`} title={i.hint} onClick={() => setTab(i.id)}>
-                  <Icon d={ICONS[i.id]} /><span>{i.name}</span>
+                  <span className="menu-ico" style={{ "--c": COLOURS[i.id] } as CSSProperties}><Icon d={ICONS[i.id]} /></span><span>{i.name}</span>
                   {i.id === "batch" && ov.batch_on && <span className="menu-dot" title="Batch mode is on" />}
                 </button>
               ))}
@@ -141,7 +150,7 @@ export default function App() {
       <main className="content">
         <div key={tab} className="page-in">
         <div className="content-head">
-          <h1><span className="head-icon"><Icon d={ICONS[tab]} /></span>{current?.name}</h1>
+          <h1><span className="head-icon" style={{ "--c": COLOURS[tab] } as CSSProperties}><Icon d={ICONS[tab]} /></span>{current?.name}</h1>
           <div className="muted small">{current?.hint}</div>
         </div>
       {tab === "edits" && <Edits profile={active} onChange={refresh} focus={focus?.kind === "edit" ? focus : null} />}

@@ -270,6 +270,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Bulk items (e.g. Stacked Deck): big price = poe.ninja (about 3c), market-price row in the list, fixers marked "low stock",
       "Only sellers with at least N in stock" works; repeat item listings show "× N".
 - [ ] Related items panel beside the price window: lifeforce, fragments, invitations, boss keys.
+- [ ] Menu icons: each page has its own colour tile (Find blue, Tiers coral, Wealth gold…), page title matches.
 - [ ] New Clean glass look: opens bigger and remembers its size; pages fade in; Wealth tiles look right; nothing broken on other pages.
 - [ ] Unidentified unique (e.g. Karui Sceptre): no false tier 1 / divine sound; the "Could be one of N uniques" list shows in F2 and Ctrl+D.
 - [ ] Jewel "Open prefix/suffix" never says more than 2 free; reduced-mod rolls (curse effect) show the right high/low.
