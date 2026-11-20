@@ -13,15 +13,9 @@ fn main() {
         if let (Ok(stats), true) = (std::env::var("POB_BUY"), s.title.contains(&std::env::var("POB_STAGE").unwrap_or_default())) {
             let index = filter_core::trade::StatIndex::from_json(&serde_json::from_str(&std::fs::read_to_string(stats).unwrap()).unwrap());
             for g in s.gear.iter().chain(s.jewels.iter().map(|j| &j.item)) {
-                let Some(setup) = filter_core::trade::setup(&g.copy, &index) else { continue };
-                let b = filter_core::trade::buy_setup(setup);
-                if std::env::var("POB_BUY_DEBUG").is_ok() {
-                    eprintln!("== {} ({})", g.name, g.base);
-                    for f in &b.filters { eprintln!("   {} {:9} {} min {:?}", if f.enabled { "[x]" } else { "[ ]" }, f.kind, f.label, f.min); }
-                    for u in &b.unknown { eprintln!("   ??? not on the trade site's list: {u}"); }
-                }
-                let q = |spare| filter_core::trade::buy_query(&b, spare);
-                println!("BUY\t{}\t{}\t{}\t{}\t{}", g.name, filter_core::trade::buy_mod_count(&b), q(0), q(1), q(2));
+                let Some((q, n)) = filter_core::trade::buy_query(&g.copy, &index) else { continue };
+                if std::env::var("POB_BUY_DEBUG").is_ok() { eprintln!("== {} ({}) {} mods\n{}", g.name, g.base, n, g.copy); }
+                println!("BUY\t{}\t{}\t{}", g.name, n, q);
             }
             return;
         }

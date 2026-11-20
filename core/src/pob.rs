@@ -180,10 +180,6 @@ fn game_copy(rarity: &str, name: &str, base: &str, lines: &[String]) -> String {
     let (mut props, mut sockets, mut ilvl) = (vec![], None, None);
     let (mut implicits, mut mods, mut tail): (Vec<String>, Vec<String>, Vec<String>) = (vec![], vec![], vec![]);
     let mut implicit_left: Option<usize> = None;
-    // Eldritch implicits: PoB writes the effect only ("20% chance to Unnerve Enemies…"); on the item (and the trade
-    // site) it reads "While a Unique Enemy is in your Presence, 20% chance…". PoB doesn't say whether it's the
-    // Unique Enemy or Pinnacle Atlas Boss version; Unique Enemy is the common one.
-    let eldritch = lines.iter().any(|l| l == "Searing Exarch Item" || l == "Eater of Worlds Item");
     for l in lines {
         if let Some(n) = l.strip_prefix("Implicits: ") { implicit_left = n.trim().parse().ok(); continue; }
         let Some(left) = implicit_left else {
@@ -203,8 +199,6 @@ fn game_copy(rarity: &str, name: &str, base: &str, lines: &[String]) -> String {
         if matches!(t.as_str(), "Corrupted" | "Mirrored" | "Split") || (t.ends_with(" Item") && !t.contains(char::is_numeric)) { tail.push(t); continue; }
         let tag = if l.contains("{enchant}") || (left > 0 && base.ends_with("Cluster Jewel")) { " (enchant)" } else if left > 0 { " (implicit)" } else if l.contains("{crafted}") { " (crafted)" }
             else if l.contains("{fractured}") { " (fractured)" } else { "" };
-        let eldritch_line = left > 0 && (eldritch || l.contains("{eater}") || l.contains("{exarch}")) && !t.starts_with("While ");
-        let t = if eldritch_line { format!("While a Unique Enemy is in your Presence, {t}") } else { t };
         if left > 0 { implicit_left = Some(left - 1); implicits.push(format!("{t}{tag}")); } else { mods.push(format!("{t}{tag}")); }
     }
     let mut sections = vec![head.join("\n")];

@@ -300,25 +300,18 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   PoB bookkeeping ("Has Alt Variant Two", "Intangibility"); Watcher's Eye keeps every alt variant's mod. Dev check:
   `POB_COPY=1 cargo run -p filter-core --example pobdump -- <pob.txt>` (all 30-odd items of his build read back).
 
-- **Buy from your build** 21 Nov (what he asked for: PoB's mods -> trade site in one click): gold "Buy" on each item / jewel
-  in F6 and My build. `trade::buy_setup` ticks every mod (totals for life / ele / chaos res / attributes instead of
-  single mods, minimums 10% under PoB's numbers if > 5, crafted and junk mods off, armour pieces' local defence mods
-  off because PoB's are base rolls, cluster enchants on with the passive count exact; uniques by name, Watcher's Eye
-  "while affected by" mods ticked). Command `buy_build_item` searches, and when nothing is for sale retries with a
-  "count" group (any N-1, then N-2 of the single mods; totals stay required), then opens the search in the browser and
-  shows "N for sale · any 3 of 4 mods". Live 21 Nov on his build: helmet 391, boots 5, ring 8 (3 of 4), cobalt 21,
-  large clusters 13 and 20. Found on the way: cluster jewels are category `jewel.cluster` (Ctrl+D searched jewel.base:
-  nothing), and notables like "1 Added Passive Skill is Overshock" are matched word for word (`StatIndex::find`).
-  21 Nov (2), he found rares got almost no mods: armour pieces' armour/ES mods are now ticked (PoB's "Armour: 1675" lines
-  don't match the real item, so no 20%-quality totals), unticked rows are sent too ("disabled": they show on the page),
-  negative numbers search as a maximum. Stat matching fixes (help Ctrl+D too): armour/weapon mods use the site's
-  "(Local)" stat first ("+# to Armour" had matched the global one), numbers that are part of the text ("for 4
-  seconds"), "-#" vs "+#", "a Charge" vs "# Charges", singular vs plural, trailing " Skill". Eldritch implicits get
-  "While a Unique Enemy is in your Presence, " (PoB drops it; it doesn't say Unique vs Pinnacle). Uniques renamed in a
-  PoB guide ("Endgame Marylene's Fallacy") are cut down to the real name (`ItemTypes.uniques` in fix_query).
-  Live: gloves / boots 1 (4 of 6 mods), body 10 (3 of 5), helmet 0 (that implicit pair isn't for sale at all).
-  Debug: add `POB_BUY_DEBUG=1` to the dev check below to see each item's ticked / unticked / unknown mods.
-  Dev check: `POB_STAGE="Endgame" POB_BUY=<data dir>/trade_stats_poe1.json cargo run -p filter-core --example pobdump -- <pob.txt>`.
+- **Buy from your build** 21 Nov (he wants PoB's mods -> trade site in one click): gold "Buy" on each item / jewel in F6
+  and My build. After two tries he showed PoEStash's build links and we copied that shape (`trade::buy_query`): exact
+  base, rarity rare/magic, every mod the item has as "has this mod" with no numbers (crafted ones on the page but
+  unticked), uniques by name (Watcher's Eye "while affected by" mods added), cluster passive counts exact. One search,
+  opened in the browser, "N for sale" under the button. No totals, no count groups, no minimums (he found those jank).
+  Matching fixes that help Ctrl+D too: armour/weapon mods use the site's "(Local)" stat first, numbers that are part
+  of a stat's text ("for 4 seconds"), "-#"/"+#", "a Charge"/"# Charges", plurals, trailing " Skill", word-for-word
+  stats (cluster notables), pick-one stats ("id|14" -> `stat_json` option), cluster category `jewel.cluster`, renamed
+  uniques cut to the real name (`ItemTypes.uniques`). Eldritch implicits stay as PoB writes them (plain, like PoEStash).
+  Live 21 Nov: gloves 1, helmet 1, belt 5, cluster 15; others 0 (PoB guide's ideal mod sets; untick on the page).
+  Dev check: `POB_STAGE="Endgame" POB_BUY=<data dir>/trade_stats_poe1.json cargo run -p filter-core --example pobdump -- <pob.txt>`
+  (add POB_BUY_DEBUG=1 to see each item's copy).
 
 - Resistances like Awakened 21 Nov (he asked; read in its pseudo/index.ts): elemental total always ticked, chaos total ticked
   (left out when its only source is a crafted chaos mod), fire / cold / lightning totals unticked; on rares every

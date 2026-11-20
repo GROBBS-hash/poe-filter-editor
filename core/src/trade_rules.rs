@@ -385,78 +385,65 @@ pub fn map_props(text: &str, item: &Item) -> Vec<StatFilter> {
 
 #[cfg(test)]
 mod buy_tests {
-    use crate::trade::{buy_mod_count, buy_query, buy_setup, setup, StatIndex};
+    use crate::trade::{buy_query, StatIndex};
     use serde_json::json;
 
-    #[test]
-    fn buy_like_your_build() {
-        let idx = StatIndex::from_json(&json!({ "result": [ { "label": "Explicit", "entries": [
-            { "id": "explicit.life", "text": "+# to maximum Life", "type": "explicit" },
-            { "id": "explicit.fire", "text": "+#% to Fire Resistance", "type": "explicit" },
-            { "id": "explicit.cold", "text": "+#% to Cold Resistance", "type": "explicit" },
-            { "id": "explicit.ms", "text": "#% increased Movement Speed", "type": "explicit" },
-            { "id": "explicit.spell", "text": "+# to Level of all Spell Skill Gems", "type": "explicit" },
-            { "id": "explicit.dex", "text": "+# to Dexterity", "type": "explicit" } ] } ] }));
-        // As PoB's boots would be written for the price window: life, two resistances, speed, a crafted mod.
-        let text = "Item Class: Boots\nRarity: Rare\nEndgame Feet\nTwo-Toned Boots\n--------\nItem Level: 1\n--------\n\
-            +80 to maximum Life\n+40% to Fire Resistance\n+30% to Cold Resistance\n30% increased Movement Speed\n+18 to Dexterity (crafted)\n";
-        let s = buy_setup(setup(text, &idx).unwrap());
-        let on: Vec<(&str, Option<f64>)> = s.filters.iter().filter(|f| f.enabled).map(|f| (f.id.as_str(), f.min)).collect();
-        // Totals for life and elemental resistance (single mods folded in), speed at 90%, no crafted Dexterity.
-        assert!(on.contains(&("pseudo.pseudo_total_life", Some(72.0))), "{on:?}");
-        assert!(on.contains(&("pseudo.pseudo_total_elemental_resistance", Some(63.0))), "{on:?}");
-        assert!(on.contains(&("explicit.ms", Some(27.0))), "{on:?}");
-        assert!(!on.iter().any(|(id, _)| *id == "explicit.dex" || id.ends_with("fire_resistance") || id.ends_with("cold_resistance")), "{on:?}");
-
-        // A crafted chaos mod on its own gets no chaos total (Awakened hides it): the mod keeps its own row.
-        let crafted = "Item Class: Rings
-Rarity: Rare
-X
-Iron Ring
---------
-Item Level: 80
---------
-+20% to Chaos Resistance (crafted)
-";
-        let c = setup(crafted, &idx).unwrap();
-        assert!(!c.filters.iter().any(|f| f.id == "pseudo.pseudo_total_chaos_resistance"));
-        assert!(!s.base_only && s.ilvl_min.is_none());
-        let q = buy_query(&s, 0);
-        assert_eq!(q["query"]["stats"][0]["type"], "and");
-        assert_eq!(q["query"]["filters"]["type_filters"]["filters"]["category"]["option"], "armour.boots");
-        assert_eq!(buy_mod_count(&s), 1);
+    fn idx() -> StatIndex {
+        StatIndex::from_json(&json!({ "result": [
+            { "label": "Explicit", "entries": [
+                { "id": "explicit.life", "text": "+# to maximum Life", "type": "explicit" },
+                { "id": "explicit.fire", "text": "+#% to Fire Resistance", "type": "explicit" },
+                { "id": "explicit.ar_global", "text": "+# to Armour", "type": "explicit" },
+                { "id": "explicit.ar_local", "text": "+# to Armour (Local)", "type": "explicit" },
+                { "id": "explicit.overshock", "text": "1 Added Passive Skill is Overshock", "type": "explicit" } ] },
+            { "label": "Implicit", "entries": [
+                { "id": "implicit.unnerve", "text": "#% chance to Unnerve Enemies for 4 seconds on Hit", "type": "implicit" } ] },
+            { "label": "Crafted", "entries": [ { "id": "crafted.dex", "text": "+# to Dexterity", "type": "crafted" } ] },
+            { "label": "Enchant", "entries": [ { "id": "enchant.passives", "text": "Adds # Passive Skills", "type": "enchant" } ] } ] }))
     }
 
     #[test]
-    fn buy_relaxed_and_cluster() {
-        let idx = StatIndex::from_json(&json!({ "result": [ { "label": "Explicit", "entries": [
-            { "id": "explicit.a", "text": "#% increased Spell Damage", "type": "explicit" },
-            { "id": "explicit.b", "text": "#% increased Cast Speed", "type": "explicit" },
-            { "id": "explicit.c", "text": "+# to Level of all Spell Skill Gems", "type": "explicit" },
-            { "id": "explicit.d", "text": "+# to Maximum Power Charges", "type": "explicit" } ] },
-            { "label": "Enchant", "entries": [ { "id": "enchant.passives", "text": "Adds # Passive Skills", "type": "enchant" } ] } ] }));
-        let staff = "Item Class: Staves\nRarity: Rare\nGhoul Spell\nImperial Staff\n--------\nItem Level: 84\n--------\n\
-            147% increased Spell Damage\n43% increased Cast Speed\n+2 to Level of all Spell Skill Gems\n+1 to Maximum Power Charges\n";
-        let s = buy_setup(setup(staff, &idx).unwrap());
-        assert_eq!(buy_mod_count(&s), 4);
-        let q = buy_query(&s, 1);
-        assert_eq!(q["query"]["stats"][1]["type"], "count");
-        assert_eq!(q["query"]["stats"][1]["value"]["min"], 3);
-        // Cluster jewel: the passive count is an enchant, ticked and exact.
+    fn like_poestash() {
+        // PoB's gloves as the price window reads them: every mod asked for, no numbers, exact base, rare.
+        let gloves = "Item Class: Gloves\nRarity: Rare\nEndgame Gloves\nPaladin Gloves\n--------\nItem Level: 1\n--------\n\
+            20% chance to Unnerve Enemies for 4 seconds on Hit (implicit)\n--------\n+80 to maximum Life\n+40% to Fire Resistance\n\
+            +68 to Armour\n+18 to Dexterity (crafted)\n";
+        let (q, n) = buy_query(gloves, &idx()).unwrap();
+        let ids: Vec<&str> = q["query"]["stats"][0]["filters"].as_array().unwrap().iter().map(|v| v["id"].as_str().unwrap()).collect();
+        assert_eq!(ids, ["implicit.unnerve", "explicit.life", "explicit.fire", "explicit.ar_local", "crafted.dex"]);
+        assert_eq!(n, 4, "the crafted one is shown but not required");
+        assert_eq!(q["query"]["stats"][0]["filters"][4]["disabled"], true);
+        assert!(q["query"]["stats"][0]["filters"].as_array().unwrap().iter().all(|v| v.get("value").is_none()), "no numbers");
+        assert_eq!(q["query"]["type"], "Paladin Gloves");
+        assert_eq!(q["query"]["filters"]["type_filters"]["filters"]["rarity"]["option"], "rare");
+
+        // Cluster jewel: passive count exact, notables by name.
         let cluster = "Item Class: Jewels\nRarity: Rare\nEagle Glisten\nLarge Cluster Jewel\n--------\nItem Level: 1\n--------\n\
-            Adds 8 Passive Skills (enchant)\n--------\n12% increased Spell Damage\n";
-        let s = buy_setup(setup(cluster, &idx).unwrap());
-        let q = buy_query(&s, 0);
-        let f = q["query"]["stats"][0]["filters"].as_array().unwrap().iter().find(|v| v["id"] == "enchant.passives").cloned().unwrap();
-        assert_eq!((f["value"]["min"].as_f64(), f["value"]["max"].as_f64()), (Some(8.0), Some(8.0)));
-        // Cluster jewels are their own category on the trade site.
-        assert_eq!(q["query"]["filters"]["type_filters"]["filters"]["category"]["option"], "jewel.cluster");
+            Adds 8 Passive Skills (enchant)\n--------\n1 Added Passive Skill is Overshock\n";
+        let (q, _) = buy_query(cluster, &idx()).unwrap();
+        let f = &q["query"]["stats"][0]["filters"];
+        assert_eq!(f[0], json!({ "id": "enchant.passives", "value": { "min": 8.0, "max": 8.0 } }));
+        assert_eq!(f[1], json!({ "id": "explicit.overshock" }));
+
+        // Pick-one stats are listed as "id|14" and searched as the id with option 14.
+        assert_eq!(crate::trade::stat_json("enchant.stat_3948993189|14"), json!({ "id": "enchant.stat_3948993189", "value": { "option": 14 } }));
+
+        // Magic flask: searched by its base, not its full name.
+        let flask = "Item Class: Utility Flasks\nRarity: Magic\nPerpetual Sapphire Flask of Craft\n--------\nItem Level: 85\n--------\n+80 to maximum Life\n";
+        let (q, _) = buy_query(flask, &idx()).unwrap();
+        assert_eq!(q["query"]["type"], "Sapphire Flask");
+        assert_eq!(q["query"]["filters"]["type_filters"]["filters"]["rarity"]["option"], "magic");
+
+        // Unique: by name, its fixed mods not asked for.
+        let unique = "Item Class: Amulets\nRarity: Unique\nMarylene's Fallacy\nLapis Amulet\n--------\nItem Level: 1\n--------\n+80 to maximum Life\n";
+        let (q, n) = buy_query(unique, &idx()).unwrap();
+        assert_eq!((q["query"]["name"].as_str(), n), (Some("Marylene's Fallacy"), 0));
     }
 }
 
 #[cfg(test)]
 mod pob_wording_tests {
-    use crate::trade::{buy_query, buy_setup, setup, ItemTypes, StatIndex};
+    use crate::trade::{setup, ItemTypes, StatIndex};
     use serde_json::json;
 
     #[test]
@@ -486,12 +473,6 @@ mod pob_wording_tests {
         assert_eq!(get("explicit.ar_local"), Some(68.0)); // gloves' own armour, not the global stat
         assert_eq!(get("explicit.chan"), Some(-3.0));
         assert_eq!((get("explicit.solaris"), get("explicit.abyss")), (Some(20.0), Some(1.0)));
-        // Buy: a negative number searches as a maximum (10% easier), unticked rows still sent, disabled.
-        let q = buy_query(&buy_setup(s), 0);
-        let rows = q["query"]["stats"][0]["filters"].as_array().unwrap();
-        let expo = rows.iter().find(|v| v["id"] == "implicit.expo").unwrap();
-        assert_eq!(expo["value"], json!({ "max": -10.0 }));
-
         // A unique renamed in PoB ("Endgame Marylene's Fallacy") is searched by its real name.
         let types = ItemTypes::from_json(&json!({ "result": [ { "entries": [
             { "name": "Marylene's Fallacy", "type": "Lapis Amulet", "text": "Marylene's Fallacy Lapis Amulet", "flags": { "unique": true } },
