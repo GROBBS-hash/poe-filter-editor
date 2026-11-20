@@ -482,3 +482,54 @@ mod pob_wording_tests {
         assert_eq!(q["query"]["name"], "Marylene's Fallacy");
     }
 }
+
+#[cfg(test)]
+mod base_item_tests {
+    use crate::trade::{query, setup, StatIndex};
+    use serde_json::json;
+
+    fn idx() -> StatIndex {
+        StatIndex::from_json(&json!({ "result": [
+            { "label": "Explicit", "entries": [
+                { "id": "explicit.life", "text": "+# to maximum Life", "type": "explicit" },
+                { "id": "explicit.ms", "text": "#% increased Movement Speed", "type": "explicit" },
+                { "id": "explicit.fire", "text": "+#% to Fire Resistance", "type": "explicit" } ] },
+            { "label": "Implicit", "entries": [ { "id": "implicit.str", "text": "+# to Strength", "type": "implicit" } ] },
+            { "label": "Fractured", "entries": [ { "id": "fractured.ms", "text": "#% increased Movement Speed", "type": "fractured" } ] },
+            { "label": "Crafted", "entries": [ { "id": "crafted.fire", "text": "+#% to Fire Resistance", "type": "crafted" } ] } ] }))
+    }
+
+    #[test]
+    fn like_awakened() {
+        // Magic boots, item level 84: a base for crafters. Its tier 1 speed mod counts, the tier 5 life roll doesn't.
+        let magic = "Item Class: Boots\nRarity: Magic\nFleet Two-Toned Boots of Life\n--------\nItem Level: 84\n--------\n\
+            { Prefix Modifier \"Fleet\" (Tier: 1) — Speed }\n30% increased Movement Speed\n\
+            { Suffix Modifier \"of Life\" (Tier: 5) — Life }\n+40 to maximum Life\n";
+        let b = setup(magic, &idx()).unwrap().base_item.expect("a base");
+        assert_eq!((b.why.clone(), b.ids.clone(), b.ilvl_min), (vec!["Item level 84".to_string()], vec!["explicit.ms".to_string()], Some(84)));
+
+        // Fractured rare, Hunter influence: only the fractured mod, both switches on; no implicits (influenced).
+        let fract = "Item Class: Boots\nRarity: Rare\nX\nTwo-Toned Boots\n--------\nItem Level: 75\n--------\n\
+            +20 to Strength (implicit)\n--------\n30% increased Movement Speed (fractured)\n+40 to maximum Life\n--------\nFractured Item\nHunter Item\n";
+        let s = setup(fract, &idx()).unwrap();
+        let b = s.base_item.clone().unwrap();
+        assert_eq!(b.why, ["Fractured", "Hunter"]);
+        assert_eq!(b.ids, ["fractured.ms"]);
+        assert_eq!(b.misc, ["hunter_item", "fractured_item"]);
+        // What the window searches when you press it: same base, item level 75+, the switches, only those mods.
+        let mut s2 = s.clone();
+        s2.base_only = true; s2.ilvl_min = b.ilvl_min; s2.misc = b.misc.clone();
+        for f in &mut s2.filters { f.enabled = b.ids.contains(&f.id); }
+        let q = query(&s2);
+        assert_eq!(q["query"]["type"], "Two-Toned Boots");
+        assert_eq!(q["query"]["filters"]["misc_filters"]["filters"]["hunter_item"]["option"], "true");
+        assert_eq!(q["query"]["filters"]["misc_filters"]["filters"]["ilvl"]["min"], 75);
+        assert_eq!(q["query"]["stats"][0]["filters"].as_array().unwrap().len(), 1);
+
+        // Finished items (a crafted mod) and ordinary low-level rares: no base search.
+        let crafted = "Item Class: Boots\nRarity: Rare\nX\nTwo-Toned Boots\n--------\nItem Level: 85\n--------\n+40 to maximum Life\n+30% to Fire Resistance (crafted)\n";
+        assert!(setup(crafted, &idx()).unwrap().base_item.is_none());
+        let plain = "Item Class: Boots\nRarity: Rare\nX\nTwo-Toned Boots\n--------\nItem Level: 70\n--------\n+40 to maximum Life\n";
+        assert!(setup(plain, &idx()).unwrap().base_item.is_none());
+    }
+}

@@ -9,7 +9,9 @@ import { Item, RARITY_COLOUR, itemTitle } from "./types";
 
 type StatFilter = { id: string; label: string; value: number; min: number | null; enabled: boolean; kind: string; tier: number | null; junk?: boolean; roll?: number | null; range?: string | null; affix?: string | null };
 type Setup = { item: Item; filters: StatFilter[]; unknown_kinds?: string[]; base_only: boolean; ilvl_min: number | null; ilvl_max?: number | null; links_min: number | null;
-  gem_level: number | null; unknown: string[]; category: string | null; raw?: string };
+  gem_level: number | null; unknown: string[]; category: string | null; raw?: string; misc?: string[];
+  /** Awakened-style "search as a base": why it's a crafting base, which mods to keep, item level, influences. */
+  base_item?: { why: string[]; ids: string[]; ilvl_min: number | null; misc: string[] } | null };
 type MapInfo = { mods: { text: string; warn: string | null }[]; unidentified: boolean; tier: number | null; stats: string[] };
 type Check = { setup: Setup | null; ninja: [number, string] | null; league: string; from_ground: boolean; error: string | null; bulk?: string | null; map?: MapInfo | null; divine?: number | null; compare?: Comparison[]; instant_all?: boolean };
 type Comparison = { slot: string; current: string; rows: { stat: string; now: number; this: number }[]; gain: string[]; lose: string[] };
@@ -60,7 +62,7 @@ const needsTrade = (c: Check) => {
     || (!c.setup.category && !c.map && it.item_class !== "Maps");
 };
 /** What a search depends on: when this changes after a search, the old prices no longer match the filters. */
-const searchKey = (s: Setup) => JSON.stringify([s.filters.map((f) => [f.enabled, f.min]), s.base_only, s.ilvl_min, s.ilvl_max ?? null, s.links_min]);
+const searchKey = (s: Setup) => JSON.stringify([s.filters.map((f) => [f.enabled, f.min]), s.base_only, s.ilvl_min, s.ilvl_max ?? null, s.links_min, s.misc ?? []]);
 
 /** Item-level band where base prices jump (75, 82, 84, 86 unlock better mod tiers): [low, high or null]. */
 const ilvlBand = (l: number): [number, number | null] => l <= 67 ? [1, 67] : l <= 74 ? [68, 74] : l <= 81 ? [75, 81] : l <= 83 ? [82, 83] : l <= 85 ? [84, 85] : [86, null];
@@ -499,16 +501,22 @@ export default function TradeWindow() {
           })}
         </div>
       )}
-      {setup.filters.some((f) => f.kind === "fractured") && it.rarity !== "Unique" && setup.category && (
-        <div className="tw-fract" title="Prices it as a crafting base: same base, same item-level band, only the fractured mods">
-          <span className="tw-fract-tag">Fractured</span>
-          <button onClick={() => { const band = it.item_level ? ilvlBand(it.item_level) : null;
-              const s = { ...setup, base_only: true, ilvl_min: it.item_level ?? null, ilvl_max: band ? band[1] : null,
-                filters: setup.filters.map((f) => ({ ...f, enabled: f.kind === "fractured", min: f.kind === "fractured" ? f.value : f.min })) };
-              setPreset(null); setSetup(s); run(s); }}>
-            Price as base{it.item_level ? ` · ilvl ${ilvlText(it.item_level)}` : ""}</button>
-        </div>
-      )}
+      {setup.base_item && (() => {
+        const b = setup.base_item;
+        const kept = setup.filters.filter((f) => b.ids.includes(f.id)).map((f) => f.label);
+        return (
+          <div className="tw-fract" title={"Prices it as a crafting base, like Awakened PoE Trade: the same base" +
+            (b.ilvl_min ? `, item level ${b.ilvl_min}+` : "") + (b.misc.length ? ", same influence / fractured / synthesised" : "") +
+            (kept.length ? `, and only: ${kept.join("; ")}` : ", no mods")}>
+            <span className="tw-fract-tag">{b.why.join(" · ")}</span>
+            <button onClick={() => {
+                const s = { ...setup, base_only: true, ilvl_min: b.ilvl_min, ilvl_max: null, misc: b.misc,
+                  filters: setup.filters.map((f) => ({ ...f, enabled: b.ids.includes(f.id) })) };
+                setPreset(null); setSetup(s); run(s); }}>
+              Search as a base{b.ilvl_min ? ` · ilvl ${b.ilvl_min}+` : ""}{kept.length ? ` · ${kept.length} mod${kept.length > 1 ? "s" : ""}` : ""}</button>
+          </div>
+        );
+      })()}
       {setup.unknown.length > 0 && showStats && (
         <div className="tw-unknown">
           {setup.unknown.map((u, i) => {

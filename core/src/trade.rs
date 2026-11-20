@@ -83,6 +83,25 @@ pub struct TradeSetup {
     /// The copied item text (for poeprices.info).
     #[serde(default)]
     pub raw: String,
+    /// Extra "yes" switches for the search's misc filters ("shaper_item", "synthesised_item"…).
+    #[serde(default)]
+    pub misc: Vec<String>,
+    /// Awakened's "base item" search, when this looks like a crafting base rather than a finished item.
+    #[serde(default)]
+    pub base_item: Option<BaseItem>,
+}
+
+/// How to price an item as a crafting base (Awakened PoE Trade's "base item" preset): same base, at least this
+/// item level, its influences, and only the mods that make the base (fractured, enchants, implicits, a magic
+/// item's top-tier mods).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct BaseItem {
+    /// Why it's a base, in words ("Fractured", "Shaper", "Item level 84"…).
+    pub why: Vec<String>,
+    /// Filters to tick (by id); the rest are unticked.
+    pub ids: Vec<String>,
+    pub ilvl_min: Option<u32>,
+    pub misc: Vec<String>,
 }
 
 /// The trade site's stat list (api/trade/data/stats), indexed by text.
@@ -408,6 +427,7 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
     // the base that's for sale, so search that base at this item level or better.
     let nothing_picked = !filters.iter().any(|f| f.enabled);
     let gear = category(&item.item_class).is_some();
+    let base_item = base_item(text, &item, &lines, &filters);
     Some(TradeSetup {
         category: category(&item.item_class).map(|c| if item.base_type.ends_with("Cluster Jewel") { "jewel.cluster" } else { c }).map(String::from),
         base_only: !matches!(item.rarity.as_str(), "Rare" | "Magic") || !gear || nothing_picked,
@@ -415,11 +435,59 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
         ilvl_max: (gear && nothing_picked && item.rarity != "Unique").then_some(item.item_level).flatten().and_then(|l| ilvl_band(l).1),
         links_min: (links >= 5).then_some(links),
         gem_level,
-        filters, unknown, unknown_kinds, item, raw: text.to_string(),
+        filters, unknown, unknown_kinds, item, raw: text.to_string(), misc: vec![], base_item,
     })
 }
 
+/// Awakened PoE Trade's rule (create-presets.ts) for offering a "base item" search: a magic or rare piece of gear or
+/// jewel that isn't finished (no crafted mod, not exactly 20% quality, not corrupted or mirrored) and is worth
+/// something to crafters (fractured, synthesised, influenced, a cluster jewel, a magic jewel, or gear of item level
+/// 82+). The search keeps fractured mods and enchants, implicits when not influenced or fractured, and on magic
+/// items their tier 1-2 mods.
+fn base_item(text: &str, item: &Item, lines: &[ModLine], filters: &[StatFilter]) -> Option<BaseItem> {
+    let cat = category(&item.item_class)?;
+    let has_line = |l: &str| text.lines().any(|x| x.trim() == l);
+    let magic = item.rarity == "Magic";
+    if !(magic || item.rarity == "Rare") || item.unidentified || cat == "flask" { return None; }
+    let finished = lines.iter().any(|m| m.kind == "crafted") || item.quality == Some(20) || item.corrupted || item.mirrored;
+    if finished { return None; }
+    let cluster = item.base_type.ends_with("Cluster Jewel");
+    let jewel = cat.starts_with("jewel.");
+    let fractured = has_line("Fractured Item") || lines.iter().any(|m| m.kind == "fractured");
+    let synthesised = has_line("Synthesised Item");
+    let ilvl = item.item_level.unwrap_or(0);
+    let mut why: Vec<String> = Vec::new();
+    if fractured { why.push("Fractured".into()); }
+    if synthesised { why.push("Synthesised".into()); }
+    why.extend(item.influences.iter().cloned());
+    if cluster { why.push("Cluster jewel".into()); }
+    if jewel && !cluster && cat != "jewel.abyss" && magic { why.push("Magic jewel".into()); }
+    if !jewel && ilvl >= 82 { why.push(format!("Item level {ilvl}")); }
+    if why.is_empty() { return None; }
+    let keep_implicits = item.influences.is_empty() && !fractured;
+    let ids = filters.iter().filter(|f| match f.kind.as_str() {
+        "fractured" | "enchant" => true,
+        "implicit" => keep_implicits,
+        "explicit" => magic && !cluster && f.tier.is_some_and(|t| t <= 2),
+        _ => false,
+    }).map(|f| f.id.clone()).collect();
+    // Item level: at least this one (most mod tiers need 68-86). Cluster jewels by bracket; other jewels don't care.
+    let ilvl_min = if cluster { [84, 75, 68, 50, 1].into_iter().find(|b| ilvl >= *b) } else if jewel { None } else { Some(ilvl.min(86)) };
+    let mut misc: Vec<String> = item.influences.iter().map(|i| format!("{}_item", i.to_lowercase())).collect();
+    if synthesised { misc.push("synthesised_item".into()); }
+    if fractured { misc.push("fractured_item".into()); }
+    Some(BaseItem { why, ids, ilvl_min: ilvl_min.filter(|l| *l > 0), misc })
+}
+
 fn is_map(it: &Item) -> bool { it.item_class == "Maps" }
+
+/// The base as the trade site knows it. Magic items only have a full name ("Demon Dagger of Finesse",
+/// "Perpetual Sapphire Flask of Craft"): their base is the longest one inside it.
+pub fn plain_base(it: &Item) -> String {
+    if it.rarity != "Magic" { return it.base_type.clone(); }
+    crate::item::base_classes().keys().filter(|b| it.base_type.contains(b.as_str())).max_by_key(|b| b.len()).cloned()
+        .unwrap_or_else(|| it.base_type.clone())
+}
 
 /// The map's tier: from "Map Tier: 16", or from the name "Map (Tier 2)".
 fn map_tier_of(it: &Item) -> Option<u32> {
@@ -451,7 +519,7 @@ pub fn query(s: &TradeSetup) -> Value {
         }
         q["type"] = json!(it.base_type);
     } else if s.base_only || s.category.is_none() {
-        q["type"] = json!(it.base_type);
+        q["type"] = json!(plain_base(it));
     }
     let mut filters = json!({});
     let mut type_f = json!({});
@@ -466,6 +534,7 @@ pub fn query(s: &TradeSetup) -> Value {
     if it.unidentified && it.rarity != "Unique" { misc["identified"] = json!({ "option": "false" }); }
     if let Some(n) = s.gem_level { misc["gem_level"] = json!({ "min": n }); }
     if foulborn { misc["mutated"] = json!({ "option": "true" }); }
+    for k in &s.misc { misc[k.as_str()] = json!({ "option": "true" }); }
     if it.item_class.contains("Gem") {
         if let Some(qual) = it.quality { misc["quality"] = json!({ "min": qual }); }
         misc["corrupted"] = json!({ "option": if it.corrupted { "true" } else { "false" } });
@@ -730,10 +799,7 @@ pub fn buy_query(text: &str, index: &StatIndex) -> Option<(Value, usize)> {
         stats.push(v);
     }
     // The base as the trade site knows it: magic items only have a full name ("Perpetual Sapphire Flask of Craft").
-    let base = if item.rarity == "Magic" {
-        crate::item::base_classes().keys().filter(|b| item.base_type.contains(b.as_str())).max_by_key(|b| b.len()).cloned()
-            .unwrap_or_else(|| item.base_type.clone())
-    } else { item.base_type.clone() };
+    let base = plain_base(&item);
     let mut q = json!({ "status": { "option": "available" }, "type": base, "stats": [{ "type": "and", "filters": stats }] });
     if unique {
         if let Some(n) = &item.name { q["name"] = json!(n.strip_prefix("Foulborn ").unwrap_or(n)); }

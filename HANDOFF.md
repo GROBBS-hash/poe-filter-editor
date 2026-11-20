@@ -300,6 +300,17 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   PoB bookkeeping ("Has Alt Variant Two", "Intangibility"); Watcher's Eye keeps every alt variant's mod. Dev check:
   `POB_COPY=1 cargo run -p filter-core --example pobdump -- <pob.txt>` (all 30-odd items of his build read back).
 
+- **Search as a base** 21 Nov (he asked for Awakened's "base item" search; read in its create-presets.ts /
+  create-stat-filters.ts / create-item-filters.ts, written fresh as `base_item` in trade.rs): offered for magic/rare
+  identified gear and jewels that aren't finished (no crafted mod, quality not exactly 20, not corrupted/mirrored) and
+  are worth something to crafters (fractured, synthesised, influenced, cluster jewel, magic jewel, gear ilvl 82+).
+  Keeps fractured mods + enchants, implicits when not influenced/fractured, magic items' tier 1-2 mods; same base,
+  item level min(ilvl, 86)+ (cluster jewels by bracket 1/50/68/75/84, other jewels none), influence / fractured /
+  synthesised switches (`TradeSetup.misc` -> misc_filters). Replaces the old fractured-only box ("Fractured · Price as
+  base"); the box names why ("Fractured · Hunter", "Item level 84"). Magic items search their real base (`plain_base`).
+  Live 21 Nov on his saved checks: velour boots 2015, magic dagger 121, magic burgonet 1947. Dev check:
+  `cargo run -p filter-core --example basecheck -- <data dir>/trade_stats_poe1.json <data dir>/samples`.
+
 - **Buy from your build** 21 Nov (he wants PoB's mods -> trade site in one click): gold "Buy" on each item / jewel in F6
   and My build. After two tries he showed PoEStash's build links and we copied that shape (`trade::buy_query`): exact
   base, rarity rare/magic, every mod the item has as "has this mod" with no numbers (crafted ones on the page but
@@ -335,7 +346,9 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Roll bars and "T3 range 6–11" numbers look right; tier badges coloured. (Roll bars confirmed 20 Nov.)
 - [ ] Every Ctrl+D shows a trade price straight away (uniques, corpses, gems too) in the big box at the top.
       (Confirmed 20 Nov for a unique, a unique belt and a gem.)
-- [ ] Fractured item: "Price as base · ilvl 73–74" gives sensible prices (fractured-only search confirmed 20 Nov).
+- [ ] "Search as a base" box (Awakened-style): shows on fractured / influenced / synthesised items, magic jewels, cluster
+      jewels and unfinished gear of item level 82+, says why, and the prices look like Awakened's base search. Not on
+      finished items (crafted mod, 20% quality, corrupted). Magic items keep only their tier 1-2 mods.
 - [x] Price window rows read in game order (confirmed 20 Nov).
 - [ ] Price window: small headings "Prefixes · up to 3 on an item", "Suffixes", "Totals", "Implicit", "Open slots".
 - [ ] Bulk: likely price fixers hidden ("N likely price fixers hidden · show"), judged against poe.ninja's price.
