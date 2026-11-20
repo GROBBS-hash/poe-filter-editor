@@ -132,6 +132,11 @@ fn unix_now() -> u64 { std::time::SystemTime::now().duration_since(std::time::UN
 /// focus, and just before "Restart to update", so a restart sees how things really were.
 pub fn beat(app: &AppHandle) { beat_as(app, None) }
 
+/// A restart he asked for (tray "Restart editor", an update): the editor comes back in front afterwards.
+pub fn mark_front(app: &AppHandle) {
+    let _ = std::fs::write(alive_path(app), format!("{} front", unix_now()));
+}
+
 /// focused: what a focus event just said (asking the window right then can still give the old answer).
 fn beat_as(app: &AppHandle, focused: Option<bool>) {
     let Some(w) = app.get_webview_window("main") else { return };

@@ -292,6 +292,11 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   `BuildView.tsx` (F6 + My build): a tick per item, key `slot|name|base`, in localStorage `build.have` (shared by both
   windows via the storage event), "Have N of M" bar with "hide what I have" (`build.hideHave`).
 
+- Tray menu 21 Nov (0.2.8): Open editor · Check for updates · Restart editor · Quit. "Check for updates" checks now
+  (updates::from_tray): installs and restarts if there's one, else shows "Up to date (x)" for 6s; the updater renames
+  it "Downloading x…" / "Update to x and restart" when one is found in the background (TrayItem in app state).
+  Restarts he asks for (tray, update) come back in front (win_place::mark_front).
+
 - Polish 4, 21 Nov (0.2.7, tidy-up): F6 with no build and F7 with no strategy get an "Open My build" / "Open the
   Atlas page" button (open_editor command: shows the main window and emits open-tab to it); card headings 19px in
   the game lettering (an older rule had them at 15.5px). Pages without preview data (Presets, Themes, Prices, My
@@ -508,6 +513,10 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 
 - [ ] Ctrl+D on a timeless jewel (Brutal Restraint): seed line ticked, prices for that exact seed; "any conqueror" row works.
 - [ ] Price window: "This week" line with ▲/▼ % under the price for currency, cards, uniques… (after the price file updates).
+
+**Tray menu (21 Nov, 0.2.8)**
+- [ ] Tray icon menu: "Restart editor" restarts it and it comes back in front; "Check for updates" says "Up to date (0.2.8)";
+      when the next version is out it says "Update to … and restart" and clicking it updates.
 
 **Polish (21 Nov)**
 - [ ] 0.2.4: pop-ups (Ctrl+D, F2, F6, F7, trades) fade in quickly and share one look; price window shows a spinner

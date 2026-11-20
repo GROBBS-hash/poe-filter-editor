@@ -2336,9 +2336,15 @@ pub fn run() {
             // Tray icon: the app lives here so hotkeys work while you play.
             use tauri::menu::{Menu, MenuItem};
             use tauri::tray::TrayIconBuilder;
+            use tauri::menu::PredefinedMenuItem;
             let open = MenuItem::with_id(app, "open", "Open editor", true, None::<&str>)?;
+            let update = MenuItem::with_id(app, "update", "Check for updates", true, None::<&str>)?;
+            let restart = MenuItem::with_id(app, "restart", "Restart editor", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&open, &quit])?;
+            let sep = PredefinedMenuItem::separator(app)?;
+            let menu = Menu::with_items(app, &[&open, &update, &restart, &sep, &quit])?;
+            // The updater renames "Check for updates" when one is waiting ("Update to 0.2.8 and restart").
+            app.manage(updates::TrayItem(update));
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
                 .tooltip("PoE Filter Editor")
@@ -2352,6 +2358,9 @@ pub fn run() {
                         }
                     }
                     "quit" => app.exit(0),
+                    // He asked for it: it comes back in front.
+                    "restart" => { win_place::mark_front(app); app.restart(); }
+                    "update" => updates::from_tray(app.clone()),
                     _ => {}
                 })
                 .build(app)?;
