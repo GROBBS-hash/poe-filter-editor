@@ -210,7 +210,10 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
           setReplacing({ id, index, detail });
         } catch { /* keep the old details */ }
       }
-      await afterChange(replacing ? `Updated “${r.label}”.` : "Saved.", r.warnings[0]);
+      // Notes about older edits whose NeverSink tier no longer exists aren't about this change (My edits lists
+      // them): don't let them block the reload or replace the "Saved" message.
+      const relevant = r.warnings.filter((w) => !w.includes("is gone in this version"));
+      await afterChange(replacing ? `Updated “${r.label}”.` : "Saved.", relevant[0]);
     } catch (e) {
       setToast(String(e));
     }
@@ -234,6 +237,20 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
       : saved(invoke("apply_quick_action", { item: picked.item, action: "hide", colour: null, opts: opts(stack) }), addNew);
   };
   const hide = () => commit(false, null, {});
+  /** On a hidden item, the same button shows it again: your own hide is simply removed (NeverSink's look
+   *  comes back); anything else hidden gets a plain visible look you can restyle. */
+  const unhide = async () => {
+    const v = status?.verdict;
+    if (v?.by_user_edit && v.source?.kind === "edit" && !replacing) {
+      try {
+        const [id, index] = await invoke<[string, number, RuleDetail]>("get_rule", { id: null, index: null, label: v.decided_by });
+        await invoke("delete_rule", { id, index });
+        await afterChange(`Removed your hide (“${v.decided_by}”): it shows again.`);
+      } catch (e) { setToast(String(e)); }
+      return;
+    }
+    return commit(true, fromCurrent(undefined, picked.item.rarity), {});
+  };
   // Stack rules always sit alongside your other rules for this item ("hide the
   // small piles" + "style the big ones"), so they're added, never swapped in.
   const hideBelow = (n: number) => commit(false, null, { below_stack: n }, true);
@@ -439,8 +456,21 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
       )}
 
       <div className="qm-row">
-        <button id="qm-hide" className="qm-btn hide" onClick={hide}>Hide</button>
-        <button className="qm-btn" onClick={iconOnly} disabled={!status && !wholeType} title="No label: just the minimap icon (and beam, if set)">Minimap icon only</button>
+        {(() => {
+          // Show · Hide · Minimap icon only, with the item's current state lit up.
+          const isHidden = status?.verdict.visibility === "Hide";
+          const isIcon = !isHidden && !!status?.verdict.style?.label_hidden;
+          const isShown = !!status && !isHidden && !isIcon;
+          const showIt = () => (isHidden ? unhide() : isIcon ? saveStyle({ ...current(), label_hidden: false }) : undefined);
+          return (
+            <div className="qm-seg">
+              <button className={`qm-btn show ${isShown ? "on" : ""}`} onClick={showIt} title="Show the item with its label">Show</button>
+              <button id="qm-hide" className={`qm-btn hide ${isHidden ? "on" : ""}`} onClick={hide} title="Hide it on the ground">Hide</button>
+              <button className={`qm-btn ${isIcon ? "on" : ""}`} onClick={iconOnly} disabled={!status && !wholeType}
+                title="No label: just the minimap icon (and beam, if set)">Minimap icon only</button>
+            </div>
+          );
+        })()}
 
       </div>
 

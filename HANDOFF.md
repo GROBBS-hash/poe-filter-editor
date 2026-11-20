@@ -268,6 +268,12 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   no offers retries in divines (Maven's Chisel of Avarice: 0 chaos sellers, 3 divine). Side panel families now also
   match by name: "Maven's Chisel of …" (and catalysts), in `family` in related.rs.
 
+- F2 pop-up 20 Nov: Show · Hide · Minimap icon only as three buttons, the item's current state lit up (`qm-seg`).
+  Show on an item hidden by your own edit deletes that edit (NeverSink's look returns); otherwise it adds a visible look.
+  All three only add/change a rule for that item (Class + BaseType, + rarity unless "every rarity"), never a whole tier.
+  Notes about older edits whose NeverSink tier is gone ("… is gone in this version") no longer block the reload or
+  replace "Saved" (My edits lists them).
+
 
 ## Still to check in game (keep this list current)
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
@@ -294,6 +300,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [x] Maps: a mod ticked on the Maps page shows in red on Ctrl+D and the stash search hides those maps (confirmed 20 Nov).
 - [ ] Unidentified rares like "Fated Composite Ring" price as "Composite Ring" (no "Unknown item base type").
 - [ ] Maven's chisels: side panel lists the other chisels; offers show (paid in divines).
+- [ ] F2: Show / Hide / Minimap icon only buttons; Show brings back an item you hid.
 - [ ] Menu icons: each page has its own colour tile (Find blue, Tiers coral, Wealth gold…), page title matches.
 - [ ] New Clean glass look: opens bigger and remembers its size; pages fade in; Wealth tiles look right; nothing broken on other pages.
 - [ ] Unidentified unique (e.g. Karui Sceptre): no false tier 1 / divine sound; the "Could be one of N uniques" list shows in F2 and Ctrl+D.

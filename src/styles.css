@@ -1229,3 +1229,8 @@ body.main ::-webkit-scrollbar-thumb:hover { background: #4a5566; }
 .map-tiers .mt-zana.off { opacity: .5; }
 .map-tiers .mt-zana-name { flex: 1 1 180px; font-size: 13px; }
 .map-tiers .mt-zana .tier-edit { flex-basis: 100%; }
+/* F2 pop-up: Show · Hide · Minimap icon only, the current one lit up. */
+.qm-seg { display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 6px; width: 100%; }
+.qm-seg .qm-btn.on { outline: none; box-shadow: inset 0 0 0 2px var(--gold); color: var(--gold); background: var(--gold-bg); }
+.qm-seg .qm-btn.show.on { box-shadow: inset 0 0 0 2px #62cf80; color: #a6e6b7; background: rgba(98,207,128,.12); }
+.qm-seg .qm-btn.hide.on { box-shadow: inset 0 0 0 2px #f0857c; color: #ffb3ac; background: rgba(240,133,124,.12); }
