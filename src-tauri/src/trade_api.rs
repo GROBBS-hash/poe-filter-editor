@@ -236,7 +236,16 @@ mod tests {
 /// (it only ever goes to pathofexile.com). Waits out the rate limit instead of failing,
 /// since a full stash scan is many requests.
 pub fn stash_tab(account: &str, sessid: &str, league: &str, poe2: bool, index: usize, with_tabs: bool) -> Result<Value, String> {
-    let url = format!("https://www.pathofexile.com/character-window/get-stash-items?accountName={}&realm={}&league={}&tabs={}&tabIndex={}",
+    stash_page("get-stash-items", account, sessid, league, poe2, index, with_tabs)
+}
+
+/// One page of your guild's stash (same sign-in, same limits). Errors when you're not in a guild or can't view it.
+pub fn guild_stash_tab(account: &str, sessid: &str, league: &str, poe2: bool, index: usize, with_tabs: bool) -> Result<Value, String> {
+    stash_page("get-guild-stash-items", account, sessid, league, poe2, index, with_tabs)
+}
+
+fn stash_page(kind: &str, account: &str, sessid: &str, league: &str, poe2: bool, index: usize, with_tabs: bool) -> Result<Value, String> {
+    let url = format!("https://www.pathofexile.com/character-window/{kind}?accountName={}&realm={}&league={}&tabs={}&tabIndex={}",
         enc(account), if poe2 { "poe2" } else { "pc" }, enc(league), if with_tabs { 1 } else { 0 }, index);
     let mut tries = 0;
     loop {

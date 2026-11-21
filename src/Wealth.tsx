@@ -16,7 +16,7 @@ export type Session = { name: string; league: string; tabs: number[]; start: num
 export type WealthView = { account: string; has_sessid: boolean; league: string; tabs: Tab[]; tracked: number[]; min: number; minutes: number;
   snapshots: Snapshot[]; missed: Valued[]; sessions: Session[]; current: Session | null; strategies: [string, number, number, number][];
   divine: number | null; now: number; profiles?: ScanProfile[]; active?: string | null; last_items?: Valued[];
-  rares?: number; rares_priced?: number; rares_todo?: number; count_rares?: boolean };
+  rares?: number; rares_priced?: number; rares_todo?: number; count_rares?: boolean; guild?: boolean };
 
 /** Seconds a session has run (pauses taken out). */
 export function seconds(s: Session, now: number) {
@@ -236,6 +236,7 @@ export default function Wealth() {
   const [sessid, setSessid] = useState("");
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
+  const [guildBusy, setGuildBusy] = useState(false);
   const [progress, setProgress] = useState<[number, number, string] | null>(null);
   const [name, setName] = useState("");
   const [now, setNow] = useState(Date.now() / 1000);
@@ -369,6 +370,11 @@ export default function Wealth() {
                 onChange={(e) => invoke<WealthView>("wealth_count_rares", { count: e.target.checked }).then(setV).catch((x) => setErr(friendly(x)))} />
               Count rares in my worth</label>
           )}
+          <label className="row small" title="Adds your guild stash tabs to the tab list, marked Guild ·. Scans, profiles and earnings can then include them. Off by default: guild items are not always yours.">
+            <input type="checkbox" checked={v.guild ?? false} disabled={!!busy || guildBusy}
+              onChange={(e) => { setGuildBusy(true); setErr("");
+                invoke<WealthView>("wealth_guild", { on: e.target.checked }).then(setV).catch((x) => setErr(friendly(x))).finally(() => setGuildBusy(false)); }} />
+            {guildBusy ? "Reading your guild stash…" : "Include my guild stash"}</label>
           {busy === "rares" && progress && <div className="w-bar"><div style={{ width: `${(progress[0] / Math.max(1, progress[1])) * 100}%` }} /></div>}
           {busy === "scan" && progress && <div className="w-bar"><div style={{ width: `${(progress[0] / Math.max(1, progress[1])) * 100}%` }} /></div>}
           <p className="muted small">pathofexile.com only allows so many requests a minute, so a big stash takes a few minutes. The app waits its turn.</p>

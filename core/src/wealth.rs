@@ -29,6 +29,17 @@ pub fn tabs_from_json(v: &Value) -> Vec<Tab> {
     }).collect()
 }
 
+/// Guild stash tabs sit at this index and up in the tab list, so they never clash with your own tabs
+/// (guild tab 2 is 1002). Scans, profiles, earnings and "Find in stash" treat them like any other tab.
+pub const GUILD_TAB: usize = 1000;
+
+pub fn is_guild(index: usize) -> bool { index >= GUILD_TAB }
+
+/// The guild stash's tab list, moved up to GUILD_TAB and named "Guild · …".
+pub fn guild_tabs_from_json(v: &Value) -> Vec<Tab> {
+    tabs_from_json(v).into_iter().map(|mut t| { t.index += GUILD_TAB; t.name = format!("Guild · {}", t.name); t }).collect()
+}
+
 /// Strips the "<<set:MS>><<set:M>><<set:S>>" markup the stash API puts in names.
 fn clean(s: &str) -> String {
     let mut out = String::new();
@@ -404,6 +415,8 @@ pub struct WealthStore {
     pub rare_prices: std::collections::BTreeMap<String, RarePrice>,
     /// "Count rares in my worth" unticked (rares stay in "Worth selling" and "Find in stash").
     pub skip_rares: bool,
+    /// "Include my guild stash": its tabs join the tab list (off by default: guild items aren't always yours).
+    pub guild: bool,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
@@ -426,6 +439,24 @@ impl WealthStore {
         self.snapshots.push(s);
         let n = self.snapshots.len();
         if n > 400 { self.snapshots.drain(..n - 400); }
+    }
+}
+
+#[cfg(test)]
+mod guild_tests {
+    use super::*;
+
+    #[test]
+    fn guild_tabs_move_up_and_say_guild() {
+        // His guild stash (21 Nov): three tabs, normal, currency and quad.
+        let v = serde_json::json!({ "numTabs": 3, "tabs": [
+            { "n": "1", "i": 0, "type": "PremiumStash", "colour": { "r": 124, "g": 84, "b": 54 } },
+            { "n": "Currency", "i": 1, "type": "CurrencyStash", "colour": { "r": 200, "g": 200, "b": 200 } },
+            { "n": "Dump", "i": 2, "type": "QuadStash", "hidden": false, "colour": { "r": 0, "g": 0, "b": 0 } } ] });
+        let t = guild_tabs_from_json(&v);
+        assert_eq!(t.iter().map(|t| (t.index, t.name.as_str())).collect::<Vec<_>>(),
+            [(1000, "Guild · 1"), (1001, "Guild · Currency"), (1002, "Guild · Dump")]);
+        assert!(is_guild(t[0].index) && !is_guild(28));
     }
 }
 

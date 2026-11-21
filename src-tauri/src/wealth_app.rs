@@ -37,6 +37,21 @@ fn who(app: &AppHandle) -> Result<(String, String, String, bool), String> {
     Ok((s.poe_account.trim().to_string(), s.poesessid.trim().to_string(), league, poe2))
 }
 
+/// Your tab list, plus the guild stash's when "Include my guild stash" is on (left out quietly if it can't be read).
+fn load_tabs(account: &str, sessid: &str, league: &str, poe2: bool, guild: bool) -> Result<Vec<Tab>, String> {
+    let mut tabs = wealth::tabs_from_json(&trade_api::stash_tab(account, sessid, league, poe2, 0, true)?);
+    if guild {
+        if let Ok(g) = trade_api::guild_stash_tab(account, sessid, league, poe2, 0, true) { tabs.extend(wealth::guild_tabs_from_json(&g)); }
+    }
+    Ok(tabs)
+}
+
+/// One stash tab's items: your own, or the guild's for tabs at GUILD_TAB and up.
+fn read_tab(account: &str, sessid: &str, league: &str, poe2: bool, index: usize) -> Result<serde_json::Value, String> {
+    if wealth::is_guild(index) { trade_api::guild_stash_tab(account, sessid, league, poe2, index - wealth::GUILD_TAB, false) }
+    else { trade_api::stash_tab(account, sessid, league, poe2, index, false) }
+}
+
 /// Values items with the current poe.ninja prices.
 fn value(app: &AppHandle, items: &serde_json::Value, tab: &str) -> Vec<Valued> {
     let state = app.state::<AppState>();
@@ -66,8 +81,8 @@ fn scan(app: &AppHandle, only: Option<&[usize]>) -> Result<(Vec<Valued>, Vec<Rar
     let state = app.state::<AppState>();
     let mut tabs = with_store(&state, |s| s.tabs.clone());
     if tabs.is_empty() {
-        let first = trade_api::stash_tab(&account, &sessid, &league, poe2, 0, true)?;
-        tabs = wealth::tabs_from_json(&first);
+        let guild = with_store(&state, |s| s.guild);
+        tabs = load_tabs(&account, &sessid, &league, poe2, guild)?;
         let t = tabs.clone();
         with_store(&state, |s| s.tabs = t);
     }
@@ -77,7 +92,7 @@ fn scan(app: &AppHandle, only: Option<&[usize]>) -> Result<(Vec<Valued>, Vec<Rar
     let mut found = Vec::new();
     for (n, t) in pick.iter().enumerate() {
         let _ = app.emit("wealth-progress", (n, pick.len(), t.name.clone()));
-        let v = trade_api::stash_tab(&account, &sessid, &league, poe2, t.index, false)?;
+        let v = read_tab(&account, &sessid, &league, poe2, t.index)?;
         let priced = value(app, &v, &t.name);
         let mut f = wealth::found_in_tab(&v["items"], t.index, &t.name);
         attach_values(&mut f, &priced);
@@ -180,6 +195,8 @@ pub struct WealthView {
     rares: usize,
     rares_priced: usize,
     rares_todo: usize,
+    /// "Include my guild stash" ticked.
+    guild: bool,
     /// "Count rares in my worth" ticked.
     count_rares: bool,
     divine: Option<f64>,
@@ -196,7 +213,7 @@ fn view(app: &AppHandle) -> WealthView {
     let rares_priced = st.rares.iter().filter(|r| fresh(r, RARE_KEEP).is_some_and(|p| p.chaos > 0.0)).count();
     let rares_todo = st.rares.iter().filter(|r| fresh(r, RARE_STALE).is_none()).count();
     WealthView {
-        rares: st.rares.len(), rares_priced, rares_todo, count_rares: !st.skip_rares,
+        rares: st.rares.len(), rares_priced, rares_todo, count_rares: !st.skip_rares, guild: st.guild,
         account: s.poe_account, has_sessid: !s.poesessid.trim().is_empty(), league,
         tracked: s.wealth_tabs, min: s.wealth_min, minutes: s.earn_minutes.max(1),
         strategies: wealth::by_strategy(&st.sessions),
@@ -221,8 +238,8 @@ pub async fn wealth_setup(app: AppHandle, account: String, sessid: Option<String
             s.save(&state.store_path).map_err(err)?;
         }
         let (account, sessid, league, poe2) = who(&app)?;
-        let first = trade_api::stash_tab(&account, &sessid, &league, poe2, 0, true)?;
-        let tabs = wealth::tabs_from_json(&first);
+        let guild = with_store(&state, |s| s.guild);
+        let tabs = load_tabs(&account, &sessid, &league, poe2, guild)?;
         if tabs.is_empty() { return Err(format!("Signed in, but no stash tabs in {league}")); }
         with_store(&state, |s| s.tabs = tabs);
         Ok(view(&app))
@@ -408,9 +425,37 @@ pub fn wealth_profile_use(app: AppHandle, name: Option<String>) -> WealthView {
 pub async fn wealth_tabs_refresh(app: AppHandle) -> Result<WealthView, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let (account, sessid, league, poe2) = who(&app)?;
-        let tabs = wealth::tabs_from_json(&trade_api::stash_tab(&account, &sessid, &league, poe2, 0, true)?);
         let state = app.state::<AppState>();
+        let guild = with_store(&state, |s| s.guild);
+        let tabs = load_tabs(&account, &sessid, &league, poe2, guild)?;
         with_store(&state, |s| s.tabs = tabs);
+        Ok(view(&app))
+    }).await.map_err(err)?
+}
+
+/// "Include my guild stash" on or off. On: reads the guild's tab list (an error says why when it can't, e.g. not in a
+/// guild). Off: its tabs leave the list, the earnings tabs and the scan profiles.
+#[tauri::command]
+pub async fn wealth_guild(app: AppHandle, on: bool) -> Result<WealthView, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        if on {
+            let (account, sessid, league, poe2) = who(&app)?;
+            let g = trade_api::guild_stash_tab(&account, &sessid, &league, poe2, 0, true)
+                .map_err(|e| format!("Couldn't read a guild stash: {e}. Are you in a guild, with permission to view its stash?"))?;
+            let gt = wealth::guild_tabs_from_json(&g);
+            if gt.is_empty() { return Err(format!("Your guild has no stash tabs you can see in {league}")); }
+            with_store(&state, |s| { s.guild = true; s.tabs.retain(|t| !wealth::is_guild(t.index)); s.tabs.extend(gt); });
+        } else {
+            with_store(&state, |s| {
+                s.guild = false;
+                s.tabs.retain(|t| !wealth::is_guild(t.index));
+                for p in &mut s.profiles { p.tabs.retain(|i| !wealth::is_guild(*i)); }
+            });
+            let mut st = state.store.lock().unwrap();
+            st.settings.wealth_tabs.retain(|i| !wealth::is_guild(*i));
+            st.save(&state.store_path).map_err(err)?;
+        }
         Ok(view(&app))
     }).await.map_err(err)?
 }

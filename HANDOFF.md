@@ -771,6 +771,12 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
       "low confidence · only N listed" instead of "sells for about" (his Dragon Turn showed 45 div from 1 listing;
       live check: ~55 similar rings, 50c–3 div). Cogwork Ring: mods marked "— 25% Increased" in the advanced copy now
       use the in-game numbers (+46 Int → +57, range 53–62); GROBBS rejected splitting Totals into Resistances / Life.
+- [ ] Wealth: guild stash (21 Nov, branch `guild-stash`, NOT merged or released: waiting for GROBBS to approve).
+      Wealth page → "Include my guild stash" (off by default: guild items aren't always yours). On: the guild's tabs
+      join the tab list as "Guild · <name>" (stored at index 1000+ so they never clash with your own), and scans,
+      scan profiles, earnings tabs and Find in stash use them like any other tab. Off: they leave the list, profiles
+      and earnings tabs. Checked live 21 Nov: his login reads the guild stash (3 tabs: normal, currency, quad).
+      Endpoint: character-window/get-guild-stash-items (same POESESSID and rate limits as get-stash-items).
 
 **Frame + fixes (21 Nov, 0.2.24)**
 - [ ] Editor window: no Windows title bar, a gold one instead; drag it to move, double-click to maximise, the three
@@ -970,7 +976,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 ## Left to do (agreed order)
 1. **GROBBS to work through "Still to check in game" above**; fix what he reports.
 2. Wealth tracker follow-ups (real account tested and rares priced via the trade site, 21 Nov):
-   "search every tab" done 21 Nov; guild stash next; crafting planner done (0.2.32).
+   "search every tab" done 21 Nov; guild stash built 21 Nov on branch `guild-stash` (awaiting approval); crafting planner done (0.2.32).
 3. Price check polish: done 21 Nov (Awakened ideas: unique roll ranges, anoints, cluster jewels, flasks, heist,
    influences, "Also searching for"). Waiting on his in-game check.
 4. Deferred earlier: batch mode tidy-up, PoE 2 coverage. (Installer + auto-update done 21 Nov: see "Installer and updates".)
