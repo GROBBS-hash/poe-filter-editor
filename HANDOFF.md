@@ -292,6 +292,10 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   `BuildView.tsx` (F6 + My build): a tick per item, key `slot|name|base`, in localStorage `build.have` (shared by both
   windows via the storage event), "Have N of M" bar with "hide what I have" (`build.hideHave`).
 
+- Crafted chaos 21 Nov (0.2.18, his Demon Cowl): a crafted "+15% to Fire and Chaos Resistances" was counted into the
+  elemental total and hidden, and the chaos total was skipped (bench craft only), so chaos vanished. Now the chaos
+  total shows, unticked (trade_rules: bench_only).
+
 - Curse on Hit 21 Nov (0.2.17): "Curse Enemies with Punishment on Hit" (Foulborn Asenath's) is the site's "#% chance to
   Curse Enemies with Punishment on Hit" at 100% (listings show hash explicit.stat_2950697759, magnitude 100): setup
   retries "Curse Enemies with …" lines as "100% chance to …". All 334 Foulborn Asenath's listed have that mod, so his
@@ -559,6 +563,9 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 
 - [ ] Ctrl+D on a timeless jewel (Brutal Restraint): seed line ticked, prices for that exact seed; "any conqueror" row works.
 - [ ] Price window: "This week" line with ▲/▼ % under the price for currency, cards, uniques… (after the price file updates).
+
+**Crafted chaos (21 Nov, 0.2.18)**
+- [ ] Ctrl+D on gear with a crafted "X and Chaos Resistances": "+N% total to Chaos Resistance" is there to tick.
 
 **Foulborn (21 Nov, 0.2.16–0.2.17)**
 - [x] (Confirmed 21 Nov.) Foulborn Asenath's Gentle Touch: "Curse Enemies with Punishment on Hit" searchable.

@@ -119,12 +119,14 @@ pub fn totals(mods: &[ModLine], item: &Item, index: &StatIndex, skip: &[usize]) 
         }
         // A unique's fixed mods are searched one by one; a total only helps when two of its mods add up.
         if (rule.needs_two || unique) && (if unique { explicit_sources } else { used.len() }) < 2 { continue; }
-        // Chaos resistance from one crafted mod alone is anyone's bench craft: no total (the mod keeps its own row).
-        if std::ptr::eq(rule.sources, CHAOS_RES) && used.len() == 1 && mods[used[0].0].kind == "crafted" { continue; }
+        // Chaos resistance from one crafted mod alone is anyone's bench craft: the total is there but not ticked.
+        // (It used to be left out, but a "Fire and Chaos" craft's row was already counted into the elemental total
+        // and hidden, so chaos vanished: 21 Nov, his Demon Cowl.)
+        let bench_only = std::ptr::eq(rule.sources, CHAOS_RES) && used.len() == 1 && mods[used[0].0].kind == "crafted";
         let total = total.floor();
         out.push(StatFilter {
             id, label: rule.text.replace('#', &total.to_string()), value: total, min: Some(total),
-            enabled: !unique && rule.tick_at.map(|t| total >= t).unwrap_or(false),
+            enabled: !unique && !bench_only && rule.tick_at.map(|t| total >= t).unwrap_or(false),
             kind: "pseudo".into(), tier: None, junk: false, roll: None, range: None, affix: None,
         });
         if !unique { hide.extend(used.iter().filter(|(_, keep)| !keep).map(|(i, _)| *i)); }
