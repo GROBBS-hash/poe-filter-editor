@@ -607,9 +607,21 @@ fn buy_build_item(app: AppHandle, text: String) -> Result<BuyResult, String> {
     let index = trade_api::stats(&dir, poe2).unwrap_or_default();
     let (mut q, of) = filter_core::trade::buy_query(&text, &index).ok_or("Couldn't read that item")?;
     if let Ok(t) = trade_api::item_types(&dir, poe2) { t.fix_query(&mut q); }
-    let (id, _, total) = trade_api::search(poe2, &league, &q)?;
+    let (mut id, _, mut total) = trade_api::search(poe2, &league, &q)?;
+    let (mut of, mut need) = (of, of);
+    // Nobody sells one with every mod: ask for fewer of the mods that vary ("any 2 of 3 notables"), keeping what
+    // makes the item (a cluster's passives and enchant, a seed). At most three more searches.
+    if total == 0 {
+        for k in 1..=3 {
+            let Some((q2, n, k_need)) = filter_core::trade::buy_loosen(&q, k) else { break };
+            let Ok((id2, _, t2)) = trade_api::search(poe2, &league, &q2) else { break };
+            id = id2;
+            (of, need, total) = (n, k_need, t2);
+            if t2 > 0 { break; }
+        }
+    }
     open_url(trade_api::site_url(poe2, &league, &id))?;
-    Ok(BuyResult { total, of, need: of })
+    Ok(BuyResult { total, of, need })
 }
 
 /// Fills in the rest (divine rate, build comparison, map check, bulk) and shows the price window.

@@ -292,6 +292,12 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   `BuildView.tsx` (F6 + My build): a tick per item, key `slot|name|base`, in localStorage `build.have` (shared by both
   windows via the storage event), "Have N of M" bar with "hide what I have" (`build.hideHave`).
 
+- Buy loosens 21 Nov (0.2.13, his large lightning cluster found nothing): (1) the cluster's "N Added Passive Skills are
+  Jewel Sockets" line made every search 0 (as enchant or explicit), so buy_query leaves it out for cluster jewels;
+  (2) nobody sold all 3 notables: buy_build_item now retries with trade::buy_loosen (enchants / seed stay required,
+  the other mods go in a "count" group needing one, two, three fewer) and opens the first with results; the button
+  says "any 2 of 3 mods". Live: 8 passives + lightning + any 2 of his 3 notables = 234.
+
 - Thin cards 21 Nov (0.2.12, his The Calling: poe.ninja "5c", 2 sold, 1c listings unsold): fetch_prices.py keeps the
   exchange's volumePrimaryValue as `volume`; PriceItem::sold() = volume / value; thin_card() = card under 50c with
   under 5 sold → values_by_base counts it 0 (worth line, price tiers). Price window shows "Hardly traded: about N sold"
@@ -531,6 +537,10 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 
 - [ ] Ctrl+D on a timeless jewel (Brutal Restraint): seed line ticked, prices for that exact seed; "any conqueror" row works.
 - [ ] Price window: "This week" line with ▲/▼ % under the price for currency, cards, uniques… (after the price file updates).
+
+**Buy (21 Nov, 0.2.13)**
+- [ ] F6 → Jewels → Buy on the "8 Passive Only" large cluster: the trade site opens with results, button says
+      "… for sale · any 2 of 3 mods".
 
 **Thin cards (21 Nov, 0.2.12)**
 - [ ] With the 5c card line on: The Calling and other hardly-traded cheap cards are hidden after F4; Ctrl+D on one says

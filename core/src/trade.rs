@@ -838,6 +838,10 @@ pub fn buy_query(text: &str, index: &StatIndex) -> Option<(Value, usize)> {
     let mut stats: Vec<Value> = Vec::new();
     for m in mods(text) {
         let local = || index.find(&ModLine { text: format!("{} (Local)", m.text), ..m.clone() }).filter(|_| local_first);
+        // A cluster jewel's "2 Added Passive Skills are Jewel Sockets": comes with its passive count, and asking for it
+        // (as enchant or explicit, any number) finds nothing on the trade site (tested 21 Nov, his large lightning
+        // cluster: 0 with it, 234 without). Leave it out.
+        if m.text.contains("Jewel Socket") && item.base_type.ends_with("Cluster Jewel") { continue; }
         let Some((id, value)) = local().or_else(|| index.find(&m)) else { continue };
         // A unique's fixed mods come with the name; only mods that differ between copies are worth asking for
         // (Watcher's Eye auras, a timeless jewel's seed).
@@ -864,10 +868,50 @@ pub fn buy_query(text: &str, index: &StatIndex) -> Option<(Value, usize)> {
     Some((json!({ "query": q, "sort": { "price": "asc" } }), n))
 }
 
+/// "Buy" found nothing with every mod: the same search with `drop` fewer of the mods that can vary required
+/// (any of them), while what makes the item what it is stays required: enchants (a cluster jewel's passive count
+/// and small passives), its jewel sockets, a timeless jewel's seed. Guides list several good notables for a
+/// cluster; a jewel has some of them. Returns (search, mods that vary, how many of them it needs); None when
+/// there's nothing left to loosen.
+pub fn buy_loosen(q: &Value, drop: usize) -> Option<(Value, usize, usize)> {
+    let filters = q["query"]["stats"][0]["filters"].as_array()?;
+    let fixed = |v: &Value| {
+        let id = v["id"].as_str().unwrap_or("");
+        id.starts_with("enchant.") || id.contains("pseudo_timeless") || id.ends_with("stat_4079888060")
+    };
+    let (keep, vary): (Vec<Value>, Vec<Value>) = filters.iter().filter(|v| v.get("disabled").is_none()).cloned().partition(fixed);
+    let n = vary.len();
+    let need = n.saturating_sub(drop);
+    if n < 2 || drop == 0 || need == 0 { return None; }
+    let mut groups = vec![json!({ "type": "count", "value": { "min": need }, "filters": vary })];
+    if !keep.is_empty() { groups.insert(0, json!({ "type": "and", "filters": keep })); }
+    let mut out = q.clone();
+    out["query"]["stats"] = json!(groups);
+    Some((out, n, need))
+}
+
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn buy_loosens_cluster_notables() {
+        // His large lightning cluster (21 Nov): nobody sold all 3 notables, any 2 found 234.
+        let q = json!({ "query": { "type": "Large Cluster Jewel", "stats": [{ "type": "and", "filters": [
+            { "id": "enchant.stat_3086156145", "value": { "min": 8, "max": 8 } },
+            { "id": "enchant.stat_3948993189", "value": { "option": 14 } },
+            { "id": "explicit.stat_228455793" }, { "id": "explicit.stat_3872380586" }, { "id": "explicit.stat_3777170562" },
+            { "id": "crafted.stat_1", "disabled": true } ] }] } });
+        let (l, of, need) = buy_loosen(&q, 1).unwrap();
+        assert_eq!((of, need), (3, 2));
+        let groups = l["query"]["stats"].as_array().unwrap();
+        assert_eq!(groups[0]["type"], "and");
+        assert_eq!(groups[0]["filters"].as_array().unwrap().len(), 2, "passives and the enchant stay required");
+        assert_eq!((groups[1]["type"].as_str(), groups[1]["value"]["min"].as_u64()), (Some("count"), Some(2)));
+        assert_eq!(buy_loosen(&q, 2).unwrap().2, 1);
+        assert!(buy_loosen(&q, 3).is_none(), "can't need 0 of them");
+    }
 
     const BOOTS: &str = "Item Class: Boots
 Rarity: Rare
