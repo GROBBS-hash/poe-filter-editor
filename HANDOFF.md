@@ -644,6 +644,9 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] F2 on a corrupted item (e.g. a corrupted rare Cobalt Jewel): an "Only corrupted ones" tick; highlight with it ticked:
       corrupted rare jewels show, ordinary ones stay hidden.
 - [ ] Editor window has only the gold title bar (the Windows one is gone; the saved window state no longer brings it back).
+      21 Nov: he still saw both, but was running 0.2.24 (the fix is in 0.2.27): check after "Restart to update".
+- [ ] General polish (after 0.2.27): name shows once (gold title bar; the sidebar no longer repeats it); pages use up
+      to 1280px and sit centred beside the sidebar on wide windows; every tick box in the app is dark with a gold tick.
 
 **Frame + fixes (21 Nov, 0.2.24)**
 - [ ] Editor window: no Windows title bar, a gold one instead; drag it to move, double-click to maximise, the three

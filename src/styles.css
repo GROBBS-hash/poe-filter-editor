@@ -1686,16 +1686,16 @@ body:has(.mt-bar) .cr-col { height: calc(100vh - 215px - var(--mt-h)); }
 .tw-lmods-chips { display: flex; flex-wrap: wrap; gap: 3px; }
 .tw-lmods-lab { width: auto; margin: 3px 0 0; }
 .tw-spread-bars i.z { opacity: .35; }
-/* Tick boxes in the price window drawn to match it: dark with a soft edge, gold when ticked (the browser's white
+/* Tick boxes everywhere (price window first, then the whole app) drawn to match: dark with a soft edge, gold when ticked (the browser's white
    default glared against the dark rows). */
-.qm.tw input[type=checkbox] { appearance: none; -webkit-appearance: none; flex: none; width: 15px; height: 15px; margin: 0;
+input[type=checkbox] { appearance: none; -webkit-appearance: none; flex: none; width: 15px; height: 15px; margin: 0 5px 0 1px;
   border: 1.5px solid #5b6372; border-radius: 4px; background: #14171c; cursor: pointer; display: inline-grid; place-items: center;
   vertical-align: -2px; transition: background-color .12s ease-out, border-color .12s ease-out; }
-.qm.tw input[type=checkbox]:hover { border-color: #8a93a3; }
-.qm.tw input[type=checkbox]:checked { background: var(--gold); border-color: var(--gold); }
-.qm.tw input[type=checkbox]:checked::after { content: ""; width: 4px; height: 8px; margin-top: -2px;
+input[type=checkbox]:hover { border-color: #8a93a3; }
+input[type=checkbox]:checked { background: var(--gold); border-color: var(--gold); }
+input[type=checkbox]:checked::after { content: ""; width: 4px; height: 8px; margin-top: -2px;
   border: solid #1a1405; border-width: 0 2px 2px 0; transform: rotate(45deg); }
-.qm.tw input[type=checkbox]:disabled { opacity: .45; cursor: default; }
+input[type=checkbox]:disabled { opacity: .45; cursor: default; }
 .tw-opts label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
 /* "Not searchable" mods: their own small heading, text lined up with the row labels above. */
 .tw-unknown { margin-top: 2px; }
@@ -1709,3 +1709,13 @@ body:has(.mt-bar) .cr-col { height: calc(100vh - 215px - var(--mt-h)); }
 .cr-legend button.link { white-space: nowrap; }
 .cr-detail-head > button { flex: none; white-space: nowrap; }
 .cr-way-nums .cr-price, .cr-way-nums .cr-odds { font-variant-numeric: tabular-nums; }
+
+/* General polish (21 Nov): the gold title bar already names the app, so the sidebar doesn't repeat it; pages use
+   more of a wide window and sit centred in
+   the space beside the sidebar instead of leaving an empty strip on the right. */
+body:has(.mt-bar) .side .brand { display: none; }
+body:has(.mt-bar) .side { padding-top: 14px; }
+.content:not(.wide) { max-width: 1280px; margin-inline: auto; }
+/* Tick boxes that keep their own colour when ticked. */
+.bv-have:checked { background: #62cf80; border-color: #62cf80; }
+.qm.tw input[type=checkbox] { margin: 0; }
