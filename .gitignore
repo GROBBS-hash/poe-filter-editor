@@ -6,6 +6,7 @@ public/_tiers.json
 public/_craft_pool.json
 public/_craft_ways.json
 public/_craft_start.json
+public/_craft_routes.json
 
 # impeccable design plugin: per-machine files
 .impeccable/config.local.json

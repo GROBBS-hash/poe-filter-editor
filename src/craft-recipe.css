@@ -11,3 +11,55 @@
 .rc-body { padding: 0 10px 10px 42px; }
 .rc-body .cr-way { margin: 6px 0 0; }
 .rc-total { margin-top: 10px; font-size: 13px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+
+/* How to make it (21 Nov, routes): a summary card in the left column and a wide panel over the other two columns. */
+.rc-sum h2 { margin-bottom: 6px; }
+.rc-sum-best { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin-bottom: 10px; font-size: 13px; }
+.rc-sum-best b { flex: 1 1 100%; line-height: 1.35; }
+.rc-sum-label { font-size: 10.5px; color: var(--gold); text-transform: uppercase; letter-spacing: .08em; }
+.rc-sum button { width: 100%; }
+.cr-cols > .rc-wide { grid-column: 2 / -1; }
+@media (max-width: 1200px) { .cr-cols > .rc-wide { grid-column: 1 / -1; height: auto; } }
+.rc-panel { max-width: 980px; }
+.rc-panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.rc-panel-head h2 { margin: 0 0 2px; }
+.rc-sort { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+.rc-sort .chip { cursor: pointer; padding: 4px 12px; }
+.rc-note { margin: 6px 0; }
+.rc-list { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 12px; }
+.rc-route { border: 1px solid var(--line); border-radius: 12px; background: var(--raised); overflow: hidden; }
+.rc-route.open { border-color: color-mix(in srgb, var(--gold) 55%, var(--line)); }
+.rc-route-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name nums" "blurb nums"; gap: 2px 16px; width: 100%;
+  padding: 10px 14px; text-align: left; background: transparent; border: 0; border-radius: 0; color: var(--text); cursor: pointer; }
+.rc-route-head:hover { background: color-mix(in srgb, var(--gold) 5%, transparent); }
+.rc-route-name { grid-area: name; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 14px; }
+.rc-route-blurb { grid-area: blurb; }
+.rc-route-nums { grid-area: nums; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 2px; white-space: nowrap; }
+.rc-big { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.rc-cost { display: inline-flex; align-items: center; gap: 2px; }
+.rc-badge { font-size: 10.5px; padding: 1px 7px; border-radius: 999px; background: var(--gold-bg); color: var(--gold); border: 1px solid color-mix(in srgb, var(--gold) 40%, transparent); }
+.rc-check-pill { font-size: 10.5px; padding: 1px 7px; border-radius: 999px; color: var(--blue); border: 1px solid color-mix(in srgb, var(--blue) 45%, transparent); }
+.rc-risk { font-size: 11px; }
+.rc-risk.r0 { color: var(--green); }
+.rc-risk.r1 { color: var(--gold); }
+.rc-risk.r2 { color: var(--red); }
+.rc-route-body { padding: 4px 14px 12px; border-top: 1px solid var(--line); }
+.rc-route-body .rc-steps { margin-top: 8px; gap: 10px; }
+.rc-steps .rc-step { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 8px; border: 0; background: transparent; overflow: visible; }
+.rc-step .rc-num { grid-row: auto; margin-top: 1px; }
+.rc-step-main { min-width: 0; display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
+.rc-step-main > .rc-title { font-size: 13.5px; font-weight: 600; }
+.rc-best-way { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; margin-top: 4px; padding: 7px 10px;
+  border: 1px solid var(--line); border-radius: 9px; background: var(--panel); }
+.rc-best-text { display: flex; flex-direction: column; min-width: 0; }
+.rc-best-text b { font-size: 13px; }
+.rc-best-nums { display: flex; flex-direction: column; align-items: flex-end; white-space: nowrap; }
+.rc-best-nums .cr-odds { min-width: 0; font-size: 13px; }
+.rc-others { width: 100%; }
+.rc-others .cr-way { margin: 6px 0 0; }
+.rc-checks { margin-top: 12px; padding: 8px 10px; border-radius: 9px; font-size: 12px; border: 1px solid color-mix(in srgb, var(--blue) 35%, transparent); background: color-mix(in srgb, var(--blue) 7%, transparent); }
+.rc-checks ul { margin: 4px 0 0; padding-left: 18px; }
+.rc-buy { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 12px; margin: 4px 0 6px;
+  border: 1px dashed var(--line-2); border-radius: 10px; }
+.rc-buy-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.rc-buy-win { color: var(--green); }

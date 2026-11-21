@@ -42,7 +42,12 @@ function InfIcon({ name, size = 16 }: { name: string; size?: number }) {
 /** Pictures for a method: each fossil of a pair, the essence, the orb. */
 function MethodIcons({ method }: { method: string }) {
   if (method === "Crafting bench") return <span className="cr-bench-ico" aria-hidden>⚒</span>;
-  const parts = method.startsWith("Harvest") ? ["Wild Crystallised Lifeforce"] : method.startsWith("Chaos Orb on") ? ["Chaos Orb"] : method.split(" + ");
+  // Route steps: bench locks and meta-crafts cost Divines; "Bench filler + Exalted Orb" shows the orb.
+  if (method.startsWith("Bench: lock") || method.startsWith("Bench: Prefix") || method.startsWith("Bench: Suffix") || method === "Bench: Can have up to 3 Crafted Modifiers")
+    return <span className="cr-icons"><ItemIcon name="Divine Orb" size={22} /></span>;
+  const cleaned = method.replace(/^Bench: Cannot roll \w+ Modifiers \+ /, "Divine Orb + ").replace(/^Bench filler \+ /, "").replace(/^Lock the \w+ \+ /, "Divine Orb + ")
+    .replace(" (both at once)", "");
+  const parts = method.startsWith("Harvest") ? ["Wild Crystallised Lifeforce"] : method.startsWith("Chaos Orb on") ? ["Chaos Orb"] : cleaned.split(" + ");
   return <span className="cr-icons">{parts.map((p) => <ItemIcon key={p} name={p} size={22} />)}</span>;
 }
 const lines = (t: string) => t.split("\n").join(" / ");
@@ -66,6 +71,7 @@ export default function Craft() {
   const [paste, setPaste] = useState(false);
   /** Which non-clickable mod of your item has its "how to get it" note open. */
   const [how, setHow] = useState<number | null>(null);
+  const [showRoutes, setShowRoutes] = useState(false);
 
   useEffect(() => { invoke<string[]>("craft_bases").then(setBases).catch(() => {}); }, []);
 
@@ -106,6 +112,8 @@ export default function Craft() {
   }, [pool, q]);
   const fam = (k: string | null) => pool?.families.find((f) => f.key === k) ?? null;
   const picked = fam(pick);
+  const routePlan = useMemo(() => plan.filter((t) => fam(t.key)), [plan, pool]);
+  const routes = useRoutes(routePlan, base, ilvl, infl, have);
 
   const clearItem = () => { setHave([]); setItemName(""); setItemText(""); setRarity(""); };
   const toggleInfl = (i: string) => setInfl(infl.includes(i) ? infl.filter((x) => x !== i) : [...infl, i].slice(-2));
@@ -193,10 +201,16 @@ export default function Craft() {
             </div>
           )}
           <PlanBox plan={plan} setPlan={setPlan} fam={fam} base={base} ilvl={ilvl} infl={infl} onPick={setPick} />
-          <RecipeBox plan={plan.filter((t) => fam(t.key))} base={base} ilvl={ilvl} infl={infl} />
+          <RouteSummary plan={routePlan} r={routes.r} err={routes.err} open={showRoutes} onOpen={() => setShowRoutes(!showRoutes)} />
         </div>
 
+        {/* How to make it: every route, wide (over the mod list and the detail) */}
+        {showRoutes && routePlan.length >= 2 && <div className="cr-col rc-wide">
+          <RoutesPanel r={routes.r} err={routes.err} onClose={() => setShowRoutes(false)} itemText={itemText} />
+        </div>}
+
         {/* Every mod */}
+        {!(showRoutes && routePlan.length >= 2) && <>
         <div className="cr-col cr-list">
           <div className="cr-list-top">
             <input className="text cr-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a mod: life, cold res, spell, shaper…" />
@@ -244,6 +258,7 @@ export default function Craft() {
             inPlan={inPlan(picked.key)} onPlan={() => addPlan(picked)} /> :
             <div className="card muted cr-empty">Click a mod to see its tiers and every way to get it. Use + to add mods to a plan and see the odds of hitting them together.</div>}
         </div>
+        </>}
       </div>
     </div>
   );
@@ -395,50 +410,159 @@ function Detail({ fam, base, ilvl, infl, have, rarity, inPlan, onPlan }: { fam: 
 
 
 type Step = { title: string; detail: string; ways: Way[] };
-type Recipe = { steps: Step[]; total: number | null; ilvl_needed: number; note: string };
+type Route = { id: string; name: string; blurb: string; steps: Step[]; cost: number | null; clicks: number; risk: number; checks: string[]; badges: string[] };
+type Routes = { routes: Route[]; ilvl_needed: number; note: string; divine: number | null };
+type Listing = { price: number | null };
+type BuyResult = { summary: [number, number] | null; total: number; url: string; divine: number | null; listings: Listing[] };
+type Sort = "cost" | "clicks" | "risk";
 
-/** "How to make it": a step-by-step route for everything in the plan (base, roll the hardest mods, add the rest,
- *  finish at the bench), each step with its cheapest ways. */
-function RecipeBox({ plan, base, ilvl, infl }: { plan: Target[]; base: string; ilvl: number; infl: string[] }) {
-  const [r, setR] = useState<Recipe | null>(null);
+const RISK = ["Safe", "Can fail a step", "Can lose mods"];
+/** Chaos, with the Divine equivalent once it's big. */
+function Cost({ c, div }: { c: number | null; div: number | null }) {
+  if (c == null) return <span className="muted">price unknown</span>;
+  return <span className="rc-cost"><Chaos c={c} />{div && c >= div * 0.8 ? <span className="muted"> ≈ {+(c / div).toFixed(c / div < 10 ? 1 : 0)}<CurrencyIcon id="divine" size={14} /></span> : null}</span>;
+}
+
+/** The routes for the plan, worked out once and shared by the summary card and the wide panel. */
+function useRoutes(plan: Target[], base: string, ilvl: number, infl: string[], have: string[]) {
+  const [r, setR] = useState<Routes | null>(null);
   const [err, setErr] = useState("");
-  const [open, setOpen] = useState<number | null>(null);
   useEffect(() => {
-    if (plan.length < 2) { setR(null); return; }
+    if (plan.length < 2) { setR(null); setErr(""); return; }
     let live = true;
     setR(null); setErr("");
-    invoke<Recipe | null>("craft_recipe", { base, ilvl, influences: infl, targets: plan.map((t) => [t.key, t.tier]) })
-      .then((x) => live && setR(x)).catch((e) => live && setErr(friendly(e)));
+    invoke<Routes | null>("craft_routes", { base, ilvl, influences: infl, targets: plan.map((t) => [t.key, t.tier]), have })
+      .then((x) => live && setR(x ?? { routes: [], ilvl_needed: 1, note: "", divine: null })).catch((e) => live && setErr(friendly(e)));
     return () => { live = false; };
-  }, [JSON.stringify(plan), base, ilvl, infl.join(",")]);
+  }, [JSON.stringify(plan), base, ilvl, infl.join(","), have.join("|")]);
+  return { r, err };
+}
+
+/** Left column: the best route in one line, and the button to compare them all. */
+function RouteSummary({ plan, r, err, onOpen, open }: { plan: Target[]; r: Routes | null; err: string; onOpen: () => void; open: boolean }) {
   if (plan.length < 2) return null;
+  const best = r?.routes[0];
   return (
-    <div className="card rc">
-      <h2>How to make it <span className="muted small">a suggested route</span></h2>
+    <div className="card rc-sum">
+      <h2>How to make it</h2>
       {err && <p className="danger-text small">{err}</p>}
-      {!r && !err && <p className="muted small">Working out a route…</p>}
-      {r && <>
+      {!r && !err && <p className="muted small">Comparing ways to craft it…</p>}
+      {r && !best && <p className="muted small">{r.note || "No route found for these mods."}</p>}
+      {best && <>
+        <div className="rc-sum-best"><span className="rc-sum-label">Cheapest</span><b>{best.name}</b><Cost c={best.cost} div={r.divine} /></div>
+        <button className={open ? "" : "primary"} onClick={onOpen}>{open ? "Back to the mods" : `Compare all ${r.routes.length} routes →`}</button>
+      </>}
+    </div>
+  );
+}
+
+/** The wide panel: every route side by side, sortable, each with its steps and the options per step. */
+function RoutesPanel({ r, err, onClose, itemText }: { r: Routes | null; err: string; onClose: () => void; itemText: string }) {
+  const [sort, setSort] = usePersist<Sort>("craft.routeSort", "cost");
+  const [open, setOpen] = useState<string | null>(null);
+  const routes = useMemo(() => {
+    const v = [...(r?.routes ?? [])];
+    const cost = (x: Route) => x.cost ?? Number.MAX_VALUE;
+    if (sort === "clicks") v.sort((a, b) => a.clicks - b.clicks || cost(a) - cost(b));
+    if (sort === "risk") v.sort((a, b) => a.risk - b.risk || cost(a) - cost(b));
+    return v;
+  }, [r, sort]);
+  const shown = open ?? routes[0]?.id ?? null;
+  return (
+    <div className="card rc-panel">
+      <div className="rc-panel-head">
+        <div><h2>How to make it</h2>
+          <p className="muted small">{r ? `${routes.length} ways to craft it, worked out with today's prices. Costs are averages: luck swings them.` : "Comparing ways to craft it…"}</p></div>
+        <button className="link small" onClick={onClose}>← Back to the mods</button>
+      </div>
+      {err && <p className="danger-text small">{err}</p>}
+      {r && <div className="rc-sort" role="tablist" aria-label="Sort routes">
+        {([["cost", "Cheapest"], ["clicks", "Fewest clicks"], ["risk", "Safest"]] as [Sort, string][]).map(([k, label]) => (
+          <button key={k} role="tab" aria-selected={sort === k} className={`chip ${sort === k ? "on" : ""}`} onClick={() => setSort(k)}>{label}</button>))}
+      </div>}
+      {itemText && <BuyCheck text={itemText} best={r?.routes[0]?.cost ?? null} div={r?.divine ?? null} />}
+      {r?.note && <p className="muted small rc-note">{r.note}</p>}
+      <div className="rc-list">
+        {routes.map((x) => <RouteCard key={x.id} x={x} div={r?.divine ?? null} open={shown === x.id} onToggle={() => setOpen(shown === x.id ? "" : x.id)} />)}
+      </div>
+      <p className="muted small">Odds come from rolling the item here thousands of times, with the 3.30 rules. Each step only counts once it leaves room for the steps after it.</p>
+    </div>
+  );
+}
+
+function RouteCard({ x, div, open, onToggle }: { x: Route; div: number | null; open: boolean; onToggle: () => void }) {
+  const [more, setMore] = useState<number | null>(null);
+  return (
+    <section className={`rc-route ${open ? "open" : ""}`}>
+      <button className="rc-route-head" onClick={onToggle} aria-expanded={open}>
+        <div className="rc-route-name">
+          <b>{x.name}</b>
+          {x.badges.map((b) => <span key={b} className="rc-badge">{b}</span>)}
+          {x.checks.length > 0 && <span className="rc-check-pill" title={x.checks.join("\n")}>check in game</span>}
+        </div>
+        <div className="rc-route-blurb muted small">{x.blurb}</div>
+        <div className="rc-route-nums">
+          <span className="rc-big"><Cost c={x.cost} div={div} /></span>
+          <span className="muted small">{Math.max(1, Math.round(x.clicks)).toLocaleString()} clicks</span>
+          <span className={`rc-risk r${x.risk}`}>{RISK[x.risk] ?? ""}</span>
+        </div>
+      </button>
+      {open && <div className="rc-route-body">
         <ol className="rc-steps">
-          {r.steps.map((s, i) => {
-            const best = s.ways.find((w) => w.average != null) ?? s.ways[0];
+          {x.steps.map((s, i) => {
+            const best = s.ways[0];
             return (
               <li key={i} className="rc-step">
-                <button className="rc-head" onClick={() => setOpen(open === i ? null : i)} aria-expanded={open === i}>
-                  <span className="rc-num">{i + 1}</span>
-                  <span className="rc-title">{s.title}</span>
-                  {best && <span className="rc-best">{best.method}{best.chance < 0.995 ? ` · ${odds(best.chance)}` : ""}{best.average != null ? <> · ≈ <Chaos c={best.average} /></> : null}</span>}
-                </button>
-                {(open === i || s.ways.length === 0) && <div className="rc-body">
+                <span className="rc-num">{i + 1}</span>
+                <div className="rc-step-main">
+                  <div className="rc-title">{s.title}</div>
                   <div className="muted small">{s.detail}</div>
-                  {s.ways.map((w, j) => <WayCard key={w.method} w={w} best={j === 0 && w.average != null} />)}
-                </div>}
+                  {best && <div className="rc-best-way">
+                    <MethodIcons method={best.method} />
+                    <div className="rc-best-text"><b>{best.method}</b><span className="muted small">{best.note}</span></div>
+                    <div className="rc-best-nums">
+                      {best.chance < 0.995 && <span className="cr-odds">{odds(best.chance)}</span>}
+                      <span className="small">{best.average != null ? <>≈ <Chaos c={best.average} /></> : <Chaos c={null} />}</span>
+                    </div>
+                  </div>}
+                  {s.ways.length > 1 && <button className="link small" onClick={() => setMore(more === i ? null : i)}>
+                    {more === i ? "Hide the other ways" : `${s.ways.length - 1} other way${s.ways.length > 2 ? "s" : ""}`}</button>}
+                  {more === i && <div className="rc-others">{s.ways.slice(1).map((w) => <WayCard key={w.method} w={w} best={false} />)}</div>}
+                </div>
               </li>
             );
           })}
         </ol>
-        <div className="rc-total">Roughly <b>{r.total != null ? <Chaos c={r.total} /> : "unknown (some prices missing)"}</b> in total, on average. Click a step for its options.</div>
-        {r.note && <p className="muted small">{r.note}</p>}
-      </>}
+        {x.checks.length > 0 && <div className="rc-checks"><b>Check in game:</b><ul>{x.checks.map((c) => <li key={c}>{c}</li>)}</ul></div>}
+      </div>}
+    </section>
+  );
+}
+
+/** "Or just buy one": the same trade search as Ctrl+D, on a click. */
+function BuyCheck({ text, best, div }: { text: string; best: number | null; div: number | null }) {
+  const [res, setRes] = useState<BuyResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  useEffect(() => { setRes(null); setErr(""); }, [text]);
+  const go = async () => {
+    setBusy(true); setErr("");
+    try { setRes(await invoke<BuyResult>("craft_buy", { text })); } catch (e) { setErr(friendly(e)); } finally { setBusy(false); }
+  };
+  const typical = res?.summary?.[1] ?? null;
+  return (
+    <div className="rc-buy">
+      <ItemIcon name="Chaos Orb" size={22} />
+      <div className="rc-buy-main">
+        <b>Or just buy one</b>
+        {!res && !err && <span className="muted small">Searches the trade site for items like your copied one.</span>}
+        {err && <span className="danger-text small">{err}</span>}
+        {res && (res.summary ? <span className="small">{res.total.toLocaleString()} listed · lowest <Cost c={res.summary[0]} div={div} /> · typical <Cost c={res.summary[1]} div={div} />
+          {best != null && typical != null && <b className={typical < best ? "rc-buy-win" : ""}> · {typical < best ? "buying is cheaper" : "crafting is cheaper"}</b>}</span>
+          : <span className="muted small">None listed like it right now.</span>)}
+      </div>
+      {res ? <button className="link small" onClick={() => invoke("open_url", { url: res.url })}>Open on trade ↗</button>
+        : <button className="small" onClick={go} disabled={busy}>{busy ? "Searching…" : "Check the price"}</button>}
     </div>
   );
 }

@@ -2071,12 +2071,22 @@ async fn craft_ways(state: State<'_, AppState>, base: String, ilvl: u32, influen
     tauri::async_runtime::spawn_blocking(move || filter_core::craft::ways(&base, ilvl, &influences, &key, min_tier, &have, &rarity, &price)).await.map_err(|e| e.to_string())
 }
 
-/// Crafting page: a step-by-step route to make an item with these mods.
+/// Crafting page: every route to make an item with these mods (lock, essence, magic, fracture, Eldritch…), cheapest first.
 #[tauri::command]
-async fn craft_recipe(state: State<'_, AppState>, base: String, ilvl: u32, influences: Vec<String>, targets: Vec<(String, u32)>) -> Result<Option<filter_core::craft::Recipe>, String> {
+async fn craft_routes(state: State<'_, AppState>, base: String, ilvl: u32, influences: Vec<String>, targets: Vec<(String, u32)>, have: Vec<String>) -> Result<Option<filter_core::craft::routes::Routes>, String> {
     let f = state.prices.lock().unwrap().get(&Game::Poe1).cloned();
     let price = move |n: &str| f.as_ref().and_then(|f| price_of(f, None, n, ""));
-    tauri::async_runtime::spawn_blocking(move || filter_core::craft::recipe(&base, ilvl, &influences, &targets, &price)).await.map_err(|e| e.to_string())
+    tauri::async_runtime::spawn_blocking(move || filter_core::craft::routes::routes(&base, ilvl, &influences, &targets, &have, &price)).await.map_err(|e| e.to_string())
+}
+
+/// Crafting page: what an item like the copied one costs on the trade site (the same search as Ctrl+D), to compare
+/// with crafting it. One search, only when you click.
+#[tauri::command(async)]
+fn craft_buy(app: AppHandle, text: String) -> Result<TradeResult, String> {
+    let (poe2, _) = trade_league(&app);
+    let index = trade_api::stats(&app.state::<AppState>().data_dir, poe2)?;
+    let setup = filter_core::trade::setup(&text, &index).ok_or("That doesn't look like an item")?;
+    trade_search(app, setup)
 }
 
 /// Crafting page calculator: the chance each method gives several mods at once.
@@ -2488,7 +2498,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             price_build_item, buy_build_item, buy_base_item, trade_untick_one, overview,
-            craft_bases, craft_start, craft_pool, craft_ways, craft_plan, craft_recipe,
+            craft_bases, craft_start, craft_pool, craft_ways, craft_plan, craft_routes, craft_buy,
             create_profile,
             list_filters,
             set_active,
