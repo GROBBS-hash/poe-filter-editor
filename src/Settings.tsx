@@ -1,3 +1,4 @@
+import { Tip } from "./Help";
 import { PageLoading } from "./Loading";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -16,8 +17,7 @@ function MapCheckLink() {
   return (
     <div className="card">
       <h2>Map check</h2>
-      <p className="muted small">The mods you can't run are one list on the Maps page. Ctrl+D shows them in red on a map,
-        and the stash search there hides maps that have them, so set them once and both follow.</p>
+      <p className="muted small">Mods you can't run are set on the Maps page; Ctrl+D and the stash search both use them.</p>
       <div className="row"><button onClick={() => window.dispatchEvent(new CustomEvent("goto-tab", { detail: "maps" }))}>Open the Maps page</button></div>
     </div>
   );
@@ -92,9 +92,9 @@ export default function SettingsPage() {
       </div>
 
       <div className="card">
-        <h2>Trade helper</h2>
-        <p className="muted small">When someone whispers to buy from you, a small list pops up with Invite, Trade, Thanks and Kick buttons.
-          Each button press types one command in game, as GGG's rules allow. It turns green when the buyer is in your area.</p>
+        <h2>Trade helper <Tip>When someone whispers to buy from you, a small list pops up with Invite, Trade, Thanks and Kick
+          buttons. Each button press types one command in game, as GGG's rules allow. It turns green when the buyer is in your area.</Tip></h2>
+        <p className="muted small">Invite, Trade, Thanks and Kick buttons when someone whispers to buy.</p>
         <label className="check"><input type="checkbox" checked={s.trade_helper ?? true} onChange={(e) => set({ trade_helper: e.target.checked })} />
           <span>Show incoming trade whispers</span></label>
         <div className="row">

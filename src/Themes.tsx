@@ -221,9 +221,10 @@ export default function Themes({ profile, onChange }: { profile: ProfileInfo; on
   return (
     <>
       <div className="card">
-        <h2>Themes for “{profile.name}” <Tip>Recolours NeverSink's labels in one go. Themes never change sounds, and never
-          override your own edits or tier changes. Use “Preview with real drops” to see it before switching.</Tip></h2>
-        <p className="muted">A theme recolours NeverSink's labels by how valuable they are, from Chase down to Junk. Sizes, beams, icons and sounds stay the same, and your own edits and price tiers keep their own looks.</p>
+        <h2>Themes for “{profile.name}” <Tip>Recolours NeverSink's labels by how valuable they are, from Chase down to Junk.
+          Sizes, beams, icons and sounds stay the same, and your own edits, tier changes and price tiers keep their own looks.
+          Use “Preview with real drops” to see it before switching.</Tip></h2>
+        <p className="muted small">Recolour the whole filter in one click. Sounds and your own edits stay as they are.</p>
         {msg && <div className="note">{msg}</div>}
       </div>
       {(() => {

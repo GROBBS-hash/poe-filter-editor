@@ -230,12 +230,17 @@ fn update_neversink(app: &AppHandle) {
     }
 }
 
-/// Saves a filter's setup before a change, so it can be gone back to.
+/// The app, for sending events from places that only have the state (set once at startup).
+static APP: std::sync::OnceLock<AppHandle> = std::sync::OnceLock::new();
+
+/// Saves a filter's setup before a change, so it can be gone back to. Every change to a filter passes through
+/// here, so it also tells the editor window to show its "Saved" note.
 fn remember(state: &AppState, store: &Store, id: &str, what: &str) {
     if let Some(p) = store.profiles.get(id) {
         let mut h = state.history.lock().unwrap();
         h.record(p, what);
         let _ = h.save(&state.history_path);
+        if let Some(app) = APP.get() { let _ = app.emit_to("main", "filter-changed", what.to_string()); }
     }
 }
 
@@ -2441,6 +2446,7 @@ pub fn run() {
                 .build(),
         )
         .setup(move |app| {
+            let _ = APP.set(app.handle().clone());
             let settings = app.state::<AppState>().store.lock().unwrap().settings.clone();
             start_price_updates(app.handle().clone());
             if register_hotkeys(app.handle(), &settings).is_err() {

@@ -92,19 +92,19 @@ export default function Prices({ profile }: { profile: ProfileInfo }) {
         <div className="row between">
           <h2>Price tiers for “{profile.name}” <Tip>Uses live poe.ninja prices (updated hourly) to give items a look by what
             they're worth, on top of NeverSink's tiers. Set the value for each tier; anything above tier 1 gets the Divine-style
-            drop sound. “Hide below” hides cheap items of that kind. Your own F2 edits still win.</Tip></h2>
+            drop sound. “Hide below” hides cheap items of that kind. Prices refresh every hour and the filter rebuilds by itself.
+            Order: your own edits first, then these price tiers, then NeverSink.</Tip></h2>
           <button onClick={refresh}>Check for new prices</button>
         </div>
         <p className="muted">
           {page.info
-            ? <>Prices from poe.ninja for <b>{page.info.league}</b> · {page.info.count.toLocaleString()} items · updated {when}. They refresh every hour and your filter is rebuilt automatically.</>
+            ? <>poe.ninja prices for <b>{page.info.league}</b> · {page.info.count.toLocaleString()} items · updated {when}</>
             : <>No prices downloaded yet. Check your internet connection, then press “Check for new prices”.</>}
         </p>
         <label className="check big-check">
           <input type="checkbox" checked={s.enabled} onChange={(e) => change((x) => { x.enabled = e.target.checked; })} />
           <span>Use price tiers in this filter</span>
         </label>
-        <p className="muted small">Order of priority: your own edits first, then these price tiers, then NeverSink.</p>
       </div>
 
       {s.groups.map((g, gi) => (

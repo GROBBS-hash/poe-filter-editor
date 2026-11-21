@@ -723,7 +723,13 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
       footer = Open on the trade site · Craft this · More (saved searches, Style, Something's wrong?).
       **New setting, on by default: Settings → Price check → "Instant buyout only"** (trade status "securable",
       checked on the live site: Stygian Vise 7,029 vs 7,913 listings). GROBBS dropped the "Quick look" style idea:
-      roll ranges matter for most rare/unique prices.
+      roll ranges matter for most rare/unique prices. (In 0.2.33.)
+- [ ] "Saved" note + less reading (21 Nov, not released yet): after any change to the filter, from any page or F2, the
+      editor shows a small note at the bottom: "✓ Saved <what> · Press F4 in game to see it · Undo". It fades after a
+      few seconds (stays while the mouse is on it); Undo goes back one change and reloads the open page. (Rust: every
+      change goes through `remember()`, which now emits `filter-changed` to the main window.) Long explanations at the
+      top of Filters, My edits, Themes, Prices, Maps, Atlas, Crafting and Settings cut to one line; the detail moved
+      into the "?" next to the heading.
 
 **Frame + fixes (21 Nov, 0.2.24)**
 - [ ] Editor window: no Windows title bar, a gold one instead; drag it to move, double-click to maximise, the three

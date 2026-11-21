@@ -1,3 +1,4 @@
+import { Tip } from "./Help";
 import { friendly } from "./errors";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -74,9 +75,9 @@ export default function Maps() {
   return (
     <>
       <div className="card">
-        <h2>Stash search for your maps</h2>
-        <p className="muted small">Paste this into the search box of your map stash or map device. It hides maps with any mod you ticked below,
-          and keeps only maps with the minimums you set.</p>
+        <h2>Stash search for your maps <Tip>Paste this into the search box of your map stash or map device. It hides maps with any
+          mod you ticked below, and keeps only maps with the minimums you set.</Tip></h2>
+        <p className="muted small">Paste into your map stash's search box.</p>
         <textarea className="map-regex" readOnly value={regex || "Tick a mod or set a minimum below."} rows={3} />
         <div className="row">
           <button className="primary" disabled={!regex} onClick={copy}>{copied ? "Copied" : "Copy"}</button>
@@ -138,7 +139,7 @@ export default function Maps() {
           <label className="check"><input type="checkbox" checked={nightmare} onChange={(e) => setNightmare(e.target.checked)} /><span>Show nightmare mods</span></label>
         </div>
         {suggestNote && <p className="note small">{suggestNote}</p>}
-        <p className="muted small">This is the one list of mods you can't run: Ctrl+D warns about these on a map, and the stash search above hides maps that have them.</p>
+        <p className="muted small">Mods you can't run: Ctrl+D warns about them and the stash search hides them.</p>
         <div className="map-mods">
           {shown.map((m) => (
             <label key={m.id} className={`map-mod ${st.bad.includes(m.id) ? "on" : ""}`}>

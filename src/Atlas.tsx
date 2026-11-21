@@ -1,3 +1,4 @@
+import { Tip } from "./Help";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
@@ -43,9 +44,9 @@ export default function Atlas() {
   return (
     <div className="atlas-page">
       <div className="card">
-        <h2>Add a strategy</h2>
-        <p className="muted small">Paste a link to a <b>maxroll farming strategy</b> (maxroll.gg/poe/farming-strategy-planner/…) or
-          a <b>pathofexile.com atlas tree</b>. maxroll strategies bring their notes, map device and threads too.</p>
+        <h2>Add a strategy <Tip>A <b>maxroll farming strategy</b> link (maxroll.gg/poe/farming-strategy-planner/…) or a
+          <b> pathofexile.com atlas tree</b> link. maxroll strategies bring their notes, map device and threads too.</Tip></h2>
+        <p className="muted small">Paste a maxroll strategy or pathofexile.com atlas tree link.</p>
         <div className="row">
           <input className="text grow" placeholder="https://maxroll.gg/poe/farming-strategy-planner/…" value={link}
             onChange={(e) => setLink(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && link.trim() && !busy) doImport(); }} />

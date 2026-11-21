@@ -197,7 +197,7 @@ export default function Craft() {
           ) : (
             <div className="card cr-empty">
               <b>Bring an item</b>
-              <p className="muted small">In game, hover an item and press Ctrl+C, then click "Use a copied item". Or press Ctrl+D on it and click "Craft this". Its mods show here, and the odds use its open slots.</p>
+              <p className="muted small">Press Ctrl+D on an item in game and click "Craft this", or Ctrl+C it and click "Use a copied item".</p>
             </div>
           )}
           <PlanBox plan={plan} setPlan={setPlan} fam={fam} base={base} ilvl={ilvl} infl={infl} onPick={setPick} />

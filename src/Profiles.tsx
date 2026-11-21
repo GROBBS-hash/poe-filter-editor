@@ -67,8 +67,7 @@ export default function Profiles({ ov, active, onChange, onNew }: { ov: Overview
             game with F4. <b>FilterBlade file?</b> Choose it under “Your own file”; your edits go on top of it.</Tip></h2>
           <button onClick={onNew}>New filter (e.g. for PoE 2)…</button>
         </div>
-        <p className="muted small">Change how strict a filter is any time. Your edits, price tiers and theme carry over.
-          Picking NeverSink here downloads his latest version and keeps it updated; picking a FilterBlade file keeps your FilterBlade choices instead.</p>
+        <p className="muted small">Change strictness any time: your edits, price tiers and theme carry over.</p>
         <ul className="rules profiles-list">
           {ov.profiles.map((p) => (
             <li key={p.id}>

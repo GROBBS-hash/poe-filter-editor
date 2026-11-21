@@ -92,6 +92,35 @@ function Icon({ d }: { d: string }) {
   return <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>;
 }
 
+/** After any change to the filter (from any page): a short note at the bottom that it's saved, what to press in game,
+ *  and Undo. Fades away by itself after a few seconds (stays while the mouse is on it). */
+function SavedNote({ reloadKey, onUndo }: { reloadKey: string; onUndo: () => void }) {
+  const [note, setNote] = useState<{ what: string; n: number } | null>(null);
+  const [undone, setUndone] = useState("");
+  const [hover, setHover] = useState(false);
+  useEffect(() => {
+    const un = listen<string>("filter-changed", (e) => { setUndone(""); setNote((p) => ({ what: e.payload, n: (p?.n ?? 0) + 1 })); });
+    return () => { un.then((f) => f()); };
+  }, []);
+  useEffect(() => {
+    if (!note || hover) return;
+    const t = setTimeout(() => setNote(null), undone ? 2500 : 6000);
+    return () => clearTimeout(t);
+  }, [note, hover, undone]);
+  if (!note) return null;
+  return (
+    <div key={note.n} className="saved-note" role="status" onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+      <span className="saved-tick" aria-hidden="true">✓</span>
+      {undone ? <span>Undone: {undone}</span> : <>
+        <span><b>Saved</b> <span className="saved-what">{note.what}</span></span>
+        <span className="muted">Press <kbd>{reloadKey}</kbd> in game to see it</span>
+        <button className="link" onClick={() => invoke<string | null>("undo_last").then((w) => { setUndone(w ?? note.what); onUndo(); }).catch(() => {})}>Undo</button>
+      </>}
+      <button className="link saved-x" aria-label="Close" onClick={() => setNote(null)}>×</button>
+    </div>
+  );
+}
+
 type UpdateInfo = { version: string; current: string; notes: string };
 
 /** A new version was downloaded in the background: it only installs when he clicks (never mid-game by itself). */
@@ -126,6 +155,8 @@ export default function App() {
   const [findPick, setFindPick] = useState<{ base_type: string; item_class: string } | null>(null);
   /** A help question picked in the search, for Help to open. */
   const [helpStart, setHelpStart] = useState(0);
+  /** Bumped by the Saved note's Undo: the open page reloads so it shows the filter as it is now. */
+  const [undoN, setUndoN] = useState(0);
   const prevTab = useRef<Tab | null>((() => {
     try { const t = localStorage.getItem("tab") as Tab | null; return t && t !== "home" && ALL.some((i) => i.id === t) ? t : null; } catch { return null; }
   })());
@@ -268,7 +299,7 @@ export default function App() {
 
       <main className={`content ${tab === "craft" ? "wide" : ""}`}>
         <UpdateBar />
-        <ErrorBoundary key={tab}>
+        <ErrorBoundary key={tab + undoN}>
         <div key={tab} className="page-in">
         <div className="content-head">
           <h1><span className="head-icon" style={{ "--c": COLOURS[tab] } as CSSProperties}><Icon d={ICONS[tab]} /></span>{current?.name}</h1>
@@ -295,6 +326,7 @@ export default function App() {
         </ErrorBoundary>
       </main>
     </div>
+    <SavedNote reloadKey={keys.key_reload ?? "F4"} onUndo={() => { refresh(); setUndoN((n) => n + 1); }} />
     {searching && <Search pages={ALL} onClose={() => setSearching(false)}
       goPage={(id) => setTab(id as Tab)}
       goHelp={(i) => { setHelpStart(i); setTab("help"); }}

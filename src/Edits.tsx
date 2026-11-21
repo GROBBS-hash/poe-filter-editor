@@ -157,7 +157,7 @@ export default function Edits({ profile, onChange, focus }: { profile: ProfileIn
           (you rarely need it: NeverSink updates do this automatically).</Tip></h2>
         <button onClick={rebuild} title="Use after downloading a new filter file">Rebuild</button>
       </div>
-      <p className="muted">In game, press <b>F4</b> to switch to and load “{profile.output_file.replace(".filter", "")}”. Newer edits win over older ones.</p>
+      <p className="muted small">Press <b>F4</b> in game to load “{profile.output_file.replace(".filter", "")}”.</p>
       {unused > 0 && <div className="warn-line">{unused} edit{unused > 1 ? "s" : ""} never apply because a newer edit covers them (marked below).</div>}
 
       {profile.rules.length === 0 ? (
