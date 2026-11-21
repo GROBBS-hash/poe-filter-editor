@@ -1754,3 +1754,8 @@ button.in-use:disabled { opacity: 1; cursor: default; background: var(--gold-bg)
 /* Presets: the mechanic tiles inside the card are flat panels, not cards inside a card. */
 .farm { background: rgba(255, 255, 255, .02); border-color: #262b34; }
 .farm:hover { border-color: var(--line-2); }
+/* F2: small in-line links ("Pick a sound…") in the app's own colours instead of web-page blue. */
+.qm-inline { color: var(--gold); text-decoration-color: rgba(220, 178, 90, .45); text-underline-offset: 3px; }
+.qm-inline:hover { color: #f0cd7c; text-decoration-color: currentColor; background: none; }
+/* F7: room for a full strategy name in the picker (it cut "Leaguestart Shrine/Magic Atlas" short). */
+.ao-head select { max-width: 320px; }
