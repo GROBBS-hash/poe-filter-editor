@@ -555,7 +555,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Price window: "This week" line with ▲/▼ % under the price for currency, cards, uniques… (after the price file updates).
 
 **Foulborn (21 Nov, 0.2.16)**
-- [ ] Ctrl+D on a Foulborn unique armour/weapon (e.g. Foulborn Ghostwrithe): ticked rolls find listings.
+- [x] (Confirmed 21 Nov.) Ctrl+D on a Foulborn unique armour/weapon (e.g. Foulborn Ghostwrithe): ticked rolls find listings.
 
 **Buy base (21 Nov, 0.2.14)**
 - [x] (Confirmed 21 Nov: "cluster base worked well".) F6 → Jewels → "Buy base" on a cluster jewel: trade site opens with cheap bases at the right item level; the note
