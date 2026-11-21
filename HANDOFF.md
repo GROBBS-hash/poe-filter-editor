@@ -292,6 +292,10 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   `BuildView.tsx` (F6 + My build): a tick per item, key `slot|name|base`, in localStorage `build.have` (shared by both
   windows via the storage event), "Have N of M" bar with "hide what I have" (`build.hideHave`).
 
+- Ctrl+D one after another 21 Nov (0.2.11): price_check stopped when the game wasn't in front, and the open price
+  window had focus. game_back_in_front(): if one of our overlay windows (not "main") is focused, focus_game() and wait
+  for it, then copy as usual (the old price window closes on blur, the new one opens).
+
 - Worth line 21 Nov (0.2.10, his Ritual idea): Tiers → Divination cards / Uniques have "Hide … worth under N c"
   (WorthLine.tsx). It's the price settings' hide_below for that group (same box as on the Prices page), and
   price_blocks now writes hide rules even with price tiers off. Cards count a stack at its total worth: hide blocks
@@ -522,6 +526,9 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 
 - [ ] Ctrl+D on a timeless jewel (Brutal Restraint): seed line ticked, prices for that exact seed; "any conqueror" row works.
 - [ ] Price window: "This week" line with ▲/▼ % under the price for currency, cards, uniques… (after the price file updates).
+
+**Ctrl+D again (21 Nov, 0.2.11)**
+- [ ] With the price window open, hover another item and press Ctrl+D: it prices the new item straight away.
 
 **Worth line (21 Nov, 0.2.10)**
 - [ ] Tiers → Divination cards: tick "Hide cards worth under", set e.g. 5c, F4 in game: cheap single cards hidden,

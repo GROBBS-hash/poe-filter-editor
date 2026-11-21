@@ -523,7 +523,9 @@ fn ninja_price(app: &AppHandle, item: &Item) -> Option<(f64, String)> {
 /// Ctrl+D: copies the hovered item (advanced copy: mod tiers too) and opens the price window.
 fn price_check(app: AppHandle) {
     thread::spawn(move || {
-        if !game_in_front() { return; }
+        // The price window from the last Ctrl+D (or F2, F6…) may have focus: give it back to the game and price
+        // what's under the mouse, so you can check one item after another (like Awakened).
+        if !game_back_in_front(&app) { return; }
         let before = app.clipboard().read_text().unwrap_or_default();
         let _ = app.clipboard().write_text(String::new());
         send_ctrl_alt_c();
@@ -997,6 +999,23 @@ fn copy_text(app: AppHandle, text: String) -> Result<(), String> {
 #[tauri::command]
 fn hide_trade_window(app: AppHandle) {
     if let Some(w) = app.get_webview_window("trade") { let _ = w.hide(); }
+}
+
+/// The game is in front, or one of our windows over it is and the game can be put back in front (the editor's
+/// main window doesn't count: a hotkey pressed there shouldn't pull you into the game).
+fn game_back_in_front(app: &AppHandle) -> bool {
+    if game_in_front() { return true; }
+    let ours = app.webview_windows().iter().any(|(label, w)| label != "main" && w.is_focused().unwrap_or(false));
+    if !ours || !focus_game() { return false; }
+    for _ in 0..15 {
+        if game_in_front() {
+            // A moment for the game to take keys again before we send it the copy.
+            thread::sleep(Duration::from_millis(60));
+            return true;
+        }
+        thread::sleep(Duration::from_millis(20));
+    }
+    false
 }
 
 /// Is Path of Exile the window in front? We only ever type into the game.
