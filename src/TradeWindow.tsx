@@ -21,7 +21,7 @@ type Check = { setup: Setup | null; ninja: [number, string] | null; league: stri
 type Comparison = { slot: string; current: string; rows: { stat: string; now: number; this: number }[]; gain: string[]; lose: string[] };
 type Offer = { pay: number; pay_currency: string; get: number; get_currency: string; each: number; stock: number; account: string; whisper: string };
 type Bulk = { offers: Offer[]; url: string; divine: number | null };
-type Listing = { amount: number; currency: string; chaos: number | null; account: string; indexed: string; whisper: string; instant?: boolean; ilvl: number | null };
+type Listing = { amount: number; currency: string; chaos: number | null; account: string; indexed: string; whisper: string; instant?: boolean; ilvl: number | null; mods?: string[] };
 type Result = { listings: Listing[]; summary: [number, number] | null; total: number; url: string; divine: number | null };
 
 const UNIT: Record<string, string> = { chaos: "c", exalted: "ex", divine: "div" };
@@ -375,6 +375,71 @@ function MapCheck({ map }: { map: MapInfo }) {
   );
 }
 
+/** Looks you can switch between (Settings, or the Style button at the bottom of the window). Shared via localStorage. */
+export const TW_STYLES: [string, string, string][] = [
+  ["classic", "Classic", "The original layout"],
+  ["tooltip", "Tooltip", "Your item drawn like the game tooltip, the price at the bottom"],
+  ["split", "Split", "Your item on the left, the market beside it"],
+  ["compare", "Compare", "Each listing's mods next to yours: green is better, red is worse"],
+  ["price", "Price first", "The price big at the top, with how listings spread"],
+];
+export const TW_STYLE_KEY = "tw.style";
+
+/** "+52 to Strength" -> ["+# to strength", 52]. */
+function modShape(t: string): [string, number | null] {
+  const m = t.match(/-?\d+(\.\d+)?/);
+  return [t.replace(/\d+(\.\d+)?/g, "#").replace(/^[+-]/, "").toLowerCase(), m ? +m[0] : null];
+}
+
+/** A listing's mods against yours: better (green), worse (red), same, or not on yours (grey). */
+function ListingMods({ mods, yours }: { mods: string[]; yours: StatFilter[] }) {
+  const mine = new Map(yours.filter((f) => f.kind !== "pseudo" && !f.id.startsWith("prop.")).map((f) => { const [s] = modShape(f.label); return [s, f.value] as const; }));
+  if (!mods.length) return null;
+  return (
+    <div className="tw-lmods">
+      {mods.map((m, i) => {
+        const [s, v] = modShape(m);
+        const y = mine.get(s);
+        const cls = y == null || v == null ? "other" : v > y ? "better" : v < y ? "worse" : "same";
+        return <span key={i} className={`tw-lmod ${cls}`} title={y == null ? "Not on your item" : `Yours: ${y}`}>{m}</span>;
+      })}
+    </div>
+  );
+}
+
+/** Where the listings' prices sit (a small bar chart), with the typical price marked. */
+function PriceSpread({ res, divine }: { res: Result | null; divine: number | null }) {
+  const ps = (res?.listings ?? []).map((l) => l.chaos).filter((x): x is number => x != null).sort((a, b) => a - b);
+  if (ps.length < 3) return null;
+  const lo = ps[0], hi = ps[ps.length - 1];
+  const bins = 10;
+  const counts = Array.from({ length: bins }, () => 0);
+  ps.forEach((p) => { counts[Math.min(bins - 1, Math.floor(((p - lo) / Math.max(1e-9, hi - lo)) * bins))] += 1; });
+  const top = Math.max(...counts);
+  const typ = res?.summary?.[1];
+  const mark = typ != null ? Math.min(bins - 1, Math.floor(((typ - lo) / Math.max(1e-9, hi - lo)) * bins)) : -1;
+  return (
+    <div className="tw-spread" title="How the cheapest listings' prices spread out; the gold bar holds the typical price">
+      <div className="tw-spread-bars">{counts.map((n, i) => <i key={i} className={i === mark ? "me" : ""} style={{ height: `${Math.max(8, (n / top) * 100)}%` }} />)}</div>
+      <div className="tw-spread-ends"><span>{money(lo, divine)}</span><span>listing prices</span><span>{money(hi, divine)}</span></div>
+    </div>
+  );
+}
+
+/** The market at a glance, for the Split look's side panel. */
+function MarketStats({ res, divine }: { res: Result; divine: number | null }) {
+  const ps = res.listings.map((l) => l.chaos).filter((x): x is number => x != null);
+  return (
+    <div className="tw-mstats">
+      {res.summary && <div><span>Cheapest</span><b>{money(res.summary[0], divine)}</b></div>}
+      {res.summary && <div><span>Typical</span><b>{money(res.summary[1], divine)}</b></div>}
+      {ps.length > 0 && <div><span>Dearest shown</span><b>{money(Math.max(...ps), divine)}</b></div>}
+      <div><span>Listed</span><b>{res.total.toLocaleString()}</b></div>
+      <div><span>Online now</span><b>{res.listings.filter((l) => l.instant || l.whisper).length}</b></div>
+    </div>
+  );
+}
+
 /** The Ctrl+D price window. */
 export default function TradeWindow() {
   const [check, setCheck] = useState<Check | null>(null);
@@ -406,6 +471,18 @@ export default function TradeWindow() {
   // Like Awakened: change a filter after a search and the old prices go, until you search again.
   useEffect(() => { if (res && setup && searched && searchKey(setup) !== searched) setRes(null); }, [setup, res, searched]);
   const box = useRef<HTMLDivElement | null>(null);
+  const [style, setStyle] = useState<string>(() => { try { return localStorage.getItem(TW_STYLE_KEY) || "classic"; } catch { return "classic"; } });
+  useEffect(() => {
+    const on = (e: StorageEvent) => { if (e.key === TW_STYLE_KEY && e.newValue) setStyle(e.newValue); };
+    window.addEventListener("storage", on);
+    return () => window.removeEventListener("storage", on);
+  }, []);
+  const nextStyle = () => {
+    const i = TW_STYLES.findIndex(([k]) => k === style);
+    const n = TW_STYLES[(i + 1) % TW_STYLES.length][0];
+    setStyle(n);
+    try { localStorage.setItem(TW_STYLE_KEY, n); } catch { /* not kept */ }
+  };
 
   const close = useCallback(() => { setCheck(null); setRes(null); setBulk(null); setErr(""); invoke("hide_trade_window"); }, []);
 
@@ -510,9 +587,18 @@ export default function TradeWindow() {
     patch(i, { min: Math.max(0, (f.min ?? f.value) + step), enabled: true });
   };
 
+  const hero = (
+    <PriceHero res={res} bulk={check.bulk ? bulk : null} busy={busy} err={err} divine={divine}
+      waiting={!res && !busy && !check.bulk ? (searched ? "Filters changed: move onto Search again" : "Pick the stats, then move your mouse onto Search") : null}
+      ninja={check.ninja} ninjaNote={it.rarity === "Unique" && !it.name ? " (best ground unique on this base)" : ""} stack={it.stack_size ?? undefined} name={it.base_type} />
+  );
+  const trend = check.trend ? <TrendLine t={check.trend} /> : null;
+  // Which look: where the price sits, and the extras each look adds.
+  const heroTop = style === "classic" || style === "compare";
   return (
-    <div className="tw-wrap" ref={box}>
+    <div className={`tw-wrap tws-${style}`} ref={box}>
     <div className="qm tw">
+      {style === "price" && <div className="tw-pf">{hero}<PriceSpread res={res} divine={divine} />{trend}</div>}
       <div className="qm-head with-icon">
         <ItemIcon name={it.rarity === "Unique" ? it.name : null} base={it.base_type || null} size={36} />
         <div className="qm-head-text">
@@ -521,10 +607,8 @@ export default function TradeWindow() {
         </div>
       </div>
 
-      <PriceHero res={res} bulk={check.bulk ? bulk : null} busy={busy} err={err} divine={divine}
-        waiting={!res && !busy && !check.bulk ? (searched ? "Filters changed: move onto Search again" : "Pick the stats, then move your mouse onto Search") : null}
-        ninja={check.ninja} ninjaNote={it.rarity === "Unique" && !it.name ? " (best ground unique on this base)" : ""} stack={it.stack_size ?? undefined} name={it.base_type} />
-      {check.trend && <TrendLine t={check.trend} />}
+      {heroTop && hero}
+      {heroTop && trend}
       {check.sold != null && check.sold < 5 && (
         <div className="qm-warn tw-thin" title="poe.ninja's price comes from the few that sold. The filter's worth line counts cards like this under 50c as worthless.">
           Hardly traded: about {Math.max(1, Math.round(check.sold))} sold recently on the exchange, so this price is a guess.</div>
@@ -628,6 +712,7 @@ export default function TradeWindow() {
         </div>
       )}
 
+      {style === "tooltip" && <div className="tw-tt-price">{hero}{trend}</div>}
       {!check.bulk && <div className="tw-opts">
         {setup.category && it.rarity !== "Unique" && (
           <label><input type="checkbox" checked={setup.base_only} onChange={(e) => setSetup({ ...setup, base_only: e.target.checked })} /> {setup.base || it.base_type} only</label>
@@ -704,6 +789,7 @@ export default function TradeWindow() {
       {res && res.listings.length > 0 && (
         <div className="tw-res">
           <div className="tw-sec tw-res-sec">Cheapest listed</div>
+          {style === "compare" && <PriceSpread res={res} divine={divine} />}
           <div className="tw-table">
             <div className="tw-th"><span>Price</span><span>{res.listings.some((l) => l.ilvl) ? "ilvl" : ""}</span><span>Listed</span><span>Seller</span><span /></div>
             {collapsed.map(({ l, n, i }) => (
@@ -717,6 +803,7 @@ export default function TradeWindow() {
                 {l.instant ? <span className="tw-instant" title="Instant buyout: buy it straight from the trade site or the in-game market, no whisper">Instant</span>
                   : l.whisper ? <button className="link small" onClick={() => copy(l.whisper, "l" + i)}>
                   {copied === "l" + i ? "Copied" : "Whisper"}</button> : <span />}
+                {style === "compare" && l.mods && <ListingMods mods={l.mods} yours={setup.filters} />}
               </div>
             ))}
           </div>
@@ -729,6 +816,8 @@ export default function TradeWindow() {
           onClick={() => { try { localStorage.setItem(CRAFT_ITEM_KEY, check.setup?.raw ?? ""); } catch { /* not passed */ } invoke("open_editor", { tab: "craft" }); }}>
           Craft this</button>)}
       {!check.bulk && savedBlock}
+      <button className="link small tw-style-btn" onClick={nextStyle} title={"Switch the look of this window: " + TW_STYLES.map(([, n]) => n).join(", ")}>
+        Style: {TW_STYLES.find(([k]) => k === style)?.[1] ?? "Classic"} ›</button>
       {reporting == null ? (
         <button className="link small tw-report-toggle" onClick={() => { setReporting(""); setReported(""); }}
           title="Saves this price check with your note, so Claude can see exactly what went wrong">
@@ -744,6 +833,15 @@ export default function TradeWindow() {
         </form>
       )}
     </div>
+    {style === "split" && (
+      <aside className="qm tw-market">
+        <div className="tw-sec">Market</div>
+        {hero}
+        {trend}
+        {res && <MarketStats res={res} divine={divine} />}
+        <PriceSpread res={res} divine={divine} />
+      </aside>
+    )}
     {relName && (
       <aside className="qm tw-side" hidden={!hasSide}>
         <RelatedItems name={relName} divine={divine} onData={setHasSide} />

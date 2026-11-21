@@ -35,7 +35,8 @@ const EXAMPLE: { check: Json; result: Json } = {
     total: 10000, url: "https://www.pathofexile.com/trade", divine: 225, summary: [0.04, 0.044],
     listings: Array.from({ length: 10 }, (_, i) => ({ amount: i < 6 ? 1 : 3, currency: i < 6 ? "alch" : "chaos", chaos: i < 6 ? 0.04 : 3,
       account: ["bluuflick", "VeenBearer", "Cerauful", "Ghorkus#7335"][i % 4], indexed: new Date(Date.now() - (i + 1) * 3.6e6 * 7).toISOString(),
-      whisper: "@x Hi, I'd like to buy...", instant: i === 3, ilvl: 70 + i })),
+      whisper: "@x Hi, I'd like to buy...", instant: i === 3, ilvl: 70 + i,
+      mods: [`+${60 + i * 2} to maximum Life`, `+${28 + i} to Strength`, i % 2 ? "+12% to Chaos Resistance" : "+40 to Dexterity"] })),
   },
 };
 

@@ -668,6 +668,9 @@ pub struct Listing {
     pub ilvl: Option<u32>,
     /// Instant buyout (from the seller's merchant tab): buy it from the trade site or in game, no whisper.
     pub instant: bool,
+    /// The listed item's mods (implicit, fractured, explicit, crafted), to compare with yours.
+    #[serde(default)]
+    pub mods: Vec<String>,
 }
 
 /// Reads the trade site's fetch answer.
@@ -685,6 +688,8 @@ pub fn listings(fetched: &Value, rates: &HashMap<String, f64>) -> Vec<Listing> {
             whisper: l["whisper"].as_str().unwrap_or("").to_string(),
             ilvl: r["item"]["ilvl"].as_u64().map(|v| v as u32),
             instant: l.get("fee").is_some() || l["whisper"].as_str().map(str::is_empty).unwrap_or(true),
+            mods: ["implicitMods", "fracturedMods", "explicitMods", "craftedMods"].iter()
+                .flat_map(|k| r["item"][*k].as_array().into_iter().flatten().filter_map(|m| m.as_str().map(String::from))).collect(),
         })
     }).collect()
 }
@@ -1258,7 +1263,7 @@ Item Level: 75
         assert_eq!(summary(&ls), Some((50.0, 200.0)));
         // One price fixer listing six cheap copies counts once: the typical price comes from the real sellers.
         let l = |acc: &str, c: f64| Listing { amount: c, currency: "chaos".into(), chaos: Some(c), account: acc.into(), indexed: String::new(),
-            whisper: String::new(), ilvl: None, instant: false };
+            whisper: String::new(), ilvl: None, instant: false, mods: vec![] };
         let mut fixed: Vec<Listing> = (0..6).map(|_| l("fixer", 0.1)).collect();
         fixed.extend([l("a", 3.0), l("b", 3.0), l("c", 4.0), l("d", 5.0)]);
         assert_eq!(summary(&fixed), Some((0.1, 3.0)));

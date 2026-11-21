@@ -296,6 +296,14 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   elemental total and hidden, and the chaos total was skipped (bench craft only), so chaos vanished. Now the chaos
   total shows, unticked (trade_rules: bench_only).
 
+- Looks + sidebar 21 Nov (0.2.23): price window has 5 looks (`TW_STYLES` in TradeWindow.tsx, localStorage `tw.style`,
+  shared with Settings → Price check "Look of the price window"; "Style: … ›" at the bottom cycles): classic,
+  tooltip (game-tooltip header, price moved down above Search), split (`.tw-market` side panel: hero, trend,
+  `MarketStats`, `PriceSpread`), compare (each listing's mods vs yours: `ListingMods`, trade.rs `Listing.mods` from
+  implicit/fractured/explicit/crafted), price first (hero + spread above the item). Sidebar: group headings gold with a
+  rule; in-game keys from Settings beside their pages (gold chips: My edits F2, Batch F3, My build F6, Atlas F7,
+  Prices Ctrl+D, Filters F4), Ctrl+N shows on hover; footer links to Settings for changing hotkeys.
+
 - Crafting page 21 Nov (0.2.20): new "Crafting" page (Endgame menu) + "Craft this" link in the Ctrl+D window (gear,
   not uniques; passes the item through localStorage `craft.item`, opens the editor on the page). Data:
   `core/data/poe1_craft.json` from RePoE via `node tools/build_craft_data.mjs` (bases with tags, prefix/suffix mods
@@ -599,6 +607,12 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 
 **Crafted chaos (21 Nov, 0.2.18)**
 - [x] (Confirmed 21 Nov.) Ctrl+D on gear with a crafted "X and Chaos Resistances": "+N% total to Chaos Resistance" is there to tick.
+
+**Looks + sidebar (21 Nov, 0.2.23)**
+- [ ] Ctrl+D → "Style: Classic ›" at the bottom switches the look (Tooltip, Split, Compare, Price first) and it sticks;
+      Settings → Price check has the same choice. Compare: each listing's mods green (better) / red (worse) than yours.
+- [ ] Sidebar: group headings easy to read; in-game keys beside My edits, Batch mode, My build, Atlas, Prices, Filters
+      (they follow what you set in Settings); hovering a page shows its Ctrl+number.
 
 **Crafting page (21 Nov, 0.2.20)**
 - [ ] Editor → Crafting: pick a base (e.g. Eternal Burgonet), item level, influence: prefixes and suffixes listed with

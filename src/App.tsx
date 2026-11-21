@@ -125,6 +125,14 @@ export default function App() {
   /** "Modify rule" from the quick menu: which rule to show. */
   const [focus, setFocus] = useState<Source | null>(null);
   const [adding, setAdding] = useState(false);
+  /** In-game hotkeys from Settings, shown next to their pages. */
+  const [keys, setKeys] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const load = () => invoke<Record<string, unknown>>("get_settings").then((s) => setKeys(Object.fromEntries(Object.entries(s).filter(([k, v]) => k.startsWith("key_") && typeof v === "string") as [string, string][]))).catch(() => {});
+    load();
+    window.addEventListener("focus", load);
+    return () => window.removeEventListener("focus", load);
+  }, [tab]);
 
   const refresh = useCallback(async () => {
     try { setOv(await invoke<Overview>("overview")); } catch (e) { setError(String(e)); }
@@ -195,6 +203,7 @@ export default function App() {
   const active = ov.profiles.find((p) => p.id === ov.active) ?? ov.profiles[0];
 
   const current = MENU.flatMap((g) => g.items).find((i) => i.id === tab);
+  const pages = MENU.flatMap((g) => g.items.map((i) => i.id));
   return (
     <div className="shell">
       <aside className="side">
@@ -214,13 +223,27 @@ export default function App() {
                 <button key={i.id} className={`menu-item ${tab === i.id ? "on" : ""}`} title={i.hint} onClick={() => setTab(i.id)}>
                   <span className="menu-ico" style={{ "--c": COLOURS[i.id] } as CSSProperties}><Icon d={ICONS[i.id]} /></span><span>{i.name}</span>
                   {i.id === "batch" && ov.batch_on && <span className="menu-dot" title="Batch mode is on" />}
-                  {i.id === "find" && <span className="menu-key" title="Press Ctrl+F anywhere in the editor">Ctrl+F</span>}
+                  {(() => {
+                    // The in-game key for this page (from Settings), and its Ctrl+number here in the editor.
+                    const game: Partial<Record<Tab, [string, string]>> = { edits: [keys.key_quick_edit ?? "F2", "In game: change the item under your mouse"],
+                      batch: [keys.key_batch ?? "F3", "In game: batch mode on/off"], build: [keys.key_build ?? "F6", "In game: show/hide your build"],
+                      atlas: [keys.key_atlas ?? "F7", "In game: show/hide your atlas strategy"], prices: [keys.key_price ?? "Ctrl+D", "In game: price check the item under your mouse"],
+                      profiles: [keys.key_reload ?? "F4", "In game: reload your filter"] };
+                    const g = game[i.id];
+                    const n = pages.indexOf(i.id) + 1;
+                    return <span className="menu-keys">
+                      {g && <span className="menu-key game" title={g[1]}>{g[0]}</span>}
+                      {i.id === "find" ? <span className="menu-key always" title="Press Ctrl+F anywhere in the editor">Ctrl+F</span>
+                        : n >= 1 && n <= 9 ? <span className="menu-key" title={`Press Ctrl+${n} anywhere in the editor`}>Ctrl+{n}</span> : null}
+                    </span>;
+                  })()}
                 </button>
               ))}
             </div>
           ))}
         </nav>
-        <div className="side-foot muted small">In game: <b>F2</b> edit item · <b>F4</b> reload · <b>F6</b> build<br />Here: <b>Ctrl+F</b> find · <b>Ctrl+1–9</b> pages · <b>Alt+←</b> back</div>
+        <div className="side-foot muted small"><span className="menu-key game">F2</span> keys work in game, <span className="menu-key">Ctrl+1</span> keys here. <b>Alt+←</b> goes back.<br />
+          <button className="link small" onClick={() => setTab("settings")}>Change hotkeys</button></div>
       </aside>
 
       <main className={`content ${tab === "craft" ? "wide" : ""}`}>

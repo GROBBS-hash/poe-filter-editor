@@ -1538,3 +1538,66 @@ main.content .card h2 { font-size: 19px; font-weight: 500; letter-spacing: .02em
 .cr-plan .cr-way-nums { min-width: 64px; }
 .cr-plan .cr-way-group { display: block; }
 
+
+/* Sidebar: clearer group headings, a key next to each page */
+.menu-gname { font-size: 11px !important; font-weight: 600 !important; letter-spacing: .1em !important; text-transform: uppercase; color: var(--gold) !important;
+  opacity: .9; display: flex; align-items: center; gap: 8px; margin: 16px 8px 6px !important; }
+.menu-gname::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, color-mix(in srgb, var(--gold) 45%, transparent), transparent); }
+.menu-group:first-child .menu-gname { margin-top: 6px !important; }
+.menu-keys { margin-left: auto; display: inline-flex; gap: 4px; align-items: center; }
+.menu-item .menu-key { margin-left: 0; }
+.menu-key { font-size: 10.5px; padding: 1px 6px; border-radius: 5px; border: 1px solid var(--line); color: var(--muted); background: var(--raised); white-space: nowrap; }
+.menu-key.game { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 45%, transparent); background: var(--gold-bg); }
+
+/* Price window looks (Style button / Settings) */
+.tw-style-btn { display: block; margin-top: 6px; }
+.tw-lmods { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 3px; padding: 0 0 4px; }
+.tw-lmod { font-size: 11px; padding: 0 6px; border-radius: 5px; background: #1c2029; color: #8c93a3; }
+.tw-lmod.better { background: rgba(95, 211, 138, .14); color: #8fe6ad; }
+.tw-lmod.worse { background: rgba(255, 123, 123, .13); color: #ff9c9c; }
+.tw-lmod.same { background: rgba(136, 136, 255, .12); color: #aab0ff; }
+.tw-spread { margin: 8px 0 6px; }
+.tw-spread-bars { display: flex; gap: 3px; align-items: flex-end; height: 30px; }
+.tw-spread-bars i { flex: 1; background: #2f3a66; border-radius: 2px; }
+.tw-spread-bars i.me { background: var(--gold); }
+.tw-spread-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+/* Tooltip: the item like the game's tooltip, mods as clean rows, price at the bottom */
+.tws-tooltip .qm.tw { background: #0d0c0b; border-color: #5a4126; }
+.tws-tooltip .qm-head { justify-content: center; text-align: center; background: linear-gradient(180deg, #2c2414, #17120b) !important; border-bottom: 1px solid #5a4126; }
+.tws-tooltip .qm-head .item-icon { display: none; }
+.tws-tooltip .qm-name { font-size: 17px; }
+.tws-tooltip .tw-stat { background: transparent; border-bottom: 1px solid #1d1a15; border-radius: 0; padding: 5px 4px; }
+.tws-tooltip .tw-stat.on { background: rgba(136, 136, 255, .07); }
+.tws-tooltip .tw-label.mod-explicit, .tws-tooltip .tw-label.mod-pseudo { color: #8f99ff; }
+.tws-tooltip .tw-group { color: #9a8f78; border-color: #2a2218; }
+.tws-tooltip .tw-tt-price { margin-top: 8px; padding-top: 6px; border-top: 1px solid #2a2218; }
+
+/* Split: the market in its own panel beside the item */
+.tw-market { width: 260px; padding: 12px; animation: card-in .3s var(--ease) both; }
+.tw-market .tw-hero { margin-top: 4px; }
+.tw-mstats { display: grid; gap: 4px; margin: 8px 0; }
+.tw-mstats div { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; padding: 4px 8px; border-radius: 6px; background: rgba(255,255,255,.03); }
+.tw-mstats span { color: var(--muted); }
+.tw-mstats b { font-weight: 600; color: var(--text); }
+
+/* Compare: listings show their mods against yours */
+.tws-compare .tw-tr { padding-bottom: 2px; }
+
+/* Price first: the answer big at the top */
+.tw-pf { margin: -2px 0 10px; }
+.tw-pf .tw-hero { margin-top: 0; padding: 14px 14px; }
+.tw-pf .tw-hero-price { font-size: 34px; }
+.tws-price .qm-head { margin-top: 0 !important; border-radius: 10px; }
+
+.shell { grid-template-columns: 236px minmax(0, 1fr); }
+@media (max-width: 760px) { .shell { grid-template-columns: 1fr; } }
+.menu-item > span:nth-child(2) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.menu-keys .menu-key { padding: 1px 5px; }
+
+.menu-keys .menu-key:not(.game) { display: none; }
+.menu-item:hover .menu-keys .menu-key:not(.game), .menu-item.on .menu-keys .menu-key:not(.game) { display: inline; }
+.menu-item:hover .menu-keys .menu-key.game ~ .menu-key, .menu-item.on .menu-keys .menu-key.game ~ .menu-key { display: none; }
+
+.menu-keys .menu-key.always { display: inline !important; }
+

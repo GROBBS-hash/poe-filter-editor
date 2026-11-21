@@ -1,6 +1,7 @@
 import { PageLoading } from "./Loading";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { TW_STYLES, TW_STYLE_KEY } from "./TradeWindow";
 
 type Settings = {
   key_quick_edit: string; key_batch: string; key_reload: string; key_cycle: string; key_build: string; key_price?: string; key_atlas?: string;
@@ -85,6 +86,7 @@ export default function SettingsPage() {
         <label className="check"><input type="checkbox" checked={s.price_instant_all ?? false} onChange={(e) => set({ price_instant_all: e.target.checked })} />
           <span>Search every item straight away. Off (like Awakened): uniques, currency and other bulk items, and
             unidentified items search at once; rares and gear wait so you can pick the stats, then move your mouse onto Search.</span></label>
+        <PriceLook />
       </div>
 
       <div className="card">
@@ -139,5 +141,21 @@ export default function SettingsPage() {
         <button className="primary" disabled={!dirty} onClick={save}>{dirty ? "Save settings" : "Saved"}</button>
       </div>
     </>
+  );
+}
+
+
+/** The price window's look: same choice as its Style button (shared through localStorage). */
+function PriceLook() {
+  const [v, setV] = useState(() => { try { return localStorage.getItem(TW_STYLE_KEY) || "classic"; } catch { return "classic"; } });
+  const pick = (k: string) => { setV(k); try { localStorage.setItem(TW_STYLE_KEY, k); } catch { /* not kept */ } };
+  return (
+    <div className="tw-look-pick">
+      <h3>Look of the price window</h3>
+      <p className="muted small">Try them for a while: the "Style" button at the bottom of the price window switches too.</p>
+      {TW_STYLES.map(([k, name, what]) => (
+        <label key={k} className="check"><input type="radio" name="tw-look" checked={v === k} onChange={() => pick(k)} /><span><b>{name}</b>: {what}</span></label>
+      ))}
+    </div>
   );
 }
