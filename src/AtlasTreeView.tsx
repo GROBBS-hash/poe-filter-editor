@@ -76,7 +76,19 @@ export function StepBar({ steps, step, onStep }: { steps: AtlasStep[]; step: num
 /** The numbered list of steps; click one to jump to it. */
 export function StepList({ steps, step, onStep }: { steps: AtlasStep[]; step: number; onStep: (i: number) => void }) {
   const cur = useRef<HTMLButtonElement | null>(null);
-  useEffect(() => { cur.current?.scrollIntoView({ block: "nearest" }); }, [step]);
+  // Keep the current step in view by scrolling only the list (scrollIntoView also scrolled the whole page, so
+  // opening the Atlas page jumped down to the list).
+  useEffect(() => {
+    const b = cur.current;
+    if (!b) return;
+    // The nearest box that scrolls on its own (the list here, its panel in the F7 window), never the page itself.
+    let box = b.parentElement;
+    while (box && box !== document.body && !(/(auto|scroll)/.test(getComputedStyle(box).overflowY) && box.scrollHeight > box.clientHeight)) box = box.parentElement;
+    if (!box || box === document.body) return;
+    const r = b.getBoundingClientRect(), br = box.getBoundingClientRect();
+    if (r.top < br.top) box.scrollTop -= br.top - r.top;
+    else if (r.bottom > br.bottom) box.scrollTop += r.bottom - br.bottom;
+  }, [step]);
   return (
     <div className="atv-steps">
       {steps.map((s, i) => (

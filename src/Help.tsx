@@ -17,10 +17,22 @@ type Faq = { q: string; a: ReactNode; tab?: [string, string] };
 const FAQ: Faq[] = [
   {
     q: "Go stricter (e.g. Semi-Strict → Uber Strict) but keep all my settings",
-    a: <>Open <b>Profiles</b> and change <b>Built on</b> next to your filter to the strictness you want. Your edits, tier changes,
+    a: <>Open <b>Filters</b> and pick the strictness you want in the box next to your filter. Your edits, tier changes,
       levelling setup, price tiers and theme are all kept: they're stored separately and put back on top of the new NeverSink file.
       Press <b>F4</b> in game. Want to keep the old one too? Use <b>Save as new</b> first, then change the copy.</>,
-    tab: ["profiles", "Open Profiles"],
+    tab: ["profiles", "Open Filters"],
+  },
+  {
+    q: "Price check an item",
+    a: <>Hover the item in game and press <b>Ctrl+D</b>. The price window shows what it sells for, with the stats that matter
+      already ticked. Change the ticks or minimums and move your mouse onto <b>Search</b> to look again. The <b>Style</b> button
+      at the bottom switches how the window looks.</>,
+  },
+  {
+    q: "Work out how to craft a mod",
+    a: <>Open <b>Crafting</b> (or press Ctrl+D on your item and click <b>Craft this</b>). Click a mod to see every way to get it,
+      cheapest first, with the odds. Press <b>+</b> on several mods to see the odds of hitting them all on one item.</>,
+    tab: ["craft", "Open Crafting"],
   },
   {
     q: "Change how one item looks or sounds in game",
@@ -93,7 +105,8 @@ export default function Help({ go }: { go: Go }) {
           </li>
         ))}
       </ul>
-      <p className="muted small">Hotkeys (change them in Settings): F2 edit the item under your mouse · F3 batch mode · F4 load/reload this filter in game.</p>
+      <p className="muted small">Hotkeys (change them in Settings): F2 edit the item under your mouse · Ctrl+D price check · F3 batch mode ·
+        F4 load/reload this filter in game · F6 your build · F7 atlas strategy.</p>
     </div>
   );
 }

@@ -96,7 +96,7 @@ mockIPC((cmd, args) => {
   if (cmd === "overview") return { profiles: [{ id: "mid", name: "Mid-Game", game: "Poe1", base_file: "", output_file: "", rules: [] }], active: "mid", poe1_dir: "", poe2_dir: "", batch_on: false };
   if (cmd === "wealth_get") return wealth;
   if (cmd === "buy_base_item") return { total: 3480, ilvl: 75, notables: [["Doryani's Lesson", 68], ["Inspired Oppression", 75], ["Overshock", 50]] };
-  if (cmd === "get_price_settings") return { settings: { enabled: false, groups: [{ group: "DivinationCards", enabled: true, tiers: [], hide_below: null }, { group: "Uniques", enabled: true, tiers: [], hide_below: null }] }, info: { unit: "chaos" } };
+  if (cmd === "get_price_settings") return { settings: { enabled: false, groups: [{ group: "DivinationCards", enabled: true, tiers: [], hide_below: null }, { group: "Uniques", enabled: true, tiers: [], hide_below: null }] }, info: { unit: "chaos", league: "Keepers", updated: new Date().toISOString(), count: 18432 } };
   if (cmd === "price_count_below") return [Math.round(Math.min(480, (args as { limit: number }).limit * 60)), 512];
   if (cmd === "set_price_settings") return [];
   if (cmd === "wealth_find") {
@@ -135,11 +135,46 @@ mockIPC((cmd, args) => {
   // Tiers sections: public/_tiers.json when present (tierdump --json from a real filter), else none.
   if (cmd === "get_tiers") return fetch("/_tiers.json").then((r) => r.ok ? r.json() : []).catch(() => []);
   if (cmd === "get_map_tiers") return mapTiers();
+  // Themes page: three built-in themes, six value levels each (Chase → Junk).
+  if (cmd === "list_themes") {
+    const lv = (h: number[]) => [0.42, 0.3, 0.2, 0.11, 0.05, 0].map((t, i) => ({
+      text: h.map((c) => Math.min(255, Math.round(c * (1 - i * 0.12)))).concat(255), border: i < 3 ? h.concat(255) : null,
+      background: h.map((c) => Math.floor(c * t)).concat([255, 245, 230, 210, 180, 140][i]) }));
+    return { builtin: [{ name: "Ember", levels: lv([255, 150, 60]) }, { name: "Frost", levels: lv([120, 200, 255]) }, { name: "Verdant", levels: lv([120, 230, 130]) }], custom: [] };
+  }
+  // Levelling gear page: a level 50 Elementalist and a few levelling uniques.
+  if (cmd === "gear_setup") return { character: ["Witch", "Elementalist", 50], league: "Keepers", gems: { Body: ["Arc", "Spell Echo"] },
+    stats: [{ id: "life", name: "Life" }, { id: "resistances", name: "Resistances" }, { id: "movement_speed", name: "Movement speed" }, { id: "spell_damage", name: "Spell damage" }] };
+  if (cmd === "gear_picks") {
+    const u = (name: string, base: string, cls: string, level: number, slot: string, mods: string[], matched: string[], price: number | null) =>
+      ({ unique: { name, base, class: cls, level, mods, stats: matched }, slot, matched, wearable: level <= 50, trade: "https://www.pathofexile.com/trade", price });
+    return [
+      u("Goldrim", "Leather Cap", "Helmets", 1, "Helmet", ["+30 to Evasion Rating", "+40% to all Elemental Resistances"], ["resistances"], 1),
+      u("Seven-League Step", "Rawhide Boots", "Boots", 1, "Boots", ["50% increased Movement Speed"], ["movement_speed"], 85),
+      u("Tabula Rasa", "Simple Robe", "Body Armours", 1, "Body", ["Item has 6 White Sockets", "6 linked"], [], 12),
+      u("Lochtonial Caress", "Iron Gauntlets", "Gloves", 10, "Gloves", ["10% increased Attack and Cast Speed", "+15 to maximum Life"], ["life"], 1),
+      u("Wanderlust", "Wool Shoes", "Boots", 1, "Boots", ["20% increased Movement Speed", "Cannot be Frozen"], ["movement_speed"], 1),
+    ];
+  }
+  if (cmd === "get_history") return [{ index: 0, at: Math.floor(Date.now() / 1000) - 600, what: "Hid normal Two Hand Maces" }];
+  // Presets page (Find view="presets"): a few league-mechanic presets.
+  if (cmd === "list_farm_presets") return [
+    { id: "breach", title: "Breach", hint: "Splinters, blessings and breach rings stand out", count: 14 },
+    { id: "expedition", title: "Expedition", hint: "Artifacts and logbooks louder", count: 9 },
+    { id: "delirium", title: "Delirium", hint: "Orbs and simulacrum splinters highlighted", count: 21 },
+    { id: "harvest", title: "Harvest", hint: "Lifeforce stacks louder", count: 4 },
+  ];
   if (cmd === "set_tiers") { const a = args as { tiers: string[]; show: boolean | null; clearStyle?: boolean; reset?: boolean }; for (const t of a.tiers) { if (a.clearStyle) extrasOff.add(t); else if (a.reset) extrasOff.delete(t); } for (const t of a.tiers) { if (a.show === false) mapHidden.add(t); else if (a.show) mapHidden.delete(t); } return []; }
   return null;
 }, { shouldMockEvents: true });
 
 try { if (!localStorage.getItem("tab")) localStorage.setItem("tab", "wealth"); } catch { /* fine */ }
+if (!buildWin && !atlasWindow) document.body.classList.add("main");
+// For checking pages from the browser console: await __go("Themes") opens that sidebar page.
+(window as unknown as { __go: (n: string) => Promise<boolean> }).__go = async (name: string) => {
+  const el = [...document.querySelectorAll<HTMLButtonElement>(".side button")].find((b) => b.textContent?.trim().startsWith(name));
+  el?.click(); await new Promise((r) => setTimeout(r, 900)); window.scrollTo(0, 0); return !!el;
+};
 if (buildWin) document.body.classList.add("overlay");
 if (atlasWindow) document.body.classList.add("overlay");
 createRoot(document.getElementById("root")!).render(atlasWindow ? <AtlasOverlay /> : buildWin ? <BuildOverlay /> : <App />);

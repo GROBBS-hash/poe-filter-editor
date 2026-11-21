@@ -79,7 +79,7 @@ const MENU: { group: string; items: { id: Tab; name: string; hint: string }[] }[
   { group: "App", items: [
     { id: "profiles", name: "Filters", hint: "Your filters, strictness and NeverSink version" },
     { id: "settings", name: "Settings", hint: "Hotkeys, area level and AI" },
-    { id: "help", name: "Help", hint: "How do I…?" },
+    { id: "help", name: "Help", hint: "Quick answers, and what each hotkey does" },
   ] },
 ];
 
