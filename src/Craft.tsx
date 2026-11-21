@@ -12,8 +12,8 @@ type BenchWay = { text: string; cost: [string, number][] };
 type Family = { key: string; affix: "prefix" | "suffix"; text: string; tags: string[]; tiers: Tier[]; chaos: number; have: number | null;
   essences: EssenceWay[]; bench: BenchWay[]; fossils_more: string[]; fossils_none: string[] };
 type Pool = { base: string; class: string; ilvl: number; influences: string[]; families: Family[] };
-type Way = { method: string; chance: number; cost_each: number | null; average: number | null; note: string };
-type Start = { base: string; ilvl: number; influences: string[]; have: string[]; name: string };
+type Way = { group: string; method: string; chance: number; cost_each: number | null; average: number | null; note: string };
+type Start = { base: string; ilvl: number; influences: string[]; have: string[]; name: string; rarity: string };
 
 const INFLUENCES = ["Shaper", "Elder", "Crusader", "Redeemer", "Hunter", "Warlord"];
 /** Shared with the Ctrl+D window: the item its "Craft" button sends here. */
@@ -39,6 +39,7 @@ export default function Craft() {
   const [have, setHave] = usePersist<string[]>("craft.have", []);
   const [itemName, setItemName] = usePersist("craft.name", "");
   const [itemText, setItemText] = usePersist("craft.text", "");
+  const [rarity, setRarity] = usePersist("craft.rarity", "");
   const [pool, setPool] = useState<Pool | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -53,7 +54,7 @@ export default function Craft() {
   const fromText = async (text: string) => {
     const s = await invoke<Start | null>("craft_start", { text }).catch(() => null);
     if (!s) { setErr("That doesn't look like gear you can craft on (armour, weapons, jewellery, quivers, shields)."); return; }
-    setErr(""); setBase(s.base); setIlvl(s.ilvl); setInfl(s.influences); setHave(s.have); setItemName(s.name); setItemText(text); setPick(null); setPaste(false);
+    setErr(""); setBase(s.base); setIlvl(s.ilvl); setInfl(s.influences); setHave(s.have); setRarity(s.rarity); setItemName(s.name); setItemText(text); setPick(null); setPaste(false);
   };
   // An item sent from the Ctrl+D window (now, or while this page was closed).
   useEffect(() => {
@@ -86,7 +87,7 @@ export default function Craft() {
   }, [pool, q]);
   const picked = pool?.families.find((f) => f.key === pick) ?? null;
 
-  const clearItem = () => { setHave([]); setItemName(""); setItemText(""); };
+  const clearItem = () => { setHave([]); setItemName(""); setItemText(""); setRarity(""); };
   const toggleInfl = (i: string) => setInfl(infl.includes(i) ? infl.filter((x) => x !== i) : [...infl, i].slice(-2));
 
   return (
@@ -114,7 +115,7 @@ export default function Craft() {
           }} title="For step-by-step plans: Craft of Exile's simulator">Open in Craft of Exile{itemText ? " (item copied: click Import item, then paste)" : ""}</button>
         </div>
         {paste && <textarea className="text cr-paste" autoFocus placeholder="Paste the item here (Ctrl+V)" onChange={(e) => e.target.value.includes("Item Class:") && fromText(e.target.value)} />}
-        {itemName && <div className="cr-item small">Crafting on <b>{itemName}</b> · {have.length} mods read from it <button className="link small" onClick={clearItem}>forget the item</button></div>}
+        {itemName && <div className="cr-item small">Crafting on <b>{itemName}</b> ({rarity.toLowerCase() || "item"}) · {have.length} mods read from it <button className="link small" onClick={clearItem}>forget the item</button></div>}
         {err && <p className="danger-text small">{err}</p>}
       </div>
 
@@ -150,7 +151,7 @@ export default function Craft() {
           })}
         </div>
         <div className="cr-side">
-          {picked ? <Detail key={picked.key} fam={picked} base={base} ilvl={ilvl} infl={infl} /> :
+          {picked ? <Detail key={picked.key} fam={picked} base={base} ilvl={ilvl} infl={infl} have={have} rarity={rarity} /> :
             <div className="card muted">Click a mod to see its tiers and the cheapest ways to get it.</div>}
         </div>
       </div>
@@ -158,7 +159,7 @@ export default function Craft() {
   );
 }
 
-function Detail({ fam, base, ilvl, infl }: { fam: Family; base: string; ilvl: number; infl: string[] }) {
+function Detail({ fam, base, ilvl, infl, have, rarity }: { fam: Family; base: string; ilvl: number; infl: string[]; have: string[]; rarity: string }) {
   const best = fam.tiers.find((t) => t.ok)?.tier ?? 1;
   const [tier, setTier] = useState(Math.min(fam.tiers.length || 1, best + 1));
   const [ways, setWays] = useState<Way[] | null>(null);
@@ -166,10 +167,10 @@ function Detail({ fam, base, ilvl, infl }: { fam: Family; base: string; ilvl: nu
   useEffect(() => {
     let live = true;
     setWays(null);
-    invoke<Way[]>("craft_ways", { base, ilvl, influences: infl, key: fam.key, minTier: tier })
+    invoke<Way[]>("craft_ways", { base, ilvl, influences: infl, key: fam.key, minTier: tier, have, rarity })
       .then((w) => live && setWays(w)).catch((e) => live && setErr(friendly(e)));
     return () => { live = false; };
-  }, [fam.key, tier, base, ilvl, infl.join(",")]);
+  }, [fam.key, tier, base, ilvl, infl.join(","), have.join("|"), rarity]);
   return (
     <div className="card cr-detail">
       <h2>{fam.text.split("\n").map((l, i) => <div key={i}>{l}</div>)}</h2>
@@ -192,8 +193,10 @@ function Detail({ fam, base, ilvl, infl }: { fam: Family; base: string; ilvl: nu
       {err && <p className="danger-text small">{err}</p>}
       {!ways && !err && <p className="muted small">Rolling the item a few thousand times…</p>}
       {ways && ways.length === 0 && <p className="muted small">No simple way found: try Craft of Exile for harvest, veiled or influenced crafts.</p>}
-      {ways && ways.map((w) => (
-        <div key={w.method} className="cr-way">
+      {ways && ways.length > 0 && <p className="muted small">Cheapest first. {rarity ? `Worked out on your ${rarity.toLowerCase()} item.` : "Bring your item (Ctrl+D → Craft this) for exact Exalted / Regal odds."}</p>}
+      {ways && ways.map((w, i) => (
+        <div key={w.method} className={`cr-way ${i === 0 && w.average != null ? "best" : ""}`}>
+          <div className="cr-way-group">{w.group}{i === 0 && w.average != null ? " · cheapest" : ""}</div>
           <div className="cr-way-top"><b>{w.method}</b><span className="cr-odds">{odds(w.chance)}</span></div>
           <div className="small">
             {w.chance < 0.995 && <>Each try {chaos(w.cost_each)} · on average {chaos(w.average)}</>}
@@ -216,7 +219,22 @@ function Detail({ fam, base, ilvl, infl }: { fam: Family; base: string; ilvl: nu
         {fam.fossils_more.length > 0 && <div className="small cr-line">More likely with: <b>{fam.fossils_more.join(", ")}</b></div>}
         {fam.fossils_none.length > 0 && <div className="small cr-line">Never with: {fam.fossils_none.join(", ")}</div>}
       </>}
-      <p className="muted small">Odds are worked out by rolling the item here thousands of times, a rough guide. For multi-step plans use Craft of Exile.</p>
+      <details className="cr-more">
+        <summary>More ways (not worked out here)</summary>
+        <ul className="small">
+          <li><b>Veiled Chaos Orb / Aisling</b>: adds a veiled mod you unveil from Jun; unveils offer a choice of 3, and bench-only "veiled" mods (like "of the Order") come only from this.</li>
+          <li><b>Conqueror Exalted Orbs</b> (Crusader, Redeemer, Hunter, Warlord): add an influence plus one of its mods to a rare with a free slot.</li>
+          <li><b>Awakener's Orb</b>: merges two influenced items, keeping one influence mod from each.</li>
+          <li><b>Eldritch Ember / Ichor</b> and <b>Eldritch Exalted / Annulment / Chaos</b>: Searing Exarch and Eater of Worlds implicits, and changing a mod while the item keeps them.</li>
+          <li><b>Recombinator</b>: combines two items of the same kind, keeping a random mix of their mods.</li>
+          <li><b>Fracturing Orb</b>: locks one mod on a rare with 4+ mods so it can never change: then reroll the rest freely.</li>
+          <li><b>Metamods on the bench</b>: "Prefixes Cannot Be Changed" + Orb of Scouring removes only the suffixes (or the other way round); "Cannot roll Attack/Caster Modifiers" blocks those for Exalts.</li>
+          <li><b>Orb of Annulment</b>: removes one random mod; <b>Divine Orb</b> rerolls the numbers; <b>Blessed Orb</b> rerolls the implicit.</li>
+          <li><b>Beastcrafting</b> (Menagerie): Imprint a magic item to try again; split, add a prefix or suffix and more.</li>
+        </ul>
+        <p className="small"><button className="link small" onClick={() => invoke("open_url", { url: "https://www.craftofexile.com/" })}>Plan these step by step on Craft of Exile</button></p>
+      </details>
+      <p className="muted small">Odds are worked out by rolling the item here thousands of times, a rough guide.</p>
     </div>
   );
 }

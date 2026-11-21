@@ -61,6 +61,8 @@ pub struct Pool { pub base: String, pub class: String, pub ilvl: u32, pub influe
 /// One way to get a mod, with its odds.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct Way {
+    /// "Guaranteed", "Reroll" or "Add a mod".
+    pub group: String,
     /// "Chaos Orb", "Shrieking Essence of Greed", "Jagged Fossil + Pristine Fossil"…
     pub method: String,
     /// Chance per try, 0–1.
@@ -74,6 +76,8 @@ pub struct Way {
 
 /// "+(15-25)% to Fire Resistance" / "+56 to Intelligence" -> "+#% to fire resistance" / "+# to intelligence".
 fn shape(text: &str) -> String {
+    // Item lines can carry their affix ("prefix|+21% to Item Rarity", see `start`).
+    let text = text.strip_prefix("prefix|").or_else(|| text.strip_prefix("suffix|")).unwrap_or(text);
     let mut out = String::new();
     let mut chars = text.chars().peekable();
     while let Some(c) = chars.next() {
@@ -89,6 +93,9 @@ fn shape(text: &str) -> String {
     }
     out.replace("+#", "#").replace("-#", "#").to_lowercase()
 }
+
+/// An item line without its "prefix|" / "suffix|" mark.
+fn shape_strip(t: &str) -> &str { t.strip_prefix("prefix|").or_else(|| t.strip_prefix("suffix|")).unwrap_or(t) }
 
 /// The top of a mod's first number ("+(15-25)% …" -> 25, "+56 …" -> 56).
 fn first_top(text: &str) -> Option<f64> {
@@ -170,23 +177,37 @@ fn rollable(tags: &HashSet<String>, ilvl: u32, fossils: &[&RawFossil]) -> Vec<(u
     }).collect()
 }
 
+/// How an item gets rolled: a rare (4–6 mods, 3+3) or magic (1–2 mods, 1+1); `tag` = Harvest's "keeps at least one
+/// mod of this kind" (the first mod is picked among those).
+#[derive(Clone, Copy)]
+struct Roll<'a> { magic: bool, tag: Option<&'a str> }
+const RARE: Roll = Roll { magic: false, tag: None };
+
 /// Rolls a rare `trials` times; counts how often each mod lands.
-fn simulate(pool: &[(usize, f64, bool, usize)], trials: u32) -> HashMap<usize, u32> {
+fn simulate(pool: &[(usize, f64, bool, usize)], trials: u32) -> HashMap<usize, u32> { simulate_with(pool, trials, RARE) }
+
+fn simulate_with(pool: &[(usize, f64, bool, usize)], trials: u32, roll: Roll) -> HashMap<usize, u32> {
+    let d = data();
     let mut rng = Rng(0x9E37_79B9_7F4A_7C15);
     let mut counts = vec![0u32; pool.len()];
     let mut used: Vec<usize> = Vec::with_capacity(6);
+    let side_max = if roll.magic { 1 } else { 3 };
+    let tagged: Vec<bool> = pool.iter().map(|(i, ..)| roll.tag.is_some_and(|t| d.mods[*i].tags.iter().any(|x| x == t))).collect();
     for _ in 0..trials {
         let r = rng.next();
-        let n = if r < 8.0 / 12.0 { 4 } else if r < 11.0 / 12.0 { 5 } else { 6 };
+        // Magic: one or two mods, about even (a rough guide); rare: 4 (8 in 12), 5 (3 in 12), 6 (1 in 12).
+        let n = if roll.magic { if r < 0.5 { 1 } else { 2 } } else if r < 8.0 / 12.0 { 4 } else if r < 11.0 / 12.0 { 5 } else { 6 };
         let (mut pre, mut suf) = (0, 0);
         used.clear();
-        for _ in 0..n {
-            let open = |p: bool, g: usize, pre: i32, suf: i32, used: &[usize]| !used.contains(&g) && if p { pre < 3 } else { suf < 3 };
-            let total: f64 = pool.iter().filter(|(_, _, p, g)| open(*p, *g, pre, suf, &used)).map(|(_, w, ..)| w).sum();
+        for step in 0..n {
+            let only_tag = step == 0 && roll.tag.is_some();
+            let open = |k: usize, p: bool, g: usize, pre: i32, suf: i32, used: &[usize]| !used.contains(&g)
+                && if p { pre < side_max } else { suf < side_max } && (!only_tag || tagged[k]);
+            let total: f64 = pool.iter().enumerate().filter(|(k, (_, _, p, g))| open(*k, *p, *g, pre, suf, &used)).map(|(_, (_, w, ..))| w).sum();
             if total <= 0.0 { break }
             let mut x = rng.next() * total;
             for (k, (_, w, p, g)) in pool.iter().enumerate() {
-                if !open(*p, *g, pre, suf, &used) { continue }
+                if !open(k, *p, *g, pre, suf, &used) { continue }
                 x -= w;
                 if x <= 0.0 {
                     used.push(*g);
@@ -199,6 +220,18 @@ fn simulate(pool: &[(usize, f64, bool, usize)], trials: u32) -> HashMap<usize, u
     }
     pool.iter().zip(counts).filter(|(_, n)| *n > 0).map(|((i, ..), n)| (*i, n)).collect()
 }
+
+/// Chance one added mod (Exalted / Regal / Augmentation) is a target: its weight over everything that can still go on.
+fn add_one(pool: &[(usize, f64, bool, usize)], used: &HashSet<usize>, pre: i32, suf: i32, side_max: i32, is_target: &dyn Fn(&usize) -> bool) -> f64 {
+    let open: Vec<&(usize, f64, bool, usize)> = pool.iter().filter(|(_, _, p, g)| !used.contains(g) && if *p { pre < side_max } else { suf < side_max }).collect();
+    let total: f64 = open.iter().map(|(_, w, ..)| w).sum();
+    if total <= 0.0 { return 0.0 }
+    open.iter().filter(|(i, ..)| is_target(i)).map(|(_, w, ..)| w).sum::<f64>() / total
+}
+
+/// Harvest reforges: "Reforge … including a <kind> modifier".
+const HARVEST: [(&str, &str); 11] = [("life", "Life"), ("defences", "Defence"), ("physical", "Physical"), ("fire", "Fire"), ("cold", "Cold"),
+    ("lightning", "Lightning"), ("chaos", "Chaos"), ("attack", "Attack"), ("caster", "Caster"), ("speed", "Speed"), ("critical", "Critical")];
 const TRIALS: u32 = 20_000;
 
 /// Everything that can roll on `base` at `ilvl` (plus bench-only and essence-only mods), grouped into families,
@@ -273,8 +306,11 @@ pub fn pool(base: &str, ilvl: u32, influences: &[String], have: &[String], price
     // What the item has now.
     for line in have {
         let s = shape(line);
-        if let Some(&f) = shapes.get(&s) {
-            let v = first_top(line.trim_start_matches(['+', '-']));
+        let affix = if line.starts_with("prefix|") { Some("prefix") } else if line.starts_with("suffix|") { Some("suffix") } else { None };
+        // Same wording as a prefix and a suffix (Item Rarity): the item says which.
+        let own = affix.and_then(|a| fams.iter().position(|f| f.affix == a && f.tiers.iter().any(|t| t.text.lines().any(|l| shape(l) == s))));
+        if let Some(f) = own.or_else(|| shapes.get(&s).copied()) {
+            let v = first_top(shape_strip(line).trim_start_matches(['+', '-']));
             fams[f].have = Some(v.and_then(|v| fams[f].tiers.iter().find(|t| first_bottom(&t.text).is_some_and(|b| b <= v)).map(|t| t.tier)).unwrap_or(0));
         }
     }
@@ -293,8 +329,10 @@ pub fn pool(base: &str, ilvl: u32, influences: &[String], have: &[String], price
     Some(Pool { base: base.to_string(), class, ilvl, influences: influences.to_vec(), families: fams })
 }
 
-/// The ways to get one family at `min_tier` or better (1 = best), cheapest first.
-pub fn ways(base: &str, ilvl: u32, influences: &[String], key: &str, min_tier: u32, price: &dyn Fn(&str) -> Option<f64>) -> Vec<Way> {
+/// The ways to get one family at `min_tier` or better (1 = best), cheapest first. `have` = the item's mod lines and
+/// `rarity` its rarity ("Magic", "Rare", or "" with no item): with an item, slams (Exalted, Regal, Augmentation) are
+/// worked out on its own open slots.
+pub fn ways(base: &str, ilvl: u32, influences: &[String], key: &str, min_tier: u32, have: &[String], rarity: &str, price: &dyn Fn(&str) -> Option<f64>) -> Vec<Way> {
     let d = data();
     let Some(p) = pool(base, ilvl, influences, &[], price) else { return vec![] };
     let Some(fam) = p.families.iter().find(|f| f.key == key) else { return vec![] };
@@ -302,31 +340,63 @@ pub fn ways(base: &str, ilvl: u32, influences: &[String], key: &str, min_tier: u
     let wanted: HashSet<&str> = fam.tiers.iter().filter(|t| t.tier <= min_tier).map(|t| t.name.as_str()).collect();
     let is_target = |i: &usize| { let m = &d.mods[*i]; format!("{}|{}", m.gen, m.r#type) == fam.key && wanted.contains(m.name.as_str()) };
     let hit = |counts: &HashMap<usize, u32>| counts.iter().filter(|(i, _)| is_target(i)).map(|(_, n)| *n).sum::<u32>() as f64 / TRIALS as f64;
+    let cost = |name: &str| price(name).or_else(|| (name == "Chaos Orb").then_some(1.0));
+    let way = |group: &str, method: String, chance: f64, each: Option<f64>, note: String| Way {
+        group: group.into(), method, chance, cost_each: each, average: each.filter(|_| chance > 0.0).map(|e| e / chance), note };
     let mut out = Vec::new();
-    let chaos = price("Chaos Orb").unwrap_or(1.0);
-    // Chaos Orbs.
-    if !fam.tiers.is_empty() {
-        let c = hit(&simulate(&rollable(&tags, ilvl, &[]), TRIALS));
-        out.push(Way { method: "Chaos Orb".into(), chance: c, cost_each: Some(chaos), average: (c > 0.0).then(|| chaos / c), note: "Reroll a rare item".into() });
+    let roll = rollable(&tags, ilvl, &[]);
+    let natural = !fam.tiers.is_empty() && fam.tiers.iter().any(|t| t.ok && t.tier <= min_tier);
+
+    // What the item has now: groups taken, prefixes / suffixes used.
+    let groups: HashMap<&str, usize> = roll.iter().map(|(i, _, _, g)| (d.mods[*i].group.as_str(), *g)).collect();
+    let (mut used, mut pre, mut suf) = (HashSet::new(), 0, 0);
+    let mut seen: HashSet<&str> = HashSet::new();
+    let mut k = 0;
+    while k < have.len() {
+        // A two-line mod ("40% increased Armour" / "16% increased Stun and Block Recovery") is one mod.
+        let gen = if have[k].starts_with("prefix|") { Some("p") } else if have[k].starts_with("suffix|") { Some("s") } else { None };
+        let fits = |m: &&RawMod| gen.is_none_or(|g| m.gen == g) && (m.src.is_empty() || m.src == "bench");
+        let pair = have.get(k + 1).map(|n| shape(&format!("{}\n{}", have[k], shape_strip(n))));
+        let two = pair.and_then(|s| d.mods.iter().filter(fits).find(|m| shape(&m.text) == s));
+        let s = shape(&have[k]);
+        let m = two.or_else(|| d.mods.iter().filter(fits).find(|m| shape(&m.text) == s)).or_else(|| d.mods.iter().filter(fits).find(|m| m.text.lines().any(|l| shape(l) == s)));
+        k += if two.is_some() { 2 } else { 1 };
+        let Some(m) = m else { continue };
+        if !seen.insert(m.group.as_str()) { continue }
+        if let Some(g) = groups.get(m.group.as_str()) { used.insert(*g); }
+        if m.gen == "p" { pre += 1 } else { suf += 1 }
     }
-    // Essences that give it outright.
+    let already = fam.have.is_some();
+
+    // Guaranteed: essences and the bench.
     for e in &fam.essences {
         if e.like_tier.is_some_and(|t| t <= min_tier) || fam.tiers.is_empty() {
-            out.push(Way { method: e.name.clone(), chance: 1.0, cost_each: e.price, average: e.price,
-                note: if e.corrupt { "Always gives it (corrupted essence: needs a Remnant of Corruption)".into() } else { format!("Always gives {}", e.text.replace('\n', " / ")) } });
+            out.push(way("Guaranteed", e.name.clone(), 1.0, e.price,
+                if e.corrupt { "Rerolls the item as a rare with this mod (corrupted essence: needs a Remnant of Corruption)".into() }
+                else { format!("Rerolls the item as a rare with {} and random other mods", e.text.replace('\n', " / ")) }));
         }
     }
-    // Bench.
     if let Some(b) = fam.bench.first() {
-        let cost: Option<f64> = b.cost.iter().map(|(c, n)| price(c).or_else(|| (c == "Chaos Orb").then_some(1.0)).map(|v| v * *n as f64)).sum();
+        let each: Option<f64> = b.cost.iter().map(|(c, n)| cost(c).map(|v| v * *n as f64)).sum();
         let like = first_bottom(&b.text).and_then(|v| fam.tiers.iter().find(|t| first_bottom(&t.text).is_some_and(|x| x <= v))).map(|t| format!(", like tier {}", t.tier)).unwrap_or_default();
-        out.push(Way { method: "Crafting bench".into(), chance: 1.0, cost_each: cost, average: cost,
-            note: format!("{}{like} (needs a free {} slot; one bench craft per item)", b.text.replace('\n', " / "), fam.affix) });
+        out.push(way("Guaranteed", "Crafting bench".into(), 1.0, each,
+            format!("Adds {}{like}. Needs a free {} slot; one bench craft per item", b.text.replace('\n', " / "), fam.affix)));
     }
-    // Fossils: each one that helps, and the best pair.
-    if !fam.tiers.is_empty() {
+
+    if natural {
+        // Reroll the whole item.
+        let c = hit(&simulate(&roll, TRIALS));
+        out.push(way("Reroll", "Chaos Orb".into(), c, cost("Chaos Orb"), "Rerolls a rare item: 4–6 new mods".into()));
+        let a = hit(&simulate_with(&roll, TRIALS, Roll { magic: true, tag: None }));
+        out.push(way("Reroll", "Orb of Alteration".into(), a, cost("Orb of Alteration"),
+            "Rerolls a magic item: 1–2 mods. Then Regal Orb to make it rare and keep it".into()));
+        for (tag, name) in HARVEST.iter().filter(|(t, _)| fam.tags.iter().any(|x| x == t)) {
+            let h = hit(&simulate_with(&roll, TRIALS, Roll { magic: false, tag: Some(tag) }));
+            out.push(way("Reroll", format!("Harvest reforge: {name}"), h, None,
+                format!("Rerolls a rare keeping at least one {} mod (Horticrafting station, costs lifeforce)", name.to_lowercase())));
+        }
+        // Fossils: each one that helps, and the best pairs.
         let helpful: Vec<&RawFossil> = d.fossils.iter().filter(|f| fam.fossils_more.contains(&f.name)).collect();
-        // Fossils that only block mods it doesn't have also help (fewer other mods in the way).
         let blockers: Vec<&RawFossil> = d.fossils.iter().filter(|f| !fam.fossils_none.contains(&f.name) && !helpful.iter().any(|h| h.name == f.name)
             && f.more.iter().all(|(_, w)| *w <= 100.0) && f.less.iter().any(|(_, w)| *w == 0.0)).collect();
         let mut combos: Vec<Vec<&RawFossil>> = helpful.iter().map(|f| vec![*f]).collect();
@@ -337,27 +407,54 @@ pub fn ways(base: &str, ilvl: u32, influences: &[String], key: &str, min_tier: u
             let c = hit(&simulate(&rollable(&tags, ilvl, &fs), TRIALS));
             let res = ["Primitive Chaotic Resonator", "Potent Chaotic Resonator", "Powerful Chaotic Resonator", "Prime Chaotic Resonator"][fs.len() - 1];
             let each: Option<f64> = fs.iter().map(|f| price(&f.name)).chain(std::iter::once(price(res))).sum();
-            Way { method: fs.iter().map(|f| f.name.as_str()).collect::<Vec<_>>().join(" + "), chance: c, cost_each: each,
-                average: each.filter(|_| c > 0.0).map(|e| e / c), note: format!("In a {res}") }
+            way("Reroll", fs.iter().map(|f| f.name.as_str()).collect::<Vec<_>>().join(" + "), c, each, format!("Rerolls a rare with these fossils in a {res}"))
         }).filter(|w| w.chance > 0.0).collect();
         tried.sort_by(|a, b| a.average.unwrap_or(f64::MAX).partial_cmp(&b.average.unwrap_or(f64::MAX)).unwrap_or(std::cmp::Ordering::Equal)
             .then(b.chance.partial_cmp(&a.chance).unwrap_or(std::cmp::Ordering::Equal)));
         out.extend(tried.into_iter().take(3));
+
+        // Add one mod to what's there.
+        let side_full = |max: i32| if fam.affix == "prefix" { pre >= max } else { suf >= max };
+        if !already {
+            match rarity {
+                "Rare" if !side_full(3) && pre + suf < 6 => {
+                    let x = add_one(&roll, &used, pre, suf, 3, &is_target);
+                    out.push(way("Add a mod", "Exalted Orb".into(), x, cost("Exalted Orb"), format!("Adds one mod to your item ({pre} prefixes, {suf} suffixes now)")));
+                }
+                "Magic" if pre + suf < 2 && !side_full(1) => {
+                    let x = add_one(&roll, &used, pre, suf, 1, &is_target);
+                    out.push(way("Add a mod", "Orb of Augmentation".into(), x, cost("Orb of Augmentation"), "Adds the missing mod to your magic item".into()));
+                    let r = add_one(&roll, &used, pre, suf, 3, &is_target);
+                    out.push(way("Add a mod", "Regal Orb".into(), r, cost("Regal Orb"), "Makes your magic item rare, adding one mod".into()));
+                }
+                "Magic" if !side_full(3) => {
+                    let r = add_one(&roll, &used, pre, suf, 3, &is_target);
+                    out.push(way("Add a mod", "Regal Orb".into(), r, cost("Regal Orb"), "Makes your magic item rare, adding one mod".into()));
+                }
+                "" => {
+                    let x = add_one(&roll, &HashSet::new(), 0, 0, 3, &is_target);
+                    out.push(way("Add a mod", "Exalted Orb".into(), x, cost("Exalted Orb"),
+                        format!("On a rare with a free {} slot (rough: the real odds depend on its other mods; bring the item for exact ones)", fam.affix)));
+                }
+                _ => {}
+            }
+        }
     }
-    out.sort_by(|a, b| a.average.unwrap_or(f64::MAX).partial_cmp(&b.average.unwrap_or(f64::MAX)).unwrap_or(std::cmp::Ordering::Equal));
+    out.sort_by(|a, b| a.average.unwrap_or(f64::MAX).partial_cmp(&b.average.unwrap_or(f64::MAX)).unwrap_or(std::cmp::Ordering::Equal)
+        .then(b.chance.partial_cmp(&a.chance).unwrap_or(std::cmp::Ordering::Equal)));
     out
 }
-
 /// A copied item, ready for the Crafting page: its base, item level, influences and mod lines.
 #[derive(Debug, Clone, Serialize, PartialEq)]
-pub struct Start { pub base: String, pub ilvl: u32, pub influences: Vec<String>, pub have: Vec<String>, pub name: String }
+pub struct Start { pub base: String, pub ilvl: u32, pub influences: Vec<String>, pub have: Vec<String>, pub name: String, pub rarity: String }
 
 pub fn start(text: &str) -> Option<Start> {
     let item = crate::item::parse_item(text)?;
     let base = find_base(&item.base_type)?;
-    let have = crate::trade::mods(text).into_iter().filter(|m| m.kind == "explicit" || m.kind == "crafted" || m.kind == "fractured").map(|m| m.text).collect();
+    let have = crate::trade::mods(text).into_iter().filter(|m| m.kind == "explicit" || m.kind == "crafted" || m.kind == "fractured")
+        .map(|m| match m.affix.as_deref() { Some(a @ ("prefix" | "suffix")) => format!("{a}|{}", m.text), _ => m.text }).collect();
     Some(Start { base, ilvl: item.item_level.unwrap_or(84), influences: item.influences.clone(), have,
-        name: item.name.clone().unwrap_or_else(|| item.base_type.clone()) })
+        name: item.name.clone().unwrap_or_else(|| item.base_type.clone()), rarity: item.rarity.clone() })
 }
 
 /// The game's file names for currency -> what it's called.
@@ -425,7 +522,17 @@ mod tests {
         let price = |n: &str| match n { "Chaos Orb" => Some(1.0), "Jagged Fossil" => Some(1.0), _ => Some(2.0) };
         let p = pool("Eternal Burgonet", 85, &[], &[], &price).unwrap();
         let life = p.families.iter().find(|f| f.text.contains("to maximum Life") && f.affix == "prefix" && !f.tiers.is_empty()).unwrap();
-        let w = ways("Eternal Burgonet", 85, &[], &life.key, 1, &price);
+        let w = ways("Eternal Burgonet", 85, &[], &life.key, 1, &[], "", &price);
+        assert!(w.iter().any(|w| w.method == "Orb of Alteration" && w.chance > 0.0), "{w:?}");
+        let chaos = w.iter().find(|w| w.method == "Chaos Orb").unwrap().chance;
+        assert!(w.iter().any(|w| w.method == "Harvest reforge: Life" && w.chance > chaos), "{w:?}");
+        // His helmet (3 prefixes): no Exalted Orb for another prefix.
+        let w = ways("Eternal Burgonet", 85, &[], &life.key, 1, &["prefix|40% increased Armour".into(), "prefix|16% increased Stun and Block Recovery".into(),
+            "prefix|+21% to Item Rarity".into(), "prefix|+152 to Armour".into(), "suffix|+56 to Intelligence".into()], "Rare", &price);
+        assert!(!w.iter().any(|w| w.method == "Exalted Orb"), "{w:?}");
+        // Same item with only the suffix: an Exalted Orb can add life.
+        let w = ways("Eternal Burgonet", 85, &[], &life.key, 2, &["+56 to Intelligence".into()], "Rare", &price);
+        assert!(w.iter().any(|w| w.method == "Exalted Orb" && w.chance > 0.0), "{w:?}");
         assert!(w.iter().any(|w| w.method == "Chaos Orb" && w.chance > 0.0 && w.chance < life.chaos));
         assert!(w.iter().any(|w| w.method.contains("Fossil")), "{w:?}");
     }

@@ -12,7 +12,7 @@ fn main() {
     if let Ok(dir) = std::env::var("CRAFT_JSON") {
         std::fs::write(format!("{dir}/_craft_pool.json"), serde_json::to_string(&p).unwrap()).unwrap();
         if let Some(f) = p.families.iter().find(|f| f.text.contains(&want)) {
-            let w = filter_core::craft::ways(&base, ilvl, &infl, &f.key, 2, &price);
+            let w = filter_core::craft::ways(&base, ilvl, &infl, &f.key, 2, &[], "", &price);
             std::fs::write(format!("{dir}/_craft_ways.json"), serde_json::to_string(&w).unwrap()).unwrap();
         }
     }
@@ -27,7 +27,7 @@ fn main() {
     for t in &f.tiers { println!("  T{} {:12} lvl {:2} w {:5} {}", t.tier, t.name, t.lvl, t.weight, t.text.replace('\n', " / ")); }
     for e in &f.essences { println!("  essence {} -> {} (like T{:?})", e.name, e.text, e.like_tier); }
     println!("  fossils more: {:?}\n  fossils none: {:?}", f.fossils_more, f.fossils_none);
-    for w in filter_core::craft::ways(&base, ilvl, &infl, &f.key, 2, &price) {
+    for w in filter_core::craft::ways(&base, ilvl, &infl, &f.key, 2, &[], "", &price) {
         println!("  WAY {:45} {:6.2}%  1 in {:6.0}  {}", w.method, w.chance * 100.0, 1.0 / w.chance.max(1e-9), w.note);
     }
 }

@@ -2065,10 +2065,10 @@ async fn craft_pool(state: State<'_, AppState>, base: String, ilvl: u32, influen
 
 /// Crafting page: the ways to get one mod, cheapest first.
 #[tauri::command]
-async fn craft_ways(state: State<'_, AppState>, base: String, ilvl: u32, influences: Vec<String>, key: String, min_tier: u32) -> Result<Vec<filter_core::craft::Way>, String> {
+async fn craft_ways(state: State<'_, AppState>, base: String, ilvl: u32, influences: Vec<String>, key: String, min_tier: u32, have: Vec<String>, rarity: String) -> Result<Vec<filter_core::craft::Way>, String> {
     let f = state.prices.lock().unwrap().get(&Game::Poe1).cloned();
     let price = move |n: &str| f.as_ref().and_then(|f| price_of(f, None, n, ""));
-    tauri::async_runtime::spawn_blocking(move || filter_core::craft::ways(&base, ilvl, &influences, &key, min_tier, &price)).await.map_err(|e| e.to_string())
+    tauri::async_runtime::spawn_blocking(move || filter_core::craft::ways(&base, ilvl, &influences, &key, min_tier, &have, &rarity, &price)).await.map_err(|e| e.to_string())
 }
 
 /// What poe.ninja says this item is worth (for the pop-up).

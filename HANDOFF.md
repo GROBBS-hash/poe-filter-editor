@@ -306,7 +306,13 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   poe.ninja cost. Bench/essence-only mods are folded away; on armour pieces, bench/essence mods for a defence the base
   lacks are hidden. "Open in Craft of Exile" copies the item and opens their site (they have no import link).
   Dev tool: `cargo run -p filter-core --example craftof -- "Eternal Burgonet" 85 "maximum Life"` (CRAFT_JSON=public
-  saves files for the page preview). Not covered yet: magic items (alteration spam), harvest, veiled, exalts.
+  saves files for the page preview).
+  0.2.21: `ways()` takes the item's mods + rarity and groups methods ("Guaranteed" / "Reroll" / "Add a mod"): adds
+  Orb of Alteration (magic: 1 or 2 mods, even split, 1+1), Harvest reforge per mod tag (first mod forced among that
+  tag), Exalted Orb on a rare with a free slot (exact: weight share of what can still go on), Augmentation / Regal on
+  a magic item; with no item, a rough Exalted. Item lines carry "prefix|"/"suffix|" (Item Rarity is both) and
+  two-line mods (Mammoth's) count once. "More ways" panel lists what isn't worked out (veiled, conqueror exalts,
+  awakener, eldritch, recombinator, fracturing, metamods, beastcraft). Not modelled: harvest costs (lifeforce).
 
 - Price check sweep 21 Nov (0.2.19): ran every saved sample through `setupof` (now prints UNKNOWN lines too).
   Mods written over 2–3 lines (Foulborn Asenath's corpse/Blinded/explode) are matched joined, as the site lists them.
@@ -591,6 +597,8 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
       "1 in N" per Chaos Orb; click a mod → tiers, ways to get it (Chaos, essence, bench, fossils) with costs.
 - [ ] Ctrl+D on a rare helmet/ring/weapon → "Craft this": the editor opens on Crafting with that item, its mods marked "yours".
 - [ ] "Open in Craft of Exile": their site opens; Import item + Ctrl+V brings your item in.
+- [ ] 0.2.21: a mod's "Ways to get it" also lists Orb of Alteration, Harvest reforges, and (with your item brought
+      over) Exalted Orb on a rare with a free slot / Augmentation and Regal on a magic item; cheapest is outlined.
 
 **Price check sweep (21 Nov, 0.2.19)**
 - [ ] Ctrl+D on a map with "Monsters Hinder on Hit with Spells" or "Monsters Inflict Withered…": no longer "not

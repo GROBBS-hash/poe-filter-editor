@@ -1461,3 +1461,9 @@ main.content .card h2 { font-size: 19px; font-weight: 500; letter-spacing: .02em
 .cr-way { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 6px 0; background: var(--raised); }
 .cr-way-top { display: flex; justify-content: space-between; gap: 8px; }
 .cr-line { margin: 3px 0; }
+.cr-way.best { border-color: var(--gold); }
+.cr-way-group { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 2px; }
+.cr-more { margin-top: 12px; }
+.cr-more summary { cursor: pointer; color: var(--text-2); font-size: 13px; }
+.cr-more ul { margin: 6px 0 0 18px; padding: 0; }
+.cr-more li { margin: 4px 0; }
