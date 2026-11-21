@@ -591,7 +591,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
       a stack worth 5c+ (e.g. Rain of Chaos ×17) still shows; good cards look as before. Same on Uniques.
 
 **Tray menu (21 Nov, 0.2.8)**
-- [ ] (Restart editor confirmed 21 Nov: comes back in front.) Still check: tray "Check for updates" says "Up to date (0.2.8)";
+- [x] (Confirmed 21 Nov, "updates works too"; restart editor: comes back in front.) Tray "Check for updates" says "Up to date (0.2.8)";
       when the next version is out it says "Update to … and restart" and clicking it updates.
 
 **Polish (21 Nov)**
