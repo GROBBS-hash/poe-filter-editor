@@ -48,6 +48,9 @@ fn value(app: &AppHandle, items: &serde_json::Value, tab: &str) -> Vec<Valued> {
             "unique" => price_of(f, name, base, "Unique"),
             // Gems come in many levels/qualities: count the cheapest, so totals don't run away.
             "gem" => f.items.iter().filter(|i| i.name == base && i.cat.contains("Gem")).map(|i| i.value).reduce(f64::min),
+            // A card hardly anyone trades (under 5 sold, under 50c) isn't worth its poe.ninja number: not counted
+            // (21 Nov: Assassin's Favour "2.25c", about 1 sold, no exchange stock).
+            _ if f.items.iter().any(|i| i.name == base && filter_core::prices::thin_card(i)) => None,
             _ => price_of(f, None, base, ""),
         }
     };

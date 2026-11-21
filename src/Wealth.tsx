@@ -340,7 +340,7 @@ export default function Wealth() {
           <Profiles v={v} setV={setV} setErr={setErr} busy={!!busy} />
           {last ? (
             <div className="w-total">
-              <div className="muted small">Scanned {new Date(last.time * 1000).toLocaleString()} · counts what poe.ninja prices (currency, uniques, cards, maps, fragments, gems…)
+              <div className="muted small">Scanned {new Date(last.time * 1000).toLocaleString()} · counts what poe.ninja prices (currency, uniques, cards, maps, fragments, gems…; not cards hardly anyone trades)
                 {(v.rares ?? 0) === 0 || v.count_rares === false ? ", not rares"
                   : `, plus ${v.rares_priced ?? 0} of your ${v.rares} rares priced on the trade site`}.</div>
             </div>

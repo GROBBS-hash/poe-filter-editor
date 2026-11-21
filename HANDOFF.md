@@ -292,6 +292,9 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   `BuildView.tsx` (F6 + My build): a tick per item, key `slot|name|base`, in localStorage `build.have` (shared by both
   windows via the storage event), "Have N of M" bar with "hide what I have" (`build.hideHave`).
 
+- Wealth thin cards 21 Nov (0.2.15): the stash worth skips cards prices::thin_card() calls hardly traded (his
+  Assassin's Favour "2.25c", ~1 sold). The Fletcher stays (~11 sold at 3.3c per poe.ninja).
+
 - Buy base 21 Nov (0.2.14, his idea + guide: reforge clusters at Harvest instead of buying exact ones): cluster
   jewels in F6/My build Jewels get "Buy base" (buy_base_item → trade::cluster_base_query): same base, passive count and
   small-passive enchant, rarity non-unique, item level ≥ the highest notable needs. Notable item levels in
