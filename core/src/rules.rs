@@ -43,9 +43,12 @@ pub struct MatchOpts {
     /// Only while levelling (areas below 68) or only in maps (68+).
     #[serde(default)]
     pub when: When,
+    /// Only corrupted items (e.g. show corrupted rare jewels while the rest stay hidden).
+    #[serde(default)]
+    pub corrupted: bool,
 }
 impl Default for MatchOpts {
-    fn default() -> Self { Self { same_rarity: true, max_item_level: None, min_stack: None, below_stack: None, when: When::Always } }
+    fn default() -> Self { Self { same_rarity: true, max_item_level: None, min_stack: None, below_stack: None, when: When::Always, corrupted: false } }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Default)]
@@ -110,12 +113,14 @@ pub fn quick_rule(item: &Item, action: Action, colour_name: Option<&str>, opts: 
     if let Some(c) = opts.when.condition() {
         conditions.push(c.to_string());
     }
+    if opts.corrupted { conditions.push("Corrupted True".into()); }
     let what = if item.base_type.is_empty() { format!("every {}", item.item_class) } else { item.base_type.clone() };
     let what = if item.uber_blighted { format!("Blight-ravaged {what}") } else if item.blighted { format!("Blighted {what}") } else { what };
     let mut who = match RARITIES.contains(&item.rarity.as_str()) && opts.same_rarity {
         true => format!("{} {what}", item.rarity),
         false => what,
     };
+    if opts.corrupted { who = format!("Corrupted {who}"); }
     match (opts.min_stack.filter(|n| *n > 1), opts.below_stack.filter(|n| *n > 1)) {
         (Some(a), Some(b)) => who.push_str(&format!(" (stacks {a}–{})", b - 1)),
         (Some(a), None) => who.push_str(&format!(" (stacks of {a}+)")),
@@ -257,6 +262,9 @@ pub struct RuleDetail {
     pub below_stack: Option<u32>,
     #[serde(default)]
     pub when: When,
+    /// Only corrupted items.
+    #[serde(default)]
+    pub corrupted: bool,
     pub style: crate::evaluate::Style,
 }
 
@@ -271,6 +279,8 @@ pub struct RuleEdit {
     pub below_stack: Option<u32>,
     #[serde(default)]
     pub when: When,
+    #[serde(default)]
+    pub corrupted: bool,
 }
 
 fn first_quoted(line: &str) -> Option<String> {
@@ -284,7 +294,7 @@ pub fn rule_detail(rule: &Rule) -> Option<RuleDetail> {
     }
     let mut d = RuleDetail {
         label: label.clone(), show: *show, item_class: String::new(), base_type: String::new(),
-        rarity: None, min_stack: None, below_stack: None, when: When::Always, style: crate::evaluate::style_of(actions),
+        rarity: None, min_stack: None, below_stack: None, when: When::Always, corrupted: false, style: crate::evaluate::style_of(actions),
     };
     for c in conditions {
         let c = c.trim();
@@ -295,6 +305,7 @@ pub fn rule_detail(rule: &Rule) -> Option<RuleDetail> {
         else if let Some(n) = c.strip_prefix("StackSize < ") { d.below_stack = n.trim().parse().ok(); }
         else if c == "AreaLevel < 68" { d.when = When::Levelling; }
         else if c == "AreaLevel >= 68" { d.when = When::Maps; }
+        else if c == "Corrupted True" { d.corrupted = true; }
     }
     Some(d)
 }
@@ -307,7 +318,7 @@ pub fn same_slot(a: &Rule, b: &Rule) -> bool {
     x.item_class == y.item_class && x.base_type == y.base_type && x.rarity == y.rarity
         && x.min_stack.is_some() == y.min_stack.is_some()
         && x.below_stack.is_some() == y.below_stack.is_some()
-        && x.when == y.when
+        && x.when == y.when && x.corrupted == y.corrupted
 }
 
 /// For each edit, the newer edit that always wins over it (so it never
@@ -323,7 +334,9 @@ pub fn shadowed_by(rules: &[Rule]) -> Vec<Option<usize>> {
             let covers_rarity = new.rarity.is_none() || new.rarity == old.rarity;
             let covers_stacks = new.min_stack.is_none() && new.below_stack.is_none();
             let covers_when = new.when == When::Always || new.when == old.when;
-            same_item && covers_rarity && covers_stacks && covers_when
+            // A corrupted-only edit doesn't cover the rest.
+            let covers_corrupt = !new.corrupted || old.corrupted;
+            same_item && covers_rarity && covers_stacks && covers_when && covers_corrupt
         })
     }).collect()
 }
@@ -349,6 +362,7 @@ pub fn edited_rule(rule: &Rule, edit: &RuleEdit) -> Option<Rule> {
         min_stack: edit.min_stack,
         below_stack: edit.below_stack,
         when: edit.when,
+        corrupted: edit.corrupted,
     };
     Some(match (edit.show, &edit.style) {
         (true, Some(style)) => custom_rule(&item, style, &opts),
@@ -463,6 +477,20 @@ pub fn apply_with_extra(segs: &mut Vec<Segment>, rules: &[Rule], extra: &str, nl
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn corrupted_only() {
+        let item = Item { item_class: "Jewels".into(), base_type: "Cobalt Jewel".into(), rarity: "Rare".into(), corrupted: true, ..Default::default() };
+        let opts = MatchOpts { corrupted: true, ..Default::default() };
+        let Rule::Override { label, conditions, .. } = quick_rule(&item, Action::Highlight, None, &opts) else { panic!() };
+        assert!(conditions.contains(&"Corrupted True".to_string()));
+        assert_eq!(label, "Highlight: Corrupted Rare Cobalt Jewel");
+        let r = quick_rule(&item, Action::Highlight, None, &opts);
+        assert!(rule_detail(&r).unwrap().corrupted);
+        // Doesn't replace a plain hide of the same jewel.
+        let plain = quick_rule(&item, Action::Hide, None, &MatchOpts::default());
+        assert!(!same_slot(&r, &plain));
+    }
+
     use super::*;
     use crate::{evaluate::status, filter::parse_filter, item::parse_item};
 
@@ -524,7 +552,7 @@ mod tests {
         let d = rule_detail(&hide).unwrap();
         assert_eq!((d.base_type.as_str(), d.item_class.as_str(), d.below_stack, d.show), ("Gold", "Gold", Some(500), false));
         // Raise the cut-off to 800.
-        let e = RuleEdit { show: false, style: None, every_rarity: false, min_stack: None, below_stack: Some(800), when: When::Always };
+        let e = RuleEdit { show: false, style: None, every_rarity: false, min_stack: None, below_stack: Some(800), when: When::Always, corrupted: false };
         let Rule::Override { label, conditions, .. } = edited_rule(&hide, &e).unwrap() else { panic!() };
         assert_eq!(label, "Hide: Gold (stacks under 800)");
         assert!(conditions.contains(&"StackSize < 800".to_string()));
@@ -536,7 +564,7 @@ mod tests {
         let r = custom_rule(&belt, &style, &MatchOpts::default());
         assert_eq!(rule_detail(&r).unwrap().rarity.as_deref(), Some("Unique"));
         assert_eq!(rule_detail(&r).unwrap().style.font_size, Some(40));
-        let e = RuleEdit { show: true, style: Some(CustomStyle { text: [9, 9, 9, 255], ..style }), every_rarity: true, min_stack: None, below_stack: None, when: When::Always };
+        let e = RuleEdit { show: true, style: Some(CustomStyle { text: [9, 9, 9, 255], ..style }), every_rarity: true, min_stack: None, below_stack: None, when: When::Always , corrupted: false };
         let Rule::Override { conditions, actions, .. } = edited_rule(&r, &e).unwrap() else { panic!() };
         assert!(!conditions.iter().any(|c| c.starts_with("Rarity")));
         assert!(actions.contains(&"SetTextColor 9 9 9 255".to_string()));

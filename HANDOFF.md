@@ -301,6 +301,11 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   elemental total and hidden, and the chaos total was skipped (bench craft only), so chaos vanished. Now the chaos
   total shows, unticked (trade_rules: bench_only).
 
+- Corrupted only 21 Nov (0.2.27): `MatchOpts.corrupted` / `RuleEdit.corrupted` / `RuleDetail.corrupted` (rules.rs) add "Corrupted True"
+  and a "Corrupted" label prefix; a corrupted-only edit has its own slot and doesn't shadow plain ones. F2 panel offers "Only
+  corrupted ones" when the item is corrupted. Double title bar: tauri-plugin-window-state restored "decorated: true" from
+  .window-state.json; now it keeps only size, position and maximised (lib.rs).
+
 - Frame + fixes 21 Nov (0.2.24): main window has no Windows frame (`"decorations": false`), `MainTitleBar` in
   WinFrame.tsx (gold-trimmed, drag / double-click maximise, min / max / close; close still hides to the tray) and a
   thin gold border (`body:has(.mt-bar)`); needs window permissions minimize / toggle-maximize / is-maximized / close.
@@ -626,6 +631,11 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 
 **Crafted chaos (21 Nov, 0.2.18)**
 - [x] (Confirmed 21 Nov.) Ctrl+D on gear with a crafted "X and Chaos Resistances": "+N% total to Chaos Resistance" is there to tick.
+
+**Corrupted only + frame fix (21 Nov, 0.2.27)**
+- [ ] F2 on a corrupted item (e.g. a corrupted rare Cobalt Jewel): an "Only corrupted ones" tick; highlight with it ticked:
+      corrupted rare jewels show, ordinary ones stay hidden.
+- [ ] Editor window has only the gold title bar (the Windows one is gone; the saved window state no longer brings it back).
 
 **Frame + fixes (21 Nov, 0.2.24)**
 - [ ] Editor window: no Windows title bar, a gold one instead; drag it to move, double-click to maximise, the three

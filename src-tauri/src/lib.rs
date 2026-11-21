@@ -2367,7 +2367,11 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         // Remembers the main window's size and position between runs (the pop-ups place themselves).
+        // Size, position and maximised only: not the frame (it would bring back the Windows title bar under our own,
+        // 21 Nov), nor visibility (win_place decides how the window opens).
         .plugin(tauri_plugin_window_state::Builder::default()
+            .with_state_flags(tauri_plugin_window_state::StateFlags::SIZE | tauri_plugin_window_state::StateFlags::POSITION
+                | tauri_plugin_window_state::StateFlags::MAXIMIZED)
             .with_denylist(&["overlay", "build", "trade", "trades", "earnings", "atlas"]).build())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()

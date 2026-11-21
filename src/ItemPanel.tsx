@@ -10,7 +10,7 @@ export type Picked = { item: Item; from_screen: boolean; screen_text?: string | 
 /** One of your saved edits, as opened for changing. */
 export type RuleDetail = {
   label: string; show: boolean; item_class: string; base_type: string; rarity?: string | null;
-  min_stack?: number | null; below_stack?: number | null; when?: When; style: CurrentStyle;
+  min_stack?: number | null; below_stack?: number | null; when?: When; corrupted?: boolean; style: CurrentStyle;
 };
 export type When = "always" | "levelling" | "maps";
 export type Replacing = { id: string; index: number; detail: RuleDetail };
@@ -155,6 +155,8 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
   const [anyRarity, setAnyRarity] = useState(replacingProp ? !replacingProp.detail.rarity : false);
   /** Always, only while levelling (areas below 68), or only in maps. */
   const [when, setWhen] = useState<When>(replacingProp?.detail.when ?? "always");
+  /** Only corrupted items (offered when the item is corrupted). */
+  const [onlyCorrupted, setOnlyCorrupted] = useState<boolean>(replacingProp?.detail.corrupted ?? false);
   /** false = not editing; otherwise the stack size the look applies from (1 = all). */
   const [editing, setEditingRaw] = useState<false | { minStack: number }>(openLook ? { minStack: 1 } : false);
   const setEditing = (v: boolean | { minStack: number }) => setEditingRaw(v === true ? { minStack: 1 } : v);
@@ -222,7 +224,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
     }
   };
   const opts = (extraOpts: { min_stack?: number; below_stack?: number } = {}) =>
-    ({ same_rarity: !anyRarity, max_item_level: null, when, ...extraOpts });
+    ({ same_rarity: !anyRarity, max_item_level: null, when, corrupted: onlyCorrupted, ...extraOpts });
 
   /** Every change goes through here: a new edit, or (when editing a rule) that rule replaced. */
   const commit = (show: boolean, style: CustomStyle | null, stack: { min_stack?: number; below_stack?: number }, addNew = false) => {
@@ -230,7 +232,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
       const d = replacing.detail;
       const keepStack = stack.min_stack === undefined && stack.below_stack === undefined;
       return saved(invoke("update_rule", { id: replacing.id, index: replacing.index, edit: {
-        show, style, every_rarity: anyRarity, when,
+        show, style, every_rarity: anyRarity, when, corrupted: onlyCorrupted,
         min_stack: keepStack ? d.min_stack ?? null : stack.min_stack ?? null,
         below_stack: keepStack ? d.below_stack ?? null : stack.below_stack ?? null,
       } }));
@@ -271,6 +273,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
       setReplacing({ id, index, detail });
       setAnyRarity(!detail.rarity);
       setWhen(detail.when ?? "always");
+      setOnlyCorrupted(!!detail.corrupted);
     } catch (e) { setToast(String(e)); }
   };
   const removeRule = async () => {
@@ -546,6 +549,12 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
         <label className="qm-check">
           <input type="checkbox" checked={anyRarity} onChange={(e) => setAnyRarity(e.target.checked)} />
           <span>Apply to every rarity, not just {item.rarity}</span>
+        </label>
+      )}
+      {(item.corrupted || onlyCorrupted) && (
+        <label className="qm-check" title="e.g. show corrupted rare jewels while ordinary ones stay hidden">
+          <input type="checkbox" checked={onlyCorrupted} onChange={(e) => setOnlyCorrupted(e.target.checked)} />
+          <span>Only corrupted ones</span>
         </label>
       )}
 
