@@ -1,0 +1,296 @@
+{
+ "poe1:exchange": {
+  "core_keys": [
+   "items",
+   "rates",
+   "primary",
+   "secondary"
+  ],
+  "core_primary": "chaos",
+  "core_secondary": "divine",
+  "core_rates": {
+   "divine": 0.004604
+  },
+  "core_items_sample": [
+   {
+    "id": "chaos",
+    "name": "Chaos Orb",
+    "image": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lSZXJvbGxSYXJlIiwic2NhbGUiOjF9XQ/46a2347805/CurrencyRerollRare.png",
+    "category": "Currency",
+    "detailsId": "chaos-orb"
+   },
+   {
+    "id": "divine",
+    "name": "Divine Orb",
+    "image": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lNb2RWYWx1ZXMiLCJzY2FsZSI6MX1d/ec48896769/CurrencyModValues.png",
+    "category": "Currency",
+    "detailsId": "divine-orb"
+   }
+  ],
+  "line_sample": [
+   {
+    "id": "accelerating-catalyst",
+    "primaryValue": 0.3879,
+    "volumePrimaryValue": 414.3,
+    "maxVolumeCurrency": "chaos",
+    "maxVolumeRate": 2.58,
+    "sparkline": {
+     "totalChange": -67.42,
+     "data": [
+      -32.64,
+      -54.38,
+      -73.43,
+      -69.56,
+      -81.31,
+      -55.65,
+      -67.42
+     ]
+    }
+   },
+   {
+    "id": "chaos",
+    "primaryValue": 1,
+    "volumePrimaryValue": 11542845,
+    "maxVolumeCurrency": "divine",
+    "maxVolumeRate": 217.2,
+    "sparkline": {
+     "totalChange": -56.87,
+     "data": [
+      -17.09,
+      -36.15,
+      -40.12,
+      -51.88,
+      -57.19,
+      -56.77,
+      -56.87
+     ]
+    }
+   },
+   {
+    "id": "divine",
+    "primaryValue": 217.2,
+    "volumePrimaryValue": 11542845,
+    "maxVolumeCurrency": "chaos",
+    "maxVolumeRate": 0.004604,
+    "sparkline": {
+     "totalChange": 131.8,
+     "data": [
+      22.06,
+      56.78,
+      67.2,
+      108.4,
+      133.7,
+      131.3,
+      131.8
+     ]
+    }
+   }
+  ],
+  "top_keys": [
+   "core",
+   "lines",
+   "items"
+  ]
+ },
+ "poe1:stash": {
+  "line_sample": [
+   {
+    "id": 129763,
+    "name": "The Golden Charlatan",
+    "icon": "https://web.poecdn.com/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvV2VhcG9ucy9Ud29IYW5kV2VhcG9ucy9Ud29IYW5kU3dvcmRzL0ZhaXRoc3RlYWxlciIsInciOjIsImgiOjQsInNjYWxlIjoxfV0/18f49b0446/Faithstealer.png",
+    "levelRequired": 65,
+    "baseType": "Lion Sword",
+    "links": 5,
+    "itemClass": 3,
+    "statIds": [
+     "local_critical_strike_chance_+%",
+     "local_physical_damage_+%"
+    ],
+    "itemType": "Two Handed Sword",
+    "chaosValue": 34100,
+    "exaltedValue": 46332,
+    "divineValue": 157.0,
+    "count": 1,
+    "detailsId": "the-golden-charlatan-lion-sword-5l",
+    "listingCount": 1
+   },
+   {
+    "id": 4951,
+    "name": "Voidforge",
+    "icon": "https://web.poecdn.com/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvV2VhcG9ucy9Ud29IYW5kV2VhcG9ucy9Ud29IYW5kU3dvcmRzL1N0YXJmb3JnZSIsInciOjIsImgiOjQsInNjYWxlIjoxfV0/86b81685e1/Starforge.png",
+    "levelRequired": 67,
+    "baseType": "Infernal Sword",
+    "links": 6,
+    "itemClass": 3,
+    "itemType": "Two Handed Sword",
+    "chaosValue": 8862,
+    "exaltedValue": 12040,
+    "divineValue": 40.8,
+    "count": 5,
+    "detailsId": "voidforge-infernal-sword-6l",
+    "listingCount": 5
+   }
+  ]
+ },
+ "poe2:exchange": {
+  "core_keys": [
+   "items",
+   "rates",
+   "primary",
+   "secondary"
+  ],
+  "core_primary": "divine",
+  "core_secondary": "chaos",
+  "core_rates": {
+   "exalted": 480.7,
+   "chaos": 11.58
+  },
+  "core_items_sample": [
+   {
+    "id": "divine",
+    "name": "Divine Orb",
+    "image": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lNb2RWYWx1ZXMiLCJzY2FsZSI6MSwicmVhbG0iOiJwb2UyIn1d/2986e220b3/CurrencyModValues.png",
+    "category": "Currency",
+    "detailsId": "divine-orb"
+   },
+   {
+    "id": "exalted",
+    "name": "Exalted Orb",
+    "image": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lBZGRNb2RUb1JhcmUiLCJzY2FsZSI6MSwicmVhbG0iOiJwb2UyIn1d/ad7c366789/CurrencyAddModToRare.png",
+    "category": "Currency",
+    "detailsId": "exalted-orb"
+   },
+   {
+    "id": "chaos",
+    "name": "Chaos Orb",
+    "image": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lSZXJvbGxSYXJlIiwic2NhbGUiOjEsInJlYWxtIjoicG9lMiJ9XQ/c0ca392a78/CurrencyRerollRare.png",
+    "category": "Currency",
+    "detailsId": "chaos-orb"
+   }
+  ],
+  "line_sample": [
+   {
+    "id": "alch",
+    "primaryValue": 0.007969,
+    "volumePrimaryValue": 41.67,
+    "maxVolumeCurrency": "divine",
+    "maxVolumeRate": 125.5,
+    "sparkline": {
+     "totalChange": 10.25,
+     "data": [
+      65.6,
+      83.41,
+      33.72,
+      30.16,
+      17.57,
+      22.08,
+      10.25
+     ]
+    }
+   },
+   {
+    "id": "exalted",
+    "primaryValue": 0.00208,
+    "volumePrimaryValue": 236.2,
+    "maxVolumeCurrency": "divine",
+    "maxVolumeRate": 480.7,
+    "sparkline": {
+     "totalChange": 25.92,
+     "data": [
+      5.64,
+      12.92,
+      17.29,
+      26.27,
+      21.41,
+      20.09,
+      25.92
+     ]
+    }
+   },
+   {
+    "id": "ancient-infuser",
+    "primaryValue": 0.6164,
+    "volumePrimaryValue": 15.0,
+    "maxVolumeCurrency": "divine",
+    "maxVolumeRate": 1.62,
+    "sparkline": {
+     "totalChange": 41.54,
+     "data": [
+      39.07,
+      55.64,
+      61.12,
+      59.19,
+      100.3,
+      59.95,
+      41.54
+     ]
+    }
+   }
+  ],
+  "top_keys": [
+   "core",
+   "lines",
+   "items"
+  ]
+ },
+ "poe2:stash": {
+  "line_sample": [
+   {
+    "id": 753,
+    "itemId": "Winter's Bite Glass Shank",
+    "detailsId": "winters-bite-glass-shank",
+    "name": "Winter's Bite",
+    "baseType": "Glass Shank",
+    "icon": "https://web.poecdn.com/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvV2VhcG9ucy9PbmVIYW5kV2VhcG9ucy9EYWdnZXJzL1VuaXF1ZXMvTmV2ZXJtZWx0IiwidyI6MSwiaCI6Mywic2NhbGUiOjEsInJlYWxtIjoicG9lMiJ9XQ/a5a4d70a8e/Nevermelt.png",
+    "levelRequired": 0,
+    "category": "[Dagger]",
+    "primaryValue": 39340000,
+    "listingCount": 1,
+    "corrupted": false,
+    "propertyModifiers": [
+     {
+      "text": "[Cold|Cold] Damage: (8-10)-(15-18)",
+      "optional": false
+     },
+     {
+      "text": "[Critical|Critical Hit] Chance: 15%",
+      "optional": false
+     },
+     {
+      "text": "Attacks per Second: 1.55",
+      "optional": false
+     }
+    ]
+   },
+   {
+    "id": 730,
+    "itemId": "Runeseeker's Call Runic Fork",
+    "detailsId": "runeseekers-call-runic-fork",
+    "name": "Runeseeker's Call",
+    "baseType": "Runic Fork",
+    "icon": "https://web.poecdn.com/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvV2VhcG9ucy9PbmVIYW5kV2VhcG9ucy9XYW5kcy9VbmlxdWVzL1J1bmljRGl2aW5lciIsInciOjIsImgiOjMsInNjYWxlIjoxLCJyZWFsbSI6InBvZTIifV0/df89e6455f/RunicDiviner.png",
+    "levelRequired": 90,
+    "category": "[Wand]",
+    "primaryValue": 5620,
+    "listingCount": 91,
+    "corrupted": false,
+    "requirementModifiers": [
+     {
+      "text": "Level: 65",
+      "optional": false
+     },
+     {
+      "text": "[Intelligence|Int]: 114",
+      "optional": false
+     }
+    ],
+    "grantedSkillModifiers": [
+     {
+      "text": "Level (17-20) The Stars Answer",
+      "optional": false
+     }
+    ]
+   }
+  ]
+ }
+}
