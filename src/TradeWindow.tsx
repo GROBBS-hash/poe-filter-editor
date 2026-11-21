@@ -711,10 +711,11 @@ export default function TradeWindow() {
       )}
       {setup.unknown.length > 0 && showStats && !asBase && (
         <div className="tw-unknown">
+          <div className="tw-group"><span>Not searchable</span><span className="tw-group-hint">the trade site has no filter for these</span></div>
           {setup.unknown.map((u, i) => {
             const k = setup.unknown_kinds?.[i] ?? "explicit";
             return <div key={i} className={`tw-label mod-${k} small`} title="The trade site has no search for this mod">
-              {u}{KIND[k] && <span className="tw-kind">{KIND[k]}</span>}<span className="tw-kind">not searchable</span></div>;
+              {u}{KIND[k] && <span className="tw-kind">{KIND[k]}</span>}</div>;
           })}
         </div>
       )}
