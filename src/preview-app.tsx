@@ -57,7 +57,7 @@ const pob = async () => {
       { label: "Swap", slot: "Weapon 1 Swap", enabled: true, gems: [gem("Clarity", "b")] }],
     gear: [{ slot: "Body Armour", rarity: "rare", name: "Doom Shelter", base: "Vaal Regalia", lines: ["Sockets: B-B-B-G-B-R", "+90 to maximum Life"], copy: "x" },
       { slot: "Helmet", rarity: "rare", name: "Doom Crown", base: "Hubris Circlet", lines: ["Sockets: R-B B-B", "+80 to maximum Life"], copy: "x" }, { slot: "Flask 1", rarity: "unique", name: "Coruscating Elixir", base: "Ruby Flask", lines: [], copy: "x" }, { slot: "Flask 2", rarity: "magic", name: "Examiner's Topaz Flask of the Rainbow", base: "Topaz Flask", lines: [] }],
-    jewels: [{ node: 7960, notables: ["Doryani's Lesson", "Inspired Oppression", "Overshock"], item: { slot: "Jewel socket 7960", rarity: "rare", name: "8 Passive Only! Not 9!", base: "Large Cluster Jewel", lines: ["Adds 8 Passive Skills", "1 Added Passive Skill is Overshock"] } },
+    jewels: [{ node: 7960, notables: ["Doryani's Lesson", "Inspired Oppression", "Overshock"], item: { slot: "Jewel socket 7960", rarity: "rare", name: "8 Passive Only! Not 9!", base: "Large Cluster Jewel", lines: ["Adds 8 Passive Skills", "1 Added Passive Skill is Overshock"], copy: "x" } },
       { node: 26196, notables: [], item: { slot: "Jewel socket 26196", rarity: "unique", name: "Brutal Restraint", base: "Timeless Jewel", lines: ["Denoted service of 7000 dekhara in the akhara of Balbala"], copy: "x" } },
       { node: null, notables: [], item: { slot: "Belt Abyssal Socket 1", rarity: "rare", name: "Bleed + CB Avoidance Jewel", base: "Hypnotic Eye Jewel", lines: ["+12% chance to Avoid Bleeding"] } }] });
   return { build: { class: "Witch", ascendancy: "Elementalist", level: 50, active: 1, stages: [stage("Start of Maps", 90), stage("End of Early Maps", 120)] }, stage: 1, link: "", follow: false };
@@ -95,6 +95,7 @@ mockWindows(atlasWindow ? "atlas" : buildWin ? "build" : "main");
 mockIPC((cmd, args) => {
   if (cmd === "overview") return { profiles: [{ id: "mid", name: "Mid-Game", game: "Poe1", base_file: "", output_file: "", rules: [] }], active: "mid", poe1_dir: "", poe2_dir: "", batch_on: false };
   if (cmd === "wealth_get") return wealth;
+  if (cmd === "buy_base_item") return { total: 3480, ilvl: 75, notables: [["Doryani's Lesson", 68], ["Inspired Oppression", 75], ["Overshock", 50]] };
   if (cmd === "get_price_settings") return { settings: { enabled: false, groups: [{ group: "DivinationCards", enabled: true, tiers: [], hide_below: null }, { group: "Uniques", enabled: true, tiers: [], hide_below: null }] }, info: { unit: "chaos" } };
   if (cmd === "price_count_below") return [Math.round(Math.min(480, (args as { limit: number }).limit * 60)), 512];
   if (cmd === "set_price_settings") return [];

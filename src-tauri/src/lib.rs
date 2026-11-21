@@ -624,6 +624,23 @@ fn buy_build_item(app: AppHandle, text: String) -> Result<BuyResult, String> {
     Ok(BuyResult { total, of, need })
 }
 
+#[derive(Serialize)]
+struct BaseResult { total: u64, ilvl: u32, notables: Vec<(String, u32)> }
+
+/// "Buy base" on a cluster jewel in your build: the base to craft it on (same passives and enchant, the item level
+/// its notables need), cheapest first, opened in your browser.
+#[tauri::command(async)]
+fn buy_base_item(app: AppHandle, text: String) -> Result<BaseResult, String> {
+    let (poe2, league) = trade_league(&app);
+    let dir = app.state::<AppState>().data_dir.clone();
+    let index = trade_api::stats(&dir, poe2).unwrap_or_default();
+    let (mut q, ilvl, notables) = filter_core::trade::cluster_base_query(&text, &index).ok_or("Only cluster jewels have a base to buy here")?;
+    if let Ok(t) = trade_api::item_types(&dir, poe2) { t.fix_query(&mut q); }
+    let (id, _, total) = trade_api::search(poe2, &league, &q)?;
+    open_url(trade_api::site_url(poe2, &league, &id))?;
+    Ok(BaseResult { total, ilvl, notables })
+}
+
 /// Fills in the rest (divine rate, build comparison, map check, bulk) and shows the price window.
 fn show_price(app: &AppHandle, payload: PriceCheck, text: &str, compare: bool) {
     let (poe2, _) = trade_league(app);
@@ -2426,7 +2443,7 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            price_build_item, buy_build_item, trade_untick_one, overview,
+            price_build_item, buy_build_item, buy_base_item, trade_untick_one, overview,
             create_profile,
             list_filters,
             set_active,

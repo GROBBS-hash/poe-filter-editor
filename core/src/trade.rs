@@ -868,6 +868,42 @@ pub fn buy_query(text: &str, index: &StatIndex) -> Option<(Value, usize)> {
     Some((json!({ "query": q, "sort": { "price": "asc" } }), n))
 }
 
+/// The item level a cluster jewel notable needs to roll (core/data/cluster_notables.json, from the game's mod data
+/// via tools/build_cluster_levels.mjs; checked against poedb).
+pub fn notable_ilvl(name: &str) -> Option<u32> {
+    static D: std::sync::OnceLock<HashMap<String, u32>> = std::sync::OnceLock::new();
+    let d = D.get_or_init(|| serde_json::from_str(include_str!("../data/cluster_notables.json")).unwrap_or_default());
+    d.get(&name.to_lowercase().chars().filter(|c| c.is_ascii_alphanumeric()).collect::<String>()).copied()
+}
+
+/// "Buy base" on a cluster jewel: the base to craft on (Harvest reforge, Alchemy...) instead of buying the finished
+/// jewel. Same passive count and small-passive enchant, item level high enough for every notable it has
+/// (Inspired Oppression needs 75), any rarity but unique, cheapest first.
+/// Returns the search, the item level asked for, and each notable with the level it needs.
+pub fn cluster_base_query(text: &str, index: &StatIndex) -> Option<(Value, u32, Vec<(String, u32)>)> {
+    let item = parse_item(text)?;
+    if !item.base_type.ends_with("Cluster Jewel") { return None; }
+    let mut stats: Vec<Value> = Vec::new();
+    let mut levels: Vec<(String, u32)> = Vec::new();
+    for m in mods(text) {
+        if let Some(n) = m.text.strip_prefix("1 Added Passive Skill is ") {
+            levels.push((n.to_string(), notable_ilvl(n).unwrap_or(1)));
+            continue;
+        }
+        if m.kind != "enchant" || m.text.contains("Jewel Socket") { continue; }
+        let Some((id, value)) = index.find(&m) else { continue };
+        let mut v = stat_json(&id);
+        if m.text.contains("Passive Skill") && value.is_finite() && v.get("value").is_none() { v["value"] = json!({ "min": value, "max": value }); }
+        stats.push(v);
+    }
+    let ilvl = levels.iter().map(|l| l.1).max().unwrap_or(1);
+    let mut filters = json!({ "type_filters": { "filters": { "rarity": { "option": "nonunique" } } } });
+    if ilvl > 1 { filters["misc_filters"] = json!({ "filters": { "ilvl": { "min": ilvl } } }); }
+    let q = json!({ "query": { "status": { "option": "available" }, "type": plain_base(&item),
+        "stats": [{ "type": "and", "filters": stats }], "filters": filters }, "sort": { "price": "asc" } });
+    Some((q, ilvl, levels))
+}
+
 /// "Buy" found nothing with every mod: the same search with `drop` fewer of the mods that can vary required
 /// (any of them), while what makes the item what it is stays required: enchants (a cluster jewel's passive count
 /// and small passives), its jewel sockets, a timeless jewel's seed. Guides list several good notables for a
@@ -894,6 +930,31 @@ pub fn buy_loosen(q: &Value, drop: usize) -> Option<(Value, usize, usize)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cluster_base_asks_for_the_item_level_the_notables_need() {
+        let t = "Item Class: Jewels
+Rarity: Rare
+8 Passive Only
+Large Cluster Jewel
+--------
+Item Level: 84
+--------
+Adds 8 Passive Skills (enchant)
+2 Added Passive Skills are Jewel Sockets (enchant)
+Added Small Passive Skills grant: 12% increased Lightning Damage (enchant)
+--------
+1 Added Passive Skill is Doryani's Lesson
+1 Added Passive Skill is Inspired Oppression
+1 Added Passive Skill is Overshock
+";
+        let (q, ilvl, levels) = cluster_base_query(t, &Default::default()).unwrap();
+        assert_eq!(ilvl, 75, "Inspired Oppression needs 75: {levels:?}");
+        assert_eq!(levels.iter().map(|l| l.1).collect::<Vec<_>>(), [68, 75, 50]);
+        assert_eq!(q["query"]["filters"]["misc_filters"]["filters"]["ilvl"]["min"], 75);
+        assert_eq!(q["query"]["type"], "Large Cluster Jewel");
+        assert!(cluster_base_query(BOOTS, &Default::default()).is_none(), "only cluster jewels");
+    }
 
     #[test]
     fn buy_loosens_cluster_notables() {

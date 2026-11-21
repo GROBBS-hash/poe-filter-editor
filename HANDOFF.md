@@ -292,6 +292,13 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   `BuildView.tsx` (F6 + My build): a tick per item, key `slot|name|base`, in localStorage `build.have` (shared by both
   windows via the storage event), "Have N of M" bar with "hide what I have" (`build.hideHave`).
 
+- Buy base 21 Nov (0.2.14, his idea + guide: reforge clusters at Harvest instead of buying exact ones): cluster
+  jewels in F6/My build Jewels get "Buy base" (buy_base_item → trade::cluster_base_query): same base, passive count and
+  small-passive enchant, rarity non-unique, item level ≥ the highest notable needs. Notable item levels in
+  core/data/cluster_notables.json (301 notables; levels 1/50/68/75) from RePoE mods.min.json via
+  tools/build_cluster_levels.mjs; checked against poedb (Inspired Oppression 75, Doryani's Lesson 68, Overshock 50;
+  poewiki blocks automated reads). Live: his jewel → 3480 bases from 1c (ilvl 76–85).
+
 - Buy loosens 21 Nov (0.2.13, his large lightning cluster found nothing): (1) the cluster's "N Added Passive Skills are
   Jewel Sockets" line made every search 0 (as enchant or explicit), so buy_query leaves it out for cluster jewels;
   (2) nobody sold all 3 notables: buy_build_item now retries with trade::buy_loosen (enchants / seed stay required,
@@ -537,6 +544,10 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 
 - [ ] Ctrl+D on a timeless jewel (Brutal Restraint): seed line ticked, prices for that exact seed; "any conqueror" row works.
 - [ ] Price window: "This week" line with ▲/▼ % under the price for currency, cards, uniques… (after the price file updates).
+
+**Buy base (21 Nov, 0.2.14)**
+- [ ] F6 → Jewels → "Buy base" on a cluster jewel: trade site opens with cheap bases at the right item level; the note
+      says "N bases · item level 75+ (Inspired Oppression)".
 
 **Buy (21 Nov, 0.2.13)**
 - [ ] F6 → Jewels → Buy on the "8 Passive Only" large cluster: the trade site opens with results, button says

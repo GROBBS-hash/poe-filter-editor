@@ -1426,3 +1426,4 @@ main.content .card h2 { font-size: 19px; font-weight: 500; letter-spacing: .02em
 .worth-line.on { border-color: rgba(220,178,90,.45); background: rgba(220,178,90,.06); }
 .worth-line label { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; cursor: pointer; }
 .worth-line .num { width: 70px; }
+.bv-buybase { border: 1px solid rgba(220,178,90,.5); background: transparent; color: var(--gold); }

@@ -13,6 +13,10 @@ fn main() {
         if let (Ok(stats), true) = (std::env::var("POB_BUY"), s.title.contains(&std::env::var("POB_STAGE").unwrap_or_default())) {
             let index = filter_core::trade::StatIndex::from_json(&serde_json::from_str(&std::fs::read_to_string(stats).unwrap()).unwrap());
             for g in s.gear.iter().chain(s.jewels.iter().map(|j| &j.item)) {
+                if std::env::var("POB_BASE").is_ok() {
+                    if let Some((q, lvl, _)) = filter_core::trade::cluster_base_query(&g.copy, &index) { println!("BASE	{}	{}	{}", g.name, lvl, q); }
+                    continue;
+                }
                 let Some((q, n)) = filter_core::trade::buy_query(&g.copy, &index) else { continue };
                 if std::env::var("POB_BUY_DEBUG").is_ok() { eprintln!("== {} ({}) {} mods\n{}", g.name, g.base, n, g.copy); }
                 println!("BUY\t{}\t{}\t{}", g.name, n, q);

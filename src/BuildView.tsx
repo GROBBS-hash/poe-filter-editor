@@ -1,3 +1,4 @@
+import { friendly } from "./errors";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef, useState } from "react";
@@ -32,6 +33,31 @@ function PriceButton({ onClick }: { onClick: () => void }) {
 type BuyResult = { total: number; of: number; need: number };
 
 /** "Buy": opens the trade site in your browser, searching for an item with the mods PoB lists. */
+type BaseResult = { total: number; ilvl: number; notables: [string, number][] };
+
+/** "Buy base" on a cluster jewel: the base to craft it on, with the item level its notables need. Often 1c against
+ *  a finished jewel's price (guides say: reforge at the Harvest bench rather than buy exact jewels). */
+function BuyBaseButton({ it }: { it: PobGear }) {
+  const [state, setState] = useState<"idle" | "busy" | BaseResult | string>("idle");
+  const go = (e: { stopPropagation(): void }) => {
+    e.stopPropagation();
+    setState("busy");
+    invoke<BaseResult>("buy_base_item", { text: it.copy }).then(setState).catch((err) => setState(friendly(err)));
+  };
+  const r = typeof state === "object" ? state : null;
+  const need = r?.notables.filter(([, l]) => l === r.ilvl).map(([n]) => n) ?? [];
+  const note = r ? `${r.total} bases · item level ${r.ilvl}+${need.length && r.ilvl > 1 ? ` (${need.join(", ")})` : ""}` : typeof state === "string" && state !== "idle" && state !== "busy" ? state : "";
+  return (
+    <>
+      {note && <span className={`bv-buynote small ${typeof state === "string" ? "bad" : ""}`} title={r ? r.notables.map(([n, l]) => `${n}: item level ${l}+`).join("\n") : note}>{note}</span>}
+      <button className="bv-price bv-buybase" disabled={state === "busy"}
+        title={"Search the trade site for the empty base to craft this on: same passive count and enchant, item level high\n" +
+          "enough for its notables to roll (from the game's data, checked against poedb), cheapest first"}
+        onClick={go}>{state === "busy" ? "Searching…" : "Buy base"}</button>
+    </>
+  );
+}
+
 function BuyButton({ it }: { it: PobGear }) {
   const [state, setState] = useState<"idle" | "busy" | BuyResult | string>("idle");
   const go = (e: { stopPropagation(): void }) => {
@@ -290,6 +316,7 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
                     <button className="link small bv-onTree" title="Show this jewel's socket on the tree"
                       onClick={(e) => { e.stopPropagation(); setJewelNode(j.node); setView("tree"); }}>on tree</button>
                   )}
+                  {j.item.copy && j.item.base.endsWith("Cluster Jewel") && <BuyBaseButton it={j.item} />}
                   {j.item.copy && <BuyButton it={j.item} />}
                   {j.item.copy && <PriceButton onClick={() => priceItem(j.item)} />}
                 </div>
