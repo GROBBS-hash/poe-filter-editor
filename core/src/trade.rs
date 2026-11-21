@@ -24,10 +24,13 @@ pub struct ModLine {
     pub range: Option<String>,
     /// "prefix" or "suffix", from the advanced copy's "{ Prefix Modifier … }" heading.
     pub affix: Option<String>,
+    /// How wide its roll range is (averaged over its numbers that vary), from the advanced copy: "(80-100)" -> 20.
+    #[serde(skip)]
+    pub width: Option<f64>,
 }
 
 /// One stat to search on, with a tick box and a minimum.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct StatFilter {
     pub id: String,
     pub label: String,
@@ -48,6 +51,9 @@ pub struct StatFilter {
     /// "prefix" or "suffix" (shown as P / S in the window).
     #[serde(default)]
     pub affix: Option<String>,
+    /// An upper limit too (a cluster jewel's passive count is searched exactly: more passives is a worse jewel).
+    #[serde(default)]
+    pub max: Option<f64>,
 }
 
 /// Mods that almost never change what an item sells for.
@@ -95,6 +101,9 @@ pub struct TradeSetup {
     /// Awakened's "base item" search, when this looks like a crafting base rather than a finished item.
     #[serde(default)]
     pub base_item: Option<BaseItem>,
+    /// Search corrupted (Some(true)) or not corrupted (Some(false)) only; None = either.
+    #[serde(default)]
+    pub corrupted: Option<bool>,
 }
 
 /// How to price an item as a crafting base (Awakened PoE Trade's "base item" preset): same base, at least this
@@ -271,6 +280,12 @@ fn roll_of(line: &str, values: &[f64]) -> Option<f64> {
     Some(spots.iter().sum::<f64>() / spots.len() as f64)
 }
 
+/// How wide the line's roll range is, averaged over its numbers that vary ("(80-100)" -> 20). None when fixed or unknown.
+fn width_of(line: &str) -> Option<f64> {
+    let w: Vec<f64> = ranges(line).iter().filter(|(a, b)| a != b).map(|(a, b)| (a.abs() - b.abs()).abs()).collect();
+    (!w.is_empty()).then(|| w.iter().sum::<f64>() / w.len() as f64)
+}
+
 /// The ranges as shown in the window: "25–29", or "8–12 / 18–25" for several numbers.
 /// None when there are none or every number is fixed.
 fn range_text(line: &str) -> Option<String> {
@@ -350,11 +365,11 @@ pub fn mods(text: &str) -> Vec<ModLine> {
                 else { header_kind.clone().unwrap_or_else(|| "explicit".into()) };
             let t = clean(l);
             // Under a "{ … Modifier }" heading every line is a mod, numbers or not ("…is Lucky while on Low Life").
-            let numberless_ok = header_kind.is_some() || t.contains("Cannot") || t.contains("Has ");
+            let numberless_ok = header_kind.is_some() || t.contains("Cannot") || t.contains("Has ") || t.starts_with("Allocates ");
             if t.is_empty() || !t.chars().any(|c| c.is_ascii_digit()) && !numberless_ok { continue; }
             let (_, values) = template(&t);
             let (roll, range) = (roll_of(l, &values), range_text(l));
-            out.push(ModLine { text: t, kind, tier: header_tier, values, roll, range, affix: header_affix.clone() });
+            out.push(ModLine { text: t, kind, tier: header_tier, values, roll, range, affix: header_affix.clone(), width: width_of(l) });
         }
     }
     out
@@ -372,9 +387,15 @@ pub fn category(class: &str) -> Option<&'static str> {
         "One Hand Axes" => "weapon.oneaxe", "Two Hand Axes" => "weapon.twoaxe",
         "One Hand Maces" => "weapon.onemace", "Two Hand Maces" => "weapon.twomace",
         "Jewels" => "jewel.base", "Abyss Jewels" => "jewel.abyss", "Flasks" | "Life Flasks" | "Mana Flasks" | "Hybrid Flasks" | "Utility Flasks" => "flask",
+        "Tinctures" => "tincture", "Trinkets" => "accessory.trinket",
+        "Heist Gear" => "heistequipment.heistweapon", "Heist Tools" => "heistequipment.heisttool",
+        "Heist Cloaks" => "heistequipment.heistutility", "Heist Brooches" => "heistequipment.heistreward",
+        "Contracts" => "heistmission.contract", "Blueprints" => "heistmission.blueprint",
         _ => return None,
     })
 }
+
+fn is_flask(it: &Item) -> bool { it.item_class.contains("Flask") || it.item_class == "Tinctures" }
 
 /// Whether a mod can be the item's own ("Local") stat on this kind of item: a weapon's damage, speed and crit, an
 /// armour piece's defences. Energy shield on a staff (Xirgil's Crank, 21 Nov) is the global stat, not armour's local one.
@@ -419,6 +440,8 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
     filters.extend(totals_f);
     filters.extend(props_f);
     let has_tiers = lines.iter().any(|m| m.tier.is_some());
+    let flask = is_flask(&item);
+    let cluster = item.base_type.ends_with("Cluster Jewel");
     let local_first = category(&item.item_class).is_some_and(|c| c.starts_with("armour.") || c.starts_with("weapon."));
     let mut skip_to = 0;
     for (i, m) in lines.iter().enumerate() {
@@ -454,17 +477,44 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
         // Found on the mutated list = a Foulborn mod (shown in its own colour).
         let kind = if id.starts_with("mutated.") { "mutated".to_string() } else { m.kind.clone() };
         let (t, _) = template(&m.text);
-        let good = if has_tiers { m.tier.map(|t| t <= 2).unwrap_or(false) } else { VALUABLE.iter().any(|k| t.contains(k)) };
+        // Flasks: both of a magic flask's mods are what you pay for, so without tiers every one counts.
+        let good = if has_tiers { m.tier.map(|t| t <= 2).unwrap_or(false) } else { (flask && !(value < 0.0)) || VALUABLE.iter().any(|k| t.contains(k)) };
         let junk = is_junk(&t);
         // Maps: price by tier and rarity; mods are there to tick, never ticked for you.
-        let enabled = !unique && !is_map(&item) && m.kind != "enchant" && good && !junk && !counted.contains(&i);
+        let mut enabled = !unique && !is_map(&item) && m.kind != "enchant" && good && !junk && !counted.contains(&i);
         // A mod with no number (or listed word for word, value NaN) is just "has it": no minimum.
         let whole = value.is_nan();
         let value = if whole { 0.0 } else { value };
-        let min = if m.values.is_empty() || whole { None } else { Some(min_for(value)) };
-        filters.push(StatFilter { id, label: m.text.clone(), value, min, enabled, kind, tier: m.tier, junk, roll: m.roll, range: m.range.clone(), affix: m.affix.clone() });
+        let mut min = if m.values.is_empty() || whole { None } else { Some(min_for(value)) };
+        let mut max = None;
+        // Uniques (Awakened's roll ranges): every mod that rolls is searched "about as good as yours": 10% of its range
+        // below your roll, exactly your roll when it's perfect. Fixed mods and plain copies (no ranges) stay unticked.
+        if unique && !whole && value > 0.0 && m.kind != "enchant" {
+            if let (Some(roll), Some(w)) = (m.roll, m.width) {
+                let slack = if roll >= 0.999 { 0.0 } else { w * 0.1 };
+                let lo = value - slack;
+                min = Some(if value.fract() == 0.0 && w >= 5.0 { lo.floor() } else { (lo * 10.0).floor() / 10.0 });
+                enabled = !junk;
+            }
+        }
+        // Anointed amulets and rings: the oil's notable sets the price as much as the item does.
+        if m.kind == "enchant" && m.text.starts_with("Allocates ") && matches!(item.item_class.as_str(), "Amulets" | "Rings") { enabled = true; }
+        // Cluster jewels (Awakened's rule): the passive count exactly (8 passives is a better large jewel than 10) and
+        // what the small passives grant (it decides which notables can roll). Its jewel sockets come with the count.
+        if cluster && !unique && m.kind == "enchant" {
+            if t.starts_with("Adds # Passive Skills") { enabled = true; max = min; }
+            if t.starts_with("Added Small Passive Skills grant") { enabled = true; }
+        }
+        filters.push(StatFilter { id, label: m.text.clone(), value, min, max, enabled, kind, tier: m.tier, junk, roll: m.roll, range: m.range.clone(), affix: m.affix.clone() });
     }
     if is_map(&item) { filters.splice(0..0, crate::trade_rules::map_props(text, &item)); }
+    // Heist contracts and blueprints: area level, wings, the job they need.
+    filters.splice(0..0, crate::trade_rules::heist_props(text, &item));
+    // Influences ("Has Shaper Influence"), there to tick: the mods they bring are usually what's ticked.
+    for inf in &item.influences {
+        let id = index.pseudo_id(&format!("Has {inf} Influence")).unwrap_or_else(|| format!("pseudo.pseudo_has_{}_influence", inf.to_lowercase()));
+        filters.push(StatFilter { id, label: format!("{inf} item"), kind: "pseudo".into(), ..Default::default() });
+    }
     // Timeless jewels (Awakened's rule): the seed decides which passives change, the conqueror the keystone. The jewel's
     // own line is ticked with the exact seed; one more row, unticked, takes the same seed under any of its conquerors.
     if let Some(i) = filters.iter().position(|f| f.id.starts_with("explicit.pseudo_timeless_jewel_")) {
@@ -477,7 +527,7 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
                 id: format!("timeless_any:{}", family.iter().map(|(id, _)| id.as_str()).collect::<Vec<_>>().join(",")),
                 label: format!("Seed {} under any conqueror ({})", filters[i].value, names.join(", ")),
                 value: filters[i].value, min: Some(filters[i].value), enabled: false, kind: "explicit".into(),
-                tier: None, junk: false, roll: None, range: None, affix: None,
+                ..Default::default()
             });
         }
     }
@@ -503,14 +553,18 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
     // the base that's for sale, so search that base at this item level or better.
     let nothing_picked = !filters.iter().any(|f| f.enabled);
     let gear = category(&item.item_class).is_some();
+    let heist_mission = matches!(item.item_class.as_str(), "Contracts" | "Blueprints");
     let base_item = base_item(text, &item, &lines, &filters);
     let base = plain_base(&item);
     let affix_max = Some(crate::trade_rules::affix_limits(text, &item));
     Some(TradeSetup {
         category: category(&item.item_class).map(|c| if item.base_type.ends_with("Cluster Jewel") { "jewel.cluster" } else { c }).map(String::from),
-        base_only: !matches!(item.rarity.as_str(), "Rare" | "Magic") || !gear || nothing_picked,
-        ilvl_min: (gear && nothing_picked && item.rarity != "Unique").then_some(item.item_level).flatten(),
-        ilvl_max: (gear && nothing_picked && item.rarity != "Unique").then_some(item.item_level).flatten().and_then(|l| ilvl_band(l).1),
+        // Flasks and tinctures: a Quicksilver Flask's price has nothing to do with a Diamond Flask's, so always this base.
+        base_only: !matches!(item.rarity.as_str(), "Rare" | "Magic") || !gear || nothing_picked || flask || heist_mission,
+        // Uniques: corrupted or not, like yours (a corrupted one can't be changed, and its implicit is part of the price).
+        corrupted: (item.rarity == "Unique" && !item.item_class.contains("Gem")).then_some(item.corrupted),
+        ilvl_min: (gear && nothing_picked && !heist_mission && item.rarity != "Unique").then_some(item.item_level).flatten(),
+        ilvl_max: (gear && nothing_picked && !heist_mission && item.rarity != "Unique").then_some(item.item_level).flatten().and_then(|l| ilvl_band(l).1),
         links_min: (links >= 5).then_some(links),
         gem_level,
         filters, unknown, unknown_kinds, item, raw: text.to_string(), misc: vec![], base, base_item, affix_max,
@@ -526,7 +580,8 @@ fn base_item(text: &str, item: &Item, lines: &[ModLine], filters: &[StatFilter])
     let cat = category(&item.item_class)?;
     let has_line = |l: &str| text.lines().any(|x| x.trim() == l);
     let magic = item.rarity == "Magic";
-    if !(magic || item.rarity == "Rare") || item.unidentified || cat == "flask" { return None; }
+    if !(magic || item.rarity == "Rare") || item.unidentified || cat == "flask" || cat == "tincture"
+        || cat.starts_with("heist") || cat == "accessory.trinket" { return None; }
     let fractured = has_line("Fractured Item") || lines.iter().any(|m| m.kind == "fractured");
     let synthesised = has_line("Synthesised Item");
     if item.corrupted || item.mirrored { return None; }
@@ -549,12 +604,14 @@ fn base_item(text: &str, item: &Item, lines: &[ModLine], filters: &[StatFilter])
     let ids = filters.iter().filter(|f| match f.kind.as_str() {
         "fractured" | "enchant" => true,
         "implicit" => keep_implicits,
+        // Influences are searched as "Has Shaper Influence" stats (the trade site dropped its "Shaper Item" switch).
+        "pseudo" => f.id.ends_with("_influence"),
         "explicit" => magic && !cluster && f.tier.is_some_and(|t| t <= 2),
         _ => false,
     }).map(|f| f.id.clone()).collect();
     // Item level: at least this one (most mod tiers need 68-86). Cluster jewels by bracket; other jewels don't care.
     let ilvl_min = if cluster { [84, 75, 68, 50, 1].into_iter().find(|b| ilvl >= *b) } else if jewel { None } else { Some(ilvl.min(86)) };
-    let mut misc: Vec<String> = item.influences.iter().map(|i| format!("{}_item", i.to_lowercase())).collect();
+    let mut misc: Vec<String> = Vec::new();
     if synthesised { misc.push("synthesised_item".into()); }
     if fractured { misc.push("fractured_item".into()); }
     Some(BaseItem { why, ids, ilvl_min: ilvl_min.filter(|l| *l > 0), misc })
@@ -615,6 +672,7 @@ pub fn query(s: &TradeSetup) -> Value {
     if it.unidentified && it.rarity != "Unique" { misc["identified"] = json!({ "option": "false" }); }
     if let Some(n) = s.gem_level { misc["gem_level"] = json!({ "min": n }); }
     if foulborn { misc["mutated"] = json!({ "option": "true" }); }
+    if let Some(c) = s.corrupted { misc["corrupted"] = json!({ "option": if c { "true" } else { "false" } }); }
     for k in &s.misc { misc[k.as_str()] = json!({ "option": "true" }); }
     if it.item_class.contains("Gem") {
         if let Some(qual) = it.quality { misc["quality"] = json!({ "min": qual }); }
@@ -633,6 +691,7 @@ pub fn query(s: &TradeSetup) -> Value {
         if let Some((group, key)) = crate::trade_rules::property_query(&f.id) {
             if filters.get(group).is_none() { filters[group] = json!({ "filters": {} }); }
             filters[group]["filters"][key] = json!({ "min": f.min.unwrap_or(f.value) });
+            if let Some(m) = f.max { filters[group]["filters"][key]["max"] = json!(m); }
         }
     }
     if filters.as_object().map(|o| !o.is_empty()).unwrap_or(false) { q["filters"] = filters; }
@@ -653,11 +712,74 @@ pub fn query(s: &TradeSetup) -> Value {
         let id = match f.id.strip_prefix("fractured.") { Some(rest) if !as_base => format!("explicit.{rest}"), _ => f.id.clone() };
         let mut v = stat_json(&id);
         if let (Some(m), None) = (f.min, v.get("value")) { v["value"] = json!({ "min": m }); }
+        if let (Some(m), Some(_)) = (f.max, v.get("value").and_then(|x| x.get("min"))) { v["value"]["max"] = json!(m); }
         if f.id.starts_with("explicit.pseudo_timeless_jewel_") { v["value"] = seed(f.min.unwrap_or(f.value)); }
         v
     }).collect();
     q["stats"] = json!([json!({ "type": "and", "filters": stats })].into_iter().chain(groups).collect::<Vec<_>>());
     json!({ "query": q, "sort": { "price": "asc" } })
+}
+
+/// Everything a search asks for besides the ticked stat rows, in plain words (the "hidden filters" Awakened shows):
+/// listing status, name or base, rarity, kind of item, item level, corrupted, links, map tier and so on.
+pub fn describe(q: &Value) -> Vec<String> {
+    let q = &q["query"];
+    let mut out = Vec::new();
+    out.push(match q["status"]["option"].as_str() {
+        Some("securable") => "Instant buyout only".to_string(),
+        Some("available") => "Instant buyout and in person".to_string(),
+        Some("online") | Some("onlineleague") => "Sellers online".to_string(),
+        _ => "Any listing".to_string(),
+    });
+    if let Some(n) = q["name"].as_str() { out.push(format!("Named {n}")); }
+    match &q["type"] {
+        Value::String(t) => out.push(format!("Base: {t}")),
+        Value::Object(o) => if let Some(t) = o.get("option").and_then(|x| x.as_str()) { out.push(format!("Base: {t}")); },
+        _ => {}
+    }
+    let f = &q["filters"];
+    match f["type_filters"]["filters"]["rarity"]["option"].as_str() {
+        Some("nonunique") => out.push("Not unique".into()),
+        Some(r) => out.push(format!("Rarity: {r}")),
+        None => {}
+    }
+    if let Some(c) = f["type_filters"]["filters"]["category"]["option"].as_str() { out.push(format!("Any {}", category_words(c))); }
+    let range = |v: &Value| match (v["min"].as_f64(), v["max"].as_f64()) {
+        (Some(a), Some(b)) if a == b => format!("{a}"), (Some(a), Some(b)) => format!("{a}–{b}"),
+        (Some(a), None) => format!("{a}+"), (None, Some(b)) => format!("up to {b}"), _ => String::new(),
+    };
+    let yes = |v: &Value| v["option"].as_str() == Some("true");
+    if let Some(m) = f["misc_filters"]["filters"].as_object() {
+        for (k, v) in m {
+            out.push(match k.as_str() {
+                "ilvl" => format!("Item level {}", range(v)),
+                "gem_level" => format!("Gem level {}", range(v)),
+                "quality" => format!("Quality {}%", range(v)),
+                "corrupted" => if yes(v) { "Corrupted".into() } else { "Not corrupted".into() },
+                "identified" => if yes(v) { "Identified".into() } else { "Unidentified".into() },
+                "mutated" => "Foulborn".into(),
+                "fractured_item" => "Fractured".into(),
+                "synthesised_item" => "Synthesised".into(),
+                other => format!("{}: {}", other.replace('_', " "), if v.get("option").is_some() { if yes(v) { "yes".into() } else { "no".into() } } else { range(v) }),
+            });
+        }
+    }
+    if let Some(l) = f["socket_filters"]["filters"]["links"].as_object() { out.push(format!("{} links", range(&Value::Object(l.clone())))); }
+    if let Some(t) = f["map_filters"]["filters"].get("map_tier") { out.push(format!("Map tier {}", range(t))); }
+    out
+}
+
+/// "armour.helmet" -> "helmet", "heistmission.contract" -> "contract".
+fn category_words(c: &str) -> String {
+    let last = c.rsplit('.').next().unwrap_or(c);
+    match last {
+        "chest" => "body armour".into(), "onesword" => "one-handed sword".into(), "twosword" => "two-handed sword".into(),
+        "oneaxe" => "one-handed axe".into(), "twoaxe" => "two-handed axe".into(), "onemace" => "one-handed mace".into(),
+        "twomace" => "two-handed mace".into(), "runedagger" => "rune dagger".into(), "base" => "jewel".into(),
+        "abyss" => "abyss jewel".into(), "cluster" => "cluster jewel".into(), "heistweapon" => "heist gear".into(),
+        "heisttool" => "heist tool".into(), "heistutility" => "heist cloak".into(), "heistreward" => "heist brooch".into(),
+        x => x.to_string(),
+    }
 }
 
 /// A stat filter for a search. The stat list writes pick-one stats as "enchant.stat_3948993189|14"
@@ -1062,7 +1184,7 @@ Item Level: 75
     fn reads_advanced_copy() {
         let m = mods(BOOTS);
         assert_eq!(m.len(), 5);
-        assert_eq!(m[0], ModLine { text: "+8% to Cold Resistance".into(), kind: "implicit".into(), tier: None, values: vec![8.0], roll: None, range: None, affix: None });
+        assert_eq!(m[0], ModLine { text: "+8% to Cold Resistance".into(), kind: "implicit".into(), tier: None, values: vec![8.0], roll: None, range: None, affix: None, width: None });
         assert_eq!((m[1].text.as_str(), m[1].tier, m[1].values[0]), ("+28 to maximum Life", Some(7), 28.0));
         assert_eq!(m[3].tier, Some(1));
         assert!(m[1].roll.is_some(), "life has a range: {:?}", m[1]);

@@ -554,7 +554,7 @@ fn price_check(app: AppHandle) {
                     let item = p.item;
                     let category = filter_core::trade::category(&item.item_class).map(|c| if item.base_type.ends_with("Cluster Jewel") { "jewel.cluster" } else { c }).map(String::from);
                     let s = filter_core::trade::TradeSetup { item: item.clone(), filters: vec![], base_only: true, ilvl_min: None, ilvl_max: None,
-                        links_min: None, gem_level: None, unknown: vec![], unknown_kinds: vec![], category, raw: String::new(), misc: vec![], base: String::new(), base_item: None, affix_max: None };
+                        links_min: None, gem_level: None, unknown: vec![], unknown_kinds: vec![], category, raw: String::new(), misc: vec![], base: String::new(), base_item: None, affix_max: None, corrupted: None };
                     PriceCheck { ninja: ninja_price(&app, &item), setup: Some(s), league, from_ground: true, error: None, bulk: None, map: None, divine: None, compare: vec![], instant_all: false, trend: None, sold: None }
                 }
                 Err(e) => PriceCheck { setup: None, ninja: None, league, from_ground: true, error: Some(e), bulk: None, map: None, divine: None, compare: vec![], instant_all: false, trend: None, sold: None },
@@ -733,6 +733,14 @@ fn trade_query(app: &AppHandle, poe2: bool, setup: &filter_core::trade::TradeSet
 
 /// When you last price checked by hand: live searches wait so yours go first.
 static LAST_MANUAL: Mutex<Option<std::time::Instant>> = Mutex::new(None);
+
+/// Everything the price window's search asks for besides the ticked stats, in plain words ("Instant buyout only",
+/// "Base: Two-Toned Boots", "Not corrupted"…): the "hidden filters" list. No network.
+#[tauri::command]
+fn trade_hidden(app: AppHandle, setup: filter_core::trade::TradeSetup) -> Vec<String> {
+    let (poe2, _) = trade_league(&app);
+    filter_core::trade::describe(&trade_query(&app, poe2, &setup))
+}
 
 /// Runs the price search on the trade site (from the price window).
 #[tauri::command(async)]
@@ -2505,7 +2513,7 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            price_build_item, buy_build_item, buy_base_item, trade_untick_one, overview,
+            price_build_item, buy_build_item, buy_base_item, trade_untick_one, trade_hidden, overview,
             craft_bases, craft_start, craft_pool, craft_ways, craft_plan, craft_routes, craft_buy,
             create_profile,
             list_filters,

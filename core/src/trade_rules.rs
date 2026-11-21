@@ -127,7 +127,7 @@ pub fn totals(mods: &[ModLine], item: &Item, index: &StatIndex, skip: &[usize]) 
         out.push(StatFilter {
             id, label: rule.text.replace('#', &total.to_string()), value: total, min: Some(total),
             enabled: !unique && !bench_only && rule.tick_at.map(|t| total >= t).unwrap_or(false),
-            kind: "pseudo".into(), tier: None, junk: false, roll: None, range: None, affix: None,
+            kind: "pseudo".into(), tier: None, junk: false, roll: None, range: None, affix: None, max: None,
         });
         if !unique { hide.extend(used.iter().filter(|(_, keep)| !keep).map(|(i, _)| *i)); }
     }
@@ -211,7 +211,7 @@ pub fn property_filters(text: &str, item: &Item, mods: &[ModLine]) -> (Vec<StatF
     let mut out = Vec::new();
     let mut replaced: Vec<&str> = Vec::new();
     let f = |id: &str, label: String, v: f64, on: bool| StatFilter {
-        id: id.into(), label, value: v, min: Some(v), enabled: on && !unique, kind: "property".into(), tier: None, junk: false, roll: None, range: None, affix: None };
+        id: id.into(), label, value: v, min: Some(v), enabled: on && !unique, kind: "property".into(), tier: None, junk: false, roll: None, range: None, affix: None, max: None };
     // Armour: each defence at 20% quality; ticked when the base has only one kind.
     let defences = [p.armour, p.evasion, p.es, p.ward].iter().filter(|x| x.is_some()).count();
     for (val, id, name, inc) in [(p.armour, "prop.ar", "Armour", AR_INC), (p.evasion, "prop.ev", "Evasion Rating", EV_INC),
@@ -258,6 +258,15 @@ pub fn property_query(id: &str) -> Option<(&'static str, &'static str)> {
         "prop.dps" => ("weapon_filters", "dps"), "prop.quality" => ("misc_filters", "quality"),
         "prop.map_iiq" => ("map_filters", "map_iiq"), "prop.map_iir" => ("map_filters", "map_iir"),
         "prop.map_bonus" => ("map_filters", "map_bonus"), "prop.map_packsize" => ("map_filters", "map_packsize"),
+        "prop.area_level" => ("map_filters", "area_level"),
+        "prop.heist_wings" => ("heist_filters", "heist_wings"), "prop.heist_max_wings" => ("heist_filters", "heist_max_wings"),
+        "prop.heist_escape_routes" => ("heist_filters", "heist_escape_routes"), "prop.heist_max_escape_routes" => ("heist_filters", "heist_max_escape_routes"),
+        "prop.heist_reward_rooms" => ("heist_filters", "heist_reward_rooms"), "prop.heist_max_reward_rooms" => ("heist_filters", "heist_max_reward_rooms"),
+        "prop.heist_lockpicking" => ("heist_filters", "heist_lockpicking"), "prop.heist_brute_force" => ("heist_filters", "heist_brute_force"),
+        "prop.heist_perception" => ("heist_filters", "heist_perception"), "prop.heist_demolition" => ("heist_filters", "heist_demolition"),
+        "prop.heist_counter_thaumaturgy" => ("heist_filters", "heist_counter_thaumaturgy"),
+        "prop.heist_trap_disarmament" => ("heist_filters", "heist_trap_disarmament"), "prop.heist_agility" => ("heist_filters", "heist_agility"),
+        "prop.heist_deception" => ("heist_filters", "heist_deception"), "prop.heist_engineering" => ("heist_filters", "heist_engineering"),
         _ => return None,
     })
 }
@@ -293,7 +302,7 @@ pub fn open_affixes(text: &str, item: &Item, index: &StatIndex) -> Vec<StatFilte
         if n == 0 { continue; }
         let Some(id) = index.pseudo_id(text_id) else { continue };
         out.push(StatFilter { id, label: format!("Open {label} ({n} free)"), value: n as f64, min: Some(1.0), enabled: false,
-            kind: "pseudo".into(), tier: None, junk: false, roll: None, range: None, affix: None });
+            kind: "pseudo".into(), tier: None, junk: false, roll: None, range: None, affix: None, max: None });
     }
     out
 }
@@ -396,7 +405,7 @@ pub fn map_props(text: &str, item: &Item) -> Vec<StatFilter> {
     let more = |k: &str| read(&format!("More {k}: "));
     let valuable = more("Scarabs").is_some() || more("Currency").is_some() || more("Divination Cards").is_some();
     let f = |id: &str, label: String, v: f64, on: bool| StatFilter {
-        id: id.into(), label, value: v, min: Some(v), enabled: on, kind: "property".into(), tier: None, junk: false, roll: None, range: None, affix: None };
+        id: id.into(), label, value: v, min: Some(v), enabled: on, kind: "property".into(), tier: None, junk: false, roll: None, range: None, affix: None, max: None };
     let mut out = Vec::new();
     for (key, id, on) in [("Item Quantity: ", "prop.map_iiq", true), ("Atlas Drops: ", "prop.map_bonus", true),
         ("Item Rarity: ", "prop.map_iir", !valuable), ("Monster Pack Size: ", "prop.map_packsize", true)] {
@@ -413,6 +422,152 @@ pub fn map_props(text: &str, item: &Item) -> Vec<StatFilter> {
     }).count();
     if mods >= 8 { out.push(StatFilter { kind: "pseudo".into(), ..f("pseudo.pseudo_number_of_affix_mods", format!("{mods} mods"), mods as f64, true) }); }
     out
+}
+
+/// Heist rogue jobs as the copy writes them, and their trade filter.
+const HEIST_JOBS: &[(&str, &str)] = &[("Lockpicking", "prop.heist_lockpicking"), ("Brute Force", "prop.heist_brute_force"),
+    ("Perception", "prop.heist_perception"), ("Demolition", "prop.heist_demolition"), ("Counter-Thaumaturgy", "prop.heist_counter_thaumaturgy"),
+    ("Trap Disarmament", "prop.heist_trap_disarmament"), ("Agility", "prop.heist_agility"), ("Deception", "prop.heist_deception"),
+    ("Engineering", "prop.heist_engineering")];
+
+/// What sells a heist contract or blueprint: its area level (83 opens the best rewards), a blueprint's total wings,
+/// and, there to tick, how much is already revealed and the job levels it needs.
+pub fn heist_props(text: &str, item: &Item) -> Vec<StatFilter> {
+    let blueprint = item.item_class == "Blueprints";
+    if !blueprint && item.item_class != "Contracts" { return vec![]; }
+    let text = text.replace('\r', "");
+    let line = |key: &str| text.lines().map(str::trim).find_map(|l| l.strip_prefix(key)).map(str::trim);
+    let num = |s: &str| s.chars().take_while(|c| c.is_ascii_digit()).collect::<String>().parse::<f64>().ok();
+    let f = |id: &str, label: String, v: f64, on: bool| StatFilter {
+        id: id.into(), label, value: v, min: Some(v), enabled: on, kind: "property".into(), ..Default::default() };
+    let mut out = Vec::new();
+    if let Some(v) = line("Area Level: ").and_then(num) { out.push(f("prop.area_level", format!("Area level: {v}"), v, true)); }
+    // "Wings Revealed: 1/4": revealed / total.
+    for (key, shown, total) in [("Wings Revealed: ", "prop.heist_wings", "prop.heist_max_wings"),
+        ("Escape Routes Revealed: ", "prop.heist_escape_routes", "prop.heist_max_escape_routes"),
+        ("Reward Rooms Revealed: ", "prop.heist_reward_rooms", "prop.heist_max_reward_rooms")] {
+        let Some((a, b)) = line(key).and_then(|v| v.split_once('/')) else { continue };
+        let name = key.trim_end_matches(" Revealed: ");
+        if let Some(b) = num(b.trim()) { out.push(f(total, format!("{name}: {b} in all"), b, name == "Wings")); }
+        if let Some(a) = num(a.trim()) { out.push(f(shown, format!("{name} revealed: {a}"), a, false)); }
+    }
+    // "Requires Lockpicking (Level 5), Counter-Thaumaturgy (Level 3)".
+    for l in text.lines().map(str::trim).filter(|l| l.starts_with("Requires ")) {
+        for (job, id) in HEIST_JOBS {
+            let Some(i) = l.find(&format!("{job} (Level ")) else { continue };
+            if let Some(v) = num(&l[i + job.len() + 8..]) { out.push(f(id, format!("{job} level {v}"), v, false)); }
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod heist_tests {
+    use crate::trade::{query, setup, StatIndex};
+
+    #[test]
+    fn blueprint() {
+        let t = "Item Class: Blueprints\nRarity: Rare\nShadowy Pledge\nBlueprint: Bunker\n--------\nHeist Target: Enchanted Armaments (Priceless)\n\
+            Area Level: 83\nWings Revealed: 1/4\nEscape Routes Revealed: 3/9\nReward Rooms Revealed: 5/16\n\
+            Requires Lockpicking (Level 5), Counter-Thaumaturgy (Level 3)\n--------\nItem Level: 83\n--------\n\
+            Guarded by 10% more Patrols\n";
+        let s = setup(t, &StatIndex::default()).unwrap();
+        let on: Vec<&str> = s.filters.iter().filter(|f| f.enabled).map(|f| f.id.as_str()).collect();
+        assert_eq!(on, ["prop.area_level", "prop.heist_max_wings"]);
+        assert!(s.filters.iter().any(|f| f.id == "prop.heist_counter_thaumaturgy" && f.value == 3.0));
+        assert!(s.base_only, "searched as Blueprint: Bunker");
+        let q = query(&s);
+        assert_eq!(q["query"]["type"], "Blueprint: Bunker");
+        assert_eq!(q["query"]["filters"]["map_filters"]["filters"]["area_level"]["min"], 83.0);
+        assert_eq!(q["query"]["filters"]["heist_filters"]["filters"]["heist_max_wings"]["min"], 4.0);
+        assert!(q["query"]["filters"]["misc_filters"]["filters"].get("ilvl").is_none());
+    }
+}
+
+#[cfg(test)]
+mod polish_tests {
+    use crate::trade::{describe, query, setup, StatIndex};
+    use serde_json::json;
+
+    fn idx() -> StatIndex {
+        StatIndex::from_json(&json!({ "result": [
+            { "label": "Explicit", "entries": [
+                { "id": "explicit.life", "text": "+# to maximum Life", "type": "explicit" },
+                { "id": "explicit.ms", "text": "#% increased Movement Speed", "type": "explicit" },
+                { "id": "explicit.dur", "text": "#% increased Duration", "type": "explicit" },
+                { "id": "explicit.ar_ench", "text": "#% increased Armour during Effect", "type": "explicit" },
+                { "id": "explicit.storm", "text": "1 Added Passive Skill is Storm Drinker", "type": "explicit" } ] },
+            { "label": "Pseudo", "entries": [ { "id": "pseudo.pseudo_has_shaper_influence", "text": "Has Shaper Influence", "type": "pseudo" } ] },
+            { "label": "Enchant", "entries": [
+                { "id": "enchant.passives", "text": "Adds # Passive Skills", "type": "enchant" },
+                { "id": "enchant.sockets", "text": "# Added Passive Skills are Jewel Sockets", "type": "enchant" },
+                { "id": "enchant.grant|14", "text": "Added Small Passive Skills grant: 12% increased Lightning Damage", "type": "enchant" },
+                { "id": "enchant.anoint|22535", "text": "Allocates Whispers of Doom", "type": "enchant" } ] } ] }))
+    }
+
+    #[test]
+    fn unique_rolls_about_as_good_as_yours() {
+        let t = "Item Class: Boots\nRarity: Unique\nSeven-League Step\nRawhide Boots\n--------\nItem Level: 80\n--------\n\
+            { Unique Modifier — Life }\n+90(80-100) to maximum Life\n{ Unique Modifier — Speed }\n50% increased Movement Speed\n";
+        let s = setup(t, &idx()).unwrap();
+        let life = s.filters.iter().find(|f| f.id == "explicit.life").unwrap();
+        assert!(life.enabled);
+        assert_eq!(life.min, Some(88.0), "10% of the 80-100 range below 90");
+        let ms = s.filters.iter().find(|f| f.id == "explicit.ms").unwrap();
+        assert!(!ms.enabled, "a fixed mod is the same on every copy");
+        assert_eq!(s.corrupted, Some(false));
+        assert_eq!(query(&s)["query"]["filters"]["misc_filters"]["filters"]["corrupted"]["option"], "false");
+        // A perfect roll: exactly that.
+        let s = setup(&t.replace("+90(80-100)", "+100(80-100)"), &idx()).unwrap();
+        assert_eq!(s.filters.iter().find(|f| f.id == "explicit.life").unwrap().min, Some(100.0));
+    }
+
+    #[test]
+    fn anointed_amulet() {
+        let t = "Item Class: Amulets\nRarity: Rare\nHate Charm\nOnyx Amulet\n--------\nItem Level: 84\n--------\n\
+            Allocates Whispers of Doom (enchant)\n--------\n+60 to maximum Life\n";
+        let s = setup(t, &idx()).unwrap();
+        let a = s.filters.iter().find(|f| f.id == "enchant.anoint|22535").unwrap();
+        assert!(a.enabled && a.min.is_none());
+        let stats = query(&s)["query"]["stats"][0]["filters"].clone();
+        assert!(stats.as_array().unwrap().iter().any(|v| v == &json!({ "id": "enchant.anoint", "value": { "option": 22535 } })));
+    }
+
+    #[test]
+    fn cluster_passive_count_exactly() {
+        let t = "Item Class: Jewels\nRarity: Rare\nBehemoth Wound\nLarge Cluster Jewel\n--------\nItem Level: 83\n--------\n\
+            Adds 8 Passive Skills (enchant)\n2 Added Passive Skills are Jewel Sockets (enchant)\n\
+            Added Small Passive Skills grant: 12% increased Lightning Damage (enchant)\n--------\n1 Added Passive Skill is Storm Drinker\n";
+        let s = setup(t, &idx()).unwrap();
+        let on = |id: &str| s.filters.iter().find(|f| f.id == id).map(|f| f.enabled);
+        assert_eq!((on("enchant.passives"), on("enchant.grant|14"), on("enchant.sockets")), (Some(true), Some(true), Some(false)));
+        let stats = query(&s)["query"]["stats"][0]["filters"].clone();
+        assert!(stats.as_array().unwrap().iter().any(|v| v == &json!({ "id": "enchant.passives", "value": { "min": 8.0, "max": 8.0 } })));
+    }
+
+    #[test]
+    fn flask_by_its_base_with_both_mods() {
+        let t = "Item Class: Utility Flasks\nRarity: Magic\nExperimenter's Granite Flask of the Armadillo\n--------\nItem Level: 84\n--------\n\
+            38% increased Duration\n60% increased Armour during Effect\n";
+        let s = setup(t, &idx()).unwrap();
+        assert!(s.base_only);
+        assert!(s.filters.iter().filter(|f| f.id.starts_with("explicit.")).all(|f| f.enabled));
+        assert_eq!(query(&s)["query"]["type"], "Granite Flask");
+    }
+
+    #[test]
+    fn influence_rows_and_plain_words() {
+        let t = "Item Class: Boots\nRarity: Rare\nGale Spur\nTwo-Toned Boots\n--------\nItem Level: 86\n--------\n\
+            +70 to maximum Life\n30% increased Movement Speed\n--------\nShaper Item\n";
+        let s = setup(t, &idx()).unwrap();
+        let sh = s.filters.iter().find(|f| f.id == "pseudo.pseudo_has_shaper_influence").unwrap();
+        assert!(!sh.enabled);
+        assert!(s.base_item.as_ref().unwrap().ids.contains(&sh.id));
+        assert!(s.base_item.as_ref().unwrap().misc.is_empty(), "no old shaper_item switch");
+        let words = describe(&query(&s));
+        assert_eq!(words[0], "Instant buyout and in person");
+        assert!(words.contains(&"Not unique".to_string()) && words.contains(&"Any boots".to_string()), "{words:?}");
+    }
 }
 
 #[cfg(test)]
@@ -546,18 +701,20 @@ mod base_item_tests {
         let s = setup(fract, &idx()).unwrap();
         let b = s.base_item.clone().unwrap();
         assert_eq!(b.why, ["Fractured", "Hunter"]);
-        assert_eq!(b.ids, ["fractured.ms"]);
-        assert_eq!(b.misc, ["hunter_item", "fractured_item"]);
+        // The influence is a "Has Hunter Influence" stat now (the trade site has no "Hunter Item" switch any more).
+        assert_eq!(b.ids, ["pseudo.pseudo_has_hunter_influence", "fractured.ms"]);
+        assert_eq!(b.misc, ["fractured_item"]);
         // What the window searches when you press it: same base, item level 75+, the switches, only those mods.
         let mut s2 = s.clone();
         s2.base_only = true; s2.ilvl_min = b.ilvl_min; s2.misc = b.misc.clone();
         for f in &mut s2.filters { f.enabled = b.ids.contains(&f.id); }
         let q = query(&s2);
         assert_eq!(q["query"]["type"], "Two-Toned Boots");
-        assert_eq!(q["query"]["filters"]["misc_filters"]["filters"]["hunter_item"]["option"], "true");
+        assert_eq!(q["query"]["filters"]["misc_filters"]["filters"]["fractured_item"]["option"], "true");
         assert_eq!(q["query"]["filters"]["misc_filters"]["filters"]["ilvl"]["min"], 75);
-        assert_eq!(q["query"]["stats"][0]["filters"].as_array().unwrap().len(), 1);
-        assert_eq!(q["query"]["stats"][0]["filters"][0]["id"], "fractured.ms", "as a base: must be fractured");
+        assert_eq!(q["query"]["stats"][0]["filters"].as_array().unwrap().len(), 2);
+        assert_eq!(q["query"]["stats"][0]["filters"][0]["id"], "pseudo.pseudo_has_hunter_influence");
+        assert_eq!(q["query"]["stats"][0]["filters"][1]["id"], "fractured.ms", "as a base: must be fractured");
         // "This item": the same mod on any item, fractured or not.
         let mut s3 = s.clone();
         for f in &mut s3.filters { f.enabled = f.id == "fractured.ms"; }

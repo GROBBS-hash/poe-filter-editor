@@ -91,6 +91,18 @@ mockIPC(async (cmd, args) => {
     const on = (((args as Json).setup as Json).filters as Json[]).filter((f) => f.enabled);
     return on.map((f, i) => ({ key: f.id, label: f.label, total: [16, 7, 2, 0, 0][i] ?? 0 })).sort((a, b) => b.total - a.total);
   }
+  if (cmd === "trade_hidden") {
+    // Shaped like core's trade::describe (the real one reads the search it would send).
+    const s = (args as Json).setup as Json;
+    const out = ["Instant buyout only"];
+    if (s.item.rarity === "Unique" && s.item.name) out.push(`Named ${s.item.name}`);
+    if (s.base_only || s.item.rarity === "Unique") out.push(`Base: ${s.base || s.item.base_type}`);
+    if (s.item.rarity !== "Unique" && s.category) out.push("Not unique");
+    if (!s.base_only && s.category && s.item.rarity !== "Unique") out.push(`Any ${String(s.category).split(".").pop()}`);
+    if (s.ilvl_min) out.push(`Item level ${s.ilvl_min}+`);
+    if (s.corrupted != null) out.push(s.corrupted ? "Corrupted" : "Not corrupted");
+    return out;
+  }
   if (cmd === "get_icons") return icons;
   if (cmd === "related_items") return related((args as Json).name);
   if (cmd === "trade_bulk") {

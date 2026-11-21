@@ -9,11 +9,15 @@ import RelatedItems from "./RelatedItems";
 import { Item, RARITY_COLOUR, itemTitle } from "./types";
 import { CRAFT_ITEM_KEY } from "./Craft";
 
-type StatFilter = { id: string; label: string; value: number; min: number | null; enabled: boolean; kind: string; tier: number | null; junk?: boolean; roll?: number | null; range?: string | null; affix?: string | null };
+type StatFilter = { id: string; label: string; value: number; min: number | null; enabled: boolean; kind: string; tier: number | null; junk?: boolean; roll?: number | null; range?: string | null; affix?: string | null;
+  /** An upper limit too: a cluster jewel's passive count is searched exactly. */
+  max?: number | null };
 type Setup = { item: Item; filters: StatFilter[]; unknown_kinds?: string[]; base_only: boolean; ilvl_min: number | null; ilvl_max?: number | null; links_min: number | null;
   gem_level: number | null; unknown: string[]; category: string | null; raw?: string; misc?: string[]; base?: string; affix_max?: [number, number] | null;
   /** Awakened-style "search as a base": why it's a crafting base, which mods to keep, item level, influences. */
-  base_item?: { why: string[]; ids: string[]; ilvl_min: number | null; misc: string[] } | null };
+  base_item?: { why: string[]; ids: string[]; ilvl_min: number | null; misc: string[] } | null;
+  /** Corrupted only (true), not corrupted only (false), or either (null): set for uniques. */
+  corrupted?: boolean | null };
 type MapInfo = { mods: { text: string; warn: string | null }[]; unidentified: boolean; tier: number | null; stats: string[] };
 type Check = { setup: Setup | null; ninja: [number, string] | null; league: string; from_ground: boolean; error: string | null; bulk?: string | null; map?: MapInfo | null; divine?: number | null; compare?: Comparison[]; instant_all?: boolean;
   /** poe.ninja's last 7 days: % change each day from a week ago (oldest first), and the total. */
@@ -92,7 +96,7 @@ const needsTrade = (c: Check) => {
     || (!c.setup.category && !c.map && it.item_class !== "Maps");
 };
 /** What a search depends on: when this changes after a search, the old prices no longer match the filters. */
-const searchKey = (s: Setup) => JSON.stringify([s.filters.map((f) => [f.enabled, f.min]), s.base_only, s.ilvl_min, s.ilvl_max ?? null, s.links_min, s.misc ?? []]);
+const searchKey = (s: Setup) => JSON.stringify([s.filters.map((f) => [f.enabled, f.min, f.max ?? null]), s.base_only, s.ilvl_min, s.ilvl_max ?? null, s.links_min, s.misc ?? [], s.corrupted ?? null]);
 
 /** Item-level band where base prices jump (75, 82, 84, 86 unlock better mod tiers): [low, high or null]. */
 const ilvlBand = (l: number): [number, number | null] => l <= 67 ? [1, 67] : l <= 74 ? [68, 74] : l <= 81 ? [75, 81] : l <= 83 ? [82, 83] : l <= 85 ? [84, 85] : [86, null];
@@ -202,6 +206,8 @@ function bulkTypical(offers: Offer[], divine: number | null, market: number | nu
 /** The small heading over a row. `max` = how many prefixes / suffixes the item can hold (Cogwork Ring 2 / 4). */
 function rowGroup(f: StatFilter, max: [number, number]): [string, string] {
   if (f.id.startsWith("prop.map_")) return ["Map", "at least this much"];
+  if (f.id === "prop.area_level" || f.id.startsWith("prop.heist_")) return ["Heist", "at least this much"];
+  if (f.id.endsWith("_influence")) return ["Influence", "tick to only find items with it"];
   if (f.id === "prop.quality") return ["Quality", "above the usual 20%"];
   if (f.id.startsWith("prop.")) return [f.id.includes("dps") ? "Damage" : "Defences", "at 20% quality"];
   if (f.kind === "pseudo") return f.id.includes("empty") ? ["Open slots", "room for another mod"] : ["Totals", "added up from all its mods"];
@@ -481,6 +487,16 @@ export default function TradeWindow() {
   const [reported, setReported] = useState("");
   const [hasSide, setHasSide] = useState(false);
   const [searched, setSearched] = useState<string | null>(null);
+  // "Also searching for": what the search asks besides the ticked rows (Awakened's hidden filters), in plain words.
+  const [hidden, setHidden] = useState<string[]>([]);
+  const [showHidden, setShowHidden] = useState<boolean>(() => { try { return localStorage.getItem("tw-hidden") === "1"; } catch { return false; } });
+  const hiddenKey = setup ? searchKey(setup) : "";
+  useEffect(() => {
+    if (!setup || check?.bulk) { setHidden([]); return; }
+    invoke<string[]>("trade_hidden", { setup }).then(setHidden).catch(() => setHidden([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hiddenKey, check?.bulk]);
+  const toggleHidden = () => { const n = !showHidden; setShowHidden(n); try { localStorage.setItem("tw-hidden", n ? "1" : "0"); } catch { /* not kept */ } };
   // Like Awakened: change a filter after a search and the old prices go, until you search again.
   useEffect(() => { if (res && setup && searched && searchKey(setup) !== searched) setRes(null); }, [setup, res, searched]);
   const box = useRef<HTMLDivElement | null>(null);
@@ -598,7 +614,8 @@ export default function TradeWindow() {
   // Mouse wheel on a minimum: 1 at a time (Shift: 10).
   const wheel = (i: number, f: StatFilter, e: React.WheelEvent) => {
     const step = (e.shiftKey ? 10 : 1) * (e.deltaY < 0 ? 1 : -1);
-    patch(i, { min: Math.max(0, (f.min ?? f.value) + step), enabled: true });
+    const v = Math.max(0, (f.min ?? f.value) + step);
+    patch(i, f.max != null ? { min: v, max: v, enabled: true } : { min: v, enabled: true });
   };
 
   const hero = (
@@ -680,7 +697,7 @@ export default function TradeWindow() {
             <button key={p} className={preset === p ? "on" : ""} title={p ? `Every minimum ${p}% below this item's roll` : "Every minimum at this item's roll"}
               onClick={() => { setPreset(p); setSetup({ ...setup, filters: setup.filters.map((f) => {
                 // Open-slot counts and timeless jewel seeds are exact: never lowered.
-                if (f.min == null || f.id.includes("empty") || f.id.includes("timeless")) return f;
+                if (f.min == null || f.max != null || f.id.includes("empty") || f.id.includes("timeless")) return f;
                 if (p === 0 || Math.abs(f.value) <= 3) return { ...f, min: f.value };
                 const v = f.value * (1 - p / 100);
                 return { ...f, min: Math.abs(f.value) >= 10 ? Math.floor(v) : Math.floor(v * 10) / 10 };
@@ -709,7 +726,8 @@ export default function TradeWindow() {
                     {f.tier != null && <span className={`tw-tier ${tierClass(f.tier)}`} title="Tier 1 is the best this mod can roll">T{f.tier}</span>}
                     {f.roll != null && <Roll r={f.roll} range={f.range} tier={f.tier} />}</span>
                   <input className="tw-min" type="number" value={f.min ?? ""} placeholder="min" onWheel={(e) => wheel(i, f, e)}
-                    onChange={(e) => patch(i, { min: e.target.value === "" ? null : +e.target.value, enabled: true })} />
+                    title={f.max != null ? "Exactly this many" : undefined}
+                    onChange={(e) => { const v = e.target.value === "" ? null : +e.target.value; patch(i, f.max != null ? { min: v, max: v, enabled: true } : { min: v, enabled: true }); }} />
                 </label>
               </React.Fragment>
             );
@@ -747,6 +765,23 @@ export default function TradeWindow() {
           }}>{busy ? <><Spinner /> Searching…</> : searched ? "Search again" : "Search trade"}</button>
         </span>
       </div>}
+      {!check.bulk && hidden.length > 0 && (
+        <div className="tw-hidden">
+          <button className="link small" onClick={toggleHidden} title="What the search also asks for, besides the ticked stats">
+            {showHidden ? "▾" : "▸"} Also searching for ({hidden.length})</button>
+          {showHidden && (
+            <div className="tw-hidden-list small">
+              {hidden.map((h) => <span key={h} className="tw-hidden-chip">{h}</span>)}
+              {it.rarity === "Unique" && (
+                <label className="tw-hidden-opt" title="A corrupted unique can't be changed any more, and its corruption implicit is part of its price">
+                  <input type="checkbox" checked={setup.corrupted != null}
+                    onChange={(e) => setSetup({ ...setup, corrupted: e.target.checked ? it.corrupted : null })} />
+                  {it.corrupted ? "Corrupted ones only" : "Not corrupted only"}</label>
+              )}
+            </div>
+          )}
+        </div>
+      )}
       {saving != null && (
         <form className="tw-save" onSubmit={(e) => { e.preventDefault();
           invoke<Saved[]>("saved_add", { name: saving, setup }).then((l) => { setSaved(l); setSaving(null); setShowSaved(true); }).catch((er) => setErr(friendly(er))); }}>

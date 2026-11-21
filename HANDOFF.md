@@ -104,9 +104,25 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Price window: "Minimums: exact / −10% / −20%" buttons. Foulborn = name without "Foulborn " + misc mutated,
   mods looked up as "mutated" first; two-line mods joined; numberless mods kept under headings; minimums start
   at the item's roll; status "available" (instant buyout + in person).
-- Awakened ideas NOT done yet (roll bars, timeless jewels, influence/ilvl base search since done): cluster jewel passive
-  count rules, flask rules, anointment / heist / sentinel handling, influence + ilvl bracket
-  filters, "hidden filters" toggle, roll ranges as min..max for uniques (± % of roll range, exact on perfect rolls).
+- Awakened ideas, done 21 Nov (all checked against the live trade site, Covens):
+  - Uniques: every mod that rolls is ticked, minimum 10% of its roll range below yours ("+90(80-100)" -> 88), exactly
+    yours on a perfect roll; fixed mods and plain copies stay unticked. `ModLine.width` = roll-range width.
+    Uniques also search "not corrupted" / "corrupted" like yours (`TradeSetup.corrupted`, a switch under "Also searching for").
+  - Anoints: "Allocates X (enchant)" on amulets and rings is ticked (stat list has them as `enchant.stat_2954116742|<node>`).
+    The line has no number, so `mods()` keeps lines starting "Allocates ".
+  - Cluster jewels (non-unique): "Adds # Passive Skills" ticked and exact (`StatFilter.max` = min) and the small-passive
+    "grant" enchant ticked; the jewel-socket enchant stays off (asking for it finds nothing). Live: Behemoth Wound -> 27.
+  - Flasks / tinctures: always this base (a magic flask used to search any flask!); without tiers every positive mod
+    counts; downsides ("66% reduced Amount Recovered") are not ticked.
+  - Heist: categories for heist gear/tools/cloaks/brooches, contracts, blueprints; `trade_rules::heist_props` adds
+    area level (ticked), a blueprint's total wings (ticked), revealed wings / escape routes / reward rooms and job levels
+    (to tick). No item-level filter on contracts. Live: a Bunker blueprint, area 83, 4 wings -> 301.
+  - Sentinels: skipped. The trade site has no Sentinel category any more (league mechanic gone).
+  - Influences: the trade site dropped its "Shaper Item" switches; they're "Has Shaper Influence" pseudo stats now.
+    Each influence is a row under "Influence" (unticked); "As a base" ticks it (the old `shaper_item` misc filter was a
+    silent bug). Item level was already a tick box beside "<base> only".
+  - "Also searching for" fold under the Search button (`trade_hidden` command, `trade::describe`): instant buyout,
+    name/base, rarity, kind of item, item level, corrupted, links, map tier, in plain words. Open/closed is remembered.
 
 - Price check "Compared with your build (PoB)" (`core/src/compare.rs`): checked item vs the PoB stage's gear in the
   same slot (both rings), totals for life(+Str/2)/ES/mana/each res/attributes/speeds/suppress/crit multi/spell dmg,
@@ -605,6 +621,11 @@ Confirmed in game so far: basic Ctrl+D price check (trade search returned listin
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
 **Price check (Ctrl+D)**
+- [ ] Awakened ideas (21 Nov, after 0.2.33): price a unique with rolls (mods ticked, minimums a little below yours,
+  "Not corrupted" in "Also searching for"); an anointed amulet (the anoint ticked); a rare cluster jewel (passive count
+  and the small-passive line ticked); a magic utility flask (searches that flask base only); a heist blueprint or
+  contract (area level, wings); an influenced item (an "Influence" row to tick; "As a base" ticks it). Open "Also
+  searching for" and check it reads right.
 - 21 Nov polish (impeccable): armour/ES rows no longer repeat "(at 20% quality)"; Save search sits beside the Search
   button; the small links (trade site, Craft this, Saved searches, Style, Something's wrong?) share one footer row;
   Compare look: listings no longer in a cut-off inner scroll box (the window scrolls), "Like yours / Also has" mods
@@ -929,9 +950,9 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 ## Left to do (agreed order)
 1. **GROBBS to work through "Still to check in game" above**; fix what he reports.
 2. Wealth tracker follow-ups (real account tested and rares priced via the trade site, 21 Nov):
-   "search every tab" done 21 Nov; guild stash next; crafting planner (parked).
-3. Price check polish ideas (any resistance, trend line done 21 Nov; same seller + price already shows once with "× N";
-   prices already in chaos and divines; maps already search by tier).
+   "search every tab" done 21 Nov; guild stash next; crafting planner done (0.2.32).
+3. Price check polish: done 21 Nov (Awakened ideas: unique roll ranges, anoints, cluster jewels, flasks, heist,
+   influences, "Also searching for"). Waiting on his in-game check.
 4. Deferred earlier: batch mode tidy-up, PoE 2 coverage. (Installer + auto-update done 21 Nov: see "Installer and updates".)
 
 ## Known caveats
