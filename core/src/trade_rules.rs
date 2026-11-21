@@ -769,6 +769,13 @@ mod affix_limit_tests {
         assert_eq!(s.affix_max, Some((2, 4)));
         let open: Vec<&str> = s.filters.iter().filter(|f| f.id.contains("empty")).map(|f| f.label.as_str()).collect();
         assert_eq!(open, ["Open prefix (1 free)", "Open suffix (1 free)"]);
+        // The suffixes are 25% stronger in game (and on the trade site) than the advanced copy's numbers.
+        let m = crate::trade::mods(text);
+        let int = m.iter().find(|l| l.text.contains("Intelligence")).unwrap();
+        assert_eq!((int.text.as_str(), int.range.as_deref()), ("+57 to Intelligence", Some("53–62")));
+        assert!(m.iter().any(|l| l.text == "+18% to all Elemental Resistances"));
+        assert!(m.iter().any(|l| l.text == "+57% to Cold Resistance"));
+        assert!(m.iter().any(|l| l.text == "+60 to maximum Mana"), "prefix not boosted");
     }
 }
 

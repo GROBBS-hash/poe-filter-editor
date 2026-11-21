@@ -294,6 +294,31 @@ fn range_text(line: &str) -> Option<String> {
     Some(r.iter().map(|(a, b)| { let (lo, hi) = if a.abs() <= b.abs() { (a, b) } else { (b, a) }; format!("{lo}–{hi}") }).collect::<Vec<_>>().join(" / "))
 }
 
+/// Every number on a line times `f`, rounded down like the game does ("+46(43-50)" x1.25 -> "+57(53-62)").
+/// For mods boosted by the item's own "25% increased Suffix Modifier magnitudes" (Cogwork Ring): the advanced copy
+/// shows the numbers before the boost, the game and the trade site show them after.
+fn boost_numbers(line: &str, f: f64) -> String {
+    let chars: Vec<char> = line.chars().collect();
+    let mut out = String::new();
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i].is_ascii_digit() {
+            let start = i;
+            while i < chars.len() && (chars[i].is_ascii_digit() || (chars[i] == '.' && i + 1 < chars.len() && chars[i + 1].is_ascii_digit())) { i += 1; }
+            let s: String = chars[start..i].iter().collect();
+            match s.parse::<f64>() {
+                Ok(v) if s.contains('.') => { let b = (v * f * 10.0 + 1e-9).floor() / 10.0; out.push_str(&format!("{b:.1}")); }
+                Ok(v) => out.push_str(&((v * f + 1e-9).floor() as i64).to_string()),
+                Err(_) => out.push_str(&s),
+            }
+            continue;
+        }
+        out.push(chars[i]);
+        i += 1;
+    }
+    out
+}
+
 /// Removes roll ranges "(25-29)" and tags like "(augmented)" from an advanced-copy line.
 fn clean(line: &str) -> String {
     let mut out = String::new();
@@ -332,6 +357,8 @@ pub fn mods(text: &str) -> Vec<ModLine> {
         let mut header_kind: Option<String> = None;
         let mut header_tier: Option<u32> = None;
         let mut header_affix: Option<String> = None;
+        // "{ Suffix Modifier … — 25% Increased }": the item boosts this mod (Cogwork Ring); its numbers need the boost.
+        let mut header_boost: Option<f64> = None;
         // A mod written over two lines: the second starts in lower case ("…in Radius" / "also grant…").
         let mut joined: Vec<String> = Vec::new();
         for l in sec {
@@ -353,12 +380,18 @@ pub fn mods(text: &str) -> Vec<ModLine> {
                     else if low.contains("enchant") { "enchant" } else if low.contains("fractured") { "fractured" }
                     else if low.contains("foulborn") || low.contains("mutated") { "mutated" } else { "explicit" }.to_string());
                 header_affix = if low.contains("prefix") { Some("prefix".into()) } else if low.contains("suffix") { Some("suffix".into()) } else { None };
+                header_boost = low.rfind("% increased").and_then(|i| {
+                    let digits: String = low[..i].chars().rev().take_while(|c| c.is_ascii_digit()).collect::<Vec<_>>().into_iter().rev().collect();
+                    digits.parse::<f64>().ok()
+                }).filter(|p| *p > 0.0).map(|p| 1.0 + p / 100.0);
                 header_tier = low.find("tier:").or_else(|| low.find("rank:")).and_then(|i| {
                     low[i + 5..].trim_start().chars().take_while(|c| c.is_ascii_digit()).collect::<String>().parse().ok()
                 });
                 continue;
             }
             if l.starts_with('(') { continue; } // reminder text
+            let boosted = header_boost.map(|f| boost_numbers(l, f));
+            let l = boosted.as_deref().unwrap_or(l);
             let kind = if l.ends_with("(implicit)") { "implicit".to_string() } else if l.ends_with("(crafted)") { "crafted".into() }
                 else if l.ends_with("(enchant)") { "enchant".into() } else if l.ends_with("(fractured)") { "fractured".into() }
                 else if l.ends_with("(mutated)") { "mutated".into() }
