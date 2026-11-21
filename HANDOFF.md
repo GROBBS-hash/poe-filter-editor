@@ -560,7 +560,8 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Ctrl+D on a timeless jewel (Brutal Restraint): seed line ticked, prices for that exact seed; "any conqueror" row works.
 - [ ] Price window: "This week" line with ▲/▼ % under the price for currency, cards, uniques… (after the price file updates).
 
-**Foulborn (21 Nov, 0.2.16)**
+**Foulborn (21 Nov, 0.2.16–0.2.17)**
+- [x] (Confirmed 21 Nov.) Foulborn Asenath's Gentle Touch: "Curse Enemies with Punishment on Hit" searchable.
 - [x] (Confirmed 21 Nov.) Ctrl+D on a Foulborn unique armour/weapon (e.g. Foulborn Ghostwrithe): ticked rolls find listings.
 
 **Buy base (21 Nov, 0.2.14)**
