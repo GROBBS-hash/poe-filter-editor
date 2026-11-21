@@ -63,7 +63,7 @@ function Chips({ value, onPick }: { value: string; onPick: (c: string) => void }
   );
 }
 
-export default function Find({ onChange, view = "find" }: { onChange: () => void; view?: "find" | "presets" }) {
+export default function Find({ onChange, view = "find", pick }: { onChange: () => void; view?: "find" | "presets"; pick?: Found | null }) {
   const [q, setQ] = usePersist("find.q", "");
   const [results, setResults] = useState<Found[]>([]);
   const [chosen, setChosen] = useState<Found | null>(null);
@@ -79,6 +79,8 @@ export default function Find({ onChange, view = "find" }: { onChange: () => void
   const timer = useRef<number | undefined>(undefined);
 
   useEffect(() => { invoke<Preset[]>("list_farm_presets").then(setPresets).catch(() => {}); }, []);
+  // An item picked in the Ctrl+K search: show it straight away.
+  useEffect(() => { if (pick) { setQ(pick.base_type); setChosen(pick); } }, [pick]);
   useEffect(() => {
     window.clearTimeout(timer.current);
     if (!q.trim()) { setResults([]); return; }

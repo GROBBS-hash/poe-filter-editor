@@ -690,6 +690,13 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
       tiles flatter; F2 "Pick a sound…" link gold instead of web blue; F7 strategy picker shows the whole name.
       Dev: preview-app.html now has sample data for Presets, Themes, Levelling gear and Prices; `await __go("Themes")`
       in the console opens a page.
+- [ ] Home page, calmer sidebar and Ctrl+K search (21 Nov, not released yet): the editor now always opens on
+      **Home** (your filter, recent changes, prices on/off, build, atlas strategy, crafting, and the in-game hotkeys;
+      "Reload in game" button). Alt+← still goes back to the page you had open last time. Sidebar: Home, then two
+      groups ("Your filter", "Playing"), Settings + Help pinned at the bottom; only the gold in-game keys show (Ctrl+1…9
+      still work, listed in each item's tooltip). **Ctrl+K** (or the Search button) finds items (opens them on Find,
+      ready to change), pages and Help answers. Check: does it feel easier? Is anything missing on Home?
+      Undo: Home.tsx / Search.tsx are self-contained; App.tsx MENU/BOTTOM hold the sidebar.
 
 **Frame + fixes (21 Nov, 0.2.24)**
 - [ ] Editor window: no Windows title bar, a gold one instead; drag it to move, double-click to maximise, the three

@@ -157,6 +157,7 @@ mockIPC((cmd, args) => {
     ];
   }
   if (cmd === "get_history") return [{ index: 0, at: Math.floor(Date.now() / 1000) - 600, what: "Hid normal Two Hand Maces" }];
+  if (cmd === "search_items") { const q = String((args as { q?: string })?.q ?? "").toLowerCase(); return [["Divine Orb", "Stackable Currency"], ["Divine Vessel", "Map Fragments"], ["Divine Life Flask", "Life Flasks"], ["Chaos Orb", "Stackable Currency"], ["Mageblood", "Belts"]].filter(([b]) => b.toLowerCase().includes(q)).map(([base_type, item_class]) => ({ base_type, item_class })); }
   // Presets page (Find view="presets"): a few league-mechanic presets.
   if (cmd === "list_farm_presets") return [
     { id: "breach", title: "Breach", hint: "Splinters, blessings and breach rings stand out", count: 14 },

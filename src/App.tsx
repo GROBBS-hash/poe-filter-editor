@@ -22,8 +22,10 @@ import Maps from "./Maps";
 import Wealth from "./Wealth";
 import Atlas from "./Atlas";
 import Craft from "./Craft";
+import Home from "./Home";
+import Search from "./Search";
 
-type Tab = "help" | "find" | "presets" | "tiers" | "gear" | "build" | "maps" | "atlas" | "wealth" | "craft" | "edits" | "prices" | "themes" | "batch" | "profiles" | "settings";
+type Tab = "home" | "help" | "find" | "presets" | "tiers" | "gear" | "build" | "maps" | "atlas" | "wealth" | "craft" | "edits" | "prices" | "themes" | "batch" | "profiles" | "settings";
 
 /** Small line icons for the side menu. */
 /** Each page's colour: a tinted tile behind its menu icon (and page title) so the menu is easy to scan. */
@@ -32,10 +34,11 @@ const COLOURS: Record<Tab, string> = {
   edits: "#4fd1c5", batch: "#ffa95a",
   build: "#7ad0ff", gear: "#f0b45a",
   maps: "#8bd67a", atlas: "#a78bfa", wealth: "#f5c542", craft: "#ff9f6b",
-  profiles: "#9fb0c8", settings: "#9fb0c8", help: "#6aa8ff",
+  profiles: "#9fb0c8", settings: "#9fb0c8", help: "#6aa8ff", home: "#e2b96f",
 };
 
 const ICONS: Record<Tab, string> = {
+  home: "M4 11l8-7 8 7M6 9.5V20h4.5v-5.5h3V20H18V9.5",
   find: "M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zm10 17-5.2-5.2",
   tiers: "M4 6h16M4 12h16M4 18h16M7 4v4M12 10v4M17 16v4",
   presets: "M5 4v16M12 4v16M19 4v16M3 8h4M10 15h4M17 10h4",
@@ -54,34 +57,36 @@ const ICONS: Record<Tab, string> = {
   help: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17h.01",
 };
 
-const MENU: { group: string; items: { id: Tab; name: string; hint: string }[] }[] = [
-  { group: "Filter", items: [
+type MenuItem = { id: Tab; name: string; hint: string };
+/** Two groups: things that change the filter, and tools for playing. Settings and Help sit at the bottom. */
+const MENU: { group: string; items: MenuItem[] }[] = [
+  { group: "", items: [
+    { id: "home", name: "Home", hint: "What's set up, what changed lately, and your hotkeys" },
+  ] },
+  { group: "Your filter", items: [
+    { id: "profiles", name: "Filters", hint: "Your filters, strictness and NeverSink version" },
     { id: "find", name: "Find", hint: "Search any item, or just say what you want" },
     { id: "tiers", name: "Tiers", hint: "NeverSink's tier lists: re-rank, hide and restyle" },
     { id: "presets", name: "Presets", hint: "Levelling setup, build switches and league mechanics" },
     { id: "themes", name: "Themes", hint: "Recolour the whole filter" },
     { id: "prices", name: "Prices", hint: "Optional poe.ninja price tiers" },
-  ] },
-  { group: "My changes", items: [
     { id: "edits", name: "My edits", hint: "Everything you've changed, history and preview" },
     { id: "batch", name: "Batch mode", hint: "Edit lots of items in a row" },
   ] },
-  { group: "Levelling", items: [
+  { group: "Playing", items: [
     { id: "build", name: "My build", hint: "Your Path of Building gems, gear and tree, in game with F6" },
     { id: "gear", name: "Levelling gear", hint: "Uniques for your level and skill, with trade links" },
-  ] },
-  { group: "Endgame", items: [
     { id: "maps", name: "Maps", hint: "Map regex for your stash, and buy maps you can run" },
     { id: "atlas", name: "Atlas", hint: "Atlas strategies from maxroll or pathofexile.com, in game with F7" },
     { id: "wealth", name: "Wealth", hint: "Stash worth, things worth selling, earnings per strategy" },
     { id: "craft", name: "Crafting", hint: "What can roll on a base, and the cheapest way to get the mod you want" },
   ] },
-  { group: "App", items: [
-    { id: "profiles", name: "Filters", hint: "Your filters, strictness and NeverSink version" },
-    { id: "settings", name: "Settings", hint: "Hotkeys, area level and AI" },
-    { id: "help", name: "Help", hint: "Quick answers, and what each hotkey does" },
-  ] },
 ];
+const BOTTOM: MenuItem[] = [
+  { id: "settings", name: "Settings", hint: "Hotkeys, area level and AI" },
+  { id: "help", name: "Help", hint: "Quick answers, and what each hotkey does" },
+];
+const ALL: MenuItem[] = [...MENU.flatMap((g) => g.items), ...BOTTOM];
 
 function Icon({ d }: { d: string }) {
   return <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>;
@@ -114,10 +119,16 @@ function UpdateBar() {
 
 export default function App() {
   const [ov, setOv] = useState<Overview | null>(null);
-  const [tab, setTabRaw] = useState<Tab>(() => {
-    try { return (localStorage.getItem("tab") as Tab) || "edits"; } catch { return "edits"; }
-  });
-  const prevTab = useRef<Tab | null>(null);
+  // The editor always opens on Home; Alt+← takes you back to the page you were on last time.
+  const [tab, setTabRaw] = useState<Tab>("home");
+  const [searching, setSearching] = useState(false);
+  /** An item picked in the Ctrl+K search, for the Find page to show. */
+  const [findPick, setFindPick] = useState<{ base_type: string; item_class: string } | null>(null);
+  /** A help question picked in the search, for Help to open. */
+  const [helpStart, setHelpStart] = useState(0);
+  const prevTab = useRef<Tab | null>((() => {
+    try { const t = localStorage.getItem("tab") as Tab | null; return t && t !== "home" && ALL.some((i) => i.id === t) ? t : null; } catch { return null; }
+  })());
   const setTab = (t: Tab) => {
     setTabRaw((cur) => { if (cur !== t) prevTab.current = cur; return t; });
     try { localStorage.setItem("tab", t); } catch { /* not kept */ }
@@ -165,7 +176,10 @@ export default function App() {
   useEffect(() => {
     const pages = MENU.flatMap((g) => g.items.map((i) => i.id));
     const onKey = (e: KeyboardEvent) => {
-      if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "f") {
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearching((s) => !s);
+      } else if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "f") {
         e.preventDefault();
         setTab("find");
         setTimeout(() => (document.querySelector("main.content input[type=search], main.content input.text, main.content input:not([type])") as HTMLInputElement | null)?.focus(), 80);
@@ -203,8 +217,25 @@ export default function App() {
 
   const active = ov.profiles.find((p) => p.id === ov.active) ?? ov.profiles[0];
 
-  const current = MENU.flatMap((g) => g.items).find((i) => i.id === tab);
+  const current = ALL.find((i) => i.id === tab);
   const pages = MENU.flatMap((g) => g.items.map((i) => i.id));
+  // The in-game key for a page (from Settings): the only key shown in the menu, to keep it calm.
+  const gameKey: Partial<Record<Tab, [string, string]>> = { edits: [keys.key_quick_edit ?? "F2", "In game: change the item under your mouse"],
+    batch: [keys.key_batch ?? "F3", "In game: batch mode on/off"], build: [keys.key_build ?? "F6", "In game: show/hide your build"],
+    atlas: [keys.key_atlas ?? "F7", "In game: show/hide your atlas strategy"], prices: [keys.key_price ?? "Ctrl+D", "In game: price check the item under your mouse"],
+    profiles: [keys.key_reload ?? "F4", "In game: reload your filter"] };
+  const item = (i: MenuItem) => {
+    const n = pages.indexOf(i.id) + 1;
+    const here = i.id === "find" ? "Ctrl+F" : n >= 1 && n <= 9 ? `Ctrl+${n}` : "";
+    const g = gameKey[i.id];
+    return (
+      <button key={i.id} className={`menu-item ${tab === i.id ? "on" : ""}`} title={here ? `${i.hint} (${here} in the editor)` : i.hint} onClick={() => setTab(i.id)}>
+        <span className="menu-ico" style={{ "--c": COLOURS[i.id] } as CSSProperties}><Icon d={ICONS[i.id]} /></span><span>{i.name}</span>
+        {i.id === "batch" && ov.batch_on && <span className="menu-dot" title="Batch mode is on" />}
+        {g && <span className="menu-keys"><span className="menu-key game" title={g[1]}>{g[0]}</span></span>}
+      </button>
+    );
+  };
   return (
     <>
     <MainTitleBar />
@@ -218,35 +249,21 @@ export default function App() {
             <option key={p.id} value={p.id}>{p.name} ({p.game === "Poe1" ? "PoE 1" : "PoE 2"})</option>
           ))}
         </select>
+        <button className="side-search" onClick={() => setSearching(true)} title="Find items, pages and help answers">
+          <Icon d={ICONS.find} /><span>Search</span><kbd>Ctrl+K</kbd>
+        </button>
         <nav className="menu">
           {MENU.map((g) => (
-            <div key={g.group} className="menu-group">
-              <div className="menu-gname">{g.group}</div>
-              {g.items.map((i) => (
-                <button key={i.id} className={`menu-item ${tab === i.id ? "on" : ""}`} title={i.hint} onClick={() => setTab(i.id)}>
-                  <span className="menu-ico" style={{ "--c": COLOURS[i.id] } as CSSProperties}><Icon d={ICONS[i.id]} /></span><span>{i.name}</span>
-                  {i.id === "batch" && ov.batch_on && <span className="menu-dot" title="Batch mode is on" />}
-                  {(() => {
-                    // The in-game key for this page (from Settings), and its Ctrl+number here in the editor.
-                    const game: Partial<Record<Tab, [string, string]>> = { edits: [keys.key_quick_edit ?? "F2", "In game: change the item under your mouse"],
-                      batch: [keys.key_batch ?? "F3", "In game: batch mode on/off"], build: [keys.key_build ?? "F6", "In game: show/hide your build"],
-                      atlas: [keys.key_atlas ?? "F7", "In game: show/hide your atlas strategy"], prices: [keys.key_price ?? "Ctrl+D", "In game: price check the item under your mouse"],
-                      profiles: [keys.key_reload ?? "F4", "In game: reload your filter"] };
-                    const g = game[i.id];
-                    const n = pages.indexOf(i.id) + 1;
-                    return <span className="menu-keys">
-                      {g && <span className="menu-key game" title={g[1]}>{g[0]}</span>}
-                      {i.id === "find" ? <span className="menu-key always" title="Press Ctrl+F anywhere in the editor">Ctrl+F</span>
-                        : n >= 1 && n <= 9 ? <span className="menu-key" title={`Press Ctrl+${n} anywhere in the editor`}>Ctrl+{n}</span> : null}
-                    </span>;
-                  })()}
-                </button>
-              ))}
+            <div key={g.group || "top"} className="menu-group">
+              {g.group && <div className="menu-gname">{g.group}</div>}
+              {g.items.map(item)}
             </div>
           ))}
         </nav>
-        <div className="side-foot muted small"><span className="menu-key game">F2</span> keys work in game, <span className="menu-key">Ctrl+1</span> keys here. <b>Alt+←</b> goes back.<br />
-          <button className="link small" onClick={() => setTab("settings")}>Change hotkeys</button></div>
+        <div className="menu-bottom">
+          {BOTTOM.map(item)}
+          <div className="side-foot muted small" title="Alt+← goes back to the last page"><span className="menu-key game">F2</span> keys work in game</div>
+        </div>
       </aside>
 
       <main className={`content ${tab === "craft" ? "wide" : ""}`}>
@@ -261,8 +278,9 @@ export default function App() {
       {tab === "prices" && <Prices profile={active} />}
       {tab === "themes" && <Themes profile={active} onChange={refresh} />}
       {tab === "settings" && <SettingsPage />}
-      {tab === "find" && <Find onChange={refresh} />}
-      {tab === "help" && <Help go={(t) => setTab(t as Tab)} />}
+      {tab === "home" && <Home profile={active} keys={keys} go={(t) => setTab(t as Tab)} search={() => setSearching(true)} />}
+      {tab === "find" && <Find onChange={refresh} pick={findPick} />}
+      {tab === "help" && <Help key={helpStart} start={helpStart} go={(t) => setTab(t as Tab)} />}
       {tab === "gear" && <Gear />}
       {tab === "build" && <MyBuild />}
       {tab === "maps" && <Maps />}
@@ -277,6 +295,10 @@ export default function App() {
         </ErrorBoundary>
       </main>
     </div>
+    {searching && <Search pages={ALL} onClose={() => setSearching(false)}
+      goPage={(id) => setTab(id as Tab)}
+      goHelp={(i) => { setHelpStart(i); setTab("help"); }}
+      goItem={(f) => { setFindPick({ ...f }); setTab("find"); }} />}
     </>
   );
 }

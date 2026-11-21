@@ -14,7 +14,7 @@ export function Tip({ children }: { children: ReactNode }) {
 type Go = (tab: string) => void;
 type Faq = { q: string; a: ReactNode; tab?: [string, string] };
 
-const FAQ: Faq[] = [
+export const FAQ: Faq[] = [
   {
     q: "Go stricter (e.g. Semi-Strict → Uber Strict) but keep all my settings",
     a: <>Open <b>Filters</b> and pick the strictness you want in the box next to your filter. Your edits, tier changes,
@@ -87,8 +87,8 @@ const FAQ: Faq[] = [
   },
 ];
 
-export default function Help({ go }: { go: Go }) {
-  const [open, setOpen] = useState<number | null>(0);
+export default function Help({ go, start = 0 }: { go: Go; start?: number }) {
+  const [open, setOpen] = useState<number | null>(start);
   return (
     <div className="card">
       <h2>How do I…?</h2>

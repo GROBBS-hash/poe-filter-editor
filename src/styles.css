@@ -1759,3 +1759,69 @@ button.in-use:disabled { opacity: 1; cursor: default; background: var(--gold-bg)
 .qm-inline:hover { color: #f0cd7c; text-decoration-color: currentColor; background: none; }
 /* F7: room for a full strategy name in the picker (it cut "Leaguestart Shrine/Magic Atlas" short). */
 .ao-head select { max-width: 320px; }
+
+/* ── Home page, calmer sidebar and Ctrl+K search (21 Nov 2026) ─────────────────────────────── */
+kbd { font: 600 11px/1.4 "Segoe UI", system-ui, sans-serif; color: var(--text-2); background: var(--raised);
+  border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; white-space: nowrap; }
+
+/* Sidebar: a search button under the filter picker, two groups, Settings and Help at the bottom. */
+.side-search { display: flex; align-items: center; gap: 9px; width: 100%; margin: 0 0 6px; padding: 7px 10px; min-height: 34px;
+  background: var(--input); border: 1px solid var(--line); border-radius: 7px; color: var(--muted); font-size: 13px; text-align: left; }
+.side-search svg { flex: none; opacity: .8; }
+.side-search span { flex: 1; }
+.side-search:hover:not(:disabled) { background: var(--input); border-color: var(--line-2); color: var(--text-2); }
+.menu-group:first-child { margin-top: 2px; }
+.menu-bottom { margin-top: auto; padding-top: 10px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; }
+.menu-bottom .side-foot { margin-top: 0; padding: 8px 10px 0; }
+@media (max-width: 720px) { .menu-bottom { flex-direction: row; flex-wrap: wrap; border: none; } }
+
+/* Home */
+.home { display: flex; flex-direction: column; gap: 16px; }
+.home-search { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 16px; text-align: left;
+  background: var(--input); border: 1px solid var(--line-2); border-radius: 10px; color: var(--muted); font-size: 14.5px; }
+.home-search span { flex: 1; }
+.home-search:hover:not(:disabled) { background: var(--input); border-color: color-mix(in srgb, var(--gold) 50%, var(--line-2)); color: var(--text-2); }
+.home-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 12px; }
+.home-tile { display: flex; flex-direction: column; gap: 6px; padding: 16px 18px 12px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 10px; min-height: 150px; }
+.home-tile h3 { margin: 0 0 2px; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.home-tile-body { flex: 1; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; color: var(--text-2); }
+.home-tile > button.link { align-self: flex-start; padding: 4px 0; color: var(--gold); font-size: 13px; }
+.home-tile > button.link:hover { color: var(--text); }
+.home-big { font-family: var(--game-font); font-size: 18px; color: var(--text); line-height: 1.25; }
+.home-big .small { font-family: "Segoe UI", system-ui, sans-serif; }
+.home-reload { margin-top: 6px; padding: 5px 11px; font-size: 13px; }
+.home-list { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: 5px; }
+.home-list li { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.home-list li > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-list li > .small { flex: none; }
+.home-on, .home-off { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 5px; margin-right: 6px; }
+.home-on { color: var(--green); background: color-mix(in srgb, var(--green) 14%, transparent); }
+.home-off { color: var(--muted); background: var(--raised); }
+.home-keys { padding: 16px 18px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+.home-keys h3 { margin: 0 0 10px; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.home-keys-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 8px 18px; }
+.home-keys-grid > div { display: flex; align-items: center; gap: 10px; color: var(--text-2); }
+.home-keys-grid kbd { min-width: 56px; text-align: center; color: var(--gold); border-color: color-mix(in srgb, var(--gold) 40%, var(--line)); background: var(--gold-bg); }
+.home-keys > button.link { margin-top: 8px; padding-left: 0; }
+
+/* Ctrl+K search */
+.srch-back { position: fixed; inset: 0; z-index: 200; background: rgba(5, 6, 9, .6); display: flex; justify-content: center; align-items: flex-start;
+  padding: 12vh 16px 16px; animation: srch-fade .12s ease-out; }
+.srch { width: min(620px, 100%); max-height: 70vh; display: flex; flex-direction: column; background: var(--panel);
+  border: 1px solid var(--line-2); border-radius: 12px; box-shadow: 0 24px 60px rgba(0, 0, 0, .55); overflow: hidden; animation: srch-in .14s ease-out; }
+.srch-in { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); color: var(--muted); }
+.srch-in input { flex: 1; font: inherit; font-size: 15px; color: var(--text); background: none; border: none; outline: none; padding: 2px 0; }
+.srch-list { list-style: none; margin: 0; padding: 6px; overflow-y: auto; }
+.srch-head { padding: 8px 10px 4px; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.srch-hit { display: flex; align-items: baseline; gap: 10px; padding: 8px 10px; border-radius: 7px; cursor: pointer; }
+.srch-hit.on { background: var(--gold-bg); }
+.srch-hit.on .srch-label { color: var(--gold); }
+.srch-label { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.srch-sub { margin-left: auto; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.srch-none { padding: 14px 10px; }
+.srch-foot { display: flex; gap: 6px; align-items: center; padding: 8px 14px; border-top: 1px solid var(--line); }
+@keyframes srch-fade { from { opacity: 0; } }
+@keyframes srch-in { from { opacity: 0; transform: translateY(-6px); } }
+@media (prefers-reduced-motion: reduce) { .srch-back, .srch { animation: none; } }
+.srch-in input, .srch-in input:focus, .srch-in input:focus-visible { border: none; outline: none; box-shadow: none; background: none; margin: 0; }
