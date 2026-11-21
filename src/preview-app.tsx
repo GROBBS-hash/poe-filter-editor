@@ -172,7 +172,7 @@ try { if (!localStorage.getItem("tab")) localStorage.setItem("tab", "wealth"); }
 if (!buildWin && !atlasWindow) document.body.classList.add("main");
 // For checking pages from the browser console: await __go("Themes") opens that sidebar page.
 (window as unknown as { __go: (n: string) => Promise<boolean> }).__go = async (name: string) => {
-  const el = [...document.querySelectorAll<HTMLButtonElement>(".side button")].find((b) => b.textContent?.trim().startsWith(name));
+  const el = Array.from(document.querySelectorAll<HTMLButtonElement>(".side button")).find((b) => b.textContent?.trim().startsWith(name));
   el?.click(); await new Promise((r) => setTimeout(r, 900)); window.scrollTo(0, 0); return !!el;
 };
 if (buildWin) document.body.classList.add("overlay");
