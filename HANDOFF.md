@@ -570,7 +570,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
       "Hardly traded: about N sold". Valuable cards still show.
 
 **Ctrl+D again (21 Nov, 0.2.11)**
-- [ ] With the price window open, hover another item and press Ctrl+D: it prices the new item straight away.
+- [x] (Confirmed 21 Nov.) With the price window open, hover another item and press Ctrl+D: it prices the new item straight away.
 
 **Worth line (21 Nov, 0.2.10)**
 - [ ] Tiers → Divination cards: tick "Hide cards worth under", set e.g. 5c, F4 in game: cheap single cards hidden,
