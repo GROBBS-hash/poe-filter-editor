@@ -296,6 +296,13 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   elemental total and hidden, and the chaos total was skipped (bench craft only), so chaos vanished. Now the chaos
   total shows, unticked (trade_rules: bench_only).
 
+- Price check sweep 21 Nov (0.2.19): ran every saved sample through `setupof` (now prints UNKNOWN lines too).
+  Mods written over 2–3 lines (Foulborn Asenath's corpse/Blinded/explode) are matched joined, as the site lists them.
+  Map mods with no chance ("Monsters Hinder on Hit with Spells", "Monsters Inflict Withered…") retry as "Monsters
+  have 100% chance to …"; any line retries as "100% chance to …" (replaces the Curse-only rule). Still unknown: "Players
+  have -20% to amount of Suppressed Spell Damage Prevented" (not on the site's list). Map rows in the price window sit
+  under "Map" instead of "Defences at 20% quality".
+
 - Curse on Hit 21 Nov (0.2.17): "Curse Enemies with Punishment on Hit" (Foulborn Asenath's) is the site's "#% chance to
   Curse Enemies with Punishment on Hit" at 100% (listings show hash explicit.stat_2950697759, magnitude 100): setup
   retries "Curse Enemies with …" lines as "100% chance to …". All 334 Foulborn Asenath's listed have that mod, so his
@@ -566,6 +573,11 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 
 **Crafted chaos (21 Nov, 0.2.18)**
 - [x] (Confirmed 21 Nov.) Ctrl+D on gear with a crafted "X and Chaos Resistances": "+N% total to Chaos Resistance" is there to tick.
+
+**Price check sweep (21 Nov, 0.2.19)**
+- [ ] Ctrl+D on a map with "Monsters Hinder on Hit with Spells" or "Monsters Inflict Withered…": no longer "not
+      searchable"; Atlas Drops / Rarity / Pack Size sit under a "Map" heading.
+- [ ] Ctrl+D on Foulborn Asenath's Gentle Touch: the corpse / Blinded / explode mod is one row you can tick.
 
 **Foulborn (21 Nov, 0.2.16–0.2.17)**
 - [x] (Confirmed 21 Nov.) Foulborn Asenath's Gentle Touch: "Curse Enemies with Punishment on Hit" searchable.

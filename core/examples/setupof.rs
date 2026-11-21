@@ -9,5 +9,6 @@ fn main() {
     let raw = sample["setup"]["raw"].as_str().expect("the sample has the item's copied text");
     let s = filter_core::trade::setup(raw, &index).expect("reads as an item");
     for f in &s.filters { println!("{}\t{}\t{}", if f.enabled { "[x]" } else { "[ ]" }, f.id, f.label); }
+    for u in &s.unknown { println!("UNKNOWN\t{u}"); }
     println!("QUERY {}", filter_core::trade::query(&s));
 }

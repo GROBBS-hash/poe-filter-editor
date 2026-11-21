@@ -407,8 +407,19 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
     filters.extend(props_f);
     let has_tiers = lines.iter().any(|m| m.tier.is_some());
     let local_first = category(&item.item_class).is_some_and(|c| c.starts_with("armour.") || c.starts_with("weapon."));
+    let mut skip_to = 0;
     for (i, m) in lines.iter().enumerate() {
-        if hidden.contains(&i) { continue; }
+        if i < skip_to || hidden.contains(&i) { continue; }
+        // A mod written over two or three lines ("Enemies near corpses … are Blinded" / "Enemies Killed near corpses …
+        // explode, dealing" / "3% of their Life as Physical Damage") is one stat on the site, its lines joined.
+        let joined = [3usize, 2].into_iter().find_map(|n| {
+            let part = lines.get(i..i + n)?;
+            if part.iter().enumerate().any(|(k, l)| l.kind != m.kind || hidden.contains(&(i + k))) { return None; }
+            let j = ModLine { text: part.iter().map(|l| l.text.as_str()).collect::<Vec<_>>().join(" "), ..m.clone() };
+            index.find(&j).map(|_| (j, n))
+        });
+        let merged;
+        let m = match joined { Some((j, n)) => { skip_to = i + n; merged = j; &merged } None => m };
         // Foulborn uniques' special mods are on the site's "mutated" list.
         // Armour and weapons: "+# to Armour" on the item itself is the site's "+# to Armour (Local)", not the global one
         // (that's for belts and jewels); try the local one first.
@@ -418,8 +429,13 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
         let found = if foulborn { index.find(&ModLine { kind: "mutated".into(), ..m.clone() }).filter(|(id, _)| id.starts_with("mutated.")).or_else(local).or_else(|| index.find(m)) } else { local().or_else(|| index.find(m)) };
         // "Curse Enemies with Punishment on Hit" is the site's "#% chance to Curse Enemies with Punishment on Hit" at 100%
         // (21 Nov: Foulborn Asenath's Gentle Touch showed it as not searchable).
-        let found = found.or_else(|| m.text.starts_with("Curse Enemies with ").then(|| index.find(&ModLine {
-            text: format!("100% chance to {}", m.text), values: vec![100.0], ..m.clone() })).flatten());
+        // Same for map mods: "Monsters Hinder on Hit with Spells" is "Monsters have #% chance to Hinder on Hit with
+        // Spells" at 100% (21 Nov, his tier 16 maps).
+        let always = |t: String| index.find(&ModLine { text: t, values: vec![100.0], ..m.clone() });
+        let found = found.or_else(|| (!m.text.contains("chance")).then(|| match m.text.split_once(' ') {
+            Some((who @ ("Monsters" | "Players" | "Minions"), rest)) => always(format!("{who} have 100% chance to {rest}")),
+            _ => always(format!("100% chance to {}", m.text)),
+        }).flatten());
         let Some((id, value)) = found else { unknown.push(m.text.clone()); unknown_kinds.push(m.kind.clone()); continue };
         // Found on the mutated list = a Foulborn mod (shown in its own colour).
         let kind = if id.starts_with("mutated.") { "mutated".to_string() } else { m.kind.clone() };
@@ -1178,6 +1194,31 @@ Item Level: 75
         let q = query(&s);
         assert_eq!(q["query"]["name"], "Ghostwrithe");
         assert_eq!(q["query"]["filters"]["misc_filters"]["filters"]["mutated"]["option"], "true");
+    }
+
+    #[test]
+    fn mod_over_several_lines() {
+        let text = "Item Class: Gloves\nRarity: Unique\nFoulborn Asenath's Gentle Touch\nSilk Gloves\n--------\nItem Level: 83\n--------\n{ Unique Modifier }\n+61 to maximum Mana\n{ Foulborn Unique Modifier }\nEnemies near corpses affected by your Curses are Blinded\nEnemies Killed near corpses affected by your Curses explode, dealing\n3% of their Life as Physical Damage\n";
+        let idx = StatIndex::from_json(&json!({ "result": [ { "label": "Explicit", "entries": [
+            { "id": "explicit.stat_mana", "text": "+# to maximum Mana", "type": "explicit" },
+            { "id": "explicit.stat_corpse", "text": "Enemies near corpses affected by your Curses are Blinded\nEnemies Killed near corpses affected by your Curses explode, dealing\n#% of their Life as Physical Damage", "type": "explicit" } ] } ] }));
+        let s = setup(text, &idx).unwrap();
+        assert!(s.unknown.is_empty(), "{:?} {:?}", s.unknown, mods(text));
+        let f = s.filters.iter().find(|f| f.id == "explicit.stat_corpse").unwrap();
+        assert_eq!(f.value, 3.0, "{}", f.label);
+        assert!(s.filters.iter().any(|f| f.id == "explicit.stat_mana"));
+    }
+
+    #[test]
+    fn map_mods_that_always_happen() {
+        let text = "Item Class: Maps\nRarity: Rare\nFoe Nexus\nCrimson Township Map\n--------\nMap Tier: 16\n--------\nItem Level: 83\n--------\n{ Prefix Modifier \"Hindering\" (Tier: 1) }\nMonsters Hinder on Hit with Spells\n{ Suffix Modifier \"of Withering\" (Tier: 1) }\nMonsters Inflict Withered for 2 seconds on Hit\n";
+        let idx = StatIndex::from_json(&json!({ "result": [ { "label": "Explicit", "entries": [
+            { "id": "explicit.stat_hinder", "text": "Monsters have #% chance to Hinder on Hit with Spells", "type": "explicit" },
+            { "id": "explicit.stat_wither", "text": "Monsters have #% chance to inflict Withered for 2 seconds on Hit", "type": "explicit" } ] } ] }));
+        let s = setup(text, &idx).unwrap();
+        assert!(s.unknown.is_empty(), "{:?} {:?}", s.unknown, mods(text));
+        assert!(s.filters.iter().any(|f| f.id == "explicit.stat_hinder"), "{:?}", s.filters.iter().map(|f| (&f.id, &f.label)).collect::<Vec<_>>());
+        assert!(s.filters.iter().any(|f| f.id == "explicit.stat_wither"));
     }
 
     #[test]
