@@ -292,6 +292,12 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   `BuildView.tsx` (F6 + My build): a tick per item, key `slot|name|base`, in localStorage `build.have` (shared by both
   windows via the storage event), "Have N of M" bar with "hide what I have" (`build.hideHave`).
 
+- Curse on Hit 21 Nov (0.2.17): "Curse Enemies with Punishment on Hit" (Foulborn Asenath's) is the site's "#% chance to
+  Curse Enemies with Punishment on Hit" at 100% (listings show hash explicit.stat_2950697759, magnitude 100): setup
+  retries "Curse Enemies with …" lines as "100% chance to …". All 334 Foulborn Asenath's listed have that mod, so his
+  15c price was right. Left: multi-line unique mods ("…explode, dealing
+3% of their Life…") still show not searchable.
+
 - Foulborn local mods 21 Nov (0.2.16): Foulborn items looked their mods up as "mutated" first, and that lookup quietly
   fell back to the global stat, skipping the local one: Foulborn Ghostwrithe's "+183 to maximum Energy Shield" searched
   the jewellery stat and found 0. Now a mutated match counts only if its id is mutated.*, then local, then global.

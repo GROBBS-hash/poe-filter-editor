@@ -416,6 +416,10 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
         // Foulborn: its mutated mod first, then like any armour/weapon (the local version, 21 Nov: Foulborn Ghostwrithe's
         // "+183 to maximum Energy Shield" went to the global stat and found nothing).
         let found = if foulborn { index.find(&ModLine { kind: "mutated".into(), ..m.clone() }).filter(|(id, _)| id.starts_with("mutated.")).or_else(local).or_else(|| index.find(m)) } else { local().or_else(|| index.find(m)) };
+        // "Curse Enemies with Punishment on Hit" is the site's "#% chance to Curse Enemies with Punishment on Hit" at 100%
+        // (21 Nov: Foulborn Asenath's Gentle Touch showed it as not searchable).
+        let found = found.or_else(|| m.text.starts_with("Curse Enemies with ").then(|| index.find(&ModLine {
+            text: format!("100% chance to {}", m.text), values: vec![100.0], ..m.clone() })).flatten());
         let Some((id, value)) = found else { unknown.push(m.text.clone()); unknown_kinds.push(m.kind.clone()); continue };
         // Found on the mutated list = a Foulborn mod (shown in its own colour).
         let kind = if id.starts_with("mutated.") { "mutated".to_string() } else { m.kind.clone() };
