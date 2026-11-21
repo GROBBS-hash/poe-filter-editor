@@ -17,6 +17,11 @@ so **commit and push after every change** (end commits with the attribution line
   changes can share one release). `Start editor.bat` / `npm run tauri dev` stays the dev way; don't run both at
   once (hotkeys clash, both write the same settings folder).
 
+## Design notes (impeccable plugin, from 21 Nov 2026)
+GROBBS uses the `impeccable` design plugin for UI polish. `PRODUCT.md` (repo root) holds the product facts it reads:
+public release planned, "one app for everything", PoE 1 and PoE 2. No DESIGN.md yet (`/impeccable document` would
+record the current look).
+
 ## What the app is
 Tauri 2 + React/TS desktop app with a Rust core crate (`core/`, `filter-core`) for Path of Exile loot filters, plus
 in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), user changes stored as rules that survive updates.
