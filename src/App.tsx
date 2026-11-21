@@ -25,6 +25,9 @@ import Craft from "./Craft";
 import Home from "./Home";
 import Search from "./Search";
 
+/** Where the main window's look is kept (Settings writes it too). */
+export const APP_LOOK_KEY = "app.look";
+
 type Tab = "home" | "help" | "find" | "presets" | "tiers" | "gear" | "build" | "maps" | "atlas" | "wealth" | "craft" | "edits" | "prices" | "themes" | "batch" | "profiles" | "settings";
 
 /** Small line icons for the side menu. */
@@ -155,6 +158,15 @@ export default function App() {
   const [findPick, setFindPick] = useState<{ base_type: string; item_class: string } | null>(null);
   /** A help question picked in the search, for Help to open. */
   const [helpStart, setHelpStart] = useState(0);
+  /** The main window's look (Settings → Main window look): "colourful" (a colour per page) or "calm" (plain icons, gold for
+   *  the page you're on). Kept in localStorage; Settings tells this window with an "app-look" event. */
+  const [look, setLook] = useState<string>(() => { try { return localStorage.getItem(APP_LOOK_KEY) || "colourful"; } catch { return "colourful"; } });
+  useEffect(() => {
+    document.body.classList.toggle("look-calm", look === "calm");
+    const on = (e: Event) => setLook((e as CustomEvent<string>).detail);
+    window.addEventListener("app-look", on);
+    return () => window.removeEventListener("app-look", on);
+  }, [look]);
   /** Bumped by the Saved note's Undo: the open page reloads so it shows the filter as it is now. */
   const [undoN, setUndoN] = useState(0);
   const prevTab = useRef<Tab | null>((() => {

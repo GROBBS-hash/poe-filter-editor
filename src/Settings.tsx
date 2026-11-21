@@ -56,6 +56,7 @@ export default function SettingsPage() {
 
   return (
     <>
+      <MainLook />
       <div className="card">
         <h2>Hotkeys</h2>
         <p className="muted small">Click a box and press the key you want. Pick keys the game and your other tools don't use.</p>
@@ -146,6 +147,34 @@ export default function SettingsPage() {
   );
 }
 
+
+/** The main window's look: a colour per page, or calm (plain icons, gold only for the page you're on). */
+function MainLook() {
+  const KEY = "app.look";
+  const [v, setV] = useState(() => { try { return localStorage.getItem(KEY) || "colourful"; } catch { return "colourful"; } });
+  const pick = (k: string) => {
+    setV(k);
+    try { localStorage.setItem(KEY, k); } catch { /* not kept */ }
+    window.dispatchEvent(new CustomEvent("app-look", { detail: k }));
+  };
+  const looks: [string, string, string][] = [
+    ["colourful", "Colourful", "Each page has its own colour in the menu"],
+    ["calm", "Calm", "Plain menu icons, gold only for the page you're on; Home leads with your filter"],
+  ];
+  return (
+    <div className="card">
+      <h2>Main window look</h2>
+      <div className="tw-layout-pick">
+        {looks.map(([k, name, what]) => (
+          <label key={k} className={v === k ? "check sel" : "check"}>
+            <input type="radio" name="app-look" checked={v === k} onChange={() => pick(k)} />
+            <span><b>{name}</b> <span className="muted small">{what}</span></span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /** The price window's look: same choice as its Style button (shared through localStorage). */
 function PriceLook() {

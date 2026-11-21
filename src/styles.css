@@ -1926,3 +1926,20 @@ kbd { font: 600 11px/1.4 "Segoe UI", system-ui, sans-serif; color: var(--text-2)
 .qm-where { font-size: 12px; }
 .w-safe { margin: 4px 0 8px; padding-left: 18px; color: var(--text-2); line-height: 1.6; }
 .w-safe li::marker { content: "✓  "; color: var(--green); }
+
+/* ── Main window "Calm" look (Settings → Main window look, 21 Nov 2026): plain menu icons, gold only for the page
+   you're on, no second search box on Home, and Home leads with your filter. ──────────────────────────────── */
+body.look-calm .menu-ico { background: transparent; border-color: transparent; box-shadow: none; }
+body.look-calm .menu-ico svg { color: var(--muted) !important; }
+body.look-calm .menu-item:hover:not(:disabled) .menu-ico { background: transparent; transform: none; }
+body.look-calm .menu-item:hover:not(:disabled) .menu-ico svg { color: var(--text) !important; }
+body.look-calm .menu-item.on .menu-ico { background: var(--gold-bg); border-color: color-mix(in srgb, var(--gold) 35%, transparent); box-shadow: none; }
+body.look-calm .menu-item.on .menu-ico svg { color: var(--gold) !important; }
+body.look-calm .content-head h1 .head-icon[style] { color: var(--gold); background: var(--gold-bg); border-color: color-mix(in srgb, var(--gold) 35%, transparent); }
+body.look-calm .side-foot { display: none; }
+body.look-calm .home-search { display: none; }
+body.look-calm .home-grid > .home-tile:first-child { grid-column: 1 / -1; min-height: 0; border-color: color-mix(in srgb, var(--gold) 30%, var(--line));
+  background: linear-gradient(180deg, rgba(220,178,90,.06), rgba(220,178,90,0) 70%), var(--panel); }
+body.look-calm .home-grid > .home-tile:first-child .home-big { font-size: 22px; }
+body.look-calm .home-reload { background: var(--gold); border-color: var(--gold); color: #1b1e25; font-weight: 700; }
+body.look-calm .home-reload:hover:not(:disabled) { background: #e7c272; }
