@@ -62,7 +62,21 @@ pub struct Pool { pub base: String, pub class: String, pub ilvl: u32, pub influe
 
 /// A mod on the item you brought, and the family it belongs to (to click through).
 #[derive(Debug, Clone, Serialize, PartialEq)]
-pub struct ItemMod { pub text: String, pub affix: Option<String>, pub tier: Option<u32>, pub key: Option<String>, pub needs: Option<String> }
+pub struct ItemMod { pub text: String, pub affix: Option<String>, pub tier: Option<u32>, pub key: Option<String>, pub needs: Option<String>,
+    /// "fractured", "crafted" or "explicit".
+    pub kind: String,
+    /// How you get it, when that isn't the usual rolling (fractured, bench, beastcraft…).
+    pub how: Option<String> }
+
+/// How to get a mod line that isn't a normal roll on this base.
+fn how_to(text: &str, kind: &str, found: bool) -> Option<String> {
+    if kind == "fractured" { return Some("Fractured: locked, it never changes when you reroll the item. A Fracturing Orb locks one mod on a rare with 4 or more mods.".into()) }
+    if text.contains("Aspect of the") { return Some("Beastcrafting: an \"Aspect of the …\" recipe at the Menagerie's Blood Altar adds it (it takes a suffix). It never rolls on its own.".into()) }
+    if kind == "crafted" { return Some(if found { "Added at the crafting bench: click to see its cost. Remove it with the bench's \"Remove Crafted Mods\" to craft another.".into() }
+        else { "A crafting bench mod (some need an unlock from Jun's veiled mods). Remove it at the bench with \"Remove Crafted Mods\".".into() }) }
+    if !found { return Some("Not in this base's normal mod pool: it may be a veiled mod (Aisling / unveil at Jun), Delve, a beastcraft or a mod from an older league.".into()) }
+    None
+}
 
 /// One way to get a mod, with its odds.
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -83,7 +97,7 @@ pub struct Way {
 /// "+(15-25)% to Fire Resistance" / "+56 to Intelligence" -> "+#% to fire resistance" / "+# to intelligence".
 fn shape(text: &str) -> String {
     // Item lines can carry their affix ("prefix|+21% to Item Rarity", see `start`).
-    let text = text.strip_prefix("prefix|").or_else(|| text.strip_prefix("suffix|")).unwrap_or(text);
+    let text = shape_strip(text);
     let mut out = String::new();
     let mut chars = text.chars().peekable();
     while let Some(c) = chars.next() {
@@ -101,7 +115,11 @@ fn shape(text: &str) -> String {
 }
 
 /// An item line without its "prefix|" / "suffix|" mark.
-fn shape_strip(t: &str) -> &str { t.strip_prefix("prefix|").or_else(|| t.strip_prefix("suffix|")).unwrap_or(t) }
+fn shape_strip(mut t: &str) -> &str {
+    for m in ["prefix|", "suffix|", "fractured|", "crafted|"] { if let Some(r) = t.strip_prefix(m) { t = r } }
+    for m in ["fractured|", "crafted|"] { if let Some(r) = t.strip_prefix(m) { t = r } }
+    t
+}
 
 /// The top of a mod's first number ("+(15-25)% …" -> 25, "+56 …" -> 56).
 fn first_top(text: &str) -> Option<f64> {
@@ -444,16 +462,19 @@ pub fn pool(base: &str, ilvl: u32, influences: &[String], have: &[String], price
     for line in have.iter().filter(|l| !l.starts_with("quality|")) {
         let s = shape(line);
         let affix = if line.starts_with("prefix|") { Some("prefix") } else if line.starts_with("suffix|") { Some("suffix") } else { None };
+        let kind = if line.contains("fractured|") { "fractured" } else if line.contains("crafted|") { "crafted" } else { "explicit" };
         // Same wording as a prefix and a suffix (Item Rarity): the item says which.
         let own = affix.and_then(|a| fams.iter().position(|f| f.affix == a && f.tiers.iter().any(|t| t.text.lines().any(|l| shape(l) == s))));
-        let found = own.or_else(|| shapes.get(&s).copied());
+        // Bench-only mods ("Channelling Skills have -3 to Total Mana Cost") are found by their whole wording.
+        let found = own.or_else(|| shapes.get(&s).copied()).or_else(|| whole.get(&s).copied());
         if let Some(f) = found {
             let boost = quality.as_ref().filter(|(t, _)| fams[f].tags.iter().any(|x| t.contains(&x.as_str()))).map(|(_, p)| 1.0 + p / 100.0).unwrap_or(1.0);
             let v = first_top(shape_strip(line).trim_start_matches(['+', '-'])).map(|v| (v / boost).floor());
             fams[f].have = Some(v.and_then(|v| fams[f].tiers.iter().find(|t| first_bottom(&t.text).is_some_and(|b| b <= v)).map(|t| t.tier)).unwrap_or(0));
         }
         item_mods.push(ItemMod { text: shape_strip(line).to_string(), affix: affix.map(String::from).or_else(|| found.map(|f| fams[f].affix.clone())),
-            tier: found.and_then(|f| fams[f].have).filter(|t| *t > 0), key: found.map(|f| fams[f].key.clone()), needs: found.and_then(|f| fams[f].needs.clone()) });
+            tier: found.and_then(|f| fams[f].have).filter(|t| *t > 0), key: found.map(|f| fams[f].key.clone()), needs: found.and_then(|f| fams[f].needs.clone()),
+            kind: kind.to_string(), how: how_to(shape_strip(line), kind, found.is_some()) });
     }
     // Armour pieces: the bench and essences only add a defence the base has (no Evasion crafts on a pure Armour helmet).
     let (_, _, base_tags) = &d.bases[base];
@@ -608,7 +629,10 @@ pub fn start(text: &str) -> Option<Start> {
     let item = crate::item::parse_item(text)?;
     let base = find_base(&item.base_type)?;
     let have = crate::trade::mods(text).into_iter().filter(|m| m.kind == "explicit" || m.kind == "crafted" || m.kind == "fractured")
-        .map(|m| match m.affix.as_deref() { Some(a @ ("prefix" | "suffix")) => format!("{a}|{}", m.text), _ => m.text }).collect::<Vec<_>>();
+        .map(|m| {
+            let kind = if m.kind == "fractured" || m.kind == "crafted" { format!("{}|", m.kind) } else { String::new() };
+            match m.affix.as_deref() { Some(a @ ("prefix" | "suffix")) => format!("{a}|{kind}{}", m.text), _ => format!("{kind}{}", m.text) }
+        }).collect::<Vec<_>>();
     // Catalyst quality ("Quality (Life and Mana Modifiers): +20%") raises those mods' numbers: passed on so tiers are read right.
     let mut have = have;
     if let Some(l) = text.lines().find(|l| l.starts_with("Quality (")) {

@@ -296,6 +296,15 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   elemental total and hidden, and the chaos total was skipped (bench craft only), so chaos vanished. Now the chaos
   total shows, unticked (trade_rules: bench_only).
 
+- Frame + fixes 21 Nov (0.2.24): main window has no Windows frame (`"decorations": false`), `MainTitleBar` in
+  WinFrame.tsx (gold-trimmed, drag / double-click maximise, min / max / close; close still hides to the tray) and a
+  thin gold border (`body:has(.mt-bar)`); needs window permissions minimize / toggle-maximize / is-maximized / close.
+  Compare look was empty: the trade site now sends listing mods as `{ description, … }` objects, not strings
+  (trade.rs `listings` reads both). Settings look picker shows a small drawing of each look (`LookPreview`). Crafting:
+  item card shows the base picture; mods marked fractured (Fracturing Orb icon + note) or crafted (⚒), carried as
+  "prefix|fractured|text"; bench-only mods on the item are found by whole wording (clickable); mods outside the pool
+  get a "how to get it" note (`how_to`: beastcraft for "Aspect of the …", bench, veiled/delve otherwise).
+
 - Looks + sidebar 21 Nov (0.2.23): price window has 5 looks (`TW_STYLES` in TradeWindow.tsx, localStorage `tw.style`,
   shared with Settings → Price check "Look of the price window"; "Style: … ›" at the bottom cycles): classic,
   tooltip (game-tooltip header, price moved down above Search), split (`.tw-market` side panel: hero, trend,
@@ -607,6 +616,14 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 
 **Crafted chaos (21 Nov, 0.2.18)**
 - [x] (Confirmed 21 Nov.) Ctrl+D on gear with a crafted "X and Chaos Resistances": "+N% total to Chaos Resistance" is there to tick.
+
+**Frame + fixes (21 Nov, 0.2.24)**
+- [ ] Editor window: no Windows title bar, a gold one instead; drag it to move, double-click to maximise, the three
+      buttons work, close hides to the tray; the window still resizes from its edges and snaps to screen sides.
+- [ ] Compare look after a search: each listing shows its mods in green / red / blue.
+- [ ] Settings → Price check: a small picture of each look; clicking one picks it.
+- [ ] Crafting with a copied item: base picture on the card; fractured mod has the fracture icon and a note; a crafted
+      mod (⚒) opens its bench cost; "Aspect of the Spider" shows how to get it (beastcraft).
 
 **Looks + sidebar (21 Nov, 0.2.23)**
 - [ ] Ctrl+D → "Style: Classic ›" at the bottom switches the look (Tooltip, Split, Compare, Price first) and it sticks;

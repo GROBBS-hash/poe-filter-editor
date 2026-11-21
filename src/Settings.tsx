@@ -153,9 +153,32 @@ function PriceLook() {
     <div className="tw-look-pick">
       <h3>Look of the price window</h3>
       <p className="muted small">Try them for a while: the "Style" button at the bottom of the price window switches too.</p>
-      {TW_STYLES.map(([k, name, what]) => (
-        <label key={k} className="check"><input type="radio" name="tw-look" checked={v === k} onChange={() => pick(k)} /><span><b>{name}</b>: {what}</span></label>
-      ))}
+      <div className="tw-looks">
+        {TW_STYLES.map(([k, name, what]) => (
+          <button key={k} className={`tw-look ${v === k ? "sel" : ""}`} onClick={() => pick(k)} title={what}>
+            <LookPreview k={k} />
+            <b>{name}</b><span className="muted small">{what}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** A tiny drawing of each look (not the real window, just its shape). */
+function LookPreview({ k }: { k: string }) {
+  const head = <div className={`lp-head ${k === "tooltip" ? "tt" : ""}`}><i /><span /></div>;
+  const price = <div className={`lp-price ${k === "price" ? "big" : ""}`}><b /><span /></div>;
+  const mods = <div className="lp-mods">{[0, 1, 2, 3].map((i) => <div key={i} className={`lp-mod ${i < 2 ? "on" : ""}`}><i /><span style={{ width: `${70 - i * 9}%` }} /></div>)}</div>;
+  const listings = <div className="lp-list">{[0, 1, 2].map((i) => <div key={i} className="lp-row"><b /><span />{k === "compare" && <em><u className="g" /><u className="r" /><u /></em>}</div>)}</div>;
+  const spread = <div className="lp-spread">{[30, 60, 100, 70, 40, 25].map((h, i) => <i key={i} className={i === 2 ? "me" : ""} style={{ height: `${h}%` }} />)}</div>;
+  return (
+    <div className={`lp lp-k-${k}`} aria-hidden>
+      {k === "split" ? <div className="lp-split"><div>{head}{mods}</div><div className="lp-side">{price}{spread}</div></div>
+        : k === "price" ? <>{price}{spread}{head}{mods}</>
+        : k === "tooltip" ? <>{head}{mods}{price}</>
+        : k === "compare" ? <>{head}{price}{mods}{listings}</>
+        : <>{head}{price}{mods}{listings}</>}
     </div>
   );
 }

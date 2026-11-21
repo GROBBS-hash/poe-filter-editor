@@ -12,7 +12,7 @@ type EssenceWay = { name: string; text: string; like_tier: number | null; price:
 type BenchWay = { text: string; cost: [string, number][] };
 type Family = { key: string; affix: "prefix" | "suffix"; text: string; tags: string[]; tiers: Tier[]; chaos: number; have: number | null;
   essences: EssenceWay[]; bench: BenchWay[]; fossils_more: string[]; fossils_none: string[]; needs: string | null };
-type ItemMod = { text: string; affix: string | null; tier: number | null; key: string | null; needs: string | null };
+type ItemMod = { text: string; affix: string | null; tier: number | null; key: string | null; needs: string | null; kind: string; how: string | null };
 type Pool = { base: string; class: string; ilvl: number; influences: string[]; families: Family[]; item_mods: ItemMod[] };
 type Way = { group: string; method: string; chance: number; cost_each: number | null; average: number | null; note: string };
 type Start = { base: string; ilvl: number; influences: string[]; have: string[]; name: string; rarity: string };
@@ -63,6 +63,8 @@ export default function Craft() {
   const [q, setQ] = useState("");
   const [pick, setPick] = useState<string | null>(null);
   const [paste, setPaste] = useState(false);
+  /** Which non-clickable mod of your item has its "how to get it" note open. */
+  const [how, setHow] = useState<number | null>(null);
 
   useEffect(() => { invoke<string[]>("craft_bases").then(setBases).catch(() => {}); }, []);
 
@@ -143,18 +145,25 @@ export default function Craft() {
           {itemName && pool ? (
             <div className="cr-tip">
               <div className="cr-tip-head" style={{ color: RARITY_COLOUR[rarity] ?? "#ddd" }}>
-                <div className="cr-tip-name">{itemName}</div>
-                {itemName !== base && <div className="cr-tip-name">{base}</div>}
+                <ItemIcon base={base} size={44} />
+                <div><div className="cr-tip-name">{itemName}</div>
+                {itemName !== base && <div className="cr-tip-name">{base}</div>}</div>
               </div>
               <div className="cr-tip-meta">Item level {ilvl}{infl.length ? <> · {infl.map((i) => <InfIcon key={i} name={i} />)} {infl.join(" + ")}</> : null}</div>
               {pool.item_mods.length === 0 && <div className="cr-tip-meta">No mods read: copy it with Ctrl+Alt+C for tiers.</div>}
               {pool.item_mods.map((m, i) => (
-                <button key={i} className={`cr-tip-mod ${m.key && m.key === pick ? "on" : ""}`} disabled={!m.key} onClick={() => m.key && setPick(m.key)}
-                  title={m.key ? "See how to get this mod" : "Not a mod you can craft"}>
-                  <span className="cr-aff">{m.affix === "prefix" ? "P" : m.affix === "suffix" ? "S" : "·"}</span>
-                  <span className="cr-tip-text" style={m.needs ? { color: INF_COLOUR[m.needs] } : undefined}>{m.text}</span>
-                  {m.tier ? <span className={`cr-tier-chip t${Math.min(m.tier, 4)}`}>T{m.tier}</span> : null}
-                </button>
+                <div key={i} className={`cr-tip-row ${m.kind}`}>
+                  <button className={`cr-tip-mod ${m.key && m.key === pick ? "on" : ""} ${m.key ? "" : "nokey"}`} onClick={() => m.key ? setPick(m.key) : setHow(how === i ? null : i)}
+                    title={m.key ? "See how to get this mod" : "How do I get this?"}>
+                    <span className="cr-aff">{m.affix === "prefix" ? "P" : m.affix === "suffix" ? "S" : "·"}</span>
+                    {m.kind === "fractured" && <span className="cr-kind-ico" title="Fractured: locked in place"><ItemIcon name="Fracturing Orb" size={16} /></span>}
+                    {m.kind === "crafted" && <span className="cr-kind-ico crafted" title="Crafted at the bench">⚒</span>}
+                    <span className="cr-tip-text" style={m.needs ? { color: INF_COLOUR[m.needs] } : undefined}>{m.text}</span>
+                    {m.tier ? <span className={`cr-tier-chip t${Math.min(m.tier, 4)}`}>T{m.tier}</span> : null}
+                    {!m.key && <span className="cr-q" aria-hidden>?</span>}
+                  </button>
+                  {m.how && (how === i || m.kind === "fractured") && <div className="cr-how">{m.how}</div>}
+                </div>
               ))}
               <div className="cr-tip-foot"><span>{pool.item_mods.filter((m) => m.affix === "prefix").length}/3 prefixes · {pool.item_mods.filter((m) => m.affix === "suffix").length}/3 suffixes</span>
                 <button className="link small" onClick={clearItem}>forget item</button></div>

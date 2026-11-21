@@ -689,7 +689,9 @@ pub fn listings(fetched: &Value, rates: &HashMap<String, f64>) -> Vec<Listing> {
             ilvl: r["item"]["ilvl"].as_u64().map(|v| v as u32),
             instant: l.get("fee").is_some() || l["whisper"].as_str().map(str::is_empty).unwrap_or(true),
             mods: ["implicitMods", "fracturedMods", "explicitMods", "craftedMods"].iter()
-                .flat_map(|k| r["item"][*k].as_array().into_iter().flatten().filter_map(|m| m.as_str().map(String::from))).collect(),
+                .flat_map(|k| r["item"][*k].as_array().into_iter().flatten()
+                    // Plain text, or (since Nov 2026) { "description": "Has 1 Abyssal Socket", … }.
+                    .filter_map(|m| m.as_str().or_else(|| m["description"].as_str()).map(String::from))).collect(),
         })
     }).collect()
 }
@@ -1199,6 +1201,14 @@ Item Level: 75
         let q = query(&s);
         assert_eq!(q["query"]["name"], "Ghostwrithe");
         assert_eq!(q["query"]["filters"]["misc_filters"]["filters"]["mutated"]["option"], "true");
+    }
+
+    #[test]
+    fn listing_mods_both_shapes() {
+        let v = json!({ "result": [ { "listing": { "price": { "amount": 4.0, "currency": "divine" }, "account": { "name": "a" }, "whisper": "@a hi" },
+            "item": { "explicitMods": [ { "description": "Has 1 Abyssal Socket", "domain": "explicit" }, "+47 to maximum Energy Shield" ] } } ] });
+        let l = listings(&v, &HashMap::new());
+        assert_eq!(l[0].mods, ["Has 1 Abyssal Socket", "+47 to maximum Energy Shield"]);
     }
 
     #[test]

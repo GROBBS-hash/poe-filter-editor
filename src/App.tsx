@@ -2,6 +2,7 @@ import { friendly } from "./errors";
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import Help from "./Help";
 import ErrorBoundary from "./ErrorBoundary";
+import { MainTitleBar } from "./WinFrame";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Overview } from "./types";
@@ -205,6 +206,8 @@ export default function App() {
   const current = MENU.flatMap((g) => g.items).find((i) => i.id === tab);
   const pages = MENU.flatMap((g) => g.items.map((i) => i.id));
   return (
+    <>
+    <MainTitleBar />
     <div className="shell">
       <aside className="side">
         <div className="brand">PoE Filter Editor</div>
@@ -274,6 +277,7 @@ export default function App() {
         </ErrorBoundary>
       </main>
     </div>
+    </>
   );
 }
 
