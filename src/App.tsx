@@ -61,32 +61,45 @@ const ICONS: Record<Tab, string> = {
 };
 
 type MenuItem = { id: Tab; name: string; hint: string };
-/** Two groups: things that change the filter, and tools for playing. Settings and Help sit at the bottom. */
-const MENU: { group: string; items: MenuItem[] }[] = [
+/** The groups' colours (22 Nov, GROBBS picked "more, smaller groups" with a colour per kind of group):
+ *  blue = the filter, amber = your changes, green = playing, purple = money and items. */
+const G_FILTER = "#7fb2ea", G_CHANGES = "#e9b46a", G_PLAY = "#6fd0a6", G_MONEY = "#c9a3ea";
+/** Six small groups, each with a line saying what's in it. Settings and Help sit at the bottom. */
+const MENU: { group: string; sub?: string; colour?: string; items: MenuItem[] }[] = [
   { group: "", items: [
     { id: "home", name: "Home", hint: "What's set up, what changed lately, and your hotkeys" },
   ] },
-  { group: "Your filter", items: [
+  { group: "Set up your filter", sub: "which filter, how strict, colours", colour: G_FILTER, items: [
     { id: "profiles", name: "Filters", hint: "Your filters, strictness and NeverSink version" },
-    { id: "find", name: "Find", hint: "Search any item, or just say what you want" },
-    { id: "tiers", name: "Tiers", hint: "NeverSink's tier lists: re-rank, hide and restyle" },
     { id: "presets", name: "Presets", hint: "Levelling setup, build switches and league mechanics" },
     { id: "themes", name: "Themes", hint: "Recolour the whole filter" },
+  ] },
+  { group: "Change what shows", sub: "items, tiers, prices", colour: G_FILTER, items: [
+    { id: "find", name: "Find", hint: "Search any item, or just say what you want" },
+    { id: "tiers", name: "Tiers", hint: "NeverSink's tier lists: re-rank, hide and restyle" },
     { id: "prices", name: "Prices", hint: "Optional poe.ninja price tiers" },
+  ] },
+  { group: "Your changes", sub: "what you've changed, many at once", colour: G_CHANGES, items: [
     { id: "edits", name: "My edits", hint: "Everything you've changed, history and preview" },
     { id: "batch", name: "Batch mode", hint: "Edit lots of items in a row" },
   ] },
-  { group: "Playing", items: [
+  { group: "Your character", sub: "build and gear while levelling", colour: G_PLAY, items: [
     { id: "build", name: "My build", hint: "Your Path of Building gems, gear and tree, in game with F6" },
     { id: "gear", name: "Levelling gear", hint: "Uniques for your level and skill, with trade links" },
+  ] },
+  { group: "Endgame", sub: "maps and atlas strategy", colour: G_PLAY, items: [
     { id: "maps", name: "Maps", hint: "Map regex for your stash, and buy maps you can run" },
     { id: "atlas", name: "Atlas", hint: "Atlas strategies from maxroll or pathofexile.com, in game with F7" },
+  ] },
+  { group: "Money and items", sub: "stash worth, crafting", colour: G_MONEY, items: [
     { id: "wealth", name: "Wealth", hint: "Stash worth, things worth selling, earnings per strategy" },
     { id: "craft", name: "Crafting", hint: "What can roll on a base, and the cheapest way to get the mod you want" },
   ] },
 ];
+/** A page's colour: its group's colour, or its own (Home, Settings, Help). */
+const tabColour = (t: Tab) => MENU.find((g) => g.items.some((i) => i.id === t))?.colour ?? COLOURS[t];
 const BOTTOM: MenuItem[] = [
-  { id: "settings", name: "Settings", hint: "Hotkeys, area level and AI" },
+  { id: "settings", name: "Settings", hint: "Hotkeys, price check, trading, maps, looks and AI" },
   { id: "help", name: "Help", hint: "Quick answers, and what each hotkey does" },
 ];
 const ALL: MenuItem[] = [...MENU.flatMap((g) => g.items), ...BOTTOM];
@@ -276,7 +289,7 @@ export default function App() {
     const g = gameKey[i.id];
     return (
       <button key={i.id} className={`menu-item ${tab === i.id ? "on" : ""}`} title={here ? `${i.hint} (${here} in the editor)` : i.hint} onClick={() => setTab(i.id)}>
-        <span className="menu-ico" style={{ "--c": COLOURS[i.id] } as CSSProperties}><Icon d={ICONS[i.id]} /></span><span>{i.name}</span>
+        <span className="menu-ico" style={{ "--c": tabColour(i.id) } as CSSProperties}><Icon d={ICONS[i.id]} /></span><span>{i.name}</span>
         {i.id === "batch" && ov.batch_on && <span className="menu-dot" title="Batch mode is on" />}
         {g && <span className="menu-keys"><span className="menu-key game" title={g[1]}>{g[0]}</span></span>}
       </button>
@@ -300,8 +313,9 @@ export default function App() {
         </button>
         <nav className="menu">
           {MENU.map((g) => (
-            <div key={g.group || "top"} className="menu-group">
+            <div key={g.group || "top"} className={`menu-group ${g.colour ? "has-g" : ""}`} style={g.colour ? { "--g": g.colour } as CSSProperties : undefined}>
               {g.group && <div className="menu-gname">{g.group}</div>}
+              {g.sub && <div className="menu-gsub">{g.sub}</div>}
               {g.items.map(item)}
             </div>
           ))}
@@ -317,7 +331,7 @@ export default function App() {
         <ErrorBoundary key={tab + undoN}>
         <div key={tab} className="page-in">
         <div className="content-head">
-          <h1><span className="head-icon" style={{ "--c": COLOURS[tab] } as CSSProperties}><Icon d={ICONS[tab]} /></span>{current?.name}</h1>
+          <h1><span className="head-icon" style={{ "--c": tabColour(tab) } as CSSProperties}><Icon d={ICONS[tab]} /></span>{current?.name}</h1>
           <div className="muted small">{current?.hint}</div>
         </div>
       {tab === "edits" && <Edits profile={active} onChange={refresh} focus={focus?.kind === "edit" ? focus : null} />}

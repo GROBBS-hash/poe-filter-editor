@@ -42,7 +42,20 @@ function KeyBox({ value, onChange, disabled }: { value: string; onChange: (k: st
   );
 }
 
+/** Settings is split into parts with a small menu down the side (22 Nov 2026, GROBBS picked mock-up "Settings 1"). */
+const SECTIONS: [string, string, string][] = [
+  ["keys", "Hotkeys", "M3 7h18v10H3zM7 11h.01M11 11h.01M15 11h.01M8 14h8"],
+  ["price", "Price check", "M12 3v18M16.5 7.5c0-1.7-2-3-4.5-3s-4.5 1.3-4.5 3 2 2.6 4.5 3 4.5 1.3 4.5 3-2 3-4.5 3-4.5-1.3-4.5-3"],
+  ["trade", "Trading", "M4 8h13l-3-3M20 16H7l3 3"],
+  ["maps", "Maps and area", "M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14"],
+  ["looks", "Looks", "M12 3a9 9 0 1 0 0 18c1 0 1.5-.8 1.2-1.6-.4-1 .3-2 1.4-2H17a4 4 0 0 0 4-4c0-5.5-4-10.4-9-10.4zM7.5 11h.01M10 7h.01M15 7h.01"],
+  ["ai", "AI (optional)", "M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"],
+];
+const SEC_KEY = "settings.section";
+
 export default function SettingsPage() {
+  const [sec, setSec] = useState(() => { try { const v = localStorage.getItem(SEC_KEY); return SECTIONS.some(([k]) => k === v) ? v! : "keys"; } catch { return "keys"; } });
+  const pickSec = (k: string) => { setSec(k); try { localStorage.setItem(SEC_KEY, k); } catch { /* not kept */ } };
   const [s, setS] = useState<Settings | null>(null);
   const [dirty, setDirty] = useState(false);
   const [msg, setMsg] = useState("");
@@ -55,9 +68,18 @@ export default function SettingsPage() {
   };
 
   return (
-    <>
-      <MainLook />
-      <div className="card">
+    <div className="set-layout">
+      <nav className="set-nav" aria-label="Settings sections">
+        {SECTIONS.map(([k, name, ico]) => (
+          <button key={k} className={sec === k ? "on" : ""} onClick={() => pickSec(k)}>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d={ico} /></svg>
+            {name}
+          </button>
+        ))}
+      </nav>
+      <div className="set-body">
+      {sec === "looks" && <><MainLook /><div className="card"><PriceLook /></div></>}
+      {sec === "keys" && <div className="card">
         <h2>Hotkeys</h2>
         <p className="muted small">Click a box and press the key you want. Pick keys the game and your other tools don't use.</p>
         <div className="set-grid">
@@ -75,9 +97,9 @@ export default function SettingsPage() {
               Set the box to the game's passive tree key (P unless you changed it). The game still gets the key.</span></label>
           <KeyBox value={s.key_tree ?? "P"} disabled={!(s.build_with_tree ?? false)} onChange={(k) => set({ key_tree: k })} />
         </div>
-      </div>
+      </div>}
 
-      <div className="card">
+      {sec === "price" && <div className="card">
         <h2>Price check</h2>
         <p className="muted small">What the price window shows besides the price.</p>
         <label className="check"><input type="checkbox" checked={s.price_compare ?? true} onChange={(e) => set({ price_compare: e.target.checked })} />
@@ -90,10 +112,10 @@ export default function SettingsPage() {
           <span>Search rares and gear straight away too
             <span className="muted small" style={{ display: "block" }}>Uniques, currency and unidentified items always search straight away. With this off
               (like Awakened), rares and gear wait for you to tick the stats you care about and press Search.</span></span></label>
-        <PriceLook />
-      </div>
+        <p className="muted small">How the price window looks is under <button className="link" onClick={() => pickSec("looks")}>Looks</button>.</p>
+      </div>}
 
-      <div className="card">
+      {sec === "trade" && <div className="card">
         <h2>Trade helper <Tip>When someone whispers to buy from you, a small list pops up with Invite, Trade, Thanks and Kick
           buttons. Each button press types one command in game, as GGG's rules allow. It turns green when the buyer is in your area.</Tip></h2>
         <p className="muted small">Invite, Trade, Thanks and Kick buttons when someone whispers to buy.</p>
@@ -118,9 +140,9 @@ export default function SettingsPage() {
         </div>
         <datalist id="chat-ideas">{CHAT_IDEAS.map((c) => <option key={c} value={c} />)}</datalist>
         <div className="row"><button onClick={() => set({ chat_keys: [...(s.chat_keys ?? []), { key: "", command: "/hideout" }] })}>Add a chat hotkey</button></div>
-      </div>
+      </div>}
 
-      <MapCheckLink />
+      {sec === "maps" && <><MapCheckLink />
 
       <div className="card">
         <h2>Area level</h2>
@@ -130,21 +152,23 @@ export default function SettingsPage() {
             onChange={(e) => set({ fallback_area_level: Math.max(1, Math.min(86, +e.target.value || 83)) })} />
           <span className="muted small">{s.fallback_area_level >= 68 ? "(maps)" : "(campaign)"}</span>
         </div>
-      </div>
+      </div></>}
 
-      <div className="card">
+      {sec === "ai" && <div className="card">
         <h2>AI for the “Just say what you want” box (optional)</h2>
         <p className="muted small">The box works without this for common phrases. With your own Claude API key it understands looser wording.
           Each request costs a fraction of a cent on your Anthropic account. The key is kept only on this PC.</p>
         <input className="text" type="password" placeholder="sk-ant-…" value={s.claude_api_key}
           onChange={(e) => set({ claude_api_key: e.target.value.trim() })} />
-      </div>
+      </div>}
 
-      <div className="save-bar">
+      {sec !== "looks" && <div className="save-bar">
         {msg && <span className="note">{msg}</span>}
         <button className="primary" disabled={!dirty} onClick={save}>{dirty ? "Save settings" : "Saved"}</button>
+      </div>}
+      {sec === "looks" && <p className="muted small">Looks change straight away; nothing to save.</p>}
       </div>
-    </>
+    </div>
   );
 }
 
@@ -159,7 +183,7 @@ function MainLook() {
     window.dispatchEvent(new CustomEvent("app-look", { detail: k }));
   };
   const looks: [string, string, string][] = [
-    ["colourful", "Colourful", "Each page has its own colour in the menu"],
+    ["colourful", "Colourful", "Each group in the menu has its own colour"],
     ["calm", "Calm", "Plain menu icons, gold only for the page you're on; Home leads with your filter"],
     ["tooltip", "Tooltip Gold", "Like the game's item tooltips: bronze frames, gold headings in the game's lettering"],
     ["mono", "Mono Amber", "Plain greys with one amber accent, no game lettering in headings"],

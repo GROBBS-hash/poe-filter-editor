@@ -628,9 +628,12 @@ editor, so unreleased things (e.g. Settings → Main window look) only reach him
 obvious → now a solid red badge and a red-tinted price box. Flat layout not tried yet. 2. Batch mode works; the small
 box was cut off → it now sizes itself to fit. 3. Guild stash not tried yet. 4. Main window look missing because it
 isn't released. Also: the "search straight away" setting reworded ("Search rares and gear straight away too" + a
-plain explanation underneath). He wants the left menu and Settings split into clearer, more specific groups: mock-ups
-shown (menu A more groups / B boxed groups / C colour per group / D big buttons then pages; Settings 1 side menu /
-2 one page with sections); waiting for his pick.
+plain explanation underneath). Flat layout confirmed. He picked menu mock-up A (six small groups, each with a
+"what's in here" line) with C's colours (blue = filter, amber = your changes, green = playing, purple = money and
+items) and Settings mock-up 1 (side menu: Hotkeys, Price check, Trading, Maps and area, Looks, AI). Both built
+22 Nov, not released yet. Group colours only show in the Colourful look; the calm looks keep gold/grey headings.
+Price window: he's still not sold on it; round 2 mock-ups shown 22 Nov (1 answer first, 2 stats as buttons, 3 tiny
+strip by the mouse, 4 what makes it valuable, 5 price ladder, 6 tick stats on the tooltip); waiting for his pick.
 1. Price window (Ctrl+D on a rare): stats in groups (Minimum rolls, Prefixes "1 of 2 used", Suffixes...); More → Layout
    → Flat gives one list with a tag on each row. An item with under 5 listed shows amber "low confidence".
    Cogwork Ring (Dragon Turn): Intelligence reads +57 (not +46).
@@ -792,8 +795,7 @@ shown (menu A more groups / B boxed groups / C colour per group / D big buttons 
       top of Filters, My edits, Themes, Prices, Maps, Atlas, Crafting and Settings cut to one line; the detail moved
       into the "?" next to the heading.
 - [ ] Price window: two layouts + low confidence + Cogwork numbers (21 Nov, in 0.2.34). 22 Nov: Grouped, low
-      confidence and +57 Int confirmed in game; low confidence changed from amber to red (not released yet); Flat
-      still to try.
+      confidence, +57 Int and Flat confirmed in game; low confidence changed from amber to red (not released yet).
       **Grouped** (default): headings Minimum rolls · Defences (at 20% quality) · Totals (all mods added up) · Base mods
       (implicit) · Prefixes "1 of 2 used" · Suffixes "3 of 4 used" (open-slot rows sit inside their group, "1 open
       prefix · room to craft") · Base and item level · For sale now. **Flat** (like Awakened): no stat headings, a tag

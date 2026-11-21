@@ -1996,3 +1996,26 @@ body.look-mono .menu-gname::after { background: var(--line); }
 body.look-mono button.primary, body.look-mono .home-reload { box-shadow: none; }
 /* Cards without inner padding (the Tiers page's main panel): the tooltip header bar stays inside. */
 body.look-tooltip .tiers-main > .card > h2:first-child { margin: 0 0 14px; }
+
+/* ── Side menu in six small groups, a colour per kind of group (22 Nov 2026: GROBBS picked mock-up A with C's colours).
+   Each group has a one-line "what's in here" under its heading. Colourful look: heading, stripe and icons take the
+   group's colour (--g). The calm looks keep their own gold/grey headings and plain icons. ── */
+.menu-gsub { font-size: 11.5px; color: var(--muted); margin: -3px 8px 4px; line-height: 1.3; }
+.menu-group.has-g .menu-gname { margin-top: 12px !important; margin-bottom: 4px !important; }
+body:not(.look-calm) .menu-group.has-g { border-left: 2px solid color-mix(in srgb, var(--g) 55%, transparent); padding-left: 6px; margin-left: 2px; }
+body:not(.look-calm) .menu-group.has-g .menu-gname { color: var(--g) !important; }
+body:not(.look-calm) .menu-group.has-g .menu-gname::after { background: linear-gradient(90deg, color-mix(in srgb, var(--g) 45%, transparent), transparent); }
+body:not(.look-calm) .menu-group.has-g .menu-item::before { left: -20px; }
+
+/* ── Settings in parts, with a small menu down the side (22 Nov 2026) ── */
+.set-layout { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 18px; align-items: start; }
+.set-nav { position: sticky; top: 12px; display: flex; flex-direction: column; gap: 2px; padding: 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.set-nav button { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; padding: 7px 10px; border: none; border-radius: 7px;
+  background: none; color: var(--text-2); font-size: 13.5px; cursor: pointer; }
+.set-nav button svg { flex: none; color: var(--muted); }
+.set-nav button:hover { background: var(--raised); color: var(--text); }
+.set-nav button.on { background: var(--gold-bg); color: var(--gold); }
+.set-nav button.on svg { color: var(--gold); }
+.set-body { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.set-body > .card { margin: 0; }
+@media (max-width: 760px) { .set-layout { grid-template-columns: 1fr; } .set-nav { position: static; flex-direction: row; flex-wrap: wrap; } .set-nav button { width: auto; } }
