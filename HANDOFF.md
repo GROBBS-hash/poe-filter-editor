@@ -292,6 +292,11 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   `BuildView.tsx` (F6 + My build): a tick per item, key `slot|name|base`, in localStorage `build.have` (shared by both
   windows via the storage event), "Have N of M" bar with "hide what I have" (`build.hideHave`).
 
+- Thin cards 21 Nov (0.2.12, his The Calling: poe.ninja "5c", 2 sold, 1c listings unsold): fetch_prices.py keeps the
+  exchange's volumePrimaryValue as `volume`; PriceItem::sold() = volume / value; thin_card() = card under 50c with
+  under 5 sold → values_by_base counts it 0 (worth line, price tiers). Price window shows "Hardly traded: about N sold"
+  (PriceCheck.sold). On 21 Nov: 48 of 198 cards priced 5c+ were thin; rare valuable ones (Father's Love) keep their price.
+
 - Ctrl+D one after another 21 Nov (0.2.11): price_check stopped when the game wasn't in front, and the open price
   window had focus. game_back_in_front(): if one of our overlay windows (not "main") is focused, focus_game() and wait
   for it, then copy as usual (the old price window closes on blur, the new one opens).
@@ -526,6 +531,10 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 
 - [ ] Ctrl+D on a timeless jewel (Brutal Restraint): seed line ticked, prices for that exact seed; "any conqueror" row works.
 - [ ] Price window: "This week" line with ▲/▼ % under the price for currency, cards, uniques… (after the price file updates).
+
+**Thin cards (21 Nov, 0.2.12)**
+- [ ] With the 5c card line on: The Calling and other hardly-traded cheap cards are hidden after F4; Ctrl+D on one says
+      "Hardly traded: about N sold". Valuable cards still show.
 
 **Ctrl+D again (21 Nov, 0.2.11)**
 - [ ] With the price window open, hover another item and press Ctrl+D: it prices the new item straight away.

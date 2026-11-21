@@ -21,6 +21,23 @@ pub struct PriceItem {
     pub trend: Option<Vec<f64>>,
     #[serde(default)]
     pub change: Option<f64>,
+    /// poe.ninja exchange items: how much was traded recently, in the file's unit (value x number sold).
+    #[serde(default)]
+    pub volume: Option<f64>,
+}
+
+impl PriceItem {
+    /// Roughly how many were sold recently (exchange items only).
+    pub fn sold(&self) -> Option<f64> { self.volume.filter(|_| self.value > 0.0).map(|v| v / self.value) }
+}
+
+/// A divination card's price only counts if people really trade it: under this many sold recently AND worth
+/// less than THIN_CAP, poe.ninja's number is a guess from a sale or two (21 Nov: The Calling, "5c", 2 sold, 1c
+/// listings unsold). Rare but valuable cards (Father's Love, The Miracle) keep their price.
+pub const THIN_SOLD: f64 = 5.0;
+pub const THIN_CAP: f64 = 50.0;
+pub fn thin_card(it: &PriceItem) -> bool {
+    it.cat == "DivinationCard" && it.value < THIN_CAP && it.sold().is_some_and(|n| n < THIN_SOLD)
 }
 
 /// An item's price trend for the price window: the week's line and its total % change.
@@ -170,8 +187,10 @@ pub fn values_by_base(file: &PriceFile, group: Group) -> BTreeMap<String, f64> {
     let mut m: BTreeMap<String, f64> = BTreeMap::new();
     for it in file.items.iter().filter(|i| Group::of(&i.cat) == Some(group) && (group != Group::Uniques || drops_on_ground(&i.name))) {
         let key = if group == Group::Uniques { it.base.clone() } else { it.name.clone() };
+        // A card hardly anyone trades counts as worth nothing (see thin_card).
+        let value = if thin_card(it) { 0.0 } else { it.value };
         let e = m.entry(key).or_insert(0.0);
-        if it.value > *e { *e = it.value; }
+        if value > *e { *e = value; }
     }
     m
 }
@@ -267,7 +286,7 @@ mod tests {
 
     fn file() -> PriceFile {
         let it = |name: &str, base: &str, cat: &str, value: f64| PriceItem {
-            name: name.into(), base: base.into(), cat: cat.into(), value, variant: None, listings: Some(10), trend: None, change: None };
+            name: name.into(), base: base.into(), cat: cat.into(), value, variant: None, listings: Some(10), trend: None, change: None, volume: None };
         PriceFile {
             game: "poe1".into(), league: "Covens".into(), league_name: None, updated: "now".into(), unit: "chaos".into(),
             items: vec![
@@ -345,6 +364,21 @@ mod tests {
     }
 
     #[test]
+    fn cards_hardly_anyone_trades_count_as_worthless() {
+        // From poe.ninja 21 Nov: The Calling "3c" with 6c traded (2 sold); Rain of Chaos busy; Father's Love rare but 8497c.
+        let card = |name: &str, value: f64, volume: f64| PriceItem { name: name.into(), base: name.into(), cat: "DivinationCard".into(),
+            value, variant: None, listings: None, trend: None, change: None, volume: Some(volume) };
+        let f = PriceFile { game: "poe1".into(), league: "Covens".into(), league_name: None, updated: String::new(), unit: "chaos".into(),
+            items: vec![card("The Calling", 3.08, 6.17), card("Rain of Chaos", 0.3, 900.0), card("Father's Love", 8497.0, 21000.0),
+                card("A Dab of Ink", 14.9, 300.0)] };
+        let v = values_by_base(&f, Group::DivinationCards);
+        assert_eq!(v["The Calling"], 0.0, "2 sold: not a real price");
+        assert_eq!(v["Rain of Chaos"], 0.3);
+        assert_eq!(v["Father's Love"], 8497.0, "rare but valuable keeps its price");
+        assert_eq!(v["A Dab of Ink"], 14.9, "20 sold is a real price");
+    }
+
+    #[test]
     fn off_means_nothing_written() {
         assert!(price_blocks(&default_settings("chaos"), &file(), "\n").is_empty());
     }
@@ -358,7 +392,7 @@ mod trend_tests {
     fn week_trend_for_the_priced_item() {
         let it = |name: &str, cat: &str, value: f64, trend: Option<Vec<f64>>| PriceItem {
             name: name.into(), base: name.into(), cat: cat.into(), value, variant: None, listings: Some(10),
-            change: trend.as_ref().and_then(|t| t.last().copied()), trend };
+            change: trend.as_ref().and_then(|t| t.last().copied()), trend, volume: None };
         let f = PriceFile { game: "poe1".into(), league: "Covens".into(), league_name: None, updated: String::new(), unit: "chaos".into(),
             items: vec![it("Accelerating Catalyst", "Currency", 0.49, Some(vec![0.0, -43.1, -61.9, -76.0, -72.9, -84.4, -60.9])),
                 it("Arcane Surge Support", "SkillGem", 1.0, Some(vec![0.0, 5.0])), it("Chaos Orb", "Currency", 1.0, None)] };

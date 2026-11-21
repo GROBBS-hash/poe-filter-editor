@@ -111,7 +111,10 @@ def exchange(game, league, typ):
         name = names.get(str(line.get("id"))) or line.get("name")
         if value is None or not name:
             continue
-        out.append({"name": name, "base": name, "cat": typ, "value": round(value * factor, 4), **trend(line.get("sparkline"))})
+        # How much changed hands recently (value x number sold): tells a real price from a sale or two.
+        vol = num(line.get("volumePrimaryValue"))
+        extra = {"volume": round(vol * factor, 2)} if vol is not None else {}
+        out.append({"name": name, "base": name, "cat": typ, "value": round(value * factor, 4), **extra, **trend(line.get("sparkline"))})
     return out, core
 
 

@@ -16,7 +16,7 @@ type Setup = { item: Item; filters: StatFilter[]; unknown_kinds?: string[]; base
 type MapInfo = { mods: { text: string; warn: string | null }[]; unidentified: boolean; tier: number | null; stats: string[] };
 type Check = { setup: Setup | null; ninja: [number, string] | null; league: string; from_ground: boolean; error: string | null; bulk?: string | null; map?: MapInfo | null; divine?: number | null; compare?: Comparison[]; instant_all?: boolean;
   /** poe.ninja's last 7 days: % change each day from a week ago (oldest first), and the total. */
-  trend?: { points: number[]; change: number } | null };
+  trend?: { points: number[]; change: number } | null; sold?: number | null };
 type Comparison = { slot: string; current: string; rows: { stat: string; now: number; this: number }[]; gain: string[]; lose: string[] };
 type Offer = { pay: number; pay_currency: string; get: number; get_currency: string; each: number; stock: number; account: string; whisper: string };
 type Bulk = { offers: Offer[]; url: string; divine: number | null };
@@ -523,6 +523,10 @@ export default function TradeWindow() {
         waiting={!res && !busy && !check.bulk ? (searched ? "Filters changed: move onto Search again" : "Pick the stats, then move your mouse onto Search") : null}
         ninja={check.ninja} ninjaNote={it.rarity === "Unique" && !it.name ? " (best ground unique on this base)" : ""} stack={it.stack_size ?? undefined} name={it.base_type} />
       {check.trend && <TrendLine t={check.trend} />}
+      {check.sold != null && check.sold < 5 && (
+        <div className="qm-warn tw-thin" title="poe.ninja's price comes from the few that sold. The filter's worth line counts cards like this under 50c as worthless.">
+          Hardly traded: about {Math.max(1, Math.round(check.sold))} sold recently on the exchange, so this price is a guess.</div>
+      )}
       {err && <div className="qm-warn">{err}</div>}
       {res && res.total === 0 && searched === searchKey(setup) && (setup.filters.some((f) => f.enabled) || (setup.base_only && setup.category) || setup.ilvl_min) && (
         <UntickHelp state={untick} onAsk={() => { setUntick("busy");
