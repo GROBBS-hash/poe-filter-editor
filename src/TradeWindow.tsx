@@ -202,19 +202,77 @@ function bulkTypical(offers: Offer[], divine: number | null, market: number | nu
   return { typical, cheapest: rows[0]?.c ?? 0, fixer };
 }
 
-/** The heading a stat row sits under, and a short hint: [title, hint]. */
-/** The small heading over a row. `max` = how many prefixes / suffixes the item can hold (Cogwork Ring 2 / 4). */
-function rowGroup(f: StatFilter, max: [number, number]): [string, string] {
+/** Fewer listings than this: the price box says "low confidence" instead of "sells for about". */
+const LOW_CONFIDENCE = 5;
+
+/** The price window's two layouts (Settings, or "Layout" under More): headings, or one flat list with a tag on each row. */
+export const TW_LAYOUTS: [string, string, string][] = [
+  ["grouped", "Grouped", "Headings: Totals, Base mods, Prefixes 2 of 3 used, Suffixes…"],
+  ["flat", "Flat", "One list like Awakened, a small tag on each row; mods already counted in a total are tucked away"],
+];
+export const TW_LAYOUT_KEY = "tw.layout";
+
+const isOpenSlot = (f: StatFilter) => f.id.includes("empty_prefix") || f.id.includes("empty_suffix");
+
+/** How many prefixes / suffixes the item has, from the open-slot rows (none: it's full). */
+function affixUsed(fs: StatFilter[], max: [number, number]): [number, number] {
+  const free = (side: string) => fs.find((f) => f.id.includes(`empty_${side}`))?.value ?? 0;
+  return [Math.max(0, max[0] - free("prefix")), Math.max(0, max[1] - free("suffix"))];
+}
+
+/** Rows in the order shown: the open prefix / suffix rows move to the end of their own group. */
+function displayOrder(idx: number[], fs: StatFilter[]): number[] {
+  const out = idx.filter((i) => !isOpenSlot(fs[i]));
+  for (const side of ["prefix", "suffix"]) {
+    const o = idx.find((i) => fs[i].id.includes(`empty_${side}`));
+    if (o == null) continue;
+    let at = -1;
+    out.forEach((i, k) => { if (fs[i].affix === side) at = k; });
+    if (at < 0) {
+      // None of that side yet: a lone open prefix goes before the suffixes, a lone open suffix after the prefixes.
+      if (side === "prefix") { const sx = out.findIndex((i) => fs[i].affix === "suffix"); at = sx >= 0 ? sx - 1 : out.length - 1; }
+      else out.forEach((i, k) => { if (fs[i].affix === "prefix" || isOpenSlot(fs[i])) at = k; });
+      if (at < 0) at = out.length - 1;
+    }
+    out.splice(at + 1, 0, o);
+  }
+  return out;
+}
+
+/** Flat layout: the small tag on the right of a row. */
+function rowTag(f: StatFilter): string {
+  if (isOpenSlot(f)) return "open slot";
+  if (f.kind === "pseudo") return "total";
+  if (f.kind === "property") return f.id.startsWith("prop.map_") ? "map" : f.id === "prop.quality" ? "" : f.id.endsWith("_influence") ? "influence" : "20% quality";
+  if (f.kind === "implicit") return "base mod";
+  if (f.kind === "enchant") return "enchant";
+  const how = f.kind === "crafted" ? "crafted " : f.kind === "fractured" ? "fractured " : f.kind === "mutated" ? "foulborn " : "";
+  return f.affix ? how + f.affix : how.trim();
+}
+
+/** Flat layout: a mod already counted in one of the totals (fire resistance inside "total Elemental Resistance",
+ *  life inside "total maximum Life"), tucked away unless ticked. */
+function inATotal(f: StatFilter, fs: StatFilter[]): boolean {
+  if (f.kind === "pseudo" || f.kind === "property" || f.enabled) return false;
+  const totals = fs.filter((x) => x.kind === "pseudo" && !isOpenSlot(x)).map((x) => x.label);
+  return [/Resistance/, /maximum Life/, /maximum Mana/, /Strength/, /Dexterity/, /Intelligence/]
+    .some((k) => k.test(f.label) && totals.some((t) => k.test(t)));
+}
+
+/** The small heading over a row, and its hint: [title, hint]. `used`/`max` = prefixes and suffixes (Cogwork Ring holds 2 / 4). */
+function rowGroup(f: StatFilter, max: [number, number], used: [number, number] = max): [string, string] {
   if (f.id.startsWith("prop.map_")) return ["Map", "at least this much"];
   if (f.id === "prop.area_level" || f.id.startsWith("prop.heist_")) return ["Heist", "at least this much"];
   if (f.id.endsWith("_influence")) return ["Influence", "tick to only find items with it"];
   if (f.id === "prop.quality") return ["Quality", "above the usual 20%"];
   if (f.id.startsWith("prop.")) return [f.id.includes("dps") ? "Damage" : "Defences", "at 20% quality"];
-  if (f.kind === "pseudo") return f.id.includes("empty") ? ["Open slots", "room for another mod"] : ["Totals", "added up from all its mods"];
+  if (f.id.includes("empty_prefix")) return ["Prefixes", `${used[0]} of ${max[0]} used`];
+  if (f.id.includes("empty_suffix")) return ["Suffixes", `${used[1]} of ${max[1]} used`];
+  if (f.kind === "pseudo") return ["Totals", "all mods added up"];
   if (f.kind === "enchant") return ["Enchant", ""];
-  if (f.kind === "implicit") return ["Implicit", "comes with the base"];
-  if (f.affix === "prefix") return ["Prefixes", `up to ${max[0]} on this item`];
-  if (f.affix === "suffix") return ["Suffixes", `up to ${max[1]} on this item`];
+  if (f.kind === "implicit") return ["Base mods", "implicit, come with the item"];
+  if (f.affix === "prefix") return ["Prefixes", `${used[0]} of ${max[0]} used`];
+  if (f.affix === "suffix") return ["Suffixes", `${used[1]} of ${max[1]} used`];
   return ["Other mods", ""];
 }
 
@@ -277,12 +335,19 @@ function TrendLine({ t }: { t: { points: number[]; change: number } }) {
 function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote, waiting, stack, name }: { res: Result | null; bulk: Bulk | null; busy: boolean; err: string; waiting?: string | null; stack?: number; name?: string;
   divine: number | null; ninja: [number, string] | null; ninjaNote: string }) {
   const ninjaChaos = ninja ? (ninja[1] === "divine" && divine ? ninja[0] * divine : ninja[1] === "chaos" ? ninja[0] : null) : null;
-  let main: number | null = null, label = "", sub: React.ReactNode = null, source = "";
+  let main: number | null = null, label = "", sub: React.ReactNode = null, source = "", low = false;
   if (res?.summary) {
-    main = res.summary[1]; label = "sells for about";
+    main = res.summary[1];
     const ps = res.listings.map((l) => l.chaos).filter((x): x is number => x != null);
     const top = ps.length ? Math.max(...ps) : null;
-    sub = <>{money(res.summary[0], divine)}{top != null && top > res.summary[0] ? <> to {money(top, divine)}</> : null} · {res.total.toLocaleString()} listed</>;
+    if (res.total < LOW_CONFIDENCE) {
+      // A handful of listings is a few people's asking prices, not a price (his Dragon Turn: one at 45 div).
+      label = "low confidence"; low = true;
+      sub = <>only {res.total} listed{res.total > 1 ? <> · {money(res.summary[0], divine)}{top != null && top > res.summary[0] ? <> to {money(top, divine)}</> : null}</> : null}</>;
+    } else {
+      label = "sells for about";
+      sub = <>{money(res.summary[0], divine)}{top != null && top > res.summary[0] ? <> to {money(top, divine)}</> : null} · {res.total.toLocaleString()} listed</>;
+    }
   } else if (bulk?.offers[0]) {
     // Like Awakened: the headline is poe.ninja's price (from real in-game Currency Exchange trades, which price
     // fixers can't move); our stock-weighted going rate only when poe.ninja doesn't have the item.
@@ -304,7 +369,7 @@ function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote, waiting, st
   const amount = (c: number) => (divine && c >= divine ? <Price n={c / divine} cur="divine" /> : <Price n={c} cur="chaos" />);
   const perDiv = bulk && main && divine ? divine / main : null;
   return (
-    <div className={`tw-hero ${main == null ? "empty" : ""}`}>
+    <div className={`tw-hero ${main == null ? "empty" : ""} ${low ? "low" : ""}`}>
       {main != null && big != null && many ? (
         <div className="tw-tiles2" title={source || undefined}>
           <div className="tw-tile2 hi"><div className="tw-tile2-lab">YOUR {stack!.toLocaleString()}</div><div className="tw-tile2-val">{amount(big)}</div>
@@ -315,7 +380,7 @@ function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote, waiting, st
         <div className="tw-hero-main">
           <span className="tw-hero-price" title={source || undefined}>{showDiv ? <CountPrice n={big / divine!} cur="divine" /> : <CountPrice n={big} cur="chaos" />}</span>
           <span className="tw-hero-side">
-            <span className="tw-hero-label">{label}</span>
+            <span className={low ? "tw-hero-label tw-low-tag" : "tw-hero-label"}>{label}</span>
             {divine && <span className="muted">{showDiv ? <>= <Price n={big} cur="chaos" /></> : big / divine >= 0.01 ? <>= <Price n={big / divine} cur="divine" /></> : null}</span>}
           </span>
         </div>
@@ -477,6 +542,15 @@ export default function TradeWindow() {
   const [showSaved, setShowSaved] = useState(false);
   /** The footer's "More": saved searches, Style and Something's wrong. */
   const [more, setMore] = useState(false);
+  const [layout, setLayout] = useState<string>(() => { try { return localStorage.getItem(TW_LAYOUT_KEY) || "grouped"; } catch { return "grouped"; } });
+  useEffect(() => {
+    const on = (e: StorageEvent) => { if (e.key === TW_LAYOUT_KEY && e.newValue) setLayout(e.newValue); };
+    window.addEventListener("storage", on);
+    return () => window.removeEventListener("storage", on);
+  }, []);
+  const nextLayout = () => { const n = layout === "flat" ? "grouped" : "flat"; setLayout(n); try { localStorage.setItem(TW_LAYOUT_KEY, n); } catch { /* not kept */ } };
+  /** Flat layout: show the mods that are already counted in a total. */
+  const [showInTotals, setShowInTotals] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
   const [preset, setPreset] = useState<number | null>(0);
   // Awakened-style tabs: price this item, or price it as a crafting base. Your own search is kept while you look.
@@ -690,9 +764,8 @@ export default function TradeWindow() {
       )}
       {setup.filters.some(shown) && (
         <div className="tw-range">
-          <span className="tw-sec">Search for</span>
+          <span className="tw-sec">Minimum rolls</span>
           <span className="tw-range-btns" title="Set every minimum relative to this item's rolls">
-          <span className="muted small">min</span>
           {[0, 10, 20].map((p) => (
             <button key={p} className={preset === p ? "on" : ""} title={p ? `Every minimum ${p}% below this item's roll` : "Every minimum at this item's roll"}
               onClick={() => { setPreset(p); setSetup({ ...setup, filters: setup.filters.map((f) => {
@@ -707,24 +780,37 @@ export default function TradeWindow() {
           </span>
         </div>
       )}
-      {setup.filters.some(shown) && (
-        <div className="tw-stats">
-          {setup.filters.map((f, i) => {
-            if (!shown(f)) return null;
-            // A small heading where the kind of row changes (rows are already in the game's order), with the full
-            // words "Prefixes" / "Suffixes" and how many an item can have, so players learn how mods split.
-            const jewel = setup.category === "jewel.base" || setup.category === "jewel.abyss";
-            const g = rowGroup(f, setup.affix_max ?? (jewel ? [2, 2] : [3, 3]));
-            const prev = setup.filters.slice(0, i).filter(shown).pop();
-            const head = !prev || rowGroup(prev, [3, 3])[0] !== g[0];
+      {setup.filters.some(shown) && (() => {
+        const jewel = setup.category === "jewel.base" || setup.category === "jewel.abyss";
+        const max = setup.affix_max ?? (jewel ? [2, 2] : [3, 3]);
+        const used = affixUsed(setup.filters, max);
+        const flat = layout === "flat";
+        const order = displayOrder(setup.filters.map((_, i) => i).filter((i) => shown(setup.filters[i])), setup.filters);
+        const tucked = flat ? order.filter((i) => inATotal(setup.filters[i], setup.filters)) : [];
+        const rows = flat && !showInTotals ? order.filter((i) => !tucked.includes(i)) : order;
+        return (
+        <div className={`tw-stats ${flat ? "flat" : ""}`}>
+          {rows.map((i, k) => {
+            const f = setup.filters[i];
+            // Grouped: a small heading where the kind of row changes, with what it means ("all mods added up",
+            // "2 of 3 used"). Flat: no headings, a tag on each row instead.
+            const g = rowGroup(f, max, used);
+            const prev = k > 0 ? setup.filters[rows[k - 1]] : null;
+            const head = !flat && (!prev || rowGroup(prev, max, used)[0] !== g[0]);
+            const tag = flat ? rowTag(f) : "";
+            const open = isOpenSlot(f);
+            const label = open ? `${f.value} open ${f.id.includes("prefix") ? "prefix" : "suffix"}${f.value > 1 ? "es" : ""}`
+              : f.label.replace(/\s*\(at 20% quality\)$/i, "");
             return (
               <React.Fragment key={f.id + i}>
-                {head && <div className="tw-group" title={g[1] || undefined}><span>{g[0]}</span></div>}
-                <label className={`tw-stat ${f.enabled ? "on" : ""} ${f.junk ? "junk" : ""}`} title={f.junk ? "Rarely changes the price" : undefined}>
+                {head && <div className="tw-group"><span>{g[0]}</span>{g[1] && <span className="tw-group-hint">{g[1]}</span>}</div>}
+                <label className={`tw-stat ${f.enabled ? "on" : ""} ${f.junk ? "junk" : ""} ${open ? "open" : ""}`} title={f.junk ? "Rarely changes the price" : undefined}>
                   <input type="checkbox" checked={f.enabled} onChange={(e) => patch(i, { enabled: e.target.checked })} />
-                  <span className={`tw-label mod-${f.kind}`}>{g[1] === "at 20% quality" ? f.label.replace(/\s*\(at 20% quality\)$/i, "") : f.label}{KIND[f.kind] && f.kind !== "pseudo" && f.kind !== "implicit" && <span className="tw-kind">{KIND[f.kind]}</span>}
+                  <span className={`tw-label mod-${f.kind}`}>{label}{open && <span className="tw-room"> room to craft</span>}
+                    {!flat && KIND[f.kind] && f.kind !== "pseudo" && f.kind !== "implicit" && <span className="tw-kind">{KIND[f.kind]}</span>}
                     {f.tier != null && <span className={`tw-tier ${tierClass(f.tier)}`} title="Tier 1 is the best this mod can roll">T{f.tier}</span>}
                     {f.roll != null && <Roll r={f.roll} range={f.range} tier={f.tier} />}</span>
+                  {flat && <span className={`tw-tag ${tag.split(" ").pop()} ${tag.includes("crafted") ? "crafted" : ""}`}>{tag}</span>}
                   <input className="tw-min" type="number" value={f.min ?? ""} placeholder="min" onWheel={(e) => wheel(i, f, e)}
                     title={f.max != null ? "Exactly this many" : undefined}
                     onChange={(e) => { const v = e.target.value === "" ? null : +e.target.value; patch(i, f.max != null ? { min: v, max: v, enabled: true } : { min: v, enabled: true }); }} />
@@ -732,8 +818,13 @@ export default function TradeWindow() {
               </React.Fragment>
             );
           })}
+          {tucked.length > 0 && (
+            <button className="link small tw-tucked" onClick={() => setShowInTotals(!showInTotals)}>
+              {showInTotals ? `Hide the ${tucked.length} mods counted in the totals` : `${tucked.length} mod${tucked.length > 1 ? "s are" : " is"} inside the totals above · show`}</button>
+          )}
         </div>
-      )}
+        );
+      })()}
       {setup.unknown.length > 0 && showStats && !asBase && (
         <div className="tw-unknown">
           <div className="tw-group" title="The trade site has no filter for these"><span>Not searchable</span></div>
@@ -746,6 +837,7 @@ export default function TradeWindow() {
       )}
 
       {style === "tooltip" && <div className="tw-tt-price">{hero}{trend}</div>}
+      {!check.bulk && layout !== "flat" && setup.category && it.rarity !== "Unique" && <div className="tw-group tw-opts-head"><span>Base and item level</span></div>}
       {!check.bulk && <div className="tw-opts">
         {setup.category && it.rarity !== "Unique" && (
           <label><input type="checkbox" checked={setup.base_only} onChange={(e) => setSetup({ ...setup, base_only: e.target.checked })} /> {setup.base || it.base_type} only</label>
@@ -840,7 +932,7 @@ export default function TradeWindow() {
       )}
       {res && res.listings.length > 0 && (
         <div className="tw-res">
-          <div className="tw-sec tw-res-sec">Cheapest listed</div>
+          <div className="tw-sec tw-res-sec">For sale now <span className="tw-group-hint">cheapest first</span></div>
           {style === "compare" && <PriceSpread res={res} divine={divine} />}
           <div className="tw-table">
             <div className="tw-th"><span>Price</span><span>{ilvls ? "ilvl" : ""}</span><span>Listed</span><span>Seller</span><span /></div>
@@ -873,6 +965,8 @@ export default function TradeWindow() {
       {!check.bulk && savedToggle}
       <button className="link small tw-style-btn" onClick={nextStyle} title={"Switch the look of this window: " + TW_STYLES.map(([, n]) => n).join(", ")}>
         Style: {TW_STYLES.find(([k]) => k === style)?.[1] ?? "Classic"} ›</button>
+      <button className="link small tw-layout-btn" onClick={nextLayout} title="Grouped: headings. Flat: one list with a tag on each row, like Awakened.">
+        Layout: {TW_LAYOUTS.find(([k]) => k === layout)?.[1] ?? "Grouped"} ›</button>
       {reporting == null && (
         <button className="link small tw-report-toggle" onClick={() => { setReporting(""); setReported(""); }}
           title="Saves this price check with your note, so Claude can see exactly what went wrong">

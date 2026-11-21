@@ -2,7 +2,7 @@ import { Tip } from "./Help";
 import { PageLoading } from "./Loading";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { TW_STYLES, TW_STYLE_KEY } from "./TradeWindow";
+import { TW_LAYOUTS, TW_LAYOUT_KEY, TW_STYLES, TW_STYLE_KEY } from "./TradeWindow";
 
 type Settings = {
   key_quick_edit: string; key_batch: string; key_reload: string; key_cycle: string; key_build: string; key_price?: string; key_atlas?: string;
@@ -151,6 +151,8 @@ export default function SettingsPage() {
 function PriceLook() {
   const [v, setV] = useState(() => { try { return localStorage.getItem(TW_STYLE_KEY) || "classic"; } catch { return "classic"; } });
   const pick = (k: string) => { setV(k); try { localStorage.setItem(TW_STYLE_KEY, k); } catch { /* not kept */ } };
+  const [lay, setLay] = useState(() => { try { return localStorage.getItem(TW_LAYOUT_KEY) || "grouped"; } catch { return "grouped"; } });
+  const pickLay = (k: string) => { setLay(k); try { localStorage.setItem(TW_LAYOUT_KEY, k); } catch { /* not kept */ } };
   return (
     <div className="tw-look-pick">
       <h3>Look of the price window</h3>
@@ -161,6 +163,15 @@ function PriceLook() {
             <LookPreview k={k} />
             <b>{name}</b><span className="muted small">{what}</span>
           </button>
+        ))}
+      </div>
+      <h3>How the stats are listed</h3>
+      <div className="tw-layout-pick">
+        {TW_LAYOUTS.map(([k, name, what]) => (
+          <label key={k} className={lay === k ? "check sel" : "check"}>
+            <input type="radio" name="tw-layout" checked={lay === k} onChange={() => pickLay(k)} />
+            <span><b>{name}</b> <span className="muted small">{what}</span></span>
+          </label>
         ))}
       </div>
     </div>

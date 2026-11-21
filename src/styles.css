@@ -1873,3 +1873,22 @@ kbd { font: 600 11px/1.4 "Segoe UI", system-ui, sans-serif; color: var(--text-2)
 .saved-note .saved-x { color: var(--muted); font-size: 16px; font-weight: 400; padding: 0 6px; }
 @keyframes saved-in { from { opacity: 0; transform: translate(-50%, 8px); } }
 @media (prefers-reduced-motion: reduce) { .saved-note { animation: none; } }
+
+/* ── Price window: two layouts (grouped headings / flat with tags) and "low confidence" prices (21 Nov 2026) ── */
+.tw-group-hint { text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 12px; color: #737b8a; }
+.tw-res-sec .tw-group-hint { margin-left: 6px; font-family: "Segoe UI", system-ui, sans-serif; }
+.tw-room { font-weight: 500; color: var(--muted); font-size: 12px; }
+.tw-stat.open .tw-label { color: var(--text-2); }
+.tw-stats.flat .tw-stat { grid-template-columns: 18px 1fr auto 58px; }
+.tw-tag { justify-self: end; font-size: 11px; font-weight: 600; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; white-space: nowrap; }
+.tw-tag.total { color: #9fc2ff; border-color: rgba(121,180,255,.35); }
+.tw-tag.crafted { color: #b8b8ff; border-color: rgba(184,184,255,.35); }
+.tw-tag:empty { display: none; }
+.tw-stat:not(.on) .tw-tag { opacity: .6; }
+.tw-tucked { display: block; margin: 4px 0 0; padding: 2px 6px; text-align: left; }
+.tw-opts-head { margin-top: 12px; }
+.tw-hero.low { border-color: color-mix(in srgb, #e0a060 45%, var(--line)); background: linear-gradient(180deg, rgba(224,160,96,.10), rgba(224,160,96,.02)); }
+.tw-hero.low .tw-hero-price { color: #d9b48a; }
+.tw-low-tag { display: inline-block; width: fit-content; font-size: 12px; font-weight: 700; color: #f0b070; background: rgba(240,176,112,.14);
+  border: 1px solid rgba(240,176,112,.35); border-radius: 5px; padding: 1px 7px; text-transform: none; }
+.tw-layout-pick { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }

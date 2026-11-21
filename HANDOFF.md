@@ -761,6 +761,16 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
       change goes through `remember()`, which now emits `filter-changed` to the main window.) Long explanations at the
       top of Filters, My edits, Themes, Prices, Maps, Atlas, Crafting and Settings cut to one line; the detail moved
       into the "?" next to the heading.
+- [ ] Price window: two layouts + low confidence + Cogwork numbers (21 Nov, not released yet).
+      **Grouped** (default): headings Minimum rolls · Defences (at 20% quality) · Totals (all mods added up) · Base mods
+      (implicit) · Prefixes "1 of 2 used" · Suffixes "3 of 4 used" (open-slot rows sit inside their group, "1 open
+      prefix · room to craft") · Base and item level · For sale now. **Flat** (like Awakened): no stat headings, a tag
+      on each row (total, base mod, prefix, crafted prefix, suffix, open slot, 20% quality); mods already counted in a
+      total (resistances, life, mana, attributes) tucked behind "N mods are inside the totals · show". Switch under
+      More → "Layout", or Settings → Price check → "How the stats are listed". Fewer than 5 listed: amber
+      "low confidence · only N listed" instead of "sells for about" (his Dragon Turn showed 45 div from 1 listing;
+      live check: ~55 similar rings, 50c–3 div). Cogwork Ring: mods marked "— 25% Increased" in the advanced copy now
+      use the in-game numbers (+46 Int → +57, range 53–62); GROBBS rejected splitting Totals into Resistances / Life.
 
 **Frame + fixes (21 Nov, 0.2.24)**
 - [ ] Editor window: no Windows title bar, a gold one instead; drag it to move, double-click to maximise, the three
