@@ -2071,6 +2071,14 @@ async fn craft_ways(state: State<'_, AppState>, base: String, ilvl: u32, influen
     tauri::async_runtime::spawn_blocking(move || filter_core::craft::ways(&base, ilvl, &influences, &key, min_tier, &have, &rarity, &price)).await.map_err(|e| e.to_string())
 }
 
+/// Crafting page calculator: the chance each method gives several mods at once.
+#[tauri::command]
+async fn craft_plan(state: State<'_, AppState>, base: String, ilvl: u32, influences: Vec<String>, targets: Vec<(String, u32)>) -> Result<Vec<filter_core::craft::Way>, String> {
+    let f = state.prices.lock().unwrap().get(&Game::Poe1).cloned();
+    let price = move |n: &str| f.as_ref().and_then(|f| price_of(f, None, n, ""));
+    tauri::async_runtime::spawn_blocking(move || filter_core::craft::plan(&base, ilvl, &influences, &targets, &price)).await.map_err(|e| e.to_string())
+}
+
 /// What poe.ninja says this item is worth (for the pop-up).
 #[tauri::command]
 fn item_price(state: State<AppState>, item: Item) -> Option<(f64, String)> {
@@ -2468,7 +2476,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             price_build_item, buy_build_item, buy_base_item, trade_untick_one, overview,
-            craft_bases, craft_start, craft_pool, craft_ways,
+            craft_bases, craft_start, craft_pool, craft_ways, craft_plan,
             create_profile,
             list_filters,
             set_active,

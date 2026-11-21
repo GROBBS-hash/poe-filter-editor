@@ -1,35 +1,50 @@
-// Crafting page: pick a base (or bring an item from Ctrl+D), see every mod that can roll on it with how often a
-// Chaos Orb gives it, and click a mod for the ways to get it (essence, bench, fossils, Chaos Orbs) with odds and cost.
+// Crafting page: pick a base (or bring an item from Ctrl+D), see every mod that can roll on it (influence-only ones
+// marked), how often a Chaos Orb gives it, and click a mod for the ways to get it with odds and cost. Add several mods
+// to the plan to get the odds of hitting them all at once. Everything fits on one screen: three columns that scroll.
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { friendly } from "./errors";
 import { usePersist } from "./usePersist";
-import { CurrencyIcon } from "./icons";
+import { CurrencyIcon, ItemIcon } from "./icons";
 
 type Tier = { tier: number; name: string; lvl: number; text: string; weight: number; ok: boolean };
 type EssenceWay = { name: string; text: string; like_tier: number | null; price: number | null; corrupt: boolean };
 type BenchWay = { text: string; cost: [string, number][] };
 type Family = { key: string; affix: "prefix" | "suffix"; text: string; tags: string[]; tiers: Tier[]; chaos: number; have: number | null;
-  essences: EssenceWay[]; bench: BenchWay[]; fossils_more: string[]; fossils_none: string[] };
-type Pool = { base: string; class: string; ilvl: number; influences: string[]; families: Family[] };
+  essences: EssenceWay[]; bench: BenchWay[]; fossils_more: string[]; fossils_none: string[]; needs: string | null };
+type ItemMod = { text: string; affix: string | null; tier: number | null; key: string | null; needs: string | null };
+type Pool = { base: string; class: string; ilvl: number; influences: string[]; families: Family[]; item_mods: ItemMod[] };
 type Way = { group: string; method: string; chance: number; cost_each: number | null; average: number | null; note: string };
 type Start = { base: string; ilvl: number; influences: string[]; have: string[]; name: string; rarity: string };
+type Target = { key: string; tier: number };
 
 const INFLUENCES = ["Shaper", "Elder", "Crusader", "Redeemer", "Hunter", "Warlord"];
-/** Shared with the Ctrl+D window: the item its "Craft" button sends here. */
+const INF_COLOUR: Record<string, string> = { Shaper: "#7fb2ff", Elder: "#c79bff", Crusader: "#ffb15e", Redeemer: "#6fdcd2", Hunter: "#9be07a", Warlord: "#ff7a6b" };
+const RARITY_COLOUR: Record<string, string> = { Normal: "#c8c8c8", Magic: "#8888ff", Rare: "#ffff77", Unique: "#af6025" };
+/** Shared with the Ctrl+D window: the item its "Craft this" button sends here. */
 export const CRAFT_ITEM_KEY = "craft.item";
 
-/** "1 in 12" / "always" / "never". */
+/** "1 in 12" / "always" / "can't roll". */
 function odds(p: number) {
   if (p >= 0.995) return "always";
   if (p <= 0) return "can't roll";
   const n = 1 / p;
   return n < 1.5 ? `${Math.round(p * 100)}%` : `1 in ${n >= 1000 ? Math.round(n).toLocaleString() : +n.toFixed(n < 10 ? 1 : 0)}`;
 }
-function chaos(c: number | null) {
+function Chaos({ c }: { c: number | null }) {
   if (c == null) return <span className="muted">price unknown</span>;
-  return <>{c >= 100 ? Math.round(c).toLocaleString() : +c.toFixed(1)}<CurrencyIcon id="chaos" /></>;
+  return <span className="cr-price">{c >= 100 ? Math.round(c).toLocaleString() : +c.toFixed(1)}<CurrencyIcon id="chaos" size={14} /></span>;
 }
+function InfIcon({ name, size = 16 }: { name: string; size?: number }) {
+  return <span className="cr-inf-ico" title={`${name} influence`}><ItemIcon name={`${name}'s Exalted Orb`} size={size} /></span>;
+}
+/** Pictures for a method: each fossil of a pair, the essence, the orb. */
+function MethodIcons({ method }: { method: string }) {
+  if (method === "Crafting bench") return <span className="cr-bench-ico" aria-hidden>⚒</span>;
+  const parts = method.startsWith("Harvest") ? ["Wild Crystallised Lifeforce"] : method.startsWith("Chaos Orb on") ? ["Chaos Orb"] : method.split(" + ");
+  return <span className="cr-icons">{parts.map((p) => <ItemIcon key={p} name={p} size={22} />)}</span>;
+}
+const lines = (t: string) => t.split("\n").join(" / ");
 
 export default function Craft() {
   const [bases, setBases] = useState<string[]>([]);
@@ -40,21 +55,22 @@ export default function Craft() {
   const [itemName, setItemName] = usePersist("craft.name", "");
   const [itemText, setItemText] = usePersist("craft.text", "");
   const [rarity, setRarity] = usePersist("craft.rarity", "");
+  const [plan, setPlan] = usePersist<Target[]>("craft.plan", []);
+  const [extras, setExtras] = usePersist("craft.extras", false);
   const [pool, setPool] = useState<Pool | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [q, setQ] = useState("");
   const [pick, setPick] = useState<string | null>(null);
   const [paste, setPaste] = useState(false);
-  const [extras, setExtras] = usePersist("craft.extras", false);
 
   useEffect(() => { invoke<string[]>("craft_bases").then(setBases).catch(() => {}); }, []);
 
-  /** Loads a copied item: its base, item level, influences and mods. */
   const fromText = async (text: string) => {
     const s = await invoke<Start | null>("craft_start", { text }).catch(() => null);
     if (!s) { setErr("That doesn't look like gear you can craft on (armour, weapons, jewellery, quivers, shields)."); return; }
-    setErr(""); setBase(s.base); setIlvl(s.ilvl); setInfl(s.influences); setHave(s.have); setRarity(s.rarity); setItemName(s.name); setItemText(text); setPick(null); setPaste(false);
+    setErr(""); setBase(s.base); setIlvl(s.ilvl); setInfl(s.influences); setHave(s.have); setRarity(s.rarity); setItemName(s.name); setItemText(text);
+    setPick(null); setPaste(false); setPlan([]);
   };
   // An item sent from the Ctrl+D window (now, or while this page was closed).
   useEffect(() => {
@@ -83,83 +99,179 @@ export default function Craft() {
 
   const shown = useMemo(() => {
     const words = q.toLowerCase().split(/\s+/).filter(Boolean);
-    return (pool?.families ?? []).filter((f) => words.every((w) => (f.text + " " + f.tags.join(" ")).toLowerCase().includes(w)));
+    return (pool?.families ?? []).filter((f) => words.every((w) => (f.text + " " + f.tags.join(" ") + " " + (f.needs ?? "")).toLowerCase().includes(w)));
   }, [pool, q]);
-  const picked = pool?.families.find((f) => f.key === pick) ?? null;
+  const fam = (k: string | null) => pool?.families.find((f) => f.key === k) ?? null;
+  const picked = fam(pick);
 
   const clearItem = () => { setHave([]); setItemName(""); setItemText(""); setRarity(""); };
   const toggleInfl = (i: string) => setInfl(infl.includes(i) ? infl.filter((x) => x !== i) : [...infl, i].slice(-2));
+  const inPlan = (k: string) => plan.some((t) => t.key === k);
+  const addPlan = (f: Family) => { if (!inPlan(f.key)) setPlan([...plan, { key: f.key, tier: Math.min(f.tiers.length || 1, 2) }]); };
+  const lockedOut = (f: Family) => !!f.needs && !infl.includes(f.needs);
 
   return (
-    <div className="page cr">
-      <div className="card">
-        <div className="row cr-top">
-          <label className="cr-field">Base
-            <input list="cr-bases" value={base} onChange={(e) => { setBase(e.target.value); clearItem(); setPick(null); }} placeholder="Eternal Burgonet" />
-            <datalist id="cr-bases">{bases.map((b) => <option key={b} value={b} />)}</datalist>
-          </label>
-          <label className="cr-field cr-ilvl">Item level
-            <input type="number" min={1} max={100} value={ilvl} onChange={(e) => setIlvl(+e.target.value)} />
-          </label>
-          <div className="cr-field">Influence
-            <div className="row cr-infl">{INFLUENCES.map((i) => <button key={i} className={`chip ${infl.includes(i) ? "on" : ""}`} onClick={() => toggleInfl(i)}>{i}</button>)}</div>
-          </div>
+    <div className="cr">
+      <div className="cr-bar">
+        <label className="cr-field">Base
+          <input className="text" list="cr-bases" value={base} onChange={(e) => { setBase(e.target.value); clearItem(); setPick(null); setPlan([]); }} placeholder="Eternal Burgonet" />
+          <datalist id="cr-bases">{bases.map((b) => <option key={b} value={b} />)}</datalist>
+        </label>
+        <label className="cr-field cr-ilvl">Item level
+          <input type="number" min={1} max={100} value={ilvl} onChange={(e) => setIlvl(+e.target.value)} />
+        </label>
+        <div className="cr-field">Influence
+          <div className="cr-infl">{INFLUENCES.map((i) => (
+            <button key={i} className={`cr-inf ${infl.includes(i) ? "on" : ""}`} style={{ "--ic": INF_COLOUR[i] } as CSSProperties} onClick={() => toggleInfl(i)} title={`${i} influence`}>
+              <InfIcon name={i} size={18} />{i}</button>))}</div>
         </div>
-        <div className="row">
+        <div className="cr-bar-end">
           <button onClick={async () => { try { const t = await navigator.clipboard.readText(); if (t.includes("Item Class:")) { fromText(t); return; } } catch { /* fall back */ } setPaste(true); }}>
             Use a copied item</button>
-          <span className="muted small">In game: hover an item and press Ctrl+C, or press Ctrl+D and click "Craft this".</span>
-          <button className="link small cr-coe" onClick={async () => {
+          <button className="link small" onClick={async () => {
             if (itemText) { try { await navigator.clipboard.writeText(itemText); } catch { /* still open it */ } }
             invoke("open_url", { url: "https://www.craftofexile.com/" });
-          }} title="For step-by-step plans: Craft of Exile's simulator">Open in Craft of Exile{itemText ? " (item copied: click Import item, then paste)" : ""}</button>
+          }} title={itemText ? "Your item is copied: click Import item there, then paste" : "Craft of Exile's simulator"}>Open in Craft of Exile ↗</button>
         </div>
-        {paste && <textarea className="text cr-paste" autoFocus placeholder="Paste the item here (Ctrl+V)" onChange={(e) => e.target.value.includes("Item Class:") && fromText(e.target.value)} />}
-        {itemName && <div className="cr-item small">Crafting on <b>{itemName}</b> ({rarity.toLowerCase() || "item"}) · {have.length} mods read from it <button className="link small" onClick={clearItem}>forget the item</button></div>}
-        {err && <p className="danger-text small">{err}</p>}
       </div>
+      {paste && <textarea className="text cr-paste" autoFocus placeholder="Paste the item here (Ctrl+V). In game: hover it and press Ctrl+C." onChange={(e) => e.target.value.includes("Item Class:") && fromText(e.target.value)} />}
+      {err && <p className="danger-text small">{err}</p>}
 
-      <div className="cr-body">
-        <div className="card cr-list">
-          <div className="row">
-            <input className="text cr-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a mod: life, cold res, spell…" />
+      <div className="cr-cols">
+        {/* Your item + plan */}
+        <div className="cr-col">
+          {itemName && pool ? (
+            <div className="cr-tip">
+              <div className="cr-tip-head" style={{ color: RARITY_COLOUR[rarity] ?? "#ddd" }}>
+                <div className="cr-tip-name">{itemName}</div>
+                {itemName !== base && <div className="cr-tip-name">{base}</div>}
+              </div>
+              <div className="cr-tip-meta">Item level {ilvl}{infl.length ? <> · {infl.map((i) => <InfIcon key={i} name={i} />)} {infl.join(" + ")}</> : null}</div>
+              {pool.item_mods.length === 0 && <div className="cr-tip-meta">No mods read: copy it with Ctrl+Alt+C for tiers.</div>}
+              {pool.item_mods.map((m, i) => (
+                <button key={i} className={`cr-tip-mod ${m.key && m.key === pick ? "on" : ""}`} disabled={!m.key} onClick={() => m.key && setPick(m.key)}
+                  title={m.key ? "See how to get this mod" : "Not a mod you can craft"}>
+                  <span className="cr-aff">{m.affix === "prefix" ? "P" : m.affix === "suffix" ? "S" : "·"}</span>
+                  <span className="cr-tip-text" style={m.needs ? { color: INF_COLOUR[m.needs] } : undefined}>{m.text}</span>
+                  {m.tier ? <span className={`cr-tier-chip t${Math.min(m.tier, 4)}`}>T{m.tier}</span> : null}
+                </button>
+              ))}
+              <div className="cr-tip-foot"><span>{pool.item_mods.filter((m) => m.affix === "prefix").length}/3 prefixes · {pool.item_mods.filter((m) => m.affix === "suffix").length}/3 suffixes</span>
+                <button className="link small" onClick={clearItem}>forget item</button></div>
+            </div>
+          ) : (
+            <div className="card cr-empty">
+              <b>Bring an item</b>
+              <p className="muted small">In game, hover an item and press Ctrl+C, then click "Use a copied item". Or press Ctrl+D on it and click "Craft this". Its mods show here, and the odds use its open slots.</p>
+            </div>
+          )}
+          <PlanBox plan={plan} setPlan={setPlan} fam={fam} base={base} ilvl={ilvl} infl={infl} onPick={setPick} />
+        </div>
+
+        {/* Every mod */}
+        <div className="cr-col cr-list">
+          <div className="cr-list-top">
+            <input className="text cr-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a mod: life, cold res, spell, shaper…" />
             {busy && <span className="muted small">Rolling…</span>}
           </div>
-          {pool && <button className="link small" onClick={() => setExtras(!extras)}>{extras ? "Hide" : "Show"} bench and essence only mods</button>}
-          {pool && <p className="muted small">{pool.class} · item level {pool.ilvl}{pool.influences.length ? ` · ${pool.influences.join(" + ")}` : ""}. The number is how often one Chaos Orb gives that mod (any tier).</p>}
+          <div className="cr-legend small">
+            {pool && <span className="muted">{pool.class} · ilvl {pool.ilvl} · "1 in N" = per Chaos Orb</span>}
+            <button className="link small" onClick={() => setExtras(!extras)}>{extras ? "Hide" : "Show"} bench / essence only</button>
+          </div>
           {(["prefix", "suffix"] as const).map((a) => {
             const all = shown.filter((f) => f.affix === a);
-            const natural = all.filter((f) => f.tiers.length > 0);
-            // Bench- and essence-only mods are folded away unless asked for (or searched for).
-            const list = extras || q ? all : natural;
+            const natural = all.filter((f) => f.tiers.length > 0 && !lockedOut(f));
+            const influenced = all.filter((f) => f.tiers.length > 0 && lockedOut(f));
+            const special = all.filter((f) => f.tiers.length === 0);
+            const row = (f: Family) => (
+              <div key={f.key + f.text} className={`cr-mod ${pick === f.key ? "on" : ""} ${f.tiers.length ? "" : "cr-special"}`}
+                style={f.needs ? { "--ic": INF_COLOUR[f.needs] } as CSSProperties : undefined} onClick={() => setPick(f.key)}>
+                {f.needs && <InfIcon name={f.needs} />}
+                <span className={`cr-text ${f.needs ? "inf" : ""}`}>{lines(f.text)}</span>
+                {f.have != null && <span className="cr-yours" title="On your item">{f.have ? `T${f.have}` : "yours"}</span>}
+                {f.essences.length > 0 && <span className="cr-mini" title="An essence can give it">E</span>}
+                {f.bench.length > 0 && <span className="cr-mini" title="The crafting bench can add it">B</span>}
+                <span className="cr-odds">{f.tiers.length ? (lockedOut(f) ? `needs ${f.needs}` : odds(f.chaos)) : f.bench.length ? "bench" : "essence"}</span>
+                <button className={`cr-add ${inPlan(f.key) ? "on" : ""}`} title={inPlan(f.key) ? "In your plan" : "Add to the plan (odds for several mods at once)"}
+                  onClick={(e) => { e.stopPropagation(); inPlan(f.key) ? setPlan(plan.filter((t) => t.key !== f.key)) : addPlan(f); }}>{inPlan(f.key) ? "✓" : "+"}</button>
+              </div>
+            );
             return (
               <div key={a}>
-                <h3>{a === "prefix" ? "Prefixes" : "Suffixes"} <span className="muted small">({natural.length} can roll{all.length > natural.length ? `, ${all.length - natural.length} only from the bench or an essence` : ""})</span></h3>
-                {list.map((f) => (
-                  <button key={f.key + f.text} className={`cr-mod ${pick === f.key ? "on" : ""} ${f.tiers.length ? "" : "cr-special"}`} onClick={() => setPick(f.key)}>
-                    <span className="cr-text">{f.text.split("\n").map((l, i) => <span key={i}>{l}</span>)}</span>
-                    <span className="cr-meta">
-                      {f.have != null && <span className="tag cr-have">yours{f.have ? ` T${f.have}` : ""}</span>}
-                      {f.essences.length > 0 && <span className="cr-pill">essence</span>}
-                      {f.bench.length > 0 && <span className="cr-pill">bench</span>}
-                      <span className="cr-odds">{f.tiers.length ? odds(f.chaos) : f.bench.length ? "bench only" : "essence only"}</span>
-                    </span>
-                  </button>
-                ))}
+                <h3 className="cr-h">{a === "prefix" ? "Prefixes" : "Suffixes"} <span className="muted small">{natural.length} can roll</span></h3>
+                {natural.map(row)}
+                {influenced.length > 0 && <div className="cr-sub">Needs an influenced item ({influenced.length})</div>}
+                {influenced.map(row)}
+                {(extras || q) && special.length > 0 && <div className="cr-sub">Only from the bench or an essence ({special.length})</div>}
+                {(extras || q) && special.map(row)}
               </div>
             );
           })}
         </div>
-        <div className="cr-side">
-          {picked ? <Detail key={picked.key} fam={picked} base={base} ilvl={ilvl} infl={infl} have={have} rarity={rarity} /> :
-            <div className="card muted">Click a mod to see its tiers and the cheapest ways to get it.</div>}
+
+        {/* One mod */}
+        <div className="cr-col">
+          {picked ? <Detail key={picked.key + infl.join()} fam={picked} base={base} ilvl={ilvl} infl={infl} have={have} rarity={rarity}
+            inPlan={inPlan(picked.key)} onPlan={() => addPlan(picked)} /> :
+            <div className="card muted cr-empty">Click a mod to see its tiers and every way to get it. Use + to add mods to a plan and see the odds of hitting them together.</div>}
         </div>
       </div>
     </div>
   );
 }
 
-function Detail({ fam, base, ilvl, infl, have, rarity }: { fam: Family; base: string; ilvl: number; infl: string[]; have: string[]; rarity: string }) {
+function WayCard({ w, best }: { w: Way; best: boolean }) {
+  return (
+    <div className={`cr-way ${best ? "best" : ""}`}>
+      <MethodIcons method={w.method} />
+      <div className="cr-way-main">
+        <div className="cr-way-top"><b>{w.method}</b><span className="cr-way-group">{w.group}{best ? " · cheapest" : ""}</span></div>
+        <div className="muted small">{w.note}</div>
+      </div>
+      <div className="cr-way-nums">
+        <div className="cr-odds">{odds(w.chance)}</div>
+        <div className="small">{w.chance < 0.995 ? <>≈ <Chaos c={w.average} /></> : <Chaos c={w.cost_each} />}</div>
+        {w.chance < 0.995 && w.cost_each != null && <div className="muted small">each <Chaos c={w.cost_each} /></div>}
+      </div>
+    </div>
+  );
+}
+
+function PlanBox({ plan, setPlan, fam, base, ilvl, infl, onPick }: { plan: Target[]; setPlan: (p: Target[]) => void; fam: (k: string) => Family | null;
+  base: string; ilvl: number; infl: string[]; onPick: (k: string) => void }) {
+  const [ways, setWays] = useState<Way[] | null>(null);
+  const [err, setErr] = useState("");
+  const targets = plan.filter((t) => fam(t.key));
+  useEffect(() => {
+    if (targets.length < 2) { setWays(null); return; }
+    let live = true;
+    setWays(null); setErr("");
+    invoke<Way[]>("craft_plan", { base, ilvl, influences: infl, targets: targets.map((t) => [t.key, t.tier]) })
+      .then((w) => live && setWays(w)).catch((e) => live && setErr(friendly(e)));
+    return () => { live = false; };
+  }, [JSON.stringify(targets), base, ilvl, infl.join(",")]);
+  return (
+    <div className="card cr-plan">
+      <h2>Plan <span className="muted small">all of these on one item</span></h2>
+      {targets.length === 0 && <p className="muted small">Press + next to mods you want together (e.g. life + two resistances) to see the odds of hitting them all at once.</p>}
+      {targets.map((t) => { const f = fam(t.key)!; return (
+        <div key={t.key} className="cr-plan-row">
+          <button className="link cr-plan-text" onClick={() => onPick(t.key)} style={f.needs ? { color: INF_COLOUR[f.needs] } : undefined}>{lines(f.text)}</button>
+          {f.tiers.length > 0 && <select value={t.tier} onChange={(e) => setPlan(plan.map((x) => x.key === t.key ? { ...x, tier: +e.target.value } : x))} title="This tier or better">
+            {f.tiers.map((x) => <option key={x.tier} value={x.tier}>T{x.tier}+</option>)}</select>}
+          <button className="link small" onClick={() => setPlan(plan.filter((x) => x.key !== t.key))} aria-label="Remove">✕</button>
+        </div>); })}
+      {targets.length === 1 && <p className="muted small">Add one more mod to see combined odds.</p>}
+      {err && <p className="danger-text small">{err}</p>}
+      {targets.length >= 2 && !ways && !err && <p className="muted small">Rolling it thousands of times…</p>}
+      {ways && ways.map((w, i) => <WayCard key={w.method} w={w} best={i === 0 && w.average != null} />)}
+      {targets.length > 0 && <button className="link small" onClick={() => setPlan([])}>Clear the plan</button>}
+    </div>
+  );
+}
+
+function Detail({ fam, base, ilvl, infl, have, rarity, inPlan, onPlan }: { fam: Family; base: string; ilvl: number; infl: string[]; have: string[]; rarity: string;
+  inPlan: boolean; onPlan: () => void }) {
   const best = fam.tiers.find((t) => t.ok)?.tier ?? 1;
   const [tier, setTier] = useState(Math.min(fam.tiers.length || 1, best + 1));
   const [ways, setWays] = useState<Way[] | null>(null);
@@ -171,70 +283,83 @@ function Detail({ fam, base, ilvl, infl, have, rarity }: { fam: Family; base: st
       .then((w) => live && setWays(w)).catch((e) => live && setErr(friendly(e)));
     return () => { live = false; };
   }, [fam.key, tier, base, ilvl, infl.join(","), have.join("|"), rarity]);
+  const locked = !!fam.needs && !infl.includes(fam.needs);
   return (
     <div className="card cr-detail">
-      <h2>{fam.text.split("\n").map((l, i) => <div key={i}>{l}</div>)}</h2>
+      <div className="cr-detail-head">
+        <h2 style={fam.needs ? { color: INF_COLOUR[fam.needs] } : undefined}>{fam.needs && <InfIcon name={fam.needs} size={20} />}{fam.text.split("\n").map((l, i) => <div key={i}>{l}</div>)}</h2>
+        <button className="small" onClick={onPlan} disabled={inPlan}>{inPlan ? "✓ In plan" : "+ Add to plan"}</button>
+      </div>
       <div className="muted small">{fam.affix === "prefix" ? "Prefix" : "Suffix"}{fam.tags.length ? ` · ${fam.tags.join(", ")}` : ""}</div>
-
-      {fam.tiers.length > 0 && <>
-        <h3>Tiers on this base</h3>
-        <div className="cr-tiers">
-          {fam.tiers.map((t) => (
-            <button key={t.name} className={`cr-tier ${t.tier <= tier ? "want" : ""} ${t.ok ? "" : "locked"}`} onClick={() => setTier(t.tier)}
-              title={t.ok ? `Click: aim for tier ${t.tier} or better` : `Needs item level ${t.lvl}`}>
-              <b>T{t.tier}</b><span>{t.text.split("\n").join(" / ")}</span><span className="muted">{t.ok ? `ilvl ${t.lvl}` : `needs ilvl ${t.lvl}`}</span>
-            </button>
-          ))}
-        </div>
-        <p className="muted small">Aiming for tier {tier} or better (click a tier to change).</p>
-      </>}
+      {locked && <div className="cr-needs" style={{ "--ic": INF_COLOUR[fam.needs!] } as CSSProperties}>
+        <InfIcon name={fam.needs!} size={22} /><div><b>Only on a {fam.needs} item.</b> Your base has no {fam.needs} influence: add it with a {fam.needs}'s Exalted Orb,
+        or tick {fam.needs} above to see the odds on an item that already has it.</div></div>}
 
       <h3>Ways to get it</h3>
       {err && <p className="danger-text small">{err}</p>}
       {!ways && !err && <p className="muted small">Rolling the item a few thousand times…</p>}
-      {ways && ways.length === 0 && <p className="muted small">No simple way found: try Craft of Exile for harvest, veiled or influenced crafts.</p>}
-      {ways && ways.length > 0 && <p className="muted small">Cheapest first. {rarity ? `Worked out on your ${rarity.toLowerCase()} item.` : "Bring your item (Ctrl+D → Craft this) for exact Exalted / Regal odds."}</p>}
-      {ways && ways.map((w, i) => (
-        <div key={w.method} className={`cr-way ${i === 0 && w.average != null ? "best" : ""}`}>
-          <div className="cr-way-group">{w.group}{i === 0 && w.average != null ? " · cheapest" : ""}</div>
-          <div className="cr-way-top"><b>{w.method}</b><span className="cr-odds">{odds(w.chance)}</span></div>
-          <div className="small">
-            {w.chance < 0.995 && <>Each try {chaos(w.cost_each)} · on average {chaos(w.average)}</>}
-            {w.chance >= 0.995 && <>Costs {chaos(w.cost_each)}</>}
-          </div>
-          <div className="muted small">{w.note}</div>
+      {ways && ways.length === 0 && <p className="muted small">No simple way found: see "More ways" below.</p>}
+      {ways && ways.length > 0 && <p className="muted small">Cheapest first, for tier {tier} or better. {rarity ? `Worked out on your ${rarity.toLowerCase()} item.` : "Bring your item for exact Exalted / Regal odds."}</p>}
+      {ways && ways.map((w, i) => <WayCard key={w.method} w={w} best={i === 0 && w.average != null} />)}
+
+      {fam.tiers.length > 0 && <>
+        <h3>Tiers <span className="muted small">click to aim for that tier or better</span></h3>
+        <div className="cr-tiers">
+          {fam.tiers.map((t) => (
+            <button key={t.name} className={`cr-tier ${t.tier <= tier ? "want" : ""} ${t.ok ? "" : "locked"}`} onClick={() => setTier(t.tier)}
+              title={t.ok ? `Aim for tier ${t.tier} or better` : `Needs item level ${t.lvl}`}>
+              <b>T{t.tier}</b><span>{lines(t.text)}</span><span className="muted">{t.name}</span><span className="muted">{t.ok ? `ilvl ${t.lvl}` : `needs ${t.lvl}`}</span>
+            </button>
+          ))}
         </div>
-      ))}
+      </>}
 
       {fam.essences.length > 0 && <>
         <h3>Essences</h3>
-        {fam.essences.map((e) => <div key={e.name} className="small cr-line"><b>{e.name}</b> → {e.text}{e.like_tier ? <span className="muted"> (like T{e.like_tier})</span> : null} · {chaos(e.price)}</div>)}
+        <div className="cr-table">
+          {fam.essences.map((e) => (
+            <div key={e.name} className="cr-trow">
+              <ItemIcon name={e.name} size={24} />
+              <span className="cr-tname">{e.name.replace(/ Essence of .*/, "")}<span className="muted"> {e.name.match(/Essence of .*/)?.[0]}</span></span>
+              <span className="cr-ttext">{lines(e.text)}</span>
+              {e.like_tier ? <span className={`cr-tier-chip t${Math.min(e.like_tier, 4)}`}>≈T{e.like_tier}</span> : <span />}
+              <Chaos c={e.price} />
+            </div>
+          ))}
+        </div>
       </>}
       {fam.bench.length > 0 && <>
         <h3>Crafting bench</h3>
-        {fam.bench.slice(0, 4).map((b) => <div key={b.text} className="small cr-line">{b.text.split("\n").join(" / ")} <span className="muted">· {b.cost.map(([c, n]) => `${n} × ${c}`).join(", ")}</span></div>)}
+        <div className="cr-table">
+          {fam.bench.slice(0, 5).map((b) => (
+            <div key={b.text} className="cr-trow cr-bench">
+              <span className="cr-ttext">{lines(b.text)}</span>
+              <span className="cr-cost">{b.cost.map(([c, n]) => <span key={c} title={c}>{n}×<ItemIcon name={c} size={20} /></span>)}</span>
+            </div>
+          ))}
+        </div>
       </>}
       {(fam.fossils_more.length > 0 || fam.fossils_none.length > 0) && <>
         <h3>Fossils</h3>
-        {fam.fossils_more.length > 0 && <div className="small cr-line">More likely with: <b>{fam.fossils_more.join(", ")}</b></div>}
-        {fam.fossils_none.length > 0 && <div className="small cr-line">Never with: {fam.fossils_none.join(", ")}</div>}
+        <div className="cr-fossils">
+          {fam.fossils_more.map((f) => <span key={f} className="cr-fossil good"><ItemIcon name={f} size={20} />{f}<em>more likely</em></span>)}
+          {fam.fossils_none.map((f) => <span key={f} className="cr-fossil bad"><ItemIcon name={f} size={20} />{f}<em>never</em></span>)}
+        </div>
       </>}
       <details className="cr-more">
         <summary>More ways (not worked out here)</summary>
         <ul className="small">
-          <li><b>Veiled Chaos Orb / Aisling</b>: adds a veiled mod you unveil from Jun; unveils offer a choice of 3, and bench-only "veiled" mods (like "of the Order") come only from this.</li>
-          <li><b>Conqueror Exalted Orbs</b> (Crusader, Redeemer, Hunter, Warlord): add an influence plus one of its mods to a rare with a free slot.</li>
+          <li><b>Veiled Chaos Orb / Aisling</b>: adds a veiled mod you unveil from Jun (a choice of 3); "veiled" bench mods like "of the Order" come only from this.</li>
           <li><b>Awakener's Orb</b>: merges two influenced items, keeping one influence mod from each.</li>
-          <li><b>Eldritch Ember / Ichor</b> and <b>Eldritch Exalted / Annulment / Chaos</b>: Searing Exarch and Eater of Worlds implicits, and changing a mod while the item keeps them.</li>
+          <li><b>Eldritch Ember / Ichor</b> and <b>Eldritch Exalted / Annulment / Chaos</b>: Exarch and Eater implicits, and changing a mod while the item keeps them.</li>
           <li><b>Recombinator</b>: combines two items of the same kind, keeping a random mix of their mods.</li>
-          <li><b>Fracturing Orb</b>: locks one mod on a rare with 4+ mods so it can never change: then reroll the rest freely.</li>
+          <li><b>Fracturing Orb</b>: locks one mod on a rare with 4+ mods, so you can reroll the rest freely.</li>
           <li><b>Metamods on the bench</b>: "Prefixes Cannot Be Changed" + Orb of Scouring removes only the suffixes (or the other way round); "Cannot roll Attack/Caster Modifiers" blocks those for Exalts.</li>
-          <li><b>Orb of Annulment</b>: removes one random mod; <b>Divine Orb</b> rerolls the numbers; <b>Blessed Orb</b> rerolls the implicit.</li>
-          <li><b>Beastcrafting</b> (Menagerie): Imprint a magic item to try again; split, add a prefix or suffix and more.</li>
+          <li><b>Orb of Annulment</b> removes one random mod; <b>Divine Orb</b> rerolls the numbers; <b>Blessed Orb</b> rerolls the implicit.</li>
+          <li><b>Beastcrafting</b>: Imprint a magic item to try again; add a prefix or suffix and more.</li>
         </ul>
-        <p className="small"><button className="link small" onClick={() => invoke("open_url", { url: "https://www.craftofexile.com/" })}>Plan these step by step on Craft of Exile</button></p>
       </details>
-      <p className="muted small">Odds are worked out by rolling the item here thousands of times, a rough guide.</p>
+      <p className="muted small">Odds come from rolling the item here thousands of times: a good guide, not exact.</p>
     </div>
   );
 }

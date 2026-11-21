@@ -313,6 +313,14 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   a magic item; with no item, a rough Exalted. Item lines carry "prefix|"/"suffix|" (Item Rarity is both) and
   two-line mods (Mammoth's) count once. "More ways" panel lists what isn't worked out (veiled, conqueror exalts,
   awakener, eldritch, recombinator, fracturing, metamods, beastcraft). Not modelled: harvest costs (lifeforce).
+  0.2.22: page rebuilt to fit one screen (full width: `.content.wide`; bar + three scrolling columns: your item as a
+  game tooltip with P/S + tier per mod, clickable / plan / mod list / detail). Influence-only mods are listed on any
+  base (`Family.needs`, coloured per influence, icon = that influence's Exalted Orb picture); their ways are the
+  "<Influence>'s Exalted Orb" (weight share of that influence's own mods) and Chaos on an item that has it.
+  Calculator: `plan()` = chance per method of hitting several mods at once (`simulate_all`, essences force one
+  target, fossils that help any and block none, Harvest per tag, Alteration when ≤1 prefix + ≤1 suffix); "+" on a mod
+  adds it, tier per target. Catalyst quality on the item ("quality|Life and Mana|20" in `have`) is taken off before
+  reading tiers. Icons for orbs, essences, fossils, bench costs. Pool returns `item_mods`.
 
 - Price check sweep 21 Nov (0.2.19): ran every saved sample through `setupof` (now prints UNKNOWN lines too).
   Mods written over 2–3 lines (Foulborn Asenath's corpse/Blinded/explode) are matched joined, as the site lists them.
@@ -599,6 +607,9 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] "Open in Craft of Exile": their site opens; Import item + Ctrl+V brings your item in.
 - [ ] 0.2.21: a mod's "Ways to get it" also lists Orb of Alteration, Harvest reforges, and (with your item brought
       over) Exalted Orb on a rare with a free slot / Augmentation and Regal on a magic item; cheapest is outlined.
+- [ ] 0.2.22: the page fits one screen; a copied item (e.g. Entropy Grasp) shows its mods on the left with P/S and
+      tier, click one to see it; search "shaper" or a Hunter mod on a plain base: it shows, coloured with the orb icon,
+      "needs Hunter"; press + on 2–3 mods: the Plan box shows the odds of all of them at once.
 
 **Price check sweep (21 Nov, 0.2.19)**
 - [ ] Ctrl+D on a map with "Monsters Hinder on Hit with Spells" or "Monsters Inflict Withered…": no longer "not

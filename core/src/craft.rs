@@ -53,10 +53,16 @@ pub struct Family {
     /// Fossils that make it more common / impossible.
     pub fossils_more: Vec<String>,
     pub fossils_none: Vec<String>,
+    /// Only on an item with this influence ("Shaper"…): shown even when the base has none, so you know what it takes.
+    pub needs: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
-pub struct Pool { pub base: String, pub class: String, pub ilvl: u32, pub influences: Vec<String>, pub families: Vec<Family> }
+pub struct Pool { pub base: String, pub class: String, pub ilvl: u32, pub influences: Vec<String>, pub families: Vec<Family>, pub item_mods: Vec<ItemMod> }
+
+/// A mod on the item you brought, and the family it belongs to (to click through).
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct ItemMod { pub text: String, pub affix: Option<String>, pub tier: Option<u32>, pub key: Option<String>, pub needs: Option<String> }
 
 /// One way to get a mod, with its odds.
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -144,6 +150,12 @@ fn tagset(base: &str, influences: &[String]) -> Option<(String, HashSet<String>)
     Some((class.clone(), set))
 }
 
+/// Which influence a mod's weight came from ("helmet_shaper" -> Shaper), if any.
+fn influence_of(m: &RawMod, tags: &HashSet<String>) -> Option<String> {
+    let (t, _) = m.sw.iter().find(|(t, _)| tags.contains(t))?;
+    INFLUENCE_TAGS.iter().find(|(_, s)| t.ends_with(&format!("_{s}"))).map(|(n, _)| n.to_string())
+}
+
 /// A mod's weight on this base: the first of its tags the base has decides.
 fn weight(m: &RawMod, tags: &HashSet<String>) -> f64 {
     m.sw.iter().find(|(t, _)| tags.contains(t)).map(|(_, w)| *w).unwrap_or(0.0)
@@ -221,6 +233,113 @@ fn simulate_with(pool: &[(usize, f64, bool, usize)], trials: u32, roll: Roll) ->
     pool.iter().zip(counts).filter(|(_, n)| *n > 0).map(|((i, ..), n)| (*i, n)).collect()
 }
 
+/// Rolls `trials` times and returns how often *every* target lands (each target = the pool slots that count for it).
+/// `forced` = an essence's mod: (is prefix, its group number if it can roll naturally); it takes one slot.
+fn simulate_all(pool: &[(usize, f64, bool, usize)], trials: u32, roll: Roll, forced: Option<(bool, Option<usize>)>, targets: &[Vec<bool>]) -> f64 {
+    let d = data();
+    let mut rng = Rng(0x2545_F491_4F6C_DD1D);
+    let side_max = if roll.magic { 1 } else { 3 };
+    let tagged: Vec<bool> = pool.iter().map(|(i, ..)| roll.tag.is_some_and(|t| d.mods[*i].tags.iter().any(|x| x == t))).collect();
+    let mut used: Vec<usize> = Vec::with_capacity(6);
+    let mut got = vec![false; targets.len()];
+    let mut wins = 0u32;
+    for _ in 0..trials {
+        let r = rng.next();
+        let n = if roll.magic { if r < 0.5 { 1 } else { 2 } } else if r < 8.0 / 12.0 { 4 } else if r < 11.0 / 12.0 { 5 } else { 6 };
+        let (mut pre, mut suf) = (0, 0);
+        used.clear();
+        got.iter_mut().for_each(|g| *g = false);
+        let mut start = 0;
+        if let Some((p, g)) = forced { if p { pre += 1 } else { suf += 1 } if let Some(g) = g { used.push(g) } start = 1; }
+        for step in start..n {
+            let only_tag = step == start && roll.tag.is_some();
+            let open = |k: usize, p: bool, g: usize, pre: i32, suf: i32, used: &[usize]| !used.contains(&g)
+                && if p { pre < side_max } else { suf < side_max } && (!only_tag || tagged[k]);
+            let total: f64 = pool.iter().enumerate().filter(|(k, (_, _, p, g))| open(*k, *p, *g, pre, suf, &used)).map(|(_, (_, w, ..))| w).sum();
+            if total <= 0.0 { break }
+            let mut x = rng.next() * total;
+            for (k, (_, w, p, g)) in pool.iter().enumerate() {
+                if !open(k, *p, *g, pre, suf, &used) { continue }
+                x -= w;
+                if x <= 0.0 {
+                    used.push(*g);
+                    if *p { pre += 1 } else { suf += 1 }
+                    for (t, set) in targets.iter().enumerate() { if set[k] { got[t] = true } }
+                    break;
+                }
+            }
+        }
+        if got.iter().all(|g| *g) { wins += 1 }
+    }
+    wins as f64 / trials as f64
+}
+
+/// Several mods at once ("T1 life + T1 cold res + …"): the chance each method gives all of them in one go.
+/// `targets` = (family key, tier or better).
+pub fn plan(base: &str, ilvl: u32, influences: &[String], targets: &[(String, u32)], price: &dyn Fn(&str) -> Option<f64>) -> Vec<Way> {
+    let d = data();
+    let Some(p) = pool(base, ilvl, influences, &[], price) else { return vec![] };
+    let Some((_, tags)) = tagset(base, influences) else { return vec![] };
+    let fams: Vec<(&Family, u32)> = targets.iter().filter_map(|(k, t)| p.families.iter().find(|f| &f.key == k).map(|f| (f, *t))).collect();
+    if fams.is_empty() { return vec![] }
+    let cost = |name: &str| price(name).or_else(|| (name == "Chaos Orb").then_some(1.0));
+    let way = |group: &str, method: String, chance: f64, each: Option<f64>, note: String| Way {
+        group: group.into(), method, chance, cost_each: each, average: each.filter(|_| chance > 0.0).map(|e| e / chance), note };
+    let sets = |pool: &[(usize, f64, bool, usize)], skip: Option<usize>| -> Vec<Vec<bool>> {
+        fams.iter().enumerate().filter(|(n, _)| Some(*n) != skip).map(|(_, (f, t))| {
+            let names: HashSet<&str> = f.tiers.iter().filter(|x| x.tier <= *t).map(|x| x.name.as_str()).collect();
+            pool.iter().map(|(i, ..)| { let m = &d.mods[*i]; format!("{}|{}", m.gen, m.r#type) == f.key && names.contains(m.name.as_str()) }).collect()
+        }).collect()
+    };
+    let n_pre = fams.iter().filter(|(f, _)| f.affix == "prefix").count();
+    let n_suf = fams.len() - n_pre;
+    let mut out = Vec::new();
+    if n_pre > 3 || n_suf > 3 { return vec![way("Reroll", "Not possible".into(), 0.0, None, "A rare holds at most 3 prefixes and 3 suffixes".into())] }
+    let roll = rollable(&tags, ilvl, &[]);
+    let all = sets(&roll, None);
+    let c = simulate_all(&roll, TRIALS, RARE, None, &all);
+    out.push(way("Reroll", "Chaos Orb".into(), c, cost("Chaos Orb"), "Rerolls a rare item: 4–6 new mods".into()));
+    if n_pre <= 1 && n_suf <= 1 {
+        let a = simulate_all(&roll, TRIALS, Roll { magic: true, tag: None }, None, &all);
+        out.push(way("Reroll", "Orb of Alteration".into(), a, cost("Orb of Alteration"), "Rerolls a magic item: 1–2 mods, then Regal Orb".into()));
+    }
+    let mut tags_seen: Vec<&str> = Vec::new();
+    for (f, _) in &fams { for t in &f.tags { if HARVEST.iter().any(|(h, _)| h == t) && !tags_seen.contains(&t.as_str()) { tags_seen.push(t) } } }
+    for t in tags_seen {
+        let name = HARVEST.iter().find(|(h, _)| *h == t).map(|(_, n)| *n).unwrap_or(t);
+        let h = simulate_all(&roll, TRIALS, Roll { magic: false, tag: Some(t) }, None, &all);
+        out.push(way("Reroll", format!("Harvest reforge: {name}"), h, None, format!("Rerolls a rare keeping at least one {} mod (costs lifeforce)", name.to_lowercase())));
+    }
+    // Essences: one target guaranteed, the rest have to roll.
+    let groups: HashMap<&str, usize> = roll.iter().map(|(i, _, _, g)| (d.mods[*i].group.as_str(), *g)).collect();
+    let by_name: HashMap<&str, &RawMod> = d.mods.iter().map(|m| (m.id.as_str(), m)).collect();
+    let class = &p.class;
+    for (n, (f, t)) in fams.iter().enumerate() {
+        for e in f.essences.iter().filter(|e| e.like_tier.is_some_and(|x| x <= *t)).take(1) {
+            let Some(raw) = d.essences.iter().find(|r| r.name == e.name).and_then(|r| r.mods.get(class)).and_then(|id| by_name.get(id.as_str())) else { continue };
+            let rest = sets(&roll, Some(n));
+            let x = if rest.is_empty() { 1.0 } else { simulate_all(&roll, TRIALS, RARE, Some((raw.gen == "p", groups.get(raw.group.as_str()).copied())), &rest) };
+            out.push(way("Reroll", e.name.clone(), x, e.price, format!("Always gives {}; the others have to roll", e.text.replace('\n', " / "))));
+        }
+    }
+    // Fossils that help any target and block none.
+    let blocked = |fo: &RawFossil| fams.iter().any(|(f, _)| f.fossils_none.contains(&fo.name));
+    let helpful: Vec<&RawFossil> = d.fossils.iter().filter(|fo| !blocked(fo) && fams.iter().any(|(f, _)| f.fossils_more.contains(&fo.name))).collect();
+    let mut combos: Vec<Vec<&RawFossil>> = helpful.iter().map(|f| vec![*f]).collect();
+    for (a, f) in helpful.iter().enumerate() { for g in helpful.iter().skip(a + 1) { combos.push(vec![*f, *g]); } }
+    let mut tried: Vec<Way> = combos.into_iter().take(10).map(|fs| {
+        let pool = rollable(&tags, ilvl, &fs);
+        let x = simulate_all(&pool, TRIALS, RARE, None, &sets(&pool, None));
+        let res = ["Primitive Chaotic Resonator", "Potent Chaotic Resonator", "Powerful Chaotic Resonator", "Prime Chaotic Resonator"][fs.len() - 1];
+        let each: Option<f64> = fs.iter().map(|f| price(&f.name)).chain(std::iter::once(price(res))).sum();
+        way("Reroll", fs.iter().map(|f| f.name.as_str()).collect::<Vec<_>>().join(" + "), x, each, format!("Rerolls a rare with these fossils in a {res}"))
+    }).filter(|w| w.chance > 0.0).collect();
+    tried.sort_by(|a, b| a.average.unwrap_or(f64::MAX).partial_cmp(&b.average.unwrap_or(f64::MAX)).unwrap_or(std::cmp::Ordering::Equal));
+    out.extend(tried.into_iter().take(3));
+    out.sort_by(|a, b| a.average.unwrap_or(f64::MAX).partial_cmp(&b.average.unwrap_or(f64::MAX)).unwrap_or(std::cmp::Ordering::Equal)
+        .then(b.chance.partial_cmp(&a.chance).unwrap_or(std::cmp::Ordering::Equal)));
+    out
+}
 /// Chance one added mod (Exalted / Regal / Augmentation) is a target: its weight over everything that can still go on.
 fn add_one(pool: &[(usize, f64, bool, usize)], used: &HashSet<usize>, pre: i32, suf: i32, side_max: i32, is_target: &dyn Fn(&usize) -> bool) -> f64 {
     let open: Vec<&(usize, f64, bool, usize)> = pool.iter().filter(|(_, _, p, g)| !used.contains(g) && if *p { pre < side_max } else { suf < side_max }).collect();
@@ -245,37 +364,45 @@ pub fn pool(base: &str, ilvl: u32, influences: &[String], have: &[String], price
     let mut fams: Vec<Family> = Vec::new();
     let mut by_key: HashMap<String, usize> = HashMap::new();
     let mut shapes: HashMap<String, usize> = HashMap::new();
-    let mut members: Vec<Vec<usize>> = Vec::new();
+    let mut members: Vec<Vec<(usize, f64)>> = Vec::new();
     // Whole-mod wording (both lines of a hybrid) -> family, for bench and essence mods.
     let mut whole: HashMap<String, usize> = HashMap::new();
+    // Each influence's tags, for mods only an influenced item can roll.
+    let each_influence: Vec<(&str, HashSet<String>)> = INFLUENCE_TAGS.iter().filter_map(|(n, _)| Some((*n, tagset(base, &[n.to_string()])?.1))).collect();
+    let mut needs_of: HashMap<usize, String> = HashMap::new();
     for (i, m) in d.mods.iter().enumerate() {
-        if !m.src.is_empty() || weight(m, &tags) <= 0.0 { continue }
+        if !m.src.is_empty() { continue }
+        let (w, needs) = if weight(m, &tags) > 0.0 { (weight(m, &tags), influence_of(m, &tags)) }
+            else if let Some((n, t)) = each_influence.iter().find(|(_, t)| weight(m, t) > 0.0) { (weight(m, t), Some(n.to_string())) }
+            else { continue };
         let key = format!("{}|{}", m.gen, m.r#type);
         let f = *by_key.entry(key.clone()).or_insert_with(|| {
             fams.push(Family { key, affix: if m.gen == "p" { "prefix" } else { "suffix" }.into(), text: String::new(), tags: m.tags.clone(),
-                tiers: vec![], chaos: 0.0, have: None, essences: vec![], bench: vec![], fossils_more: vec![], fossils_none: vec![] });
+                tiers: vec![], chaos: 0.0, have: None, essences: vec![], bench: vec![], fossils_more: vec![], fossils_none: vec![], needs: None });
             members.push(vec![]);
             fams.len() - 1
         });
-        members[f].push(i);
+        members[f].push((i, w));
+        if let Some(n) = needs { needs_of.insert(f, n); }
         for line in m.text.lines() { shapes.entry(shape(line)).or_insert(f); }
         whole.entry(shape(&m.text)).or_insert(f);
     }
     for (f, ids) in members.iter().enumerate() {
         let mut ids = ids.clone();
-        ids.sort_by(|a, b| d.mods[*b].lvl.cmp(&d.mods[*a].lvl));
+        ids.sort_by(|a, b| d.mods[b.0].lvl.cmp(&d.mods[a.0].lvl));
         let fam = &mut fams[f];
-        fam.tiers = ids.iter().enumerate().map(|(n, i)| { let m = &d.mods[*i];
-            Tier { tier: n as u32 + 1, name: m.name.clone(), lvl: m.lvl, text: m.text.clone(), weight: weight(m, &tags), ok: m.lvl <= ilvl } }).collect();
+        fam.needs = needs_of.get(&f).cloned();
+        fam.tiers = ids.iter().enumerate().map(|(n, (i, w))| { let m = &d.mods[*i];
+            Tier { tier: n as u32 + 1, name: m.name.clone(), lvl: m.lvl, text: m.text.clone(), weight: *w, ok: m.lvl <= ilvl } }).collect();
         fam.text = fam.tiers.iter().find(|t| t.ok).or(fam.tiers.last()).map(|t| t.text.clone()).unwrap_or_default();
-        fam.chaos = ids.iter().map(|i| counts.get(i).copied().unwrap_or(0)).sum::<u32>() as f64 / TRIALS as f64;
+        fam.chaos = ids.iter().map(|(i, _)| counts.get(i).copied().unwrap_or(0)).sum::<u32>() as f64 / TRIALS as f64;
     }
     // Bench and essence mods: on the family with the same wording, or a family of their own ("bench only").
     let attach = |m: &RawMod, fams: &mut Vec<Family>, shapes: &mut HashMap<String, usize>| -> usize {
         let s = shape(&m.text);
         if let Some(&f) = shapes.get(&s) { return f }
         fams.push(Family { key: format!("{}|{}", m.gen, m.r#type), affix: if m.gen == "p" { "prefix" } else { "suffix" }.into(), text: m.text.clone(),
-            tags: m.tags.clone(), tiers: vec![], chaos: 0.0, have: None, essences: vec![], bench: vec![], fossils_more: vec![], fossils_none: vec![] });
+            tags: m.tags.clone(), tiers: vec![], chaos: 0.0, have: None, essences: vec![], bench: vec![], fossils_more: vec![], fossils_none: vec![], needs: None });
         shapes.insert(s, fams.len() - 1);
         fams.len() - 1
     };
@@ -303,16 +430,30 @@ pub fn pool(base: &str, ilvl: u32, influences: &[String], have: &[String], price
         // Best bench craft first.
         fam.bench.sort_by(|a, b| first_top(&b.text).unwrap_or(0.0).partial_cmp(&first_top(&a.text).unwrap_or(0.0)).unwrap_or(std::cmp::Ordering::Equal));
     }
-    // What the item has now.
-    for line in have {
+    // What the item has now. Catalyst quality first: "quality|Life and Mana|20" (see `start`).
+    let quality: Option<(Vec<&str>, f64)> = have.iter().find_map(|l| {
+        let mut p = l.strip_prefix("quality|")?.split('|');
+        let kind = p.next()?;
+        let pct: f64 = p.next()?.parse().ok()?;
+        let tags: Vec<&str> = match kind { "Life and Mana" => vec!["life", "mana"], "Attribute" => vec!["attribute"], "Resistance" => vec!["resistance"],
+            "Defence" => vec!["defences"], "Elemental Damage" => vec!["elemental_damage", "elemental"], "Physical and Chaos Damage" => vec!["physical_damage", "chaos_damage"],
+            "Caster" => vec!["caster"], "Attack" => vec!["attack"], "Speed" => vec!["speed"], "Critical" => vec!["critical"], _ => vec![] };
+        Some((tags, pct))
+    });
+    let mut item_mods = Vec::new();
+    for line in have.iter().filter(|l| !l.starts_with("quality|")) {
         let s = shape(line);
         let affix = if line.starts_with("prefix|") { Some("prefix") } else if line.starts_with("suffix|") { Some("suffix") } else { None };
         // Same wording as a prefix and a suffix (Item Rarity): the item says which.
         let own = affix.and_then(|a| fams.iter().position(|f| f.affix == a && f.tiers.iter().any(|t| t.text.lines().any(|l| shape(l) == s))));
-        if let Some(f) = own.or_else(|| shapes.get(&s).copied()) {
-            let v = first_top(shape_strip(line).trim_start_matches(['+', '-']));
+        let found = own.or_else(|| shapes.get(&s).copied());
+        if let Some(f) = found {
+            let boost = quality.as_ref().filter(|(t, _)| fams[f].tags.iter().any(|x| t.contains(&x.as_str()))).map(|(_, p)| 1.0 + p / 100.0).unwrap_or(1.0);
+            let v = first_top(shape_strip(line).trim_start_matches(['+', '-'])).map(|v| (v / boost).floor());
             fams[f].have = Some(v.and_then(|v| fams[f].tiers.iter().find(|t| first_bottom(&t.text).is_some_and(|b| b <= v)).map(|t| t.tier)).unwrap_or(0));
         }
+        item_mods.push(ItemMod { text: shape_strip(line).to_string(), affix: affix.map(String::from).or_else(|| found.map(|f| fams[f].affix.clone())),
+            tier: found.and_then(|f| fams[f].have).filter(|t| *t > 0), key: found.map(|f| fams[f].key.clone()), needs: found.and_then(|f| fams[f].needs.clone()) });
     }
     // Armour pieces: the bench and essences only add a defence the base has (no Evasion crafts on a pure Armour helmet).
     let (_, _, base_tags) = &d.bases[base];
@@ -326,7 +467,7 @@ pub fn pool(base: &str, ilvl: u32, influences: &[String], have: &[String], price
     }
     fams.retain(|f| !f.text.is_empty());
     fams.sort_by(|a, b| a.affix.cmp(&b.affix).then(b.chaos.partial_cmp(&a.chaos).unwrap_or(std::cmp::Ordering::Equal)));
-    Some(Pool { base: base.to_string(), class, ilvl, influences: influences.to_vec(), families: fams })
+    Some(Pool { base: base.to_string(), class, ilvl, influences: influences.to_vec(), families: fams, item_mods })
 }
 
 /// The ways to get one family at `min_tier` or better (1 = best), cheapest first. `have` = the item's mod lines and
@@ -346,6 +487,21 @@ pub fn ways(base: &str, ilvl: u32, influences: &[String], key: &str, min_tier: u
     let mut out = Vec::new();
     let roll = rollable(&tags, ilvl, &[]);
     let natural = !fam.tiers.is_empty() && fam.tiers.iter().any(|t| t.ok && t.tier <= min_tier);
+    // Needs an influence the item doesn't have: a conqueror / Shaper / Elder Exalted Orb adds it with one of its mods.
+    if let Some(n) = fam.needs.as_ref().filter(|n| !influences.contains(n)) {
+        let inf = [n.clone()];
+        let Some((_, itags)) = tagset(base, &inf) else { return vec![] };
+        let ipool = rollable(&itags, ilvl, &[]);
+        let plain: HashSet<usize> = roll.iter().map(|(i, ..)| *i).collect();
+        let only: Vec<(usize, f64, bool, usize)> = ipool.iter().filter(|(i, ..)| !plain.contains(i)).copied().collect();
+        let orb = format!("{n}'s Exalted Orb");
+        let x = add_one(&only, &HashSet::new(), 0, 0, 3, &is_target);
+        out.push(way("Add a mod", orb.clone(), x, cost(&orb), format!("Makes a non-influenced rare {n} and adds one {n} mod (needs a free {} slot)", fam.affix)));
+        let c = hit(&simulate(&ipool, TRIALS));
+        out.push(way("Reroll", format!("Chaos Orb on a {n} item"), c, cost("Chaos Orb"), format!("Once the item is {n}, Chaos Orbs can roll it too")));
+        out.sort_by(|a, b| a.average.unwrap_or(f64::MAX).partial_cmp(&b.average.unwrap_or(f64::MAX)).unwrap_or(std::cmp::Ordering::Equal));
+        return out;
+    }
 
     // What the item has now: groups taken, prefixes / suffixes used.
     let groups: HashMap<&str, usize> = roll.iter().map(|(i, _, _, g)| (d.mods[*i].group.as_str(), *g)).collect();
@@ -452,7 +608,14 @@ pub fn start(text: &str) -> Option<Start> {
     let item = crate::item::parse_item(text)?;
     let base = find_base(&item.base_type)?;
     let have = crate::trade::mods(text).into_iter().filter(|m| m.kind == "explicit" || m.kind == "crafted" || m.kind == "fractured")
-        .map(|m| match m.affix.as_deref() { Some(a @ ("prefix" | "suffix")) => format!("{a}|{}", m.text), _ => m.text }).collect();
+        .map(|m| match m.affix.as_deref() { Some(a @ ("prefix" | "suffix")) => format!("{a}|{}", m.text), _ => m.text }).collect::<Vec<_>>();
+    // Catalyst quality ("Quality (Life and Mana Modifiers): +20%") raises those mods' numbers: passed on so tiers are read right.
+    let mut have = have;
+    if let Some(l) = text.lines().find(|l| l.starts_with("Quality (")) {
+        if let (Some(kind), Some(pct)) = (l.split('(').nth(1).and_then(|s| s.split(" Modifiers").next()), l.split('+').nth(1).and_then(|s| s.split('%').next()).and_then(|s| s.trim().parse::<f64>().ok())) {
+            have.push(format!("quality|{kind}|{pct}"));
+        }
+    }
     Some(Start { base, ilvl: item.item_level.unwrap_or(84), influences: item.influences.clone(), have,
         name: item.name.clone().unwrap_or_else(|| item.base_type.clone()), rarity: item.rarity.clone() })
 }
@@ -497,10 +660,30 @@ mod tests {
         assert!(int.have.is_some());
         // Shaper helmets can roll "Socketed Gems are Supported by…"; plain ones can't.
         let sh = pool("Eternal Burgonet", 85, &["Shaper".into()], &[], &none).unwrap();
-        assert!(sh.families.len() > p.families.len());
+        // ...but they're listed on a plain one too, marked as needing Shaper, with no Chaos odds.
+        let plain = p.families.iter().find(|f| f.needs.as_deref() == Some("Shaper")).expect("shaper mods listed");
+        assert_eq!(plain.chaos, 0.0);
+        assert!(sh.families.iter().any(|f| f.key == plain.key && f.chaos > 0.0));
         // Chances of all mods add up to the 4–6 mods a rare gets.
         let sum: f64 = p.families.iter().map(|f| f.chaos).sum();
         assert!((sum - 4.4).abs() < 0.3, "{sum}");
+    }
+
+    #[test]
+    fn plan_and_influence() {
+        let price = |n: &str| match n { "Chaos Orb" => Some(1.0), _ => Some(2.0) };
+        let p = pool("Eternal Burgonet", 85, &[], &[], &price).unwrap();
+        let life = p.families.iter().find(|f| f.text.contains("to maximum Life") && f.affix == "prefix" && !f.tiers.is_empty() && f.needs.is_none()).unwrap();
+        let cold = p.families.iter().find(|f| f.text.contains("to Cold Resistance") && !f.text.contains(" and ") && f.needs.is_none()).unwrap();
+        let one = ways("Eternal Burgonet", 85, &[], &life.key, 3, &[], "", &price).into_iter().find(|w| w.method == "Chaos Orb").unwrap().chance;
+        let both = plan("Eternal Burgonet", 85, &[], &[(life.key.clone(), 3), (cold.key.clone(), 3)], &price);
+        let c = both.iter().find(|w| w.method == "Chaos Orb").unwrap().chance;
+        assert!(c > 0.0 && c < one, "{c} vs {one}");
+        assert!(both.iter().any(|w| w.method.contains("Essence of") && w.chance > c), "{both:?}");
+        // A Shaper-only mod on a plain helmet: the Shaper's Exalted Orb route.
+        let sh = p.families.iter().find(|f| f.needs.as_deref() == Some("Shaper")).unwrap();
+        let w = ways("Eternal Burgonet", 85, &[], &sh.key, 99, &[], "", &price);
+        assert!(w.iter().any(|w| w.method == "Shaper's Exalted Orb" && w.chance > 0.0), "{w:?}");
     }
 
     #[test]

@@ -223,7 +223,7 @@ export default function App() {
         <div className="side-foot muted small">In game: <b>F2</b> edit item · <b>F4</b> reload · <b>F6</b> build<br />Here: <b>Ctrl+F</b> find · <b>Ctrl+1–9</b> pages · <b>Alt+←</b> back</div>
       </aside>
 
-      <main className="content">
+      <main className={`content ${tab === "craft" ? "wide" : ""}`}>
         <UpdateBar />
         <ErrorBoundary key={tab}>
         <div key={tab} className="page-in">

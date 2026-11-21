@@ -5,3 +5,4 @@ src-tauri/gen
 public/_tiers.json
 public/_craft_pool.json
 public/_craft_ways.json
+public/_craft_start.json

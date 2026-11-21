@@ -7,7 +7,15 @@ fn main() {
     let want = a.next().unwrap_or_default();
     let infl: Vec<String> = a.collect();
     let price = |n: &str| match n { "Chaos Orb" => Some(1.0), _ => None };
-    let p = filter_core::craft::pool(&base, ilvl, &infl, &[], &price).expect("base known");
+    // CRAFT_ITEM=file: an item's copied text, so its mods are marked (and saved for the preview's "Use a copied item").
+    let item = std::env::var("CRAFT_ITEM").ok().and_then(|f| std::fs::read_to_string(f).ok());
+    let start = item.as_deref().and_then(filter_core::craft::start);
+    let have = start.as_ref().map(|s| s.have.clone()).unwrap_or_default();
+    let p = filter_core::craft::pool(&base, ilvl, &infl, &have, &price).expect("base known");
+    if let (Ok(dir), Some(s)) = (std::env::var("CRAFT_JSON"), &start) {
+        std::fs::write(format!("{dir}/_craft_start.json"), serde_json::to_string(s).unwrap()).unwrap();
+    }
+    for m in &p.item_mods { println!("ITEM {:?} T{:?} {} -> {:?}", m.affix, m.tier, m.text, m.key); }
     // CRAFT_JSON=dir: also save the pool and one mod's ways for the page preview (preview-app.tsx).
     if let Ok(dir) = std::env::var("CRAFT_JSON") {
         std::fs::write(format!("{dir}/_craft_pool.json"), serde_json::to_string(&p).unwrap()).unwrap();
