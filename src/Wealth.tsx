@@ -284,11 +284,16 @@ export default function Wealth() {
       {(!connected || showSetup) && (
         <div className="card">
           <h2>Connect your stash</h2>
-          <p className="muted small">The wealth tracker reads your stash tabs from pathofexile.com, the same way tools like Acquisition do.
-            It needs your account name and your <b>POESESSID</b>, the cookie that keeps you logged in on pathofexile.com.
-            It's saved on this PC only and only ever sent to pathofexile.com. Treat it like a password: never paste it anywhere else.</p>
+          <p className="muted small">The wealth tracker reads your stash tabs from pathofexile.com to value them. Path of Exile isn't
+            taking new apps for its "Sign in with Path of Exile" button yet, so it uses your website login code, <b>POESESSID</b>,
+            like Acquisition and Exilence do.</p>
+          <ul className="w-safe small">
+            <li>Saved on this PC only, and only ever sent to pathofexile.com.</li>
+            <li>The app only reads your stash. Treat the code like a password: never paste it anywhere else.</li>
+            <li>Log out of pathofexile.com any time to cancel it; paste a new one after logging back in.</li>
+          </ul>
           <ol className="muted small w-steps">
-            <li>Log in on pathofexile.com in your browser.</li>
+            <li>Log in on pathofexile.com in your browser: <button className="link small" onClick={() => invoke("open_url", { url: "https://www.pathofexile.com/login" })}>open pathofexile.com</button></li>
             <li>Press F12, open <b>Application</b> (Chrome/Edge) or <b>Storage</b> (Firefox), then <b>Cookies → pathofexile.com</b>.</li>
             <li>Copy the value next to <b>POESESSID</b> and paste it below. Logging out of the website ends it; just paste a new one.</li>
           </ol>

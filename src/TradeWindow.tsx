@@ -970,7 +970,7 @@ export default function TradeWindow() {
       {reporting == null && (
         <button className="link small tw-report-toggle" onClick={() => { setReporting(""); setReported(""); }}
           title="Saves this price check with your note, so Claude can see exactly what went wrong">
-          {reported ? "✓ Saved: mention it to Claude in chat" : "Something's wrong?"}</button>
+          {reported ? "✓ Report saved" : "Something's wrong?"}</button>
       )}
       </div>}
       </div>
@@ -981,7 +981,7 @@ export default function TradeWindow() {
             .then(() => { setReporting(null); setReported("ok"); }).catch((er) => setErr(friendly(er))); }}>
           <textarea className="text" autoFocus rows={2} value={reporting} onChange={(e) => setReporting(e.target.value)}
             placeholder="What looks wrong? e.g. price too high, wrong mod ticked" />
-          <div className="row"><button type="submit">Save for Claude</button>
+          <div className="row"><button type="submit">Save report</button>
             <button type="button" className="link small" onClick={() => setReporting(null)}>Cancel</button></div>
         </form>
       )}

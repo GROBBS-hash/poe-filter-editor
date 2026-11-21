@@ -155,9 +155,9 @@ export default function Edits({ profile, onChange, focus }: { profile: ProfileIn
         <h2>Edits in “{profile.name}” <Tip>Every change you've made to this filter. Newer edits win over older ones.
           Edit or Remove any of them; History lets you go back to before a change. Rebuild re-applies everything
           (you rarely need it: NeverSink updates do this automatically).</Tip></h2>
-        <button onClick={rebuild} title="Use after downloading a new filter file">Rebuild</button>
+        <button onClick={rebuild} title="Puts all your edits back on top of the filter file. Rarely needed: NeverSink updates do this by themselves.">Rebuild filter</button>
       </div>
-      <p className="muted small">Press <b>F4</b> in game to load “{profile.output_file.replace(".filter", "")}”.</p>
+      <p className="muted small">Press <b>F4</b> in game to load {profile.output_file ? <>“{profile.output_file.replace(".filter", "")}”</> : "this filter"}.</p>
       {unused > 0 && <div className="warn-line">{unused} edit{unused > 1 ? "s" : ""} never apply because a newer edit covers them (marked below).</div>}
 
       {profile.rules.length === 0 ? (

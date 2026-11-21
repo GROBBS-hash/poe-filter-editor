@@ -65,7 +65,7 @@ export default function SettingsPage() {
           <span>Reload your filter in game</span><KeyBox value={s.key_reload} onChange={(k) => set({ key_reload: k })} />
           <span>Show/hide your build (PoB)</span><KeyBox value={s.key_build ?? "F6"} onChange={(k) => set({ key_build: k })} />
           <span>Price check the item under your mouse</span><KeyBox value={s.key_price ?? "Ctrl+D"} onChange={(k) => set({ key_price: k })} />
-          <span>Show/hide your atlas strategy (Endgame → Atlas)</span><KeyBox value={s.key_atlas ?? "F7"} onChange={(k) => set({ key_atlas: k })} />
+          <span>Show/hide your atlas strategy (Atlas page)</span><KeyBox value={s.key_atlas ?? "F7"} onChange={(k) => set({ key_atlas: k })} />
           <label className="check"><input type="checkbox" checked={s.cycle_enabled} onChange={(e) => set({ cycle_enabled: e.target.checked })} />
             <span>Switch to your next filter (e.g. League Start → Strict 1 → Strict 2) and load it</span></label>
           <KeyBox value={s.key_cycle} disabled={!s.cycle_enabled} onChange={(k) => set({ key_cycle: k })} />
@@ -156,7 +156,7 @@ function PriceLook() {
   return (
     <div className="tw-look-pick">
       <h3>Look of the price window</h3>
-      <p className="muted small">Try them for a while: the "Style" button at the bottom of the price window switches too.</p>
+      <p className="muted small">Try them for a while: "More" at the bottom of the price window has Style and Layout too.</p>
       <div className="tw-looks">
         {TW_STYLES.map(([k, name, what]) => (
           <button key={k} className={`tw-look ${v === k ? "sel" : ""}`} onClick={() => pick(k)} title={what}>

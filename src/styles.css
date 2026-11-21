@@ -1911,3 +1911,18 @@ kbd { font: 600 11px/1.4 "Segoe UI", system-ui, sans-serif; color: var(--text-2)
 .batch-win { padding: 8px 10px; cursor: move; min-width: 220px; }
 .batch-win .win-bar.compact { margin: -8px -10px 6px; }
 .batch-win-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Readability pass (design review, 21 Nov 2026): the small grey text was just under readable contrast on every
+   page, faded price-window rows dropped to about 2:1, and a few labels were 9–10px. ─────────────────────────── */
+:root { --muted: #8f98a7; }
+.side-foot, .tiers-gname, .tw-group-hint { color: var(--muted); }
+.tw-stat.junk { opacity: .78; }
+.tw-stat:not(.on) .tw-label, .tw-stat:not(.on) .tw-min { opacity: .74; }
+.tw-stat:not(.on) .tw-tag { opacity: .78; }
+.menu-key { font-size: 11px; }
+.gem-lvl { font-size: 11px; }
+.tiers-ico-badge { font-size: 10.5px; }
+.tw-cmp th, .qm.tw th { font-size: 11px; }
+.qm-where { font-size: 12px; }
+.w-safe { margin: 4px 0 8px; padding-left: 18px; color: var(--text-2); line-height: 1.6; }
+.w-safe li::marker { content: "✓  "; color: var(--green); }

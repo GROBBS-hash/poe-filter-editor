@@ -25,8 +25,8 @@ export const FAQ: Faq[] = [
   {
     q: "Price check an item",
     a: <>Hover the item in game and press <b>Ctrl+D</b>. The price window shows what it sells for, with the stats that matter
-      already ticked. Change the ticks or minimums and move your mouse onto <b>Search</b> to look again. The <b>Style</b> button
-      at the bottom switches how the window looks.</>,
+      already ticked. Change the ticks or minimums and move your mouse onto <b>Search</b> to look again. <b>More</b> at the
+      bottom has Style and Layout, to change how the window looks.</>,
   },
   {
     q: "Work out how to craft a mod",
@@ -87,7 +87,8 @@ export const FAQ: Faq[] = [
   },
 ];
 
-export default function Help({ go, start = 0 }: { go: Go; start?: number }) {
+export default function Help({ go, start = 0, keys = {} }: { go: Go; start?: number; keys?: Record<string, string> }) {
+  const k = (id: string, d: string) => keys[id] || d;
   const [open, setOpen] = useState<number | null>(start);
   return (
     <div className="card">
@@ -105,8 +106,9 @@ export default function Help({ go, start = 0 }: { go: Go; start?: number }) {
           </li>
         ))}
       </ul>
-      <p className="muted small">Hotkeys (change them in Settings): F2 edit the item under your mouse · Ctrl+D price check · F3 batch mode ·
-        F4 load/reload this filter in game · F6 your build · F7 atlas strategy.</p>
+      <p className="muted small">Your hotkeys (change them in Settings): {k("key_quick_edit", "F2")} edit the item under your mouse ·
+        {" "}{k("key_price", "Ctrl+D")} price check · {k("key_batch", "F3")} batch mode · {k("key_reload", "F4")} load/reload this filter in game ·
+        {" "}{k("key_build", "F6")} your build · {k("key_atlas", "F7")} atlas strategy.</p>
     </div>
   );
 }

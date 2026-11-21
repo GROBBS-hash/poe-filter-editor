@@ -77,7 +77,7 @@ export default function Setup({ ov, onDone, onCancel }: { ov: Overview; onDone: 
       {step === 1 && (
         <div className="card">
           <h2>What should it start from?</h2>
-          <p className="muted small">Your edits go on top of this. It's never changed, and you can switch later in Profiles.</p>
+          <p className="muted small">Your edits go on top of this. It's never changed, and you can switch later on the Filters page.</p>
 
           <label className={`choice ${start.kind === "neversink" ? "on" : ""}`}>
             <input type="radio" checked={start.kind === "neversink"} onChange={() => setStart({ kind: "neversink", level: 2 })} />

@@ -311,7 +311,7 @@ export default function App() {
       {tab === "settings" && <SettingsPage />}
       {tab === "home" && <Home profile={active} keys={keys} go={(t) => setTab(t as Tab)} search={() => setSearching(true)} />}
       {tab === "find" && <Find onChange={refresh} pick={findPick} />}
-      {tab === "help" && <Help key={helpStart} start={helpStart} go={(t) => setTab(t as Tab)} />}
+      {tab === "help" && <Help key={helpStart} start={helpStart} keys={keys} go={(t) => setTab(t as Tab)} />}
       {tab === "gear" && <Gear />}
       {tab === "build" && <MyBuild />}
       {tab === "maps" && <Maps />}
