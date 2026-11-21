@@ -309,6 +309,10 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   elemental total and hidden, and the chaos total was skipped (bench craft only), so chaos vanished. Now the chaos
   total shows, unticked (trade_rules: bench_only).
 
+- Local stats 21 Nov (0.2.30): armour/weapons tried the site's "(Local)" stat first for every mod, so ES on a staff
+  (Xirgil's Crank) and attack speed on gloves searched stats those items can't have. `local_fits` (trade.rs): weapons use
+  local only for non-defence mods, armour only for non-weapon (damage/speed/crit/accuracy) mods.
+
 - Flask quality + jewels 21 Nov (0.2.28): `prop.quality` row (trade_rules `property_filters`) when quality > 20 (not gems or
   maps), ticked on flasks/tinctures, searched as misc_filters.quality. Tiers `KNOWN` lists NeverSink's jewels->generic /
   abyss / cluster / clustereco / special / leveling (only the ones the filter has show).
@@ -643,6 +647,10 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 
 **Crafted chaos (21 Nov, 0.2.18)**
 - [x] (Confirmed 21 Nov.) Ctrl+D on gear with a crafted "X and Chaos Resistances": "+N% total to Chaos Resistance" is there to tick.
+
+**Local stats fix (21 Nov, 0.2.30)**
+- [ ] Ctrl+D on Xirgil's Crank (or any staff/weapon with +maximum Energy Shield): ticked rolls find listings again.
+- [ ] Gloves with "increased Attack Speed" (e.g. Phoenix Clutches) find listings with that roll.
 
 **Flask quality + jewels on Tiers (21 Nov, 0.2.28)**
 - [ ] Ctrl+D on a flask with quality over 20% (e.g. 26%): a ticked "Quality: 26%" row; the search finds 26%+ flasks.

@@ -376,6 +376,19 @@ pub fn category(class: &str) -> Option<&'static str> {
     })
 }
 
+/// Whether a mod can be the item's own ("Local") stat on this kind of item: a weapon's damage, speed and crit, an
+/// armour piece's defences. Energy shield on a staff (Xirgil's Crank, 21 Nov) is the global stat, not armour's local one.
+fn local_fits(category: Option<&str>, text: &str) -> bool {
+    let t = text.to_lowercase();
+    let defence = ["armour", "evasion", "energy shield", "ward"].iter().any(|w| t.contains(w));
+    let weapon = ["damage", "attack speed", "attacks per second", "critical strike chance", "accuracy"].iter().any(|w| t.contains(w));
+    match category {
+        Some(c) if c.starts_with("weapon.") => !defence,
+        Some(c) if c.starts_with("armour.") => !weapon,
+        _ => true,
+    }
+}
+
 /// Mods that usually set an item's price when tiers aren't known.
 const VALUABLE: &[&str] = &["to Level of", "Movement Speed", "Spell Damage", "Critical Strike Multiplier", "increased Physical Damage",
     "Attack Speed", "Cast Speed", "maximum Energy Shield", "Suppress", "Damage over Time Multiplier", "to Level of all", "Minion",
@@ -423,7 +436,8 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
         // Foulborn uniques' special mods are on the site's "mutated" list.
         // Armour and weapons: "+# to Armour" on the item itself is the site's "+# to Armour (Local)", not the global one
         // (that's for belts and jewels); try the local one first.
-        let local = || index.find(&ModLine { text: format!("{} (Local)", m.text), ..m.clone() }).filter(|_| local_first);
+        let local = || index.find(&ModLine { text: format!("{} (Local)", m.text), ..m.clone() })
+            .filter(|_| local_first && local_fits(category(&item.item_class), &m.text));
         // Foulborn: its mutated mod first, then like any armour/weapon (the local version, 21 Nov: Foulborn Ghostwrithe's
         // "+183 to maximum Energy Shield" went to the global stat and found nothing).
         let found = if foulborn { index.find(&ModLine { kind: "mutated".into(), ..m.clone() }).filter(|(id, _)| id.starts_with("mutated.")).or_else(local).or_else(|| index.find(m)) } else { local().or_else(|| index.find(m)) };
@@ -866,7 +880,7 @@ pub fn buy_query(text: &str, index: &StatIndex) -> Option<(Value, usize)> {
     let local_first = cat.is_some_and(|c| c.starts_with("armour.") || c.starts_with("weapon."));
     let mut stats: Vec<Value> = Vec::new();
     for m in mods(text) {
-        let local = || index.find(&ModLine { text: format!("{} (Local)", m.text), ..m.clone() }).filter(|_| local_first);
+        let local = || index.find(&ModLine { text: format!("{} (Local)", m.text), ..m.clone() }).filter(|_| local_first && local_fits(cat, &m.text));
         // A cluster jewel's "2 Added Passive Skills are Jewel Sockets": comes with its passive count, and asking for it
         // (as enchant or explicit, any number) finds nothing on the trade site (tested 21 Nov, his large lightning
         // cluster: 0 with it, 234 without). Leave it out.
@@ -1201,6 +1215,15 @@ Item Level: 75
         let q = query(&s);
         assert_eq!(q["query"]["name"], "Ghostwrithe");
         assert_eq!(q["query"]["filters"]["misc_filters"]["filters"]["mutated"]["option"], "true");
+    }
+
+    #[test]
+    fn local_only_where_it_fits() {
+        // Energy shield on a staff is the global stat; attack speed on gloves too.
+        assert!(!local_fits(Some("weapon.staff"), "+137 to maximum Energy Shield"));
+        assert!(local_fits(Some("weapon.staff"), "Adds 10 to 20 Physical Damage"));
+        assert!(!local_fits(Some("armour.gloves"), "16% increased Attack Speed"));
+        assert!(local_fits(Some("armour.gloves"), "+50 to maximum Energy Shield"));
     }
 
     #[test]
