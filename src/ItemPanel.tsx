@@ -557,6 +557,9 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
           <span>Only corrupted ones</span>
         </label>
       )}
+      {onlyCorrupted && !replacing && (
+        <div className="qm-hint">Ticking alone saves nothing: now pick a highlight colour (or Hide) above, and it applies to corrupted ones only.</div>
+      )}
 
       {inGame && (
         <label className="qm-check">

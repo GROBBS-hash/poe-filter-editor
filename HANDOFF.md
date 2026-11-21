@@ -648,6 +648,11 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 **Crafted chaos (21 Nov, 0.2.18)**
 - [x] (Confirmed 21 Nov.) Ctrl+D on gear with a crafted "X and Chaos Resistances": "+N% total to Chaos Resistance" is there to tick.
 
+**Corrupted jewels (21 Nov, next release)**
+- [ ] Tiers → Jewels → Jewels: a "Corrupted rare jewels" card; Show them / Hide them / Back to NeverSink's; after F4,
+      corrupted rare Cobalt / Crimson / Viridian jewels show highlighted.
+- [ ] F2 with "Only corrupted ones" ticked: a gold note says to pick a colour or Hide (ticking alone saves nothing).
+
 **Local stats fix (21 Nov, 0.2.30)**
 - [ ] Ctrl+D on Xirgil's Crank (or any staff/weapon with +maximum Energy Shield): ticked rolls find listings again.
 - [ ] Gloves with "increased Attack Speed" (e.g. Phoenix Clutches) find listings with that roll.

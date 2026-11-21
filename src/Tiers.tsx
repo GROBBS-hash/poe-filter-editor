@@ -249,6 +249,9 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
               <div className="note">Each base sits in several rows here (one per item tier), so dragging is off: use the
                 item tier boxes, ticks and looks instead. Top bases are the most valuable to pick up.</div>
             )}
+            {section.group === "Jewels" && section.title === "Jewels" && (
+              <CorruptedJewels onDone={(p, m) => done(p, m)} />
+            )}
             {section.group === "Before maps" && (
               <div className="note">Rules for the campaign, before maps: each row is one step NeverSink shows while you level
                 (most only up to a certain area level). <b>Untick</b> a step to hide it, or change how it looks.</div>
@@ -322,6 +325,41 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
         )}
         {msg && <div className="note">{msg}</div>}
       </div>
+    </div>
+  );
+}
+
+/** The rule "every corrupted rare jewel" (Cobalt, Crimson and Viridian): one switch on the Jewels page, since NeverSink
+ *  hides most rare jewels but corrupted ones can be worth a lot (21 Nov). */
+const CJ_ITEM = { item_class: "Jewels", rarity: "Rare", name: null, base_type: "", item_level: null, stack_size: null, quality: null,
+  sockets: null, map_tier: null, corrupted: true, mirrored: false, unidentified: false };
+const CJ_OPTS = { same_rarity: true, max_item_level: null, corrupted: true };
+const CJ_LABELS = ["Highlight: Corrupted Rare every Jewels", "Hide: Corrupted Rare every Jewels"];
+function CorruptedJewels({ onDone }: { onDone: (p: Promise<unknown>, msg: string) => Promise<void> }) {
+  const [state, setState] = useState<"shown" | "hidden" | "none">("none");
+  const check = () => {
+    Promise.all(CJ_LABELS.map((label) => invoke("get_rule", { id: null, index: null, label }).then(() => true).catch(() => false)))
+      .then(([shown, hidden]) => setState(shown ? "shown" : hidden ? "hidden" : "none"));
+  };
+  useEffect(check, []);
+  const remove = async () => {
+    for (const label of CJ_LABELS) {
+      try { const [id, index] = await invoke<[string, number]>("get_rule", { id: null, index: null, label }); await invoke("delete_rule", { id, index }); } catch { /* not there */ }
+    }
+  };
+  const act = (what: "show" | "hide" | "reset") => onDone((async () => {
+    await remove();
+    if (what !== "reset") await invoke("apply_quick_action", { item: CJ_ITEM, action: what === "show" ? "highlight" : "hide", colour: what === "show" ? "purple" : null, opts: CJ_OPTS });
+  })().finally(check), what === "show" ? "Corrupted rare jewels now show, highlighted." : what === "hide" ? "Corrupted rare jewels hidden." : "Corrupted rare jewels back to NeverSink's.");
+  return (
+    <div className="note cj-card">
+      <span className="with-icon"><ItemIcon base="Cobalt Jewel" size={22} /><b>Corrupted rare jewels</b></span>
+      <span className="muted small">Cobalt, Crimson and Viridian. Corrupted ones can be worth a lot.</span>
+      <span className="cj-btns">
+        <button className={state === "shown" ? "primary" : ""} onClick={() => act("show")}>{state === "shown" ? "✓ Shown" : "Show them"}</button>
+        <button className={state === "hidden" ? "primary" : ""} onClick={() => act("hide")}>{state === "hidden" ? "✓ Hidden" : "Hide them"}</button>
+        {state !== "none" && <button className="link small" onClick={() => act("reset")}>Back to NeverSink's</button>}
+      </span>
     </div>
   );
 }

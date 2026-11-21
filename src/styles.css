@@ -1735,3 +1735,7 @@ h1:has(.tip-body), h2:has(.tip-body), h3:has(.tip-body) { flex-wrap: wrap; }
 .tier { padding: 10px 12px; }
 .tier .chip { background: var(--input); border-color: #2a2f39; }
 .tier .chip:hover { border-color: var(--line-2); }
+.cj-card { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.cj-btns { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+
+.qm-hint { font-size: 12px; color: var(--gold); margin: 2px 0 6px 26px; line-height: 1.4; }
