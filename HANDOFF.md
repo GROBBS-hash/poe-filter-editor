@@ -779,12 +779,22 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
       "low confidence · only N listed" instead of "sells for about" (his Dragon Turn showed 45 div from 1 listing;
       live check: ~55 similar rings, 50c–3 div). Cogwork Ring: mods marked "— 25% Increased" in the advanced copy now
       use the in-game numbers (+46 Int → +57, range 53–62); GROBBS rejected splitting Totals into Resistances / Life.
-- [ ] Wealth: guild stash (21 Nov, branch `guild-stash`, NOT merged or released: waiting for GROBBS to approve).
+- [ ] Wealth: guild stash (21 Nov, approved and released in 0.2.35).
       Wealth page → "Include my guild stash" (off by default: guild items aren't always yours). On: the guild's tabs
       join the tab list as "Guild · <name>" (stored at index 1000+ so they never clash with your own), and scans,
       scan profiles, earnings tabs and Find in stash use them like any other tab. Off: they leave the list, profiles
       and earnings tabs. Checked live 21 Nov: his login reads the guild stash (3 tabs: normal, currency, quad).
       Endpoint: character-window/get-guild-stash-items (same POESESSID and rate limits as get-stash-items).
+- [ ] Design review fixes + main window looks (21 Nov, not released yet). Whole-app impeccable critique scored 28/40
+      (saved in .impeccable/critique/). Done from it: small grey text readable everywhere (--muted lifted), faded
+      price-window rows and roll ranges clearer, no labels under 11px; wording (Setup says Filters, atlas key says
+      Atlas page, "More > Style/Layout", Help shows his own hotkeys, "Rebuild filter", "Save report" not "Save for
+      Claude"); calmer stash sign-in panel. GROBBS kept F2 and the rare price check as they are (Awakened also waits
+      on rares). "Sign in with Path of Exile" (GGG OAuth) isn't possible: GGG isn't taking new app registrations, and
+      guild stash access would need a special request. **Settings → Main window look**: Colourful (old), Calm (plain
+      menu icons, gold for the current page, Home leads with the filter), Tooltip Gold (game tooltip frames, bronze,
+      Fontin headings) and Mono Amber (plain greys, amber accent). Main window only; the overlays keep their own looks.
+      GROBBS is a visual learner: show design options as mock-up pictures.
 
 **Frame + fixes (21 Nov, 0.2.24)**
 - [ ] Editor window: no Windows title bar, a gold one instead; drag it to move, double-click to maximise, the three

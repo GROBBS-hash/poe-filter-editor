@@ -162,7 +162,10 @@ export default function App() {
    *  the page you're on). Kept in localStorage; Settings tells this window with an "app-look" event. */
   const [look, setLook] = useState<string>(() => { try { return localStorage.getItem(APP_LOOK_KEY) || "colourful"; } catch { return "colourful"; } });
   useEffect(() => {
-    document.body.classList.toggle("look-calm", look === "calm");
+    // Tooltip Gold and Mono Amber sit on the Calm layout and add their own colours.
+    document.body.classList.toggle("look-calm", ["calm", "tooltip", "mono"].includes(look));
+    document.body.classList.toggle("look-tooltip", look === "tooltip");
+    document.body.classList.toggle("look-mono", look === "mono");
     const on = (e: Event) => setLook((e as CustomEvent<string>).detail);
     window.addEventListener("app-look", on);
     return () => window.removeEventListener("app-look", on);

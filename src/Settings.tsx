@@ -160,6 +160,8 @@ function MainLook() {
   const looks: [string, string, string][] = [
     ["colourful", "Colourful", "Each page has its own colour in the menu"],
     ["calm", "Calm", "Plain menu icons, gold only for the page you're on; Home leads with your filter"],
+    ["tooltip", "Tooltip Gold", "Like the game's item tooltips: bronze frames, gold headings in the game's lettering"],
+    ["mono", "Mono Amber", "Plain greys with one amber accent, no game lettering in headings"],
   ];
   return (
     <div className="card">

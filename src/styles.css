@@ -1943,3 +1943,55 @@ body.look-calm .home-grid > .home-tile:first-child { grid-column: 1 / -1; min-he
 body.look-calm .home-grid > .home-tile:first-child .home-big { font-size: 22px; }
 body.look-calm .home-reload { background: var(--gold); border-color: var(--gold); color: #1b1e25; font-weight: 700; }
 body.look-calm .home-reload:hover:not(:disabled) { background: #e7c272; }
+
+/* ── Main window looks "Tooltip Gold" and "Mono Amber" (Settings → Main window look, 21 Nov 2026). Both sit on the
+   Calm layout (body.look-calm is set with them); these only change colours, lettering and frames. ─────────── */
+
+/* Tooltip Gold: the game's item tooltips. Warm black, bronze frames, gold headings in the game's lettering. */
+body.look-tooltip {
+  --bg: #0c0a08; --side: #0a0806; --panel: #15110d; --raised: #211a13; --input: #0d0a08;
+  --line: #3a2f22; --line-2: #54432c; --text: #ece3d0; --text-2: #cdc2ab; --muted: #a0957f;
+  --gold: #d9b66e; --gold-bg: rgba(217,182,110,.14);
+}
+body.main.look-tooltip { background: radial-gradient(1100px 520px at 85% -10%, rgba(217,182,110,.07), transparent 60%), var(--bg); }
+body.look-tooltip .side { background: linear-gradient(180deg, #100d0a, var(--side)); }
+body.look-tooltip .menu-item { font-family: var(--game-font); font-size: 14.5px; }
+body.look-tooltip .menu-item.on { background: linear-gradient(180deg, #2a2116, #17120d); color: #ecd59e; box-shadow: inset 0 0 0 1px #54432c, inset 0 1px 0 rgba(236,213,158,.15); }
+body.look-tooltip .menu-gname { font-family: var(--game-font); text-transform: none !important; letter-spacing: .04em !important; font-size: 13px !important; color: var(--muted) !important; }
+body.look-tooltip .menu-gname::after { background: linear-gradient(90deg, #54432c, transparent); }
+body.look-tooltip .content-head h1 { color: #e3c47f; font-weight: 400; font-size: 27px; }
+body.look-tooltip .card { border-radius: 3px; border-color: #4a3a25; background: var(--panel); box-shadow: 0 10px 28px rgba(0,0,0,.35); }
+body.look-tooltip .card > h2:first-child { margin: -18px -20px 14px; padding: 9px 20px 8px; justify-content: center; font-weight: 400; font-size: 17px;
+  color: #e3c47f; letter-spacing: .02em; background: linear-gradient(180deg, #3a2c19, #211910); border-bottom: 1px solid #4a3a25; border-radius: 3px 3px 0 0; }
+body.look-tooltip .card > h2:first-child::before, body.look-tooltip .card > .row-between:first-child > h2::before,
+body.look-tooltip .card > .row:first-child > h2::before { display: none; }
+body.look-tooltip .card > .row-between:first-child > h2, body.look-tooltip .card > .row:first-child > h2 { color: #e3c47f; font-weight: 400; font-size: 17px; }
+body.look-tooltip .home-tile { border-radius: 3px; border-color: #4a3a25; padding-top: 0; }
+body.look-tooltip .home-tile h3 { margin: 0 -18px 8px; padding: 7px 18px 6px; text-align: center; font-family: var(--game-font); font-weight: 400;
+  font-size: 16px; letter-spacing: .02em; text-transform: none; color: #e3c47f; background: linear-gradient(180deg, #3a2c19, #211910); border-bottom: 1px solid #4a3a25; }
+body.look-tooltip .home-keys { border-radius: 3px; border-color: #4a3a25; }
+body.look-tooltip button, body.look-tooltip select, body.look-tooltip .text, body.look-tooltip input { border-radius: 3px; }
+body.look-tooltip button.primary, body.look-tooltip .home-reload { background: linear-gradient(180deg, #e6cc8e, #b48f4c); border-color: #f0dca8; color: #1a1208;
+  font-family: var(--game-font); font-weight: 600; box-shadow: 0 0 0 1px #3a2c19; }
+body.look-tooltip button.primary:hover:not(:disabled), body.look-tooltip .home-reload:hover:not(:disabled) { background: linear-gradient(180deg, #f0d89e, #c39c58); }
+body.look-tooltip .menu-key.game, body.look-tooltip kbd { border-radius: 3px; }
+
+/* Mono Amber: plain greys, one amber accent, no game lettering in headings (item names keep theirs). */
+body.look-mono {
+  --bg: #0e0e0f; --side: #0e0e0f; --panel: #151517; --raised: #1e1e21; --input: #0b0b0c;
+  --line: #26262a; --line-2: #35353b; --text: #ededee; --text-2: #c6c6ca; --muted: #93939a;
+  --gold: #f2b84b; --gold-bg: rgba(242,184,75,.12);
+}
+body.main.look-mono { background: var(--bg); }
+body.look-mono .side { background: var(--side); }
+body.look-mono .content-head h1, body.look-mono .card h2, body.look-mono .tw-sec, body.look-mono .bo-title {
+  font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; font-weight: 650; letter-spacing: -.01em; }
+body.look-mono .card { background: var(--panel); border-radius: 8px; box-shadow: none; }
+body.look-mono .card > h2:first-child::before, body.look-mono .card > .row-between:first-child > h2::before,
+body.look-mono .card > .row:first-child > h2::before { display: none; }
+body.look-mono .home-tile, body.look-mono .home-keys { border-radius: 8px; }
+body.look-mono .menu-gname { color: var(--muted) !important; }
+body.look-mono .menu-gname::after { background: var(--line); }
+body.look-mono button.primary, body.look-mono .home-reload { box-shadow: none; }
+/* Cards without inner padding (the Tiers page's main panel): the tooltip header bar stays inside. */
+body.look-tooltip .tiers-main > .card > h2:first-child { margin: 0 0 14px; }
