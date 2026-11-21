@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- PoE Lodestone: a faceted gold lodestone with a compass needle through it, on a dark rounded tile. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#241d13"/>
+      <stop offset="1" stop-color="#120f0a"/>
+    </linearGradient>
+  </defs>
+  <rect x="32" y="32" width="960" height="960" rx="200" fill="url(#bg)"/>
+  <rect x="32" y="32" width="960" height="960" rx="200" fill="none" stroke="#6b5426" stroke-width="12"/>
+  <g transform="translate(512 515) scale(1.08) translate(-512 -515)">
+  <!-- The stone: six facets round a centre point. -->
+  <g stroke="#2a2012" stroke-width="10" stroke-linejoin="round">
+    <polygon points="512,140 780,330 512,500" fill="#f4d47c"/>
+    <polygon points="780,330 716,768 512,500" fill="#d9a945"/>
+    <polygon points="716,768 512,890 512,500" fill="#9c6e26"/>
+    <polygon points="512,890 308,768 512,500" fill="#b9862f"/>
+    <polygon points="308,768 244,330 512,500" fill="#e2b552"/>
+    <polygon points="244,330 512,140 512,500" fill="#fbe39c"/>
+  </g>
+  <polygon points="512,140 780,330 716,768 512,890 308,768 244,330" fill="none" stroke="#fff0c2" stroke-width="14" stroke-linejoin="round" opacity=".55"/>
+  <!-- Compass needle: dark north half, deep-gold south half. -->
+  <polygon points="512,250 566,500 458,500" fill="#16110a"/>
+  <polygon points="458,500 566,500 512,750" fill="#5c3f14"/>
+  <circle cx="512" cy="500" r="30" fill="#fbe39c" stroke="#16110a" stroke-width="10"/>
+  </g>
+</svg>

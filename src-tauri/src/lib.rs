@@ -2449,7 +2449,7 @@ pub fn run() {
             app.manage(updates::TrayItem(update));
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
-                .tooltip("PoE Filter Editor")
+                .tooltip("PoE Lodestone")
                 .menu(&menu)
                 .on_menu_event(|app, e| match e.id.as_ref() {
                     "open" => {

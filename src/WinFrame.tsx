@@ -68,9 +68,9 @@ export function MainTitleBar() {
         if (e.detail === 2) w.toggleMaximize(); else w.startDragging();
       }}>
       <span className="mt-logo" aria-hidden>
-        <svg viewBox="0 0 24 24" width="15" height="15"><path d="M3 4h18l-7 8v6l-4 2v-8z" fill="currentColor" /></svg>
+        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 2.6l6.6 4.6-1.6 10.9L12 21.4l-5-3.3-1.6-10.9z" fill="currentColor" /><path d="M12 5.6l1.4 6.2L12 18l-1.4-6.2z" fill="#16110a" /></svg>
       </span>
-      <span className="mt-title">PoE Filter Editor</span>
+      <span className="mt-title">PoE Lodestone</span>
       <span className="mt-btns">
         <button className="mt-btn" title="Minimise" onClick={() => w.minimize()}><svg viewBox="0 0 12 12" width="12" height="12"><path d="M2 6.5h8" /></svg></button>
         <button className="mt-btn" title={max ? "Restore" : "Maximise"} onClick={() => w.toggleMaximize()}>

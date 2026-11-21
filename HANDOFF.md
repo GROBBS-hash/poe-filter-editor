@@ -17,6 +17,14 @@ so **commit and push after every change** (end commits with the attribution line
   changes can share one release). `Start editor.bat` / `npm run tauri dev` stays the dev way; don't run both at
   once (hotkeys clash, both write the same settings folder).
 
+## Name and icon (21 Nov 2026)
+The app is now called **PoE Lodestone** on screen: window title, gold title bar (gem symbol in `MainTitleBar`),
+sidebar, tray tooltip, page title. New icon: `app-icon.svg` (gold lodestone + compass needle); regenerate every size
+with `npx tauri icon app-icon.svg`. **Deliberately unchanged:** `productName` ("PoE Filter Editor") and `identifier`
+in tauri.conf.json, so updates keep installing over the same program and settings stay in the same folder. Changing
+productName makes the NSIS installer put a second copy beside the old one; switch it later together with a one-time
+fresh install (uninstall old, install new), and tell GROBBS first. The repo/folder name also stays.
+
 ## Design notes (impeccable plugin, from 21 Nov 2026)
 GROBBS uses the `impeccable` design plugin for UI polish. `PRODUCT.md` (repo root) holds the product facts it reads:
 public release planned, "one app for everything", PoE 1 and PoE 2. No DESIGN.md yet (`/impeccable document` would

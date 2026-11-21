@@ -210,7 +210,7 @@ export default function App() {
     <MainTitleBar />
     <div className="shell">
       <aside className="side">
-        <div className="brand">PoE Filter Editor</div>
+        <div className="brand">PoE Lodestone</div>
         <label className="side-label">Editing</label>
         <select className="profile-pick" value={active.id}
           onChange={async (e) => { await invoke("set_active", { id: e.target.value }); refresh(); }}>

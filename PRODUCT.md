@@ -53,7 +53,8 @@ place. Separate single-purpose tools can't connect these steps.
 
 ## Brand Commitments
 
-- Name: "PoE Filter Editor" (working name; a public name is undecided).
+- Name: "PoE Lodestone" (chosen 21 Nov 2026; was "PoE Filter Editor"). Icon: a faceted gold lodestone with a compass
+  needle, on a dark rounded tile (`app-icon.svg`, source for every icon size via `npx tauri icon app-icon.svg`).
 - The app's existing look borrows from the game (gold title bars, item-card styling, rarity colours). Visual direction
   is recorded in DESIGN.md when documented, not here.
 - Not affiliated with Grinding Gear Games; must not present itself as an official tool.

@@ -1,4 +1,4 @@
-# PoE Filter Editor
+# PoE Lodestone (formerly PoE Filter Editor)
 
 Edit your NeverSink loot filter while you play. Hover an item, press **F2**, click Hide or a colour.
 
