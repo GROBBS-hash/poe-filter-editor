@@ -2047,6 +2047,30 @@ fn related_items(state: State<AppState>, name: String) -> Option<filter_core::re
     filter_core::related::related(prices.get(&game)?, &name)
 }
 
+/// Crafting page: base names for the search box.
+#[tauri::command]
+fn craft_bases() -> Vec<String> { filter_core::craft::base_names() }
+
+/// Crafting page: a copied item's base, item level, influences and mods.
+#[tauri::command]
+fn craft_start(text: String) -> Option<filter_core::craft::Start> { filter_core::craft::start(&text) }
+
+/// Crafting page: what can roll on a base, with essence / bench / fossil options and Chaos Orb odds.
+#[tauri::command]
+async fn craft_pool(state: State<'_, AppState>, base: String, ilvl: u32, influences: Vec<String>, have: Vec<String>) -> Result<Option<filter_core::craft::Pool>, String> {
+    let f = state.prices.lock().unwrap().get(&Game::Poe1).cloned();
+    let price = move |n: &str| f.as_ref().and_then(|f| price_of(f, None, n, ""));
+    tauri::async_runtime::spawn_blocking(move || filter_core::craft::pool(&base, ilvl, &influences, &have, &price)).await.map_err(|e| e.to_string())
+}
+
+/// Crafting page: the ways to get one mod, cheapest first.
+#[tauri::command]
+async fn craft_ways(state: State<'_, AppState>, base: String, ilvl: u32, influences: Vec<String>, key: String, min_tier: u32) -> Result<Vec<filter_core::craft::Way>, String> {
+    let f = state.prices.lock().unwrap().get(&Game::Poe1).cloned();
+    let price = move |n: &str| f.as_ref().and_then(|f| price_of(f, None, n, ""));
+    tauri::async_runtime::spawn_blocking(move || filter_core::craft::ways(&base, ilvl, &influences, &key, min_tier, &price)).await.map_err(|e| e.to_string())
+}
+
 /// What poe.ninja says this item is worth (for the pop-up).
 #[tauri::command]
 fn item_price(state: State<AppState>, item: Item) -> Option<(f64, String)> {
@@ -2444,6 +2468,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             price_build_item, buy_build_item, buy_base_item, trade_untick_one, overview,
+            craft_bases, craft_start, craft_pool, craft_ways,
             create_profile,
             list_filters,
             set_active,

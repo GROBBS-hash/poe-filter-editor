@@ -3,3 +3,5 @@ dist
 target
 src-tauri/gen
 public/_tiers.json
+public/_craft_pool.json
+public/_craft_ways.json

@@ -1427,3 +1427,37 @@ main.content .card h2 { font-size: 19px; font-weight: 500; letter-spacing: .02em
 .worth-line label { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; cursor: pointer; }
 .worth-line .num { width: 70px; }
 .bv-buybase { border: 1px solid rgba(220,178,90,.5); background: transparent; color: var(--gold); }
+
+/* Crafting page */
+.cr-top { align-items: flex-end; gap: 14px; }
+.cr-field { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--muted); }
+.cr-field input { min-width: 240px; }
+.cr-ilvl input { min-width: 0; width: 80px; }
+.cr-infl { margin: 0; gap: 4px; }
+.cr-infl .chip { cursor: pointer; padding: 2px 10px; }
+.cr-coe { margin-left: auto; }
+.cr-paste { width: 100%; min-height: 90px; margin-top: 6px; }
+.cr-item { margin-top: 6px; }
+.cr-body { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+@media (max-width: 1000px) { .cr-body { grid-template-columns: minmax(0, 1fr); } }
+.cr-side { position: sticky; top: 10px; }
+.cr-search { flex: 1; }
+.cr-mod { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 10px; text-align: left; padding: 6px 10px;
+  margin: 2px 0; background: transparent; border: 1px solid transparent; border-radius: 6px; color: #8888ff; cursor: pointer; }
+.cr-mod:hover { background: rgba(136, 136, 255, .07); border-color: var(--line); }
+.cr-mod.on { background: rgba(136, 136, 255, .12); border-color: #4b5aa8; }
+.cr-mod.cr-special { color: #b4b4ff; opacity: .75; }
+.cr-text { display: flex; flex-direction: column; }
+.cr-meta { display: flex; gap: 6px; align-items: center; flex: none; }
+.cr-pill { font-size: 11px; padding: 0 6px; border-radius: 8px; background: var(--raised); color: var(--text-2); border: 1px solid var(--line); }
+.cr-odds { font-size: 12.5px; color: var(--gold); min-width: 70px; text-align: right; }
+.cr-detail h2 { color: #8888ff; }
+.cr-tiers { display: flex; flex-direction: column; gap: 2px; }
+.cr-tier { display: grid; grid-template-columns: 40px 1fr auto; gap: 8px; text-align: left; padding: 3px 8px; font-size: 12.5px;
+  background: transparent; border: 1px solid transparent; border-radius: 5px; color: var(--text-2); cursor: pointer; }
+.cr-tier:hover { border-color: var(--line); }
+.cr-tier.want { background: var(--gold-bg); color: var(--text); }
+.cr-tier.locked { opacity: .45; }
+.cr-way { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 6px 0; background: var(--raised); }
+.cr-way-top { display: flex; justify-content: space-between; gap: 8px; }
+.cr-line { margin: 3px 0; }

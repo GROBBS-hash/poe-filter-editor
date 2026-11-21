@@ -20,8 +20,9 @@ import MyBuild from "./MyBuild";
 import Maps from "./Maps";
 import Wealth from "./Wealth";
 import Atlas from "./Atlas";
+import Craft from "./Craft";
 
-type Tab = "help" | "find" | "presets" | "tiers" | "gear" | "build" | "maps" | "atlas" | "wealth" | "edits" | "prices" | "themes" | "batch" | "profiles" | "settings";
+type Tab = "help" | "find" | "presets" | "tiers" | "gear" | "build" | "maps" | "atlas" | "wealth" | "craft" | "edits" | "prices" | "themes" | "batch" | "profiles" | "settings";
 
 /** Small line icons for the side menu. */
 /** Each page's colour: a tinted tile behind its menu icon (and page title) so the menu is easy to scan. */
@@ -29,7 +30,7 @@ const COLOURS: Record<Tab, string> = {
   find: "#6aa8ff", tiers: "#ff8a65", presets: "#b48cff", themes: "#ff7eb6", prices: "#5fd38a",
   edits: "#4fd1c5", batch: "#ffa95a",
   build: "#7ad0ff", gear: "#f0b45a",
-  maps: "#8bd67a", atlas: "#a78bfa", wealth: "#f5c542",
+  maps: "#8bd67a", atlas: "#a78bfa", wealth: "#f5c542", craft: "#ff9f6b",
   profiles: "#9fb0c8", settings: "#9fb0c8", help: "#6aa8ff",
 };
 
@@ -46,6 +47,7 @@ const ICONS: Record<Tab, string> = {
   maps: "M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14",
   atlas: "M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 3v18M4 7.5l8 4.5 8-4.5",
   wealth: "M4 7h16v12H4zM4 7l2-3h12l2 3M9 12h6",
+  craft: "M14 4l6 6-3 3-6-6zM11 7L4 14l2 2 7-7M6 16l-2 4 4-2M15 15l5 5",
   profiles: "M3 7h6l2 2h10v10H3zM3 7v12",
   settings: "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM19.4 15l1.6 1-2 3.4-1.8-.7a7 7 0 0 1-2 1.2L15 22h-4l-.3-2.1a7 7 0 0 1-2-1.2l-1.8.7-2-3.4 1.6-1a7 7 0 0 1 0-2.4l-1.6-1 2-3.4 1.8.7a7 7 0 0 1 2-1.2L11 2h4l.3 2.1a7 7 0 0 1 2 1.2l1.8-.7 2 3.4-1.6 1a7 7 0 0 1 0 2.4z",
   help: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17h.01",
@@ -71,6 +73,7 @@ const MENU: { group: string; items: { id: Tab; name: string; hint: string }[] }[
     { id: "maps", name: "Maps", hint: "Map regex for your stash, and buy maps you can run" },
     { id: "atlas", name: "Atlas", hint: "Atlas strategies from maxroll or pathofexile.com, in game with F7" },
     { id: "wealth", name: "Wealth", hint: "Stash worth, things worth selling, earnings per strategy" },
+    { id: "craft", name: "Crafting", hint: "What can roll on a base, and the cheapest way to get the mod you want" },
   ] },
   { group: "App", items: [
     { id: "profiles", name: "Filters", hint: "Your filters, strictness and NeverSink version" },
@@ -239,6 +242,7 @@ export default function App() {
       {tab === "maps" && <Maps />}
       {tab === "atlas" && <Atlas />}
       {tab === "wealth" && <Wealth />}
+      {tab === "craft" && <Craft />}
       {tab === "tiers" && <Tiers profile={active} onChange={refresh} focus={focus?.kind === "neversink" ? focus : null} />}
       {tab === "presets" && <Find key="presets" view="presets" onChange={refresh} />}
       {tab === "batch" && <Batch on={ov.batch_on} onChange={refresh} />}

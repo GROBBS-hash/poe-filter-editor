@@ -7,6 +7,7 @@ import { CurrencyIcon, ItemIcon } from "./icons";
 import BaseUniques from "./BaseUniques";
 import RelatedItems from "./RelatedItems";
 import { Item, RARITY_COLOUR, itemTitle } from "./types";
+import { CRAFT_ITEM_KEY } from "./Craft";
 
 type StatFilter = { id: string; label: string; value: number; min: number | null; enabled: boolean; kind: string; tier: number | null; junk?: boolean; roll?: number | null; range?: string | null; affix?: string | null };
 type Setup = { item: Item; filters: StatFilter[]; unknown_kinds?: string[]; base_only: boolean; ilvl_min: number | null; ilvl_max?: number | null; links_min: number | null;
@@ -722,6 +723,11 @@ export default function TradeWindow() {
         </div>
       )}
       {res && res.url && <button className="link small tw-open-site" onClick={() => invoke("open_url", { url: res.url })}>Open on the trade site</button>}
+      {/* Gear you can craft on: open the Crafting page with this item (shared localStorage, see Craft.tsx). */}
+      {check.setup?.raw && check.setup.item.rarity !== "Unique" && /^(armour|weapon|accessory)\./.test(check.setup.category ?? "") && (
+        <button className="link small tw-open-site" title="See what else can roll on it and the cheapest way to get a mod"
+          onClick={() => { try { localStorage.setItem(CRAFT_ITEM_KEY, check.setup?.raw ?? ""); } catch { /* not passed */ } invoke("open_editor", { tab: "craft" }); }}>
+          Craft this</button>)}
       {!check.bulk && savedBlock}
       {reporting == null ? (
         <button className="link small tw-report-toggle" onClick={() => { setReporting(""); setReported(""); }}

@@ -126,6 +126,11 @@ mockIPC((cmd, args) => {
   if (cmd === "pob_get") return pob();
   if (cmd === "build_tree_opt") return [true, "P"];
   if (cmd === "list_sounds") return [];
+  // Crafting page: public/_craft_pool.json / _craft_ways.json when present (cargo run --example craftof with CRAFT_JSON=public).
+  if (cmd === "craft_bases") return ["Eternal Burgonet", "Hubris Circlet", "Vaal Regalia"];
+  if (cmd === "craft_pool") return fetch("/_craft_pool.json").then((r) => r.ok ? r.json() : null).catch(() => null);
+  if (cmd === "craft_ways") return fetch("/_craft_ways.json").then((r) => r.ok ? r.json() : []).catch(() => []);
+  if (cmd === "craft_start") return null;
   // Tiers sections: public/_tiers.json when present (tierdump --json from a real filter), else none.
   if (cmd === "get_tiers") return fetch("/_tiers.json").then((r) => r.ok ? r.json() : []).catch(() => []);
   if (cmd === "get_map_tiers") return mapTiers();

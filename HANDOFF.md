@@ -296,6 +296,18 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   elemental total and hidden, and the chaos total was skipped (bench craft only), so chaos vanished. Now the chaos
   total shows, unticked (trade_rules: bench_only).
 
+- Crafting page 21 Nov (0.2.20): new "Crafting" page (Endgame menu) + "Craft this" link in the Ctrl+D window (gear,
+  not uniques; passes the item through localStorage `craft.item`, opens the editor on the page). Data:
+  `core/data/poe1_craft.json` from RePoE via `node tools/build_craft_data.mjs` (bases with tags, prefix/suffix mods
+  with spawn weights, essences, fossils, bench crafts). `core/src/craft.rs`: `pool()` = every mod family on a base at
+  an item level (+ influences, which add "<tag>_shaper" etc.), tiers, how often one Chaos Orb gives it (20k simulated
+  rolls: 4/5/6 mods at 8/3/1 in 12, max 3+3, one per group, by weight), essence / bench / fossil options, which ones
+  the item has; `ways()` = Chaos Orb, essences, bench, best fossils (single + pairs) for "tier N or better", with
+  poe.ninja cost. Bench/essence-only mods are folded away; on armour pieces, bench/essence mods for a defence the base
+  lacks are hidden. "Open in Craft of Exile" copies the item and opens their site (they have no import link).
+  Dev tool: `cargo run -p filter-core --example craftof -- "Eternal Burgonet" 85 "maximum Life"` (CRAFT_JSON=public
+  saves files for the page preview). Not covered yet: magic items (alteration spam), harvest, veiled, exalts.
+
 - Price check sweep 21 Nov (0.2.19): ran every saved sample through `setupof` (now prints UNKNOWN lines too).
   Mods written over 2–3 lines (Foulborn Asenath's corpse/Blinded/explode) are matched joined, as the site lists them.
   Map mods with no chance ("Monsters Hinder on Hit with Spells", "Monsters Inflict Withered…") retry as "Monsters
@@ -573,6 +585,12 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 
 **Crafted chaos (21 Nov, 0.2.18)**
 - [x] (Confirmed 21 Nov.) Ctrl+D on gear with a crafted "X and Chaos Resistances": "+N% total to Chaos Resistance" is there to tick.
+
+**Crafting page (21 Nov, 0.2.20)**
+- [ ] Editor → Crafting: pick a base (e.g. Eternal Burgonet), item level, influence: prefixes and suffixes listed with
+      "1 in N" per Chaos Orb; click a mod → tiers, ways to get it (Chaos, essence, bench, fossils) with costs.
+- [ ] Ctrl+D on a rare helmet/ring/weapon → "Craft this": the editor opens on Crafting with that item, its mods marked "yours".
+- [ ] "Open in Craft of Exile": their site opens; Import item + Ctrl+V brings your item in.
 
 **Price check sweep (21 Nov, 0.2.19)**
 - [ ] Ctrl+D on a map with "Monsters Hinder on Hit with Spells" or "Monsters Inflict Withered…": no longer "not
