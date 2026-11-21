@@ -565,7 +565,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Price window: "This week" line with ▲/▼ % under the price for currency, cards, uniques… (after the price file updates).
 
 **Crafted chaos (21 Nov, 0.2.18)**
-- [ ] Ctrl+D on gear with a crafted "X and Chaos Resistances": "+N% total to Chaos Resistance" is there to tick.
+- [x] (Confirmed 21 Nov.) Ctrl+D on gear with a crafted "X and Chaos Resistances": "+N% total to Chaos Resistance" is there to tick.
 
 **Foulborn (21 Nov, 0.2.16–0.2.17)**
 - [x] (Confirmed 21 Nov.) Foulborn Asenath's Gentle Touch: "Curse Enemies with Punishment on Hit" searchable.
