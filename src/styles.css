@@ -1700,3 +1700,12 @@ body:has(.mt-bar) .cr-col { height: calc(100vh - 215px - var(--mt-h)); }
 /* "Not searchable" mods: their own small heading, text lined up with the row labels above. */
 .tw-unknown { margin-top: 2px; }
 .tw-unknown .tw-label { padding: 2px 6px 2px 30px; opacity: 1; }
+
+/* Crafting page polish (21 Nov): the mod list gets the most room (it's what you scan), the odds column is labelled
+   once per heading instead of in a cramped legend, and the detail's Add to plan button stays on one line. */
+@media (min-width: 1201px) { .cr-cols { grid-template-columns: minmax(250px, 300px) minmax(0, 1.25fr) minmax(0, 1fr); } }
+.cr-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.cr-h-col { font-size: 10.5px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-right: 30px; white-space: nowrap; }
+.cr-legend button.link { white-space: nowrap; }
+.cr-detail-head > button { flex: none; white-space: nowrap; }
+.cr-way-nums .cr-price, .cr-way-nums .cr-odds { font-variant-numeric: tabular-nums; }

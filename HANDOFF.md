@@ -644,6 +644,9 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
       (they follow what you set in Settings); hovering a page shows its Ctrl+number.
 
 **Crafting page (21 Nov, 0.2.20)**
+- 21 Nov polish (impeccable): the mod list column is wider (fewer mods wrap); "per Chaos Orb" labels the odds
+  column beside each Prefixes/Suffixes heading (the cramped legend line is gone); "+ Add to plan" stays on one line;
+  way cards say "price unknown" instead of "≈ price unknown".
 - [ ] Editor → Crafting: pick a base (e.g. Eternal Burgonet), item level, influence: prefixes and suffixes listed with
       "1 in N" per Chaos Orb; click a mod → tiers, ways to get it (Chaos, essence, bench, fossils) with costs.
 - [ ] Ctrl+D on a rare helmet/ring/weapon → "Craft this": the editor opens on Crafting with that item, its mods marked "yours".

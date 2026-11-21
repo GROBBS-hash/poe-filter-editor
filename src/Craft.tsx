@@ -194,7 +194,7 @@ export default function Craft() {
             {busy && <span className="muted small">Rolling…</span>}
           </div>
           <div className="cr-legend small">
-            {pool && <span className="muted">{pool.class} · ilvl {pool.ilvl} · "1 in N" = per Chaos Orb</span>}
+            {pool && <span className="muted">{pool.class} · item level {pool.ilvl}</span>}
             <button className="link small" onClick={() => setExtras(!extras)}>{extras ? "Hide" : "Show"} bench / essence only</button>
           </div>
           {(["prefix", "suffix"] as const).map((a) => {
@@ -217,7 +217,8 @@ export default function Craft() {
             );
             return (
               <div key={a}>
-                <h3 className="cr-h">{a === "prefix" ? "Prefixes" : "Suffixes"} <span className="muted small">{natural.length} can roll</span></h3>
+                <h3 className="cr-h"><span>{a === "prefix" ? "Prefixes" : "Suffixes"} <span className="muted small">{natural.length} can roll</span></span>
+                  <span className="cr-h-col" title="How often one Chaos Orb gives this mod">per Chaos Orb</span></h3>
                 {natural.map(row)}
                 {influenced.length > 0 && <div className="cr-sub">Needs an influenced item ({influenced.length})</div>}
                 {influenced.map(row)}
@@ -249,7 +250,7 @@ function WayCard({ w, best }: { w: Way; best: boolean }) {
       </div>
       <div className="cr-way-nums">
         <div className="cr-odds">{odds(w.chance)}</div>
-        <div className="small">{w.chance < 0.995 ? <>≈ <Chaos c={w.average} /></> : <Chaos c={w.cost_each} />}</div>
+        <div className="small">{w.chance < 0.995 ? (w.average != null ? <>≈ <Chaos c={w.average} /></> : <Chaos c={null} />) : <Chaos c={w.cost_each} />}</div>
         {w.chance < 0.995 && w.cost_each != null && <div className="muted small">each <Chaos c={w.cost_each} /></div>}
       </div>
     </div>
