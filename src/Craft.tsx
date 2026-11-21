@@ -144,11 +144,21 @@ export default function Craft() {
         <div className="cr-col">
           {itemName && pool ? (
             <div className="cr-tip">
-              <div className="cr-tip-head" style={{ color: RARITY_COLOUR[rarity] ?? "#ddd" }}>
-                <ItemIcon base={base} size={44} />
-                <div><div className="cr-tip-name">{itemName}</div>
-                {itemName !== base && <div className="cr-tip-name">{base}</div>}</div>
-              </div>
+              {(() => {
+                // Like the game's tooltip: a symbol at each end of the title for a fractured item or its influences
+                // (one symbol: both ends; two influences: one each).
+                const syms = pool.item_mods.some((m) => m.kind === "fractured") ? ["Fracturing Orb"] : infl.map((i) => `${i}'s Exalted Orb`);
+                const sym = (n?: string) => n ? <span className="cr-tip-sym"><ItemIcon name={n} size={30} /></span> : <span className="cr-tip-sym" />;
+                return (
+                  <div className={`cr-tip-head ${syms.length ? "has-sym" : ""}`} style={{ color: RARITY_COLOUR[rarity] ?? "#ddd" }}>
+                    {syms.length > 0 && sym(syms[0])}
+                    <ItemIcon base={base} size={44} />
+                    <div><div className="cr-tip-name">{itemName}</div>
+                    {itemName !== base && <div className="cr-tip-name">{base}</div>}</div>
+                    {syms.length > 0 && sym(syms[1] ?? syms[0])}
+                  </div>
+                );
+              })()}
               <div className="cr-tip-meta">Item level {ilvl}{infl.length ? <> · {infl.map((i) => <InfIcon key={i} name={i} />)} {infl.join(" + ")}</> : null}</div>
               {pool.item_mods.length === 0 && <div className="cr-tip-meta">No mods read: copy it with Ctrl+Alt+C for tiers.</div>}
               {pool.item_mods.map((m, i) => (

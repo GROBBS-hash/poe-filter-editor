@@ -620,7 +620,9 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 **Frame + fixes (21 Nov, 0.2.24)**
 - [ ] Editor window: no Windows title bar, a gold one instead; drag it to move, double-click to maximise, the three
       buttons work, close hides to the tray; the window still resizes from its edges and snaps to screen sides.
-- [ ] Compare look after a search: each listing shows its mods in green / red / blue.
+- [x] (Confirmed 21 Nov, "compare works".) Compare look after a search: each listing shows its mods in green / red / blue.
+- [ ] 0.2.25: Compare splits each listing into "Like yours" (green/red/blue) and "Also has"; the Crafting item card
+      has the fracture symbol (or influence symbols) at both ends of its title, like the game.
 - [ ] Settings → Price check: a small picture of each look; clicking one picks it.
 - [ ] Crafting with a copied item: base picture on the card; fractured mod has the fracture icon and a note; a crafted
       mod (⚒) opens its bench cost; "Aspect of the Spider" shows how to get it (beastcraft).

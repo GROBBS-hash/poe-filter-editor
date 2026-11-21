@@ -395,14 +395,22 @@ function modShape(t: string): [string, number | null] {
 function ListingMods({ mods, yours }: { mods: string[]; yours: StatFilter[] }) {
   const mine = new Map(yours.filter((f) => f.kind !== "pseudo" && !f.id.startsWith("prop.")).map((f) => { const [s] = modShape(f.label); return [s, f.value] as const; }));
   if (!mods.length) return null;
+  // Two rows: the mods you also have (compared), then the rest of theirs.
+  const rated = mods.map((m) => {
+    const [s, v] = modShape(m);
+    const y = mine.get(s);
+    return { m, y, cls: y == null || v == null ? "other" : v > y ? "better" : v < y ? "worse" : "same" };
+  });
+  const shared = rated.filter((r) => r.cls !== "other");
+  const rest = rated.filter((r) => r.cls === "other");
+  const row = (label: string, list: typeof rated) => list.length > 0 && (
+    <div className="tw-lmods-row"><span className="tw-lmods-lab">{label}</span>
+      {list.map((r, i) => <span key={i} className={`tw-lmod ${r.cls}`} title={r.y == null ? "Not on your item" : `Yours: ${r.y}`}>{r.m}</span>)}</div>
+  );
   return (
     <div className="tw-lmods">
-      {mods.map((m, i) => {
-        const [s, v] = modShape(m);
-        const y = mine.get(s);
-        const cls = y == null || v == null ? "other" : v > y ? "better" : v < y ? "worse" : "same";
-        return <span key={i} className={`tw-lmod ${cls}`} title={y == null ? "Not on your item" : `Yours: ${y}`}>{m}</span>;
-      })}
+      {row("Like yours", shared)}
+      {row("Also has", rest)}
     </div>
   );
 }
