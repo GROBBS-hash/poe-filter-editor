@@ -211,8 +211,8 @@ export default function Themes({ profile, onChange }: { profile: ProfileInfo; on
           {previewing === (name ?? "") ? "Close preview" : "Preview with real drops"}
         </button>
         {previewing === (name ?? "") && <DropPreview profile={profile} theme={name ?? ""} />}
-        <button className={inUse ? "primary wide" : "wide"} disabled={inUse} onClick={() => use(name)}>
-          {inUse ? `Used by “${profile.name}”` : `Use for “${profile.name}”`}
+        <button className={inUse ? "wide in-use" : "wide"} disabled={inUse} onClick={() => use(name)}>
+          {inUse ? `✓ In use on “${profile.name}”` : `Use for “${profile.name}”`}
         </button>
       </div>
     );
