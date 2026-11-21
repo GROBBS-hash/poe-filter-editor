@@ -413,7 +413,9 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
         // Armour and weapons: "+# to Armour" on the item itself is the site's "+# to Armour (Local)", not the global one
         // (that's for belts and jewels); try the local one first.
         let local = || index.find(&ModLine { text: format!("{} (Local)", m.text), ..m.clone() }).filter(|_| local_first);
-        let found = if foulborn { index.find(&ModLine { kind: "mutated".into(), ..m.clone() }).or_else(|| index.find(m)) } else { local().or_else(|| index.find(m)) };
+        // Foulborn: its mutated mod first, then like any armour/weapon (the local version, 21 Nov: Foulborn Ghostwrithe's
+        // "+183 to maximum Energy Shield" went to the global stat and found nothing).
+        let found = if foulborn { index.find(&ModLine { kind: "mutated".into(), ..m.clone() }).filter(|(id, _)| id.starts_with("mutated.")).or_else(local).or_else(|| index.find(m)) } else { local().or_else(|| index.find(m)) };
         let Some((id, value)) = found else { unknown.push(m.text.clone()); unknown_kinds.push(m.kind.clone()); continue };
         // Found on the mutated list = a Foulborn mod (shown in its own colour).
         let kind = if id.starts_with("mutated.") { "mutated".to_string() } else { m.kind.clone() };

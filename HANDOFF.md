@@ -292,6 +292,12 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   `BuildView.tsx` (F6 + My build): a tick per item, key `slot|name|base`, in localStorage `build.have` (shared by both
   windows via the storage event), "Have N of M" bar with "hide what I have" (`build.hideHave`).
 
+- Foulborn local mods 21 Nov (0.2.16): Foulborn items looked their mods up as "mutated" first, and that lookup quietly
+  fell back to the global stat, skipping the local one: Foulborn Ghostwrithe's "+183 to maximum Energy Shield" searched
+  the jewellery stat and found 0. Now a mutated match counts only if its id is mutated.*, then local, then global.
+  Live: 183+ ES, 90+ life, 35% → 34 listed from 250c (poe.ninja said 25c). Dev tool: examples/setupof.rs reruns a
+  saved price check (samples/*.json) and lists the stats it picks.
+
 - Wealth thin cards 21 Nov (0.2.15): the stash worth skips cards prices::thin_card() calls hardly traded (his
   Assassin's Favour "2.25c", ~1 sold). The Fletcher stays (~11 sold at 3.3c per poe.ninja).
 
@@ -548,8 +554,11 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Ctrl+D on a timeless jewel (Brutal Restraint): seed line ticked, prices for that exact seed; "any conqueror" row works.
 - [ ] Price window: "This week" line with ▲/▼ % under the price for currency, cards, uniques… (after the price file updates).
 
+**Foulborn (21 Nov, 0.2.16)**
+- [ ] Ctrl+D on a Foulborn unique armour/weapon (e.g. Foulborn Ghostwrithe): ticked rolls find listings.
+
 **Buy base (21 Nov, 0.2.14)**
-- [ ] F6 → Jewels → "Buy base" on a cluster jewel: trade site opens with cheap bases at the right item level; the note
+- [x] (Confirmed 21 Nov: "cluster base worked well".) F6 → Jewels → "Buy base" on a cluster jewel: trade site opens with cheap bases at the right item level; the note
       says "N bases · item level 75+ (Inspired Oppression)".
 
 **Buy (21 Nov, 0.2.13)**
