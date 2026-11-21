@@ -566,6 +566,10 @@ Confirmed in game so far: basic Ctrl+D price check (trade search returned listin
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
 **Price check (Ctrl+D)**
+- 21 Nov polish (impeccable): armour/ES rows no longer repeat "(at 20% quality)"; Save search sits beside the Search
+  button; the small links (trade site, Craft this, Saved searches, Style, Something's wrong?) share one footer row;
+  Compare look: listings no longer in a cut-off inner scroll box (the window scrolls), "Like yours / Also has" mods
+  line up in a column.
 - [ ] "min: exact / −10% / −20%" buttons change the results, and the picked one stays highlighted.
 - [ ] Your gear's mods in the build box show real numbers, not "(60-80)". (New layout: he said it looks tidier.)
 - [ ] "Search trade" on a tall window (e.g. Duskdawn): prices appear and the window scrolls to them.
