@@ -405,7 +405,7 @@ function ListingMods({ mods, yours }: { mods: string[]; yours: StatFilter[] }) {
   const rest = rated.filter((r) => r.cls === "other");
   const row = (label: string, list: typeof rated) => list.length > 0 && (
     <div className="tw-lmods-row"><span className="tw-lmods-lab">{label}</span>
-      {list.map((r, i) => <span key={i} className={`tw-lmod ${r.cls}`} title={r.y == null ? "Not on your item" : `Yours: ${r.y}`}>{r.m}</span>)}</div>
+      <span className="tw-lmods-chips">{list.map((r, i) => <span key={i} className={`tw-lmod ${r.cls}`} title={r.y == null ? "Not on your item" : `Yours: ${r.y}`}>{r.m}</span>)}</span></div>
   );
   return (
     <div className="tw-lmods">
@@ -428,7 +428,7 @@ function PriceSpread({ res, divine }: { res: Result | null; divine: number | nul
   const mark = typ != null ? Math.min(bins - 1, Math.floor(((typ - lo) / Math.max(1e-9, hi - lo)) * bins)) : -1;
   return (
     <div className="tw-spread" title="How the cheapest listings' prices spread out; the gold bar holds the typical price">
-      <div className="tw-spread-bars">{counts.map((n, i) => <i key={i} className={i === mark ? "me" : ""} style={{ height: `${Math.max(8, (n / top) * 100)}%` }} />)}</div>
+      <div className="tw-spread-bars">{counts.map((n, i) => <i key={i} className={i === mark ? "me" : n === 0 ? "z" : ""} style={{ height: `${Math.max(8, (n / top) * 100)}%` }} />)}</div>
       <div className="tw-spread-ends"><span>{money(lo, divine)}</span><span>listing prices</span><span>{money(hi, divine)}</span></div>
     </div>
   );
@@ -554,13 +554,12 @@ export default function TradeWindow() {
     setCheck({ setup: x.setup, ninja: null, league: check?.league ?? "", from_ground: false, error: null });
     setSetup(x.setup); setBulk(null); setShowSaved(false); run(x.setup);
   };
-  const savedBlock = (
-    <>
-      <button className="link small tw-saved-toggle" onClick={() => setShowSaved(!showSaved)}>
-        {showSaved ? "Hide saved searches" : `Saved searches (${saved.length})`}{saved.some((x) => x.live) ? " · live on" : ""}</button>
-      {showSaved && <SavedPanel list={saved} setList={setSaved} onRun={runSaved} />}
-    </>
+  const savedToggle = (
+    <button className="link small tw-saved-toggle" onClick={() => setShowSaved(!showSaved)}>
+      {showSaved ? "Hide saved searches" : `Saved searches (${saved.length})`}{saved.some((x) => x.live) ? " · live on" : ""}</button>
   );
+  const savedPanel = showSaved && <SavedPanel list={saved} setList={setSaved} onRun={runSaved} />;
+  const savedBlock = <>{savedToggle}{savedPanel}</>;
 
   if (!check) return null;
   if (!setup) return <div className="qm tw" ref={box}><div className="qm-fail">{err || "Nothing to price."}</div>{savedBlock}</div>;
@@ -699,7 +698,7 @@ export default function TradeWindow() {
                 {head && <div className="tw-group"><span>{g[0]}</span>{g[1] && <span className="tw-group-hint">{g[1]}</span>}</div>}
                 <label className={`tw-stat ${f.enabled ? "on" : ""} ${f.junk ? "junk" : ""}`} title={f.junk ? "Rarely changes the price" : undefined}>
                   <input type="checkbox" checked={f.enabled} onChange={(e) => patch(i, { enabled: e.target.checked })} />
-                  <span className={`tw-label mod-${f.kind}`}>{f.label}{KIND[f.kind] && f.kind !== "pseudo" && f.kind !== "implicit" && <span className="tw-kind">{KIND[f.kind]}</span>}
+                  <span className={`tw-label mod-${f.kind}`}>{g[1] === "at 20% quality" ? f.label.replace(/\s*\(at 20% quality\)$/i, "") : f.label}{KIND[f.kind] && f.kind !== "pseudo" && f.kind !== "implicit" && <span className="tw-kind">{KIND[f.kind]}</span>}
                     {f.tier != null && <span className={`tw-tier ${tierClass(f.tier)}`} title="Tier 1 is the best this mod can roll">T{f.tier}</span>}
                     {f.roll != null && <Roll r={f.roll} range={f.range} tier={f.tier} />}</span>
                   <input className="tw-min" type="number" value={f.min ?? ""} placeholder="min" onWheel={(e) => wheel(i, f, e)}
@@ -729,6 +728,7 @@ export default function TradeWindow() {
           <label title="Bases in the same item-level band: better mod tiers unlock at 75, 82, 84 and 86"><input type="checkbox" checked={setup.ilvl_min != null}
             onChange={(e) => setSetup({ ...setup, ilvl_min: e.target.checked ? it.item_level ?? null : null, ilvl_max: e.target.checked && it.item_level ? ilvlBand(it.item_level)[1] : null })} /> ilvl {ilvlText(it.item_level)}</label>
         )}
+        <span className="tw-actions">
         <button className="link small" onClick={() => setSaving(saving == null ? itemTitle(it) : null)} title="Keep this search to run again or watch live">Save search</button>
         <button className="tw-search" disabled={busy} onClick={() => run(setup)}
           title="Move your mouse onto this button to search (or click)"
@@ -737,6 +737,7 @@ export default function TradeWindow() {
             const from = e.relatedTarget as Node | null;
             if (!busy && !res && from && box.current?.contains(from)) run(setup);
           }}>{busy ? <><Spinner /> Searching…</> : searched ? "Search again" : "Search trade"}</button>
+        </span>
       </div>}
       {saving != null && (
         <form className="tw-save" onSubmit={(e) => { e.preventDefault();
@@ -817,20 +818,24 @@ export default function TradeWindow() {
           </div>
         </div>
       )}
+      <div className="tw-foot">
       {res && res.url && <button className="link small tw-open-site" onClick={() => invoke("open_url", { url: res.url })}>Open on the trade site</button>}
       {/* Gear you can craft on: open the Crafting page with this item (shared localStorage, see Craft.tsx). */}
       {check.setup?.raw && check.setup.item.rarity !== "Unique" && /^(armour|weapon|accessory)\./.test(check.setup.category ?? "") && (
         <button className="link small tw-open-site" title="See what else can roll on it and the cheapest way to get a mod"
           onClick={() => { try { localStorage.setItem(CRAFT_ITEM_KEY, check.setup?.raw ?? ""); } catch { /* not passed */ } invoke("open_editor", { tab: "craft" }); }}>
           Craft this</button>)}
-      {!check.bulk && savedBlock}
+      {!check.bulk && savedToggle}
       <button className="link small tw-style-btn" onClick={nextStyle} title={"Switch the look of this window: " + TW_STYLES.map(([, n]) => n).join(", ")}>
         Style: {TW_STYLES.find(([k]) => k === style)?.[1] ?? "Classic"} ›</button>
-      {reporting == null ? (
+      {reporting == null && (
         <button className="link small tw-report-toggle" onClick={() => { setReporting(""); setReported(""); }}
           title="Saves this price check with your note, so Claude can see exactly what went wrong">
           {reported ? "✓ Saved: mention it to Claude in chat" : "Something's wrong?"}</button>
-      ) : (
+      )}
+      </div>
+      {!check.bulk && savedPanel}
+      {reporting != null && (
         <form className="tw-report" onSubmit={(e) => { e.preventDefault();
           invoke<string>("report_problem", { note: reporting, data: { check, setup, res, bulk, err } })
             .then(() => { setReporting(null); setReported("ok"); }).catch((er) => setErr(friendly(er))); }}>

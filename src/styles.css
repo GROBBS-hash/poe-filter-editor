@@ -1670,3 +1670,19 @@ body:has(.mt-bar) .cr-col { height: calc(100vh - 215px - var(--mt-h)); }
 .cr-tip-head.has-sym > div { flex: 1; text-align: center; }
 .cr-tip-sym { width: 34px; height: 34px; display: grid; place-items: center; flex: none; border-radius: 50%;
   background: radial-gradient(circle, rgba(0,0,0,.55), rgba(0,0,0,.2)); box-shadow: 0 0 0 1px rgba(220,178,90,.45); }
+
+/* Price window polish (21 Nov): Save search sits with the Search button; the small links share one footer row;
+   listings flow with the window (it already scrolls) instead of a cut-off inner box in the Compare look. */
+.tw-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.tw-actions .tw-search { margin-left: 0; }
+.tw-foot { display: flex; flex-wrap: wrap; align-items: center; column-gap: 4px; row-gap: 0; margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--line); }
+.tw-foot button.link { margin: 0; display: inline-block; padding: 4px 6px; }
+.tw-foot .tw-report-toggle { margin-left: auto; }
+.tw-foot:empty { display: none; }
+.tw-min, .tw-tr, .tw-th, .tw-hero-price, .tw-spread-ends { font-variant-numeric: tabular-nums; }
+.tws-compare .tw-table { max-height: none; overflow: visible; }
+.tws-compare .tw-tr { padding-top: 7px; padding-bottom: 7px; }
+.tw-lmods-row { display: grid; grid-template-columns: 72px 1fr; align-items: start; }
+.tw-lmods-chips { display: flex; flex-wrap: wrap; gap: 3px; }
+.tw-lmods-lab { width: auto; margin: 3px 0 0; }
+.tw-spread-bars i.z { opacity: .35; }
