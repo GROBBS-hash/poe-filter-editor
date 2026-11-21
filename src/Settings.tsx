@@ -87,8 +87,9 @@ export default function SettingsPage() {
         <label className="check"><input type="checkbox" checked={s.price_buyout_only ?? true} onChange={(e) => set({ price_buyout_only: e.target.checked })} />
           <span>Instant buyout only: price from listings you can buy straight away, not sellers you have to whisper</span></label>
         <label className="check"><input type="checkbox" checked={s.price_instant_all ?? false} onChange={(e) => set({ price_instant_all: e.target.checked })} />
-          <span>Search every item straight away. Off (like Awakened): uniques, currency and other bulk items, and
-            unidentified items search at once; rares and gear wait so you can pick the stats, then move your mouse onto Search.</span></label>
+          <span>Search rares and gear straight away too
+            <span className="muted small" style={{ display: "block" }}>Uniques, currency and unidentified items always search straight away. With this off
+              (like Awakened), rares and gear wait for you to tick the stats you care about and press Search.</span></span></label>
         <PriceLook />
       </div>
 

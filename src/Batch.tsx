@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Action, COLOURS, Item, RARITY_COLOUR, itemSub, itemTitle } from "./types";
@@ -146,8 +147,16 @@ export function BatchWindow() {
     return () => { un.then((f) => f()); };
   }, []);
   const n = c?.count ?? 0;
+  // Fit the window to the box, so the title, the close button and the last line are never cut off.
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!box.current) return;
+    const r = box.current.getBoundingClientRect();
+    getCurrentWindow().setSize(new LogicalSize(Math.ceil(r.width) + 2, Math.ceil(r.height) + 2))
+      .then(() => invoke("keep_on_screen")).catch(() => {});
+  });
   return (
-    <div className="qm batch-win" data-tauri-drag-region>
+    <div className="qm batch-win" ref={box} data-tauri-drag-region>
       <WinBar compact title={<><span className="batch-dot" /> Batch mode · {n} item{n === 1 ? "" : "s"}</>}
         onClose={() => invoke("set_batch_mode", { on: false })} closeTip="Stop collecting" />
       <div className="batch-win-line small" data-tauri-drag-region>

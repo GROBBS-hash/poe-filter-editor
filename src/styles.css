@@ -1887,10 +1887,11 @@ kbd { font: 600 11px/1.4 "Segoe UI", system-ui, sans-serif; color: var(--text-2)
 .tw-stat:not(.on) .tw-tag { opacity: .6; }
 .tw-tucked { display: block; margin: 4px 0 0; padding: 2px 6px; text-align: left; }
 .tw-opts-head { margin-top: 12px; }
-.tw-hero.low { border-color: color-mix(in srgb, #e0a060 45%, var(--line)); background: linear-gradient(180deg, rgba(224,160,96,.10), rgba(224,160,96,.02)); }
-.tw-hero.low .tw-hero-price { color: #d9b48a; }
-.tw-low-tag { display: inline-block; width: fit-content; font-size: 12px; font-weight: 700; color: #f0b070; background: rgba(240,176,112,.14);
-  border: 1px solid rgba(240,176,112,.35); border-radius: 5px; padding: 1px 7px; text-transform: none; }
+/* Low confidence is red (22 Nov: amber didn't stand out enough). */
+.tw-hero.low { border-color: color-mix(in srgb, #e85a50 60%, var(--line)); background: linear-gradient(180deg, rgba(232,90,80,.14), rgba(232,90,80,.03)); }
+.tw-hero.low .tw-hero-price { color: #f0a49c; }
+.tw-low-tag { display: inline-block; width: fit-content; font-size: 12.5px; font-weight: 750; color: #fff; background: #c83a32;
+  border: 1px solid #e85a50; border-radius: 5px; padding: 1px 8px; text-transform: none; }
 .tw-layout-pick { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
 
 /* Batch mode page and its small in-game box */
@@ -1908,7 +1909,7 @@ kbd { font: 600 11px/1.4 "Segoe UI", system-ui, sans-serif; color: var(--text-2)
 .batch-name { font-weight: 600; }
 .batch-choice { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .batch-colours { display: inline-flex; gap: 4px; }
-.batch-win { padding: 8px 10px; cursor: move; min-width: 220px; }
+.batch-win { padding: 8px 10px; cursor: move; width: max-content; min-width: 240px; max-width: 420px; }
 .batch-win .win-bar.compact { margin: -8px -10px 6px; }
 .batch-win-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 

@@ -621,8 +621,16 @@ Confirmed in game so far: basic Ctrl+D price check (trade search returned listin
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
 **Next test session (planned 21 Nov night, for 22 Nov).** Walk him through it a few at a time, between maps.
-Latest release is 0.2.36; only the design fixes + main window looks (035b42c, 4d7ea7f, a9b298f) are unreleased, and
-he sees those in the dev editor `Start editor.bat` opens. Details for each are in the items further down.
+Latest release is 0.2.36; only the design fixes + main window looks (035b42c, 4d7ea7f, a9b298f) are unreleased.
+**He plays on the installed release** (`%LOCALAPPDATA%\PoE Filter Editor\poe-filter-editor.exe`), not the dev
+editor, so unreleased things (e.g. Settings → Main window look) only reach him after a release.
+**22 Nov results:** 1. Grouped layout, low confidence and Dragon Turn +57 seen working; he wanted low confidence more
+obvious → now a solid red badge and a red-tinted price box. Flat layout not tried yet. 2. Batch mode works; the small
+box was cut off → it now sizes itself to fit. 3. Guild stash not tried yet. 4. Main window look missing because it
+isn't released. Also: the "search straight away" setting reworded ("Search rares and gear straight away too" + a
+plain explanation underneath). He wants the left menu and Settings split into clearer, more specific groups: mock-ups
+shown (menu A more groups / B boxed groups / C colour per group / D big buttons then pages; Settings 1 side menu /
+2 one page with sections); waiting for his pick.
 1. Price window (Ctrl+D on a rare): stats in groups (Minimum rolls, Prefixes "1 of 2 used", Suffixes...); More → Layout
    → Flat gives one list with a tag on each row. An item with under 5 listed shows amber "low confidence".
    Cogwork Ring (Dragon Turn): Intelligence reads +57 (not +46).
@@ -633,6 +641,8 @@ he sees those in the dev editor `Start editor.bat` opens. Details for each are i
    to read on every page? Home page + Ctrl+K search feel easier?
 
 **Batch mode (21 Nov, in 0.2.36)**
+- [x] (Confirmed 22 Nov, "seems good".) Box was cut off at its fixed 250×64 size; it now fits itself to its text
+  (not released yet; check the box shows its close button and whole second line).
 - [ ] Press F3 in game: the editor no longer pops up over the game; a small "Batch mode · N items" box shows instead
   (drag it anywhere, it remembers). Ctrl+C items: it says "Added: …" or "Already listed: …". Press F3 again: the
   editor opens on Batch mode with the list. Each row says what the filter does now ("now Hidden"); hidden items start
@@ -781,7 +791,9 @@ he sees those in the dev editor `Start editor.bat` opens. Details for each are i
       change goes through `remember()`, which now emits `filter-changed` to the main window.) Long explanations at the
       top of Filters, My edits, Themes, Prices, Maps, Atlas, Crafting and Settings cut to one line; the detail moved
       into the "?" next to the heading.
-- [ ] Price window: two layouts + low confidence + Cogwork numbers (21 Nov, in 0.2.34).
+- [ ] Price window: two layouts + low confidence + Cogwork numbers (21 Nov, in 0.2.34). 22 Nov: Grouped, low
+      confidence and +57 Int confirmed in game; low confidence changed from amber to red (not released yet); Flat
+      still to try.
       **Grouped** (default): headings Minimum rolls · Defences (at 20% quality) · Totals (all mods added up) · Base mods
       (implicit) · Prefixes "1 of 2 used" · Suffixes "3 of 4 used" (open-slot rows sit inside their group, "1 open
       prefix · room to craft") · Base and item level · For sale now. **Flat** (like Awakened): no stat headings, a tag
