@@ -671,6 +671,15 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
       (In 0.2.28.)
 - [ ] Tiers page polish (after 0.2.28): the "?" help opens under the heading in normal letters (was squeezed beside it
       in small caps); help boxes everywhere have a soft gold frame; tiers aren't a box inside a box; item chips show as pills.
+      (In 0.2.29.)
+- [ ] "Polish everything" pass (21 Nov, after 0.2.29, not released yet): card headings one size everywhere (ones beside a
+      button were smaller: Filters, My edits, Batch, Prices, Wealth); hint text in empty boxes easier to read; Help says
+      "Filters" (not "Profiles"/"Built on"), adds price check + crafting answers and every hotkey; Atlas page opens at the
+      top (the step list used to scroll the whole page down to the current step); Maps wishes three per row (labels no
+      longer wrap); Levelling gear main skill box fills its row; Themes: the one in use reads "✓ In use on …"; Presets
+      tiles flatter; F2 "Pick a sound…" link gold instead of web blue; F7 strategy picker shows the whole name.
+      Dev: preview-app.html now has sample data for Presets, Themes, Levelling gear and Prices; `await __go("Themes")`
+      in the console opens a page.
 
 **Frame + fixes (21 Nov, 0.2.24)**
 - [ ] Editor window: no Windows title bar, a gold one instead; drag it to move, double-click to maximise, the three
