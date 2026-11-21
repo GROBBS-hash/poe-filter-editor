@@ -1719,3 +1719,19 @@ body:has(.mt-bar) .side { padding-top: 14px; }
 /* Tick boxes that keep their own colour when ticked. */
 .bv-have:checked { background: #62cf80; border-color: #62cf80; }
 .qm.tw input[type=checkbox] { margin: 0; }
+
+/* Tiers page polish (21 Nov). The help box under a "?" opened beside the heading, in the heading's small-caps game
+   lettering: it now drops below the heading at full width in the normal reading font. Help boxes get a soft gold
+   frame instead of a stripe down one side. The tier list no longer sits in a box inside a box: the tiers are the
+   boxes. Item chips stand out a little from their tier. */
+h1 .tip-body, h2 .tip-body, h3 .tip-body { flex-basis: 100%; width: 100%; box-sizing: border-box; margin: 8px 0 2px;
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif; font-size: 13px; font-weight: 400;
+  letter-spacing: 0; line-height: 1.5; text-transform: none; font-variant: normal; }
+h1:has(.tip-body), h2:has(.tip-body), h3:has(.tip-body) { flex-wrap: wrap; }
+.tip-body { border: 1px solid rgba(220, 178, 90, .32); background: color-mix(in srgb, var(--gold) 6%, var(--raised)); border-radius: 8px; }
+.tip-body b { color: var(--text); }
+.tiers-main > .card { background: none; border: 0; box-shadow: none; padding: 0; }
+.tiers-main > .card > .note:first-child { margin-top: 0; }
+.tier { padding: 10px 12px; }
+.tier .chip { background: var(--input); border-color: #2a2f39; }
+.tier .chip:hover { border-color: var(--line-2); }

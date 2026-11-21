@@ -655,6 +655,9 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
       21 Nov: he still saw both, but was running 0.2.24 (the fix is in 0.2.27): check after "Restart to update".
 - [ ] General polish (after 0.2.27): name shows once (gold title bar; the sidebar no longer repeats it); pages use up
       to 1280px and sit centred beside the sidebar on wide windows; every tick box in the app is dark with a gold tick.
+      (In 0.2.28.)
+- [ ] Tiers page polish (after 0.2.28): the "?" help opens under the heading in normal letters (was squeezed beside it
+      in small caps); help boxes everywhere have a soft gold frame; tiers aren't a box inside a box; item chips show as pills.
 
 **Frame + fixes (21 Nov, 0.2.24)**
 - [ ] Editor window: no Windows title bar, a gold one instead; drag it to move, double-click to maximise, the three
