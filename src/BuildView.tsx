@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef, useState } from "react";
 import { ItemIcon, useIcons } from "./icons";
 import TreeView from "./TreeView";
+import { CRAFT_ITEM_KEY, CRAFT_PLAN_MARK } from "./Craft";
 
 export type PobGem = { name: string; level: number; quality: number; enabled: boolean; support: boolean; colour: string };
 export type PobGroup = { label: string; slot: string; enabled: boolean; gems: PobGem[] };
@@ -27,6 +28,15 @@ function PriceButton({ onClick }: { onClick: () => void }) {
   return (
     <button className="bv-price" title="Price check this item (the price window, like Ctrl+D)"
       onClick={(e) => { e.stopPropagation(); onClick(); }}>Price</button>
+  );
+}
+
+/** "Craft": opens the editor's Crafting page with this item, to see how to make it (uniques can't be crafted). */
+function CraftButton({ it }: { it: PobGear }) {
+  if (it.rarity === "unique" || !it.copy || it.slot.startsWith("Flask") || it.base.includes("Jewel")) return null;
+  return (
+    <button className="bv-price" title="How to craft this item (opens the Crafting page with it)"
+      onClick={(e) => { e.stopPropagation(); try { localStorage.setItem(CRAFT_ITEM_KEY, CRAFT_PLAN_MARK + (it.copy ?? "")); } catch { /* not passed */ } invoke("open_editor", { tab: "craft" }); }}>Craft</button>
   );
 }
 
@@ -249,6 +259,7 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
             {it.base !== it.name && <span className="muted small"> {it.base}</span>}
           </span>
           <SocketStrip it={it} />
+          <CraftButton it={it} />
           {it.copy && <BuyButton it={it} />}
           {it.copy && <PriceButton onClick={() => priceItem(it)} />}
         </div>
@@ -317,6 +328,7 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
                       onClick={(e) => { e.stopPropagation(); setJewelNode(j.node); setView("tree"); }}>on tree</button>
                   )}
                   {j.item.copy && j.item.base.endsWith("Cluster Jewel") && <BuyBaseButton it={j.item} />}
+                  <CraftButton it={j.item} />
                   {j.item.copy && <BuyButton it={j.item} />}
                   {j.item.copy && <PriceButton onClick={() => priceItem(j.item)} />}
                 </div>

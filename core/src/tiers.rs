@@ -9,7 +9,7 @@ use serde::Serialize;
 #[derive(Debug, Clone, Serialize)]
 pub struct TierRow {
     pub tier: String,
-    /// "Tier 1", "Tier 2 (Divine)", "Exotic: hidden"...
+    /// "Tier 1", "Tier 2 · about a Divine Orb", "Exotic: hidden"...
     pub name: String,
     pub visibility: String,
     pub style: Style,
@@ -125,6 +125,17 @@ pub fn tier_name(t: &str) -> String {
             }
         }
     }
+    if let Some(n) = special_tier_name(t) { return n; }
+    // Cheap cluster jewels: "n12_i84_t1" = 12 passives, item level 84+, NeverSink's tier 1.
+    if let Some(rest) = t.strip_prefix('n') {
+        let parts: Vec<&str> = rest.split('_').collect();
+        if let [n, i, tier] = parts.as_slice() {
+            if let (Ok(n), Some(i), Some(tier)) = (n.parse::<u32>(), i.strip_prefix('i'), tier.strip_prefix('t')) {
+                let _ = i; // the item level shows beside the name (the rule's note)
+                return format!("Tier {tier} · {n} passives");
+            }
+        }
+    }
     match t {
         "strandedfractured" => return "Fractured, memory-stranded".into(),
         "strandedveiled" => return "Veiled, memory-stranded".into(),
@@ -139,11 +150,57 @@ pub fn tier_name(t: &str) -> String {
         let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
         if !digits.is_empty() {
             let tail = rest[digits.len()..].trim_start_matches('_');
-            return if tail.is_empty() { format!("Tier {digits}") } else { format!("Tier {digits} ({tail})") };
+            // What NeverSink's word after the number means: the currency each tier is worth about, or what's special.
+            let tail = match tail {
+                "exalted" => "worth an Exalted Orb or more", "divine" => "about a Divine Orb", "annul" => "about an Orb of Annulment",
+                "chaos" => "about a Chaos Orb", "alchemy" => "about an Orb of Alchemy", "chrom" => "Chromatic Orbs",
+                "chance" => "Orbs of Chance", "trans" => "Orbs of Transmutation", "armour" => "Armourer's Scraps and the like",
+                "c" => "currency cards", "boss" => "boss drops", "stackedex" => "stacks of 3+", "lifeforce" | "divination" => "",
+                other => other,
+            };
+            return if tail.is_empty() { format!("Tier {digits}") } else { format!("Tier {digits} · {tail}") };
         }
     }
     let mut c = t.chars();
     c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default()
+}
+
+/// NeverSink's one-word tier names that don't follow "t1, t2…", in plain words (checked against what each rule
+/// catches in the filter, 21 Nov).
+fn special_tier_name(t: &str) -> Option<String> {
+    Some(match t {
+        // Safety net in most sections: anything of that kind NeverSink hasn't tiered yet (new league items), shown loudly.
+        "restex" => "New items, not tiered yet",
+        // Divination cards.
+        "excustomstack" => "Special: stacks of The Fortunate",
+        // Uniques.
+        "exuberimpresence" => "Special: Impresence with Shaper and Elder", "exkaom" => "Special: Kaom's Heart",
+        "extabula" => "Special: 6-linked Tabula Rasa", "exforgesword" => "Special: influenced Infernal Sword",
+        "exrationaljewel" => "Special: synthesised unique Cobalt Jewel", "exsynth" => "Special: synthesised unique rings",
+        "ex6link" => "6-linked uniques", "4xabysshelmet" => "Special: 4 abyss sockets", "3xabyss" => "Special: 3 abyss sockets",
+        "2xabyss" => "2 abyss sockets", "vestige" => "Vestigial uniques", "exuniqueidols" => "Unique idols",
+        "2xcorrupteduniques" => "Twice-corrupted uniques", "excrucibleunique" => "Crucible uniques",
+        "multispecialhigh" => "Could be a pricey one (several uniques share the base)",
+        "multispecial" | "multi" => "Could be worth something (several uniques share the base)",
+        "overqual" => "Over 20% quality", "5link" => "5-linked uniques", "earlyleague" => "Good early in the league",
+        "exjewelscorrupted" => "Corrupted unique jewels", "exjewels" => "Unique jewels",
+        "hideable2" => "Cheap", "hideable" => "Cheapest",
+        // Fractured and exotic bases.
+        "fractt1" => "Best fractured bases", "fractt2" => "Other fractured bases",
+        "exoticstiered" => "Any exotic base, item tier 5+", "exoticsmemory" => "Any exotic base, memory strands 70+",
+        "exoticsfract" => "Any fractured exotic base", "stygianmirage" => "Stygian Vise with an abyss mod",
+        // Their item level shows beside the name (the rule's note), so the names don't repeat it.
+        "stygian86" => "Stygian Vise, high item level",
+        "v86" | "v85" | "v84" | "v83" => "High item level bases",
+        // Jewels.
+        "anyrare" => "Rare jewels", "anymagic" => "White and magic jewels",
+        "optimal1highlarge" => "Large, 12 passives", "optimalhighlarge" => "Large, 8 passives (best item level)",
+        "highlarge" => "Large, 8 passives", "large" => "Other large",
+        "optimalhighmedium" => "Medium, up to 5 passives (best item level)", "highmedium" => "Medium, up to 5 passives",
+        "medium" => "Other medium", "highsmall" => "Small (best item level)", "small" => "Other small",
+        "1modcorrupted" => "Corrupted, with a corruption mod", "1moduncorrupted" => "With a top mod (Shimmering, Vivid…)",
+        _ => return None,
+    }.to_string())
 }
 
 /// The Tiers tab's name for a NeverSink section, when it lists it.
@@ -531,7 +588,10 @@ mod tests {
         let cur = &s[0];
         assert_eq!(cur.title, "Currency");
         assert!(cur.tiers[0].bases.contains(&"Mirror of Kalandra".to_string()), "{:?}", cur.tiers[0]);
-        assert_eq!(tier_name("t2divine"), "Tier 2 (divine)");
+        assert_eq!(tier_name("t2divine"), "Tier 2 · about a Divine Orb");
+        assert_eq!(tier_name("n12_i84_t1"), "Tier 1 · 12 passives");
+        assert_eq!(tier_name("optimalhighlarge"), "Large, 8 passives (best item level)");
+        assert_eq!(tier_name("t3lifeforce"), "Tier 3");
         assert_eq!(tier_name("twisdom"), "Wisdom scrolls");
         let w = s.iter().find(|x| x.title == "Wisdom scroll stacks").unwrap();
         assert_eq!(w.tiers.iter().map(|t| t.min_stack.unwrap()).collect::<Vec<_>>(), vec![10, 5, 3]);

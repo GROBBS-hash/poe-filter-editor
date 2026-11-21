@@ -27,6 +27,7 @@ const wealth = {
 
 // Tiers → Map tiers: NeverSink-like map rules (whites T1-5, yellows T6-10, reds T11-16); hidden ones remembered here.
 const mapHidden = new Set<string>(["maps_d_t1", "maps_d_t2"]);
+let cjRule: { kind: string; style: Record<string, unknown> } | null = null;
 const mapStyle = (b: string) => ({ font_size: 45, muted: false, text: b === "d" ? [255, 255, 255, 255] : [0, 0, 0, 255],
   background: b === "d" ? [20, 20, 0, 255] : b === "c" ? [235, 235, 120, 255] : [235, 235, 235, 255], border: b === "a" ? [255, 0, 0, 255] : null,
   beam: b === "d" ? "White" : "Yellow", minimap_parts: [b === "d" ? 2 : 1, b === "d" ? "White" : "Red", "Square"] });
@@ -137,6 +138,21 @@ mockIPC((cmd, args) => {
   if (cmd === "craft_buy") return new Promise((ok) => setTimeout(() => ok({ summary: [380, 520], total: 37, url: "https://www.pathofexile.com/trade", divine: 221, listings: [] }), 600));
   // Tiers sections: public/_tiers.json when present (tierdump --json from a real filter), else none.
   if (cmd === "get_tiers") return fetch("/_tiers.json").then((r) => r.ok ? r.json() : []).catch(() => []);
+  // The "Corrupted rare jewels" switch on the Jewels page: one saved edit, highlighted or restyled.
+  if (cmd === "get_rule" && String((args as { label?: string }).label ?? "").includes("Corrupted Rare every Jewels")) {
+    const label = String((args as { label: string }).label);
+    if (!cjRule || !label.startsWith(cjRule.kind)) throw "That edit lives in another profile";
+    return ["preview", 0, { label, show: true, item_class: "Jewels", base_type: "", style: cjRule.style }];
+  }
+  if (cmd === "delete_rule") { cjRule = null; return null; }
+  if (cmd === "apply_quick_action" || cmd === "apply_custom_style") {
+    const a = args as { action?: string; style?: { text: number[]; border: number[] | null; background: number[]; font_size: number } };
+    if (a.action === "hide") cjRule = null;
+    else cjRule = a.style
+      ? { kind: "Style:", style: { text: a.style.text, border: a.style.border, background: a.style.background, font_size: a.style.font_size, muted: false } }
+      : { kind: "Highlight:", style: { text: [255, 255, 255, 255], border: [175, 96, 255, 255], background: [60, 20, 90, 255], font_size: 40, muted: false } };
+    return { label: "ok", warnings: [] };
+  }
   if (cmd === "get_map_tiers") return mapTiers();
   // Themes page: three built-in themes, six value levels each (Chase → Junk).
   if (cmd === "list_themes") {

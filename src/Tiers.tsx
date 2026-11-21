@@ -260,6 +260,10 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
               <b> Click the label</b> to change how the whole tier looks. <b>Drag</b> an item onto another tier to move it there
               (e.g. drag Chaos Orb up a tier). <b>+ Add item</b> puts any item in a tier, e.g. add a currency to “Stacks of 6+” to give its stacks that look while single drops keep their normal one. <b>Copy/Paste</b> gives one tier another tier's look. <b>Reset</b> puts a tier back
               to NeverSink's. Your changes survive NeverSink updates and strictness changes.</Tip></h2>
+            {!isExtra && section.tiers.some((t) => /^t2(D|$)/.test(t.tier)) && !section.tiers.some((t) => /^t1(D|$)/.test(t.tier)) && (
+              <div className="note">No tier 1 here: NeverSink keeps that tier empty at the moment, because nothing in this group is
+                worth that much. <b>Tier 2</b> is the best one. To make an item stand out more, restyle Tier 2 or give the item its own look from Find.</div>
+            )}
             {!isExtra && (section.title === "Divination cards" || section.title === "Uniques") && (
               <WorthLine profileId={profile.id} group={section.title === "Uniques" ? "Uniques" : "DivinationCards"} onChange={onChange} />
             )}
@@ -334,12 +338,15 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
 const CJ_ITEM = { item_class: "Jewels", rarity: "Rare", name: null, base_type: "", item_level: null, stack_size: null, quality: null,
   sockets: null, map_tier: null, corrupted: true, mirrored: false, unidentified: false };
 const CJ_OPTS = { same_rarity: true, max_item_level: null, corrupted: true };
-const CJ_LABELS = ["Highlight: Corrupted Rare every Jewels", "Hide: Corrupted Rare every Jewels"];
+// "Show them" makes a highlight; changing its look turns it into a "Style:" edit with the same match.
+const CJ_LABELS = ["Highlight: Corrupted Rare every Jewels", "Hide: Corrupted Rare every Jewels", "Style: Corrupted Rare every Jewels"];
 function CorruptedJewels({ onDone }: { onDone: (p: Promise<unknown>, msg: string) => Promise<void> }) {
   const [state, setState] = useState<"shown" | "hidden" | "none">("none");
+  const [look, setLook] = useState<CurrentStyle | null>(null);
+  const [editing, setEditing] = useState(false);
   const check = () => {
-    Promise.all(CJ_LABELS.map((label) => invoke("get_rule", { id: null, index: null, label }).then(() => true).catch(() => false)))
-      .then(([shown, hidden]) => setState(shown ? "shown" : hidden ? "hidden" : "none"));
+    Promise.all(CJ_LABELS.map((label) => invoke<[string, number, { style: CurrentStyle }]>("get_rule", { id: null, index: null, label }).then((r) => r[2].style).catch(() => null)))
+      .then(([shown, hidden, styled]) => { setState(shown || styled ? "shown" : hidden ? "hidden" : "none"); setLook(styled ?? shown ?? null); });
   };
   useEffect(check, []);
   const remove = async () => {
@@ -347,6 +354,10 @@ function CorruptedJewels({ onDone }: { onDone: (p: Promise<unknown>, msg: string
       try { const [id, index] = await invoke<[string, number]>("get_rule", { id: null, index: null, label }); await invoke("delete_rule", { id, index }); } catch { /* not there */ }
     }
   };
+  const restyle = (style: CustomStyle) => { setEditing(false); onDone((async () => {
+    await remove();
+    await invoke("apply_custom_style", { item: CJ_ITEM, style, opts: CJ_OPTS });
+  })().finally(check), "Corrupted rare jewels restyled."); };
   const act = (what: "show" | "hide" | "reset") => onDone((async () => {
     await remove();
     if (what !== "reset") await invoke("apply_quick_action", { item: CJ_ITEM, action: what === "show" ? "highlight" : "hide", colour: what === "show" ? "purple" : null, opts: CJ_OPTS });
@@ -360,6 +371,19 @@ function CorruptedJewels({ onDone }: { onDone: (p: Promise<unknown>, msg: string
         <button className={state === "hidden" ? "primary" : ""} onClick={() => act("hide")}>{state === "hidden" ? "✓ Hidden" : "Hide them"}</button>
         {state !== "none" && <button className="link small" onClick={() => act("reset")}>Back to NeverSink's</button>}
       </span>
+      {state === "shown" && look && (
+        <span className="cj-look">
+          <span className="muted small">How they look (click to change):</span>
+          <LookButton className="tier-look" onClick={() => setEditing(!editing)}>
+            <Preview s={fromCurrent(look, "Rare")} text="Cobalt Jewel" />
+          </LookButton>
+        </span>
+      )}
+      {editing && look && (
+        <div className="qm tier-edit cj-edit">
+          <StyleEditor start={fromCurrent(look, "Rare")} label="Cobalt Jewel" onCancel={() => setEditing(false)} onSave={restyle} />
+        </div>
+      )}
     </div>
   );
 }

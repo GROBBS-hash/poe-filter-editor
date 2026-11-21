@@ -620,6 +620,16 @@ Everything below was built since GROBBS last tested and has only been checked wi
 Confirmed in game so far: basic Ctrl+D price check (trade search returned listings); 20 Nov: weapon + armour
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
+**Tiers page and build window (21 Nov, after 0.2.33)**
+- [ ] Tiers: every tier now has a plain name (e.g. cluster jewels "Large, 8 passives (best item level)", uniques
+  "Could be worth something (several uniques share the base)", currency "Tier 2 · about a Divine Orb", "New items, not
+  tiered yet" for NeverSink's restex safety net). Viscera / Essences / Delirium orbs say why there's no tier 1
+  (NeverSink comments it out: nothing is worth that much).
+- [ ] Jewels page: after "Show them" on corrupted rare jewels, "How they look" opens the look editor (saves as a
+  "Style: Corrupted Rare every Jewels" edit; Back to NeverSink's removes it).
+- [ ] Build window (F6): rare/magic gear has a "Craft" button: opens Crafting with every mod planned, from a fresh base at
+  item level 86 (PoB copies say item level 1). Not on uniques, flasks or jewels.
+
 **Price check (Ctrl+D)**
 - [ ] Awakened ideas (21 Nov, after 0.2.33): price a unique with rolls (mods ticked, minimums a little below yours,
   "Not corrupted" in "Also searching for"); an anointed amulet (the anoint ticked); a rare cluster jewel (passive count

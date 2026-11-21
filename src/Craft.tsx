@@ -2,7 +2,7 @@
 // marked), how often a Chaos Orb gives it, and click a mod for the ways to get it with odds and cost. Add several mods
 // to the plan to get the odds of hitting them all at once. Everything fits on one screen: three columns that scroll.
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { friendly } from "./errors";
 import { usePersist } from "./usePersist";
 import { CurrencyIcon, ItemIcon } from "./icons";
@@ -24,6 +24,9 @@ const INF_COLOUR: Record<string, string> = { Shaper: "#7fb2ff", Elder: "#c79bff"
 const RARITY_COLOUR: Record<string, string> = { Normal: "#c8c8c8", Magic: "#8888ff", Rare: "#ffff77", Unique: "#af6025" };
 /** Shared with the Ctrl+D window: the item its "Craft this" button sends here. */
 export const CRAFT_ITEM_KEY = "craft.item";
+/** Put in front of the item text when it's an item to make (from your build), not one you own: the page plans every
+ *  mod on it and starts from a fresh base. */
+export const CRAFT_PLAN_MARK = "[plan]\n";
 
 /** "1 in 12" / "always" / "can't roll". */
 function odds(p: number) {
@@ -72,13 +75,16 @@ export default function Craft() {
   /** Which non-clickable mod of your item has its "how to get it" note open. */
   const [how, setHow] = useState<number | null>(null);
   const [showRoutes, setShowRoutes] = useState(false);
+  /** An item from your build arrived: plan all its mods once its mods are read, then forget it (you don't own it). */
+  const planWanted = useRef(false);
 
   useEffect(() => { invoke<string[]>("craft_bases").then(setBases).catch(() => {}); }, []);
 
   const fromText = async (text: string) => {
     const s = await invoke<Start | null>("craft_start", { text }).catch(() => null);
     if (!s) { setErr("That doesn't look like gear you can craft on (armour, weapons, jewellery, quivers, shields)."); return; }
-    setErr(""); setBase(s.base); setIlvl(s.ilvl); setInfl(s.influences); setHave(s.have); setRarity(s.rarity); setItemName(s.name); setItemText(text);
+    // PoB doesn't keep item levels (its copies say 1): an item to make from your build is planned at 86, where every tier rolls.
+    setErr(""); setBase(s.base); setIlvl(planWanted.current && s.ilvl < 68 ? 86 : s.ilvl); setInfl(s.influences); setHave(s.have); setRarity(s.rarity); setItemName(s.name); setItemText(text);
     setPick(null); setPaste(false); setPlan([]);
   };
   // An item sent from the Ctrl+D window (now, or while this page was closed).
@@ -86,6 +92,7 @@ export default function Craft() {
     const take = () => {
       let t: string | null = null;
       try { t = localStorage.getItem(CRAFT_ITEM_KEY); localStorage.removeItem(CRAFT_ITEM_KEY); } catch { /* none */ }
+      if (t && t.startsWith(CRAFT_PLAN_MARK)) { planWanted.current = true; t = t.slice(CRAFT_PLAN_MARK.length); }
       if (t) fromText(t);
     };
     take();
@@ -111,6 +118,19 @@ export default function Craft() {
     return (pool?.families ?? []).filter((f) => words.every((w) => (f.text + " " + f.tags.join(" ") + " " + (f.needs ?? "")).toLowerCase().includes(w)));
   }, [pool, q]);
   const fam = (k: string | null) => pool?.families.find((f) => f.key === k) ?? null;
+  /** Every mod on the item that can be crafted, at its own tier or better, into the plan. */
+  const planAll = (p: Pool) => {
+    const seen = new Set<string>();
+    setPlan(p.item_mods.filter((m) => m.key && m.kind !== "fractured" && !seen.has(m.key) && seen.add(m.key))
+      .map((m) => { const f = p.families.find((x) => x.key === m.key); return { key: m.key!, tier: m.tier ?? Math.min(f?.tiers.length || 1, 2) }; }));
+  };
+  // From your build: plan it, then start from a fresh base (the plan stays; the item's mods aren't yours yet).
+  useEffect(() => {
+    if (!planWanted.current || !pool || pool.item_mods.length === 0) return;
+    planWanted.current = false;
+    planAll(pool);
+    clearItem();
+  }, [pool]); // eslint-disable-line react-hooks/exhaustive-deps
   const picked = fam(pick);
   const routePlan = useMemo(() => plan.filter((t) => fam(t.key)), [plan, pool]);
   const routes = useRoutes(routePlan, base, ilvl, infl, have);
@@ -186,12 +206,7 @@ export default function Craft() {
               ))}
               <div className="cr-tip-foot"><span>{pool.item_mods.filter((m) => m.affix === "prefix").length}/3 prefixes · {pool.item_mods.filter((m) => m.affix === "suffix").length}/3 suffixes</span>
                 <button className="link small" onClick={clearItem}>forget item</button></div>
-              <button className="primary cr-planall" onClick={() => {
-                // Every mod on the item that can be crafted, at its own tier or better, into the plan.
-                const seen = new Set<string>();
-                setPlan(pool.item_mods.filter((m) => m.key && m.kind !== "fractured" && !seen.has(m.key) && seen.add(m.key))
-                  .map((m) => { const f = fam(m.key); return { key: m.key!, tier: m.tier ?? Math.min(f?.tiers.length || 1, 2) }; }));
-              }} title="Puts every mod on this item into the plan and shows a step-by-step route to make it">
+              <button className="primary cr-planall" onClick={() => planAll(pool)} title="Puts every mod on this item into the plan and shows a step-by-step route to make it">
                 Plan this whole item</button>
             </div>
           ) : (
