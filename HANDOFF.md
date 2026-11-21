@@ -620,7 +620,19 @@ Everything below was built since GROBBS last tested and has only been checked wi
 Confirmed in game so far: basic Ctrl+D price check (trade search returned listings); 20 Nov: weapon + armour
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
-**Batch mode (21 Nov, after 0.2.34)**
+**Next test session (planned 21 Nov night, for 22 Nov).** Walk him through it a few at a time, between maps.
+Latest release is 0.2.36; only the design fixes + main window looks (035b42c, 4d7ea7f, a9b298f) are unreleased, and
+he sees those in the dev editor `Start editor.bat` opens. Details for each are in the items further down.
+1. Price window (Ctrl+D on a rare): stats in groups (Minimum rolls, Prefixes "1 of 2 used", Suffixes...); More → Layout
+   → Flat gives one list with a tag on each row. An item with under 5 listed shows amber "low confidence".
+   Cogwork Ring (Dragon Turn): Intelligence reads +57 (not +46).
+2. Batch mode: F3, Ctrl+C a few items (small box says "Added"), F3 again, pick Hide/Highlight, Save, F4.
+   After any filter change: "✓ Saved … · Undo" note at the bottom; Undo puts it back.
+3. Wealth page: tick "Include my guild stash", scan: "Guild · …" tabs appear in the list and the total.
+4. Settings → Main window look: try Colourful, Calm, Tooltip Gold, Mono Amber; pick a favourite. Small grey text easy
+   to read on every page? Home page + Ctrl+K search feel easier?
+
+**Batch mode (21 Nov, in 0.2.36)**
 - [ ] Press F3 in game: the editor no longer pops up over the game; a small "Batch mode · N items" box shows instead
   (drag it anywhere, it remembers). Ctrl+C items: it says "Added: …" or "Already listed: …". Press F3 again: the
   editor opens on Batch mode with the list. Each row says what the filter does now ("now Hidden"); hidden items start
@@ -740,7 +752,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Tiers page polish (after 0.2.28): the "?" help opens under the heading in normal letters (was squeezed beside it
       in small caps); help boxes everywhere have a soft gold frame; tiers aren't a box inside a box; item chips show as pills.
       (In 0.2.29.)
-- [ ] "Polish everything" pass (21 Nov, after 0.2.29, not released yet): card headings one size everywhere (ones beside a
+- [ ] "Polish everything" pass (21 Nov, released after 0.2.29): card headings one size everywhere (ones beside a
       button were smaller: Filters, My edits, Batch, Prices, Wealth); hint text in empty boxes easier to read; Help says
       "Filters" (not "Profiles"/"Built on"), adds price check + crafting answers and every hotkey; Atlas page opens at the
       top (the step list used to scroll the whole page down to the current step); Maps wishes three per row (labels no
@@ -748,14 +760,14 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
       tiles flatter; F2 "Pick a sound…" link gold instead of web blue; F7 strategy picker shows the whole name.
       Dev: preview-app.html now has sample data for Presets, Themes, Levelling gear and Prices; `await __go("Themes")`
       in the console opens a page.
-- [ ] Home page, calmer sidebar and Ctrl+K search (21 Nov, not released yet): the editor now always opens on
+- [ ] Home page, calmer sidebar and Ctrl+K search (21 Nov, in 0.2.32): the editor now always opens on
       **Home** (your filter, recent changes, prices on/off, build, atlas strategy, crafting, and the in-game hotkeys;
       "Reload in game" button). Alt+← still goes back to the page you had open last time. Sidebar: Home, then two
       groups ("Your filter", "Playing"), Settings + Help pinned at the bottom; only the gold in-game keys show (Ctrl+1…9
       still work, listed in each item's tooltip). **Ctrl+K** (or the Search button) finds items (opens them on Find,
       ready to change), pages and Help answers. Check: does it feel easier? Is anything missing on Home?
       Undo: Home.tsx / Search.tsx are self-contained; App.tsx MENU/BOTTOM hold the sidebar.
-- [ ] Price window clean-up, every style (21 Nov, not released yet): window 480px wide so long mods fit on one line;
+- [ ] Price window clean-up, every style (21 Nov, in 0.2.33): window 480px wide so long mods fit on one line;
       price box reads "sells for about" with "20c to 1 div · 32 listed"; unticked stats fade back; each stat keeps its
       tier and roll bar plus the roll range (no "high roll" words); headings without hints (hover for them); small
       "This item / As a base" switch; no "Instant" tag on listings; item level column only when levels differ;
@@ -763,13 +775,13 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
       **New setting, on by default: Settings → Price check → "Instant buyout only"** (trade status "securable",
       checked on the live site: Stygian Vise 7,029 vs 7,913 listings). GROBBS dropped the "Quick look" style idea:
       roll ranges matter for most rare/unique prices. (In 0.2.33.)
-- [ ] "Saved" note + less reading (21 Nov, not released yet): after any change to the filter, from any page or F2, the
+- [ ] "Saved" note + less reading (21 Nov, in 0.2.34): after any change to the filter, from any page or F2, the
       editor shows a small note at the bottom: "✓ Saved <what> · Press F4 in game to see it · Undo". It fades after a
       few seconds (stays while the mouse is on it); Undo goes back one change and reloads the open page. (Rust: every
       change goes through `remember()`, which now emits `filter-changed` to the main window.) Long explanations at the
       top of Filters, My edits, Themes, Prices, Maps, Atlas, Crafting and Settings cut to one line; the detail moved
       into the "?" next to the heading.
-- [ ] Price window: two layouts + low confidence + Cogwork numbers (21 Nov, not released yet).
+- [ ] Price window: two layouts + low confidence + Cogwork numbers (21 Nov, in 0.2.34).
       **Grouped** (default): headings Minimum rolls · Defences (at 20% quality) · Totals (all mods added up) · Base mods
       (implicit) · Prefixes "1 of 2 used" · Suffixes "3 of 4 used" (open-slot rows sit inside their group, "1 open
       prefix · room to craft") · Base and item level · For sale now. **Flat** (like Awakened): no stat headings, a tag
