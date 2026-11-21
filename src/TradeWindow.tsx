@@ -172,9 +172,9 @@ function Roll({ r, range, tier }: { r: number; range?: string | null; tier: numb
   const cls = pct >= 80 ? "hi" : pct >= 40 ? "mid" : "lo";
   const word = pct >= 80 ? "high roll" : pct >= 40 ? "mid roll" : "low roll";
   return (
-    <span className={`tw-roll ${cls}`} title={`${pct}% of the way from the lowest to the highest roll${tier != null ? " for this tier" : ""}`}>
-      <span className="tw-roll-bar"><span style={{ width: `${Math.max(4, pct)}%` }} /></span>{word}
-      {range && <span className="tw-roll-range">{tier != null ? `T${tier} range` : "range"} {range}</span>}
+    <span className={`tw-roll ${cls}`} title={`${word}: ${pct}% of the way from the lowest to the highest roll${tier != null ? ` for tier ${tier}` : ""}${range ? ` (${range})` : ""}`}>
+      <span className="tw-roll-bar"><span style={{ width: `${Math.max(4, pct)}%` }} /></span>
+      {range && <span className="tw-roll-range">{range}</span>}
     </span>
   );
 }
@@ -273,8 +273,10 @@ function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote, waiting, st
   const ninjaChaos = ninja ? (ninja[1] === "divine" && divine ? ninja[0] * divine : ninja[1] === "chaos" ? ninja[0] : null) : null;
   let main: number | null = null, label = "", sub: React.ReactNode = null, source = "";
   if (res?.summary) {
-    main = res.summary[1]; label = "on trade now";
-    sub = <>cheapest {money(res.summary[0], divine)} · {res.total.toLocaleString()} listed</>;
+    main = res.summary[1]; label = "sells for about";
+    const ps = res.listings.map((l) => l.chaos).filter((x): x is number => x != null);
+    const top = ps.length ? Math.max(...ps) : null;
+    sub = <>{money(res.summary[0], divine)}{top != null && top > res.summary[0] ? <> to {money(top, divine)}</> : null} · {res.total.toLocaleString()} listed</>;
   } else if (bulk?.offers[0]) {
     // Like Awakened: the headline is poe.ninja's price (from real in-game Currency Exchange trades, which price
     // fixers can't move); our stock-weighted going rate only when poe.ninja doesn't have the item.
@@ -467,6 +469,8 @@ export default function TradeWindow() {
   const [showFixers, setShowFixers] = useState(false);
   const [saved, setSaved] = useState<Saved[]>([]);
   const [showSaved, setShowSaved] = useState(false);
+  /** The footer's "More": saved searches, Style and Something's wrong. */
+  const [more, setMore] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
   const [preset, setPreset] = useState<number | null>(0);
   // Awakened-style tabs: price this item, or price it as a crafting base. Your own search is kept while you look.
@@ -583,6 +587,8 @@ export default function TradeWindow() {
   // Where poe.ninja's price sits among the offers (Awakened's "market ratio" row).
   const ratioAt = bulk && ninjaC != null ? (() => { const i = bulk.offers.findIndex((o) => (o.pay_currency === "divine" && bulk.divine ? o.each * bulk.divine : o.each) >= ninjaC); return i === -1 ? bulk.offers.length : i; })() : -1;
   // Item listings: the same seller at the same price several times in a row shows once, with "× N" (like Awakened).
+  // The item level column only when the listings' levels differ.
+  const ilvls = new Set((res?.listings ?? []).map((l) => l.ilvl).filter(Boolean)).size > 1;
   const collapsed = (res?.listings ?? []).reduce<{ l: Listing; n: number; i: number }[]>((acc, l, i) => {
     const last = acc[acc.length - 1];
     if (last && last.l.account === l.account && last.l.amount === l.amount && last.l.currency === l.currency) last.n += 1; else acc.push({ l, n: 1, i });
@@ -653,7 +659,7 @@ export default function TradeWindow() {
         return (
           <div className="tw-tabs" title={"Awakened PoE Trade's two searches: this item with its stats, or what it's worth as a base to craft on (" + b.why.join(", ") + ")"}>
             <button className={asBase ? "" : "on"} onClick={() => pick(false)}>This item</button>
-            <button className={asBase ? "on" : ""} onClick={() => pick(true)}>As a base <span className="tw-tab-why">{b.why.join(" · ")}</span></button>
+            <button className={asBase ? "on" : ""} onClick={() => pick(true)}>As a base</button>
           </div>
         );
       })()}
@@ -696,7 +702,7 @@ export default function TradeWindow() {
             const head = !prev || rowGroup(prev, [3, 3])[0] !== g[0];
             return (
               <React.Fragment key={f.id + i}>
-                {head && <div className="tw-group"><span>{g[0]}</span>{g[1] && <span className="tw-group-hint">{g[1]}</span>}</div>}
+                {head && <div className="tw-group" title={g[1] || undefined}><span>{g[0]}</span></div>}
                 <label className={`tw-stat ${f.enabled ? "on" : ""} ${f.junk ? "junk" : ""}`} title={f.junk ? "Rarely changes the price" : undefined}>
                   <input type="checkbox" checked={f.enabled} onChange={(e) => patch(i, { enabled: e.target.checked })} />
                   <span className={`tw-label mod-${f.kind}`}>{g[1] === "at 20% quality" ? f.label.replace(/\s*\(at 20% quality\)$/i, "") : f.label}{KIND[f.kind] && f.kind !== "pseudo" && f.kind !== "implicit" && <span className="tw-kind">{KIND[f.kind]}</span>}
@@ -712,7 +718,7 @@ export default function TradeWindow() {
       )}
       {setup.unknown.length > 0 && showStats && !asBase && (
         <div className="tw-unknown">
-          <div className="tw-group"><span>Not searchable</span><span className="tw-group-hint">the trade site has no filter for these</span></div>
+          <div className="tw-group" title="The trade site has no filter for these"><span>Not searchable</span></div>
           {setup.unknown.map((u, i) => {
             const k = setup.unknown_kinds?.[i] ?? "explicit";
             return <div key={i} className={`tw-label mod-${k} small`} title="The trade site has no search for this mod">
@@ -802,16 +808,16 @@ export default function TradeWindow() {
           <div className="tw-sec tw-res-sec">Cheapest listed</div>
           {style === "compare" && <PriceSpread res={res} divine={divine} />}
           <div className="tw-table">
-            <div className="tw-th"><span>Price</span><span>{res.listings.some((l) => l.ilvl) ? "ilvl" : ""}</span><span>Listed</span><span>Seller</span><span /></div>
+            <div className="tw-th"><span>Price</span><span>{ilvls ? "ilvl" : ""}</span><span>Listed</span><span>Seller</span><span /></div>
             {collapsed.map(({ l, n, i }) => (
               <div key={i} className="tw-tr">
                 <span className="tw-price"><Price n={l.amount} cur={l.currency} />
                   {l.chaos != null && !["chaos", "divine"].includes(l.currency) && <span className="tw-eq">{money(l.chaos, divine)}</span>}
                   {n > 1 && <span className="tw-times" title={`The same seller lists ${n} of these at this price`}>× {n}</span>}</span>
-                <span className="muted">{l.ilvl || ""}</span>
+                <span className="muted">{ilvls ? l.ilvl || "" : ""}</span>
                 <span className="muted">{ago(l.indexed)}</span>
                 <span className="tw-seller muted">{l.account}</span>
-                {l.instant ? <span className="tw-instant" title="Instant buyout: buy it straight from the trade site or the in-game market, no whisper">Instant</span>
+                {l.instant ? <span />
                   : l.whisper ? <button className="link small" onClick={() => copy(l.whisper, "l" + i)}>
                   {copied === "l" + i ? "Copied" : "Whisper"}</button> : <span />}
                 {style === "compare" && l.mods && <ListingMods mods={l.mods} yours={setup.filters} />}
@@ -827,6 +833,8 @@ export default function TradeWindow() {
         <button className="link small tw-open-site" title="See what else can roll on it and the cheapest way to get a mod"
           onClick={() => { try { localStorage.setItem(CRAFT_ITEM_KEY, check.setup?.raw ?? ""); } catch { /* not passed */ } invoke("open_editor", { tab: "craft" }); }}>
           Craft this</button>)}
+      <button className={`link small tw-more-btn ${more ? "on" : ""}`} onClick={() => setMore(!more)}>More {more ? "▴" : "▾"}</button>
+      {more && <div className="tw-more">
       {!check.bulk && savedToggle}
       <button className="link small tw-style-btn" onClick={nextStyle} title={"Switch the look of this window: " + TW_STYLES.map(([, n]) => n).join(", ")}>
         Style: {TW_STYLES.find(([k]) => k === style)?.[1] ?? "Classic"} ›</button>
@@ -835,6 +843,7 @@ export default function TradeWindow() {
           title="Saves this price check with your note, so Claude can see exactly what went wrong">
           {reported ? "✓ Saved: mention it to Claude in chat" : "Something's wrong?"}</button>
       )}
+      </div>}
       </div>
       {!check.bulk && savedPanel}
       {reporting != null && (

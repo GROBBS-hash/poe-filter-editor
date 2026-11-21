@@ -716,6 +716,14 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
       still work, listed in each item's tooltip). **Ctrl+K** (or the Search button) finds items (opens them on Find,
       ready to change), pages and Help answers. Check: does it feel easier? Is anything missing on Home?
       Undo: Home.tsx / Search.tsx are self-contained; App.tsx MENU/BOTTOM hold the sidebar.
+- [ ] Price window clean-up, every style (21 Nov, not released yet): window 480px wide so long mods fit on one line;
+      price box reads "sells for about" with "20c to 1 div · 32 listed"; unticked stats fade back; each stat keeps its
+      tier and roll bar plus the roll range (no "high roll" words); headings without hints (hover for them); small
+      "This item / As a base" switch; no "Instant" tag on listings; item level column only when levels differ;
+      footer = Open on the trade site · Craft this · More (saved searches, Style, Something's wrong?).
+      **New setting, on by default: Settings → Price check → "Instant buyout only"** (trade status "securable",
+      checked on the live site: Stygian Vise 7,029 vs 7,913 listings). GROBBS dropped the "Quick look" style idea:
+      roll ranges matter for most rare/unique prices.
 
 **Frame + fixes (21 Nov, 0.2.24)**
 - [ ] Editor window: no Windows title bar, a gold one instead; drag it to move, double-click to maximise, the three

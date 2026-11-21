@@ -720,6 +720,8 @@ fn currency_rates(app: &AppHandle) -> std::collections::HashMap<String, f64> {
 /// The trade site search for a price window setup (with transfigured gems' search names).
 fn trade_query(app: &AppHandle, poe2: bool, setup: &filter_core::trade::TradeSetup) -> serde_json::Value {
     let mut q = filter_core::trade::query(setup);
+    // Instant buyout only (the default): prices you can actually buy at, no whisper-and-wait sellers.
+    if app.state::<AppState>().store.lock().unwrap().settings.price_buyout_only { q["query"]["status"]["option"] = serde_json::json!("securable"); }
     if let Ok(types) = trade_api::item_types(&app.state::<AppState>().data_dir, poe2) { types.fix_query(&mut q); }
     q
 }

@@ -1829,3 +1829,25 @@ kbd { font: 600 11px/1.4 "Segoe UI", system-ui, sans-serif; color: var(--text-2)
 /* The item editor in the main window is a two-column sheet (.qm-sheet): the boxes it sits in on My edits and Find
    were still the in-game pop-up's 300px, which crushed both columns. Give them the sheet's width. */
 .rule-edit.qm:has(.qm-sheet), .find-panel:has(.qm-sheet) { width: min(860px, 100%); max-width: none; margin: 12px auto 6px; padding: 16px 18px; }
+
+/* ── Price window clean-up (21 Nov 2026): wider so long mods fit on one line, unticked stats fade back,
+   a small "This item / As a base" switch, plain roll ranges, and a "More" fold in the footer. ─────────────── */
+.qm.tw { width: 480px; }
+.tw-stat { grid-template-columns: 18px 1fr 58px; }
+.tw-stat:not(.on) { background: transparent; }
+.tw-stat:not(.on) .tw-label, .tw-stat:not(.on) .tw-min { opacity: .6; }
+.tw-stat:not(.on):hover .tw-label, .tw-stat:not(.on):hover .tw-min { opacity: .9; }
+.tws-tooltip .tw-stat:not(.on) { background: transparent; }
+.tw-group { margin-top: 10px; }
+.tw-roll { font-size: 11px; gap: 6px; }
+.tw-roll-bar { width: 34px; height: 4px; }
+.tw-roll-range { margin-left: 0; opacity: 1; }
+.tw-tabs { display: inline-flex; gap: 2px; margin: 6px 0 4px; padding: 2px; border-radius: 8px; background: rgba(255,255,255,0.03); }
+.tw-tabs button { flex: none; padding: 3px 12px; font-size: 12px; border-radius: 6px; color: var(--muted); }
+.tw-tabs button.on { background: var(--raised); color: var(--text); box-shadow: inset 0 0 0 1px var(--line-2); }
+.tws-tooltip .tw-tabs button.on { background: #2a2116; color: #e8d7b0; }
+.tw-th, .tw-tr { grid-template-columns: 120px 32px 40px 1fr auto; }
+.tw-foot .tw-more-btn { margin-left: auto; }
+.tw-foot .tw-more-btn.on { color: var(--text); }
+.tw-more { flex-basis: 100%; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0 4px; }
+.tw-more .tw-report-toggle { margin-left: 0; }

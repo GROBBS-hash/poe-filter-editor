@@ -7,7 +7,7 @@ type Settings = {
   key_quick_edit: string; key_batch: string; key_reload: string; key_cycle: string; key_build: string; key_price?: string; key_atlas?: string;
   cycle_enabled: boolean; fallback_area_level: number; claude_api_key: string; map_avoid?: string[] | null;
   trade_helper?: boolean; thanks_message?: string; chat_keys?: { key: string; command: string }[];
-  price_compare?: boolean; price_rolls?: boolean; price_instant_all?: boolean; build_with_tree?: boolean; key_tree?: string;
+  price_compare?: boolean; price_rolls?: boolean; price_instant_all?: boolean; price_buyout_only?: boolean; build_with_tree?: boolean; key_tree?: string;
 };
 const CHAT_IDEAS = ["/hideout", "/kingsmarch", "/menagerie", "/delve", "/exit", "/invite", "/kick", "/afk"];
 
@@ -83,6 +83,8 @@ export default function SettingsPage() {
           <span>Compare the item with your build's gear (needs a PoB link on the Build page)</span></label>
         <label className="check"><input type="checkbox" checked={s.price_rolls ?? true} onChange={(e) => set({ price_rolls: e.target.checked })} />
           <span>Show how well each mod rolled (a bar from the lowest to the highest roll)</span></label>
+        <label className="check"><input type="checkbox" checked={s.price_buyout_only ?? true} onChange={(e) => set({ price_buyout_only: e.target.checked })} />
+          <span>Instant buyout only: price from listings you can buy straight away, not sellers you have to whisper</span></label>
         <label className="check"><input type="checkbox" checked={s.price_instant_all ?? false} onChange={(e) => set({ price_instant_all: e.target.checked })} />
           <span>Search every item straight away. Off (like Awakened): uniques, currency and other bulk items, and
             unidentified items search at once; rares and gear wait so you can pick the stats, then move your mouse onto Search.</span></label>
