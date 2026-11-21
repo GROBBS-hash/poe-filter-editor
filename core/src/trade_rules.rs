@@ -239,6 +239,12 @@ pub fn property_filters(text: &str, item: &Item, mods: &[ModLine]) -> (Vec<StatF
             replaced.extend(WEAPON_LOCAL.iter().copied());
         }
     }
+    // Quality above the usual 20% (catalysts, flasks rolled with "Superior" quality up to 30%): a row of its own.
+    // Ticked on flasks, where high quality is what you pay for; there to tick on other gear.
+    if p.quality > 20.0 && !item.item_class.contains("Gem") && item.item_class != "Maps" {
+        let flask = item.item_class.contains("Flask") || item.item_class == "Tinctures";
+        out.push(StatFilter { enabled: flask && !unique, ..f("prop.quality", format!("Quality: {}%", p.quality), p.quality, true) });
+    }
     let hide = mods.iter().enumerate().filter(|(_, m)| m.kind != "implicit" && m.kind != "enchant"
         && replaced.contains(&template(&m.text).0.to_lowercase().as_str())).map(|(i, _)| i).collect();
     (out, hide)
@@ -249,7 +255,7 @@ pub fn property_query(id: &str) -> Option<(&'static str, &'static str)> {
     Some(match id {
         "prop.ar" => ("armour_filters", "ar"), "prop.ev" => ("armour_filters", "ev"), "prop.es" => ("armour_filters", "es"),
         "prop.ward" => ("armour_filters", "ward"), "prop.pdps" => ("weapon_filters", "pdps"), "prop.edps" => ("weapon_filters", "edps"),
-        "prop.dps" => ("weapon_filters", "dps"),
+        "prop.dps" => ("weapon_filters", "dps"), "prop.quality" => ("misc_filters", "quality"),
         "prop.map_iiq" => ("map_filters", "map_iiq"), "prop.map_iir" => ("map_filters", "map_iir"),
         "prop.map_bonus" => ("map_filters", "map_bonus"), "prop.map_packsize" => ("map_filters", "map_packsize"),
         _ => return None,
@@ -297,6 +303,16 @@ mod tests {
     use super::*;
     use crate::trade::{mods, setup, query};
     use serde_json::json;
+
+    #[test]
+    fn flask_quality() {
+        let text = "Item Class: Life Flasks\nRarity: Magic\nSeething Divine Life Flask of Staunching\n--------\nQuality: +26% (augmented)\nRecovers 2400 Life over 3.50 Seconds\n--------\nRequirements:\nLevel: 60\n--------\nItem Level: 84\n--------\n66% reduced Amount Recovered\nInstant Recovery\n";
+        let s = setup(text, &StatIndex::default()).unwrap();
+        let q = s.filters.iter().find(|f| f.id == "prop.quality").expect("quality row");
+        assert!(q.enabled);
+        assert_eq!(q.value, 26.0);
+        assert_eq!(query(&s)["query"]["filters"]["misc_filters"]["filters"]["quality"]["min"], 26.0);
+    }
 
     fn index() -> StatIndex {
         StatIndex::from_json(&json!({ "result": [

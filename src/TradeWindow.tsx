@@ -202,6 +202,7 @@ function bulkTypical(offers: Offer[], divine: number | null, market: number | nu
 /** The small heading over a row. `max` = how many prefixes / suffixes the item can hold (Cogwork Ring 2 / 4). */
 function rowGroup(f: StatFilter, max: [number, number]): [string, string] {
   if (f.id.startsWith("prop.map_")) return ["Map", "at least this much"];
+  if (f.id === "prop.quality") return ["Quality", "above the usual 20%"];
   if (f.id.startsWith("prop.")) return [f.id.includes("dps") ? "Damage" : "Defences", "at 20% quality"];
   if (f.kind === "pseudo") return f.id.includes("empty") ? ["Open slots", "room for another mod"] : ["Totals", "added up from all its mods"];
   if (f.kind === "enchant") return ["Enchant", ""];

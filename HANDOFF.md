@@ -309,6 +309,10 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   elemental total and hidden, and the chaos total was skipped (bench craft only), so chaos vanished. Now the chaos
   total shows, unticked (trade_rules: bench_only).
 
+- Flask quality + jewels 21 Nov (0.2.28): `prop.quality` row (trade_rules `property_filters`) when quality > 20 (not gems or
+  maps), ticked on flasks/tinctures, searched as misc_filters.quality. Tiers `KNOWN` lists NeverSink's jewels->generic /
+  abyss / cluster / clustereco / special / leveling (only the ones the filter has show).
+
 - Corrupted only 21 Nov (0.2.27): `MatchOpts.corrupted` / `RuleEdit.corrupted` / `RuleDetail.corrupted` (rules.rs) add "Corrupted True"
   and a "Corrupted" label prefix; a corrupted-only edit has its own slot and doesn't shadow plain ones. F2 panel offers "Only
   corrupted ones" when the item is corrupted. Double title bar: tauri-plugin-window-state restored "decorated: true" from
@@ -639,6 +643,10 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 
 **Crafted chaos (21 Nov, 0.2.18)**
 - [x] (Confirmed 21 Nov.) Ctrl+D on gear with a crafted "X and Chaos Resistances": "+N% total to Chaos Resistance" is there to tick.
+
+**Flask quality + jewels on Tiers (21 Nov, 0.2.28)**
+- [ ] Ctrl+D on a flask with quality over 20% (e.g. 26%): a ticked "Quality: 26%" row; the search finds 26%+ flasks.
+- [ ] Tiers page: a Jewels group (Jewels, Cluster jewels, Cluster jewels (cheap), Special jewels) with jewel pictures.
 
 **Corrupted only + frame fix (21 Nov, 0.2.27)**
 - [ ] F2 on a corrupted item (e.g. a corrupted rare Cobalt Jewel): an "Only corrupted ones" tick; highlight with it ticked:

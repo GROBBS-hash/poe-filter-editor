@@ -104,6 +104,13 @@ const KNOWN: &[(&str, &str, &str)] = &[
     ("exotic->fractured", "Gear", "Fractured bases"),
     ("rare->exotic->veiled", "Gear", "Veiled items"),
     ("exoticbases", "Gear", "Exotic bases"),
+    // Jewels (21 Nov: he looked for the jewel rules here and couldn't find them).
+    ("jewels->generic", "Jewels", "Jewels"),
+    ("jewels->abyss", "Jewels", "Abyss jewels"),
+    ("jewels->cluster", "Jewels", "Cluster jewels"),
+    ("jewels->clustereco", "Jewels", "Cluster jewels (cheap)"),
+    ("jewels->special", "Jewels", "Special jewels"),
+    ("jewels->leveling", LEVELLING, "Jewels while levelling"),
 ];
 
 /// "t2divine" -> "Tier 2 (divine)", "exhide" -> "Hidden extras".

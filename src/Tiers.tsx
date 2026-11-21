@@ -27,6 +27,8 @@ const SECTION_ICON: Record<string, { item?: string; url?: string; badge?: string
   "Delirium orbs": { item: "Fine Delirium Orb" }, "Omens": { item: "Omen of Amelioration" }, "Tattoos": { item: "Tattoo of the Arohongui Warrior" },
   "Lifeforce": { item: "Vivid Crystallised Lifeforce" }, "Runegrafts": { item: "Runegraft of Blasphemy" },
   "Rare gear by item tier": { item: "Hubris Circlet" }, "Fractured bases": { item: "Fractured Fossil" }, "Veiled items": { item: "Veiled Chaos Orb" },
+  "Jewels": { item: "Cobalt Jewel" }, "Abyss jewels": { item: "Searching Eye Jewel" }, "Cluster jewels": { item: "Large Cluster Jewel" },
+  "Cluster jewels (cheap)": { item: "Small Cluster Jewel" }, "Special jewels": { item: "Timeless Jewel" }, "Jewels while levelling": { item: "Crimson Jewel" },
 };
 
 /** A menu entry's picture (fixed size, so names line up even when there's no picture). */
