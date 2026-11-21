@@ -3,7 +3,7 @@
 //! or resize, put back (and pulled fully onto a screen) each time they're shown.
 //!
 //! - "build" (F6) and "atlas" (F7): place and size; they have a resize grip.
-//! - "trades" and "earnings": place only (they size themselves to what they show).
+//! - "trades", "earnings" and "batch": place only (they size themselves to what they show).
 
 use super::*;
 use std::collections::HashMap;
@@ -11,7 +11,7 @@ use std::collections::HashMap;
 /// Windows whose size is remembered too.
 const SIZED: [&str; 2] = ["build", "atlas"];
 /// Windows whose place is remembered.
-const PLACED: [&str; 4] = ["build", "atlas", "trades", "earnings"];
+const PLACED: [&str; 5] = ["build", "atlas", "trades", "earnings", "batch"];
 
 #[derive(Serialize, serde::Deserialize, Clone, Copy, PartialEq)]
 struct Place { x: i32, y: i32, w: u32, h: u32 }

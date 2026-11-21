@@ -1892,3 +1892,22 @@ kbd { font: 600 11px/1.4 "Segoe UI", system-ui, sans-serif; color: var(--text-2)
 .tw-low-tag { display: inline-block; width: fit-content; font-size: 12px; font-weight: 700; color: #f0b070; background: rgba(240,176,112,.14);
   border: 1px solid rgba(240,176,112,.35); border-radius: 5px; padding: 1px 7px; text-transform: none; }
 .tw-layout-pick { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+
+/* Batch mode page and its small in-game box */
+.batch-page .batch-steps { margin: 6px 0 4px; padding-left: 20px; line-height: 1.7; }
+.batch-page .batch-on { margin: 6px 0; }
+.batch-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ff6a5a; margin-right: 6px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #ff6a5a 25%, transparent); vertical-align: middle; animation: batch-pulse 1.6s ease-in-out infinite; }
+@keyframes batch-pulse { 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) { .batch-dot { animation: none; } }
+.batch-all { flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.batch-clear { margin-left: auto; }
+.batch li { flex-wrap: wrap; }
+.batch-item { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.batch-item > span:last-child { display: flex; flex-direction: column; min-width: 0; }
+.batch-name { font-weight: 600; }
+.batch-choice { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.batch-colours { display: inline-flex; gap: 4px; }
+.batch-win { padding: 8px 10px; cursor: move; min-width: 220px; }
+.batch-win .win-bar.compact { margin: -8px -10px 6px; }
+.batch-win-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

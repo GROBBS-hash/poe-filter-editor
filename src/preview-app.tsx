@@ -27,6 +27,11 @@ const wealth = {
 
 // Tiers → Map tiers: NeverSink-like map rules (whites T1-5, yellows T6-10, reds T11-16); hidden ones remembered here.
 const mapHidden = new Set<string>(["maps_d_t1", "maps_d_t2"]);
+let batchItems = [
+  { item_class: "Rings", rarity: "Normal", name: null, base_type: "Iron Ring", item_level: 70, corrupted: false, mirrored: false, unidentified: false },
+  { item_class: "Stackable Currency", rarity: "Currency", name: null, base_type: "Orb of Alteration", item_level: null, stack_size: 4, corrupted: false, mirrored: false, unidentified: false },
+  { item_class: "Body Armours", rarity: "Unique", name: "Tabula Rasa", base_type: "Simple Robe", item_level: 68, corrupted: false, mirrored: false, unidentified: false },
+];
 let cjRule: { kind: string; style: Record<string, unknown> } | null = null;
 const mapStyle = (b: string) => ({ font_size: 45, muted: false, text: b === "d" ? [255, 255, 255, 255] : [0, 0, 0, 255],
   background: b === "d" ? [20, 20, 0, 255] : b === "c" ? [235, 235, 120, 255] : [235, 235, 235, 255], border: b === "a" ? [255, 0, 0, 255] : null,
@@ -138,6 +143,14 @@ mockIPC((cmd, args) => {
   if (cmd === "craft_buy") return new Promise((ok) => setTimeout(() => ok({ summary: [380, 520], total: 37, url: "https://www.pathofexile.com/trade", divine: 221, listings: [] }), 600));
   // Tiers sections: public/_tiers.json when present (tierdump --json from a real filter), else none.
   if (cmd === "get_tiers") return fetch("/_tiers.json").then((r) => r.ok ? r.json() : []).catch(() => []);
+  // Batch mode: three items collected in game.
+  if (cmd === "batch_list") return batchItems;
+  if (cmd === "batch_forget") { const k = (args as { keys: string[] | null }).keys; batchItems = k ? batchItems.filter((i) => !k.includes(`${i.rarity}|${i.base_type}|${i.rarity === "Unique" ? i.name ?? "" : ""}`)) : []; return null; }
+  if (cmd === "item_status") {
+    const it = (args as { item: { base_type: string } }).item;
+    const hidden = it.base_type === "Iron Ring";
+    return { status: { verdict: { visibility: hidden ? "Hide" : "Show", reason: "", by_user_edit: false } } };
+  }
   // The "Corrupted rare jewels" switch on the Jewels page: one saved edit, highlighted or restyled.
   if (cmd === "get_rule" && String((args as { label?: string }).label ?? "").includes("Corrupted Rare every Jewels")) {
     const label = String((args as { label: string }).label);

@@ -620,6 +620,14 @@ Everything below was built since GROBBS last tested and has only been checked wi
 Confirmed in game so far: basic Ctrl+D price check (trade search returned listings); 20 Nov: weapon + armour
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
+**Batch mode (21 Nov, after 0.2.34)**
+- [ ] Press F3 in game: the editor no longer pops up over the game; a small "Batch mode · N items" box shows instead
+  (drag it anywhere, it remembers). Ctrl+C items: it says "Added: …" or "Already listed: …". Press F3 again: the
+  editor opens on Batch mode with the list. Each row says what the filter does now ("now Hidden"); hidden items start
+  on Highlight, shown ones on Hide; "Leave as is" takes it off with no edit. Save, then F4.
+  Code: the list lives in the app (`BATCH_LIST`, `batch_list` / `batch_forget`), so switching pages loses nothing;
+  window label "batch" (`BatchWindow` in src/Batch.tsx). Uniques are told apart by name.
+
 **Tiers page and build window (21 Nov, after 0.2.33)**
 - [ ] Tiers: every tier now has a plain name (e.g. cluster jewels "Large, 8 passives (best item level)", uniques
   "Could be worth something (several uniques share the base)", currency "Tier 2 · about a Divine Orb", "New items, not
@@ -979,7 +987,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
    "search every tab" done 21 Nov; guild stash built 21 Nov on branch `guild-stash` (awaiting approval); crafting planner done (0.2.32).
 3. Price check polish: done 21 Nov (Awakened ideas: unique roll ranges, anoints, cluster jewels, flasks, heist,
    influences, "Also searching for"). Waiting on his in-game check.
-4. Deferred earlier: batch mode tidy-up, PoE 2 coverage. (Installer + auto-update done 21 Nov: see "Installer and updates".)
+4. Deferred earlier: PoE 2 coverage. Batch mode tidy-up done 21 Nov (see "Batch mode"). (Installer + auto-update done 21 Nov: see "Installer and updates".)
 
 ## Known caveats
 - This cloud workspace can't reach pathofexile.com / poe.ninja / poeprices.info, so network code is only tested by

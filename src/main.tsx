@@ -8,10 +8,11 @@ import TradeWindow from "./TradeWindow";
 import TradesWindow from "./TradesWindow";
 import EarningsWindow from "./EarningsWindow";
 import AtlasOverlay from "./AtlasOverlay";
+import { BatchWindow } from "./Batch";
 import "./styles.css";
 
 const label = getCurrentWindow().label;
-document.body.classList.add(label === "overlay" || label === "build" || label === "trade" || label === "trades" || label === "earnings" || label === "atlas" ? "overlay" : "main");
+document.body.classList.add(label === "overlay" || label === "build" || label === "trade" || label === "trades" || label === "earnings" || label === "atlas" || label === "batch" ? "overlay" : "main");
 if (label === "trade") document.body.classList.add("scroll");
 
 // Windows over the game fade and settle in each time they appear, instead of popping in hard.
@@ -27,4 +28,4 @@ if (label !== "main") {
   for (const ev of ["price-check", "item-picked", "build-shown"]) listen(ev, pop);
   pop();
 }
-createRoot(document.getElementById("root")!).render(label === "overlay" ? <QuickMenu /> : label === "build" ? <BuildOverlay /> : label === "trade" ? <TradeWindow /> : label === "trades" ? <TradesWindow /> : label === "earnings" ? <EarningsWindow /> : label === "atlas" ? <AtlasOverlay /> : <App />);
+createRoot(document.getElementById("root")!).render(label === "overlay" ? <QuickMenu /> : label === "build" ? <BuildOverlay /> : label === "trade" ? <TradeWindow /> : label === "trades" ? <TradesWindow /> : label === "earnings" ? <EarningsWindow /> : label === "atlas" ? <AtlasOverlay /> : label === "batch" ? <BatchWindow /> : <App />);

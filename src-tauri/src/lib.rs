@@ -245,6 +245,15 @@ fn remember(state: &AppState, store: &Store, id: &str, what: &str) {
 }
 
 static BATCH_ON: AtomicBool = AtomicBool::new(false);
+/// What batch mode has collected so far, kept here (not in the page) so nothing is lost while the editor is on
+/// another page or closed to the tray. One entry per item kind (rarity, base and, for uniques, the name).
+static BATCH_LIST: Mutex<Vec<Item>> = Mutex::new(Vec::new());
+
+fn batch_key(i: &Item) -> String { format!("{}|{}|{}", i.rarity, i.base_type, if i.rarity == "Unique" { i.name.as_deref().unwrap_or("") } else { "" }) }
+
+/// The count and the last item, for the small in-game batch window.
+#[derive(Serialize, Clone)]
+struct BatchCount { count: usize, last: String, added: bool }
 
 fn filter_dir(game: Game) -> PathBuf {
     let docs = dirs::document_dir().unwrap_or_else(|| PathBuf::from("."));
@@ -1226,7 +1235,15 @@ fn start_batch_watcher(app: AppHandle) {
             }
             last = text.clone();
             if let Some(item) = read_item(&app, &text) {
-                let _ = app.emit("batch-item", &item);
+                let name = item.name.clone().filter(|_| item.rarity == "Unique" || item.rarity == "Rare").map(|n| format!("{n} ({})", item.base_type)).unwrap_or_else(|| item.base_type.clone());
+                let (count, added) = {
+                    let mut l = BATCH_LIST.lock().unwrap();
+                    let added = !l.iter().any(|x| batch_key(x) == batch_key(&item));
+                    if added { l.push(item.clone()); }
+                    (l.len(), added)
+                };
+                if added { let _ = app.emit("batch-item", &item); }
+                let _ = app.emit("batch-count", BatchCount { count, last: name, added });
             }
         }
     });
@@ -2361,6 +2378,29 @@ fn set_batch_mode(app: AppHandle, on: bool) {
     }
     BATCH_ON.store(on, Ordering::Relaxed);
     let _ = app.emit("batch-mode", on);
+    // The small in-game window says it's on and counts what you copy (no focus taken: you keep playing).
+    if let Some(w) = app.get_webview_window("batch") {
+        if on {
+            let count = BATCH_LIST.lock().unwrap().len();
+            let _ = app.emit_to("batch", "batch-count", BatchCount { count, last: String::new(), added: false });
+            crate::win_place::show_over_game(&app, &w);
+        } else { let _ = w.hide(); }
+    }
+}
+
+/// Batch mode's collected items (the Batch page reads them when it opens).
+#[tauri::command]
+fn batch_list() -> Vec<Item> { BATCH_LIST.lock().unwrap().clone() }
+
+/// Takes items off the collected list (by rarity|base|name key); none = clear it all.
+#[tauri::command]
+fn batch_forget(app: AppHandle, keys: Option<Vec<String>>) {
+    let count = {
+        let mut l = BATCH_LIST.lock().unwrap();
+        match keys { Some(k) => l.retain(|i| !k.contains(&batch_key(i))), None => l.clear() }
+        l.len()
+    };
+    let _ = app.emit("batch-count", BatchCount { count, last: String::new(), added: false });
 }
 
 // ---------- startup ----------
@@ -2405,7 +2445,7 @@ pub fn run() {
         .plugin(tauri_plugin_window_state::Builder::default()
             .with_state_flags(tauri_plugin_window_state::StateFlags::SIZE | tauri_plugin_window_state::StateFlags::POSITION
                 | tauri_plugin_window_state::StateFlags::MAXIMIZED)
-            .with_denylist(&["overlay", "build", "trade", "trades", "earnings", "atlas"]).build())
+            .with_denylist(&["overlay", "build", "trade", "trades", "earnings", "atlas", "batch"]).build())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(move |app, sc, ev| {
@@ -2444,11 +2484,9 @@ pub fn run() {
                     } else if action == Some(HotAction::Batch) {
                         let on = !BATCH_ON.load(Ordering::Relaxed);
                         set_batch_mode(app.clone(), on);
-                        if on {
-                            if let Some(w) = app.get_webview_window("main") {
-                                let _ = w.show();
-                            }
-                        }
+                        // Turning it on no longer pops the editor over the game (the small batch window shows instead);
+                        // turning it off with items collected opens the Batch page to choose what to do with them.
+                        if !on && !BATCH_LIST.lock().unwrap().is_empty() { open_editor(app.clone(), Some("batch".into())); }
                     }
                 })
                 .build(),
@@ -2532,7 +2570,7 @@ pub fn run() {
             update_rule,
             locate_item,
             item_status,
-            set_batch_mode,
+            set_batch_mode, batch_list, batch_forget,
             get_price_settings,
             set_price_settings,
             refresh_prices,
