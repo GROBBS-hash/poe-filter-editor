@@ -621,6 +621,91 @@ pub fn ways(base: &str, ilvl: u32, influences: &[String], key: &str, min_tier: u
         .then(b.chance.partial_cmp(&a.chance).unwrap_or(std::cmp::Ordering::Equal)));
     out
 }
+/// One step of a crafting route: what to do, and the ways to do it (cheapest first).
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct Step { pub title: String, pub detail: String, pub ways: Vec<Way> }
+
+/// A suggested route to make an item with these mods: the base, roll the hardest mods, add the rest one at a time,
+/// finish at the bench. A rough guide built from the same odds as the rest of the page.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct Recipe { pub steps: Vec<Step>, pub total: Option<f64>, pub ilvl_needed: u32, pub note: String }
+
+pub fn recipe(base: &str, ilvl: u32, influences: &[String], targets: &[(String, u32)], price: &dyn Fn(&str) -> Option<f64>) -> Option<Recipe> {
+    let d = data();
+    let p = pool(base, ilvl, influences, &[], price)?;
+    let (_, tags) = tagset(base, influences)?;
+    let fams: Vec<(&Family, u32)> = targets.iter().filter_map(|(k, t)| p.families.iter().find(|f| &f.key == k).map(|f| (f, *t))).collect();
+    if fams.is_empty() { return None }
+    let cheapest = |w: &[Way]| w.iter().find(|w| w.average.is_some()).and_then(|w| w.average);
+    let mut steps = Vec::new();
+    let mut total = Some(0.0);
+    let add_total = |total: &mut Option<f64>, v: Option<f64>| { *total = match (*total, v) { (Some(a), Some(b)) => Some(a + b), _ => None } };
+
+    // The item level the wanted tiers need.
+    let ilvl_needed = fams.iter().filter_map(|(f, t)| f.tiers.iter().filter(|x| x.tier <= *t).map(|x| x.lvl).min()).max().unwrap_or(1);
+    steps.push(Step { title: format!("Get a {base} of item level {ilvl_needed}+"),
+        detail: format!("The tiers you want need item level {ilvl_needed}. Any rarity: it gets rerolled next."), ways: vec![] });
+
+    // Saved for the end: one bench craft, on the hardest-to-roll mod the bench can make well enough.
+    let bench_ok = |f: &Family, t: u32| f.bench.first().is_some_and(|b| f.tiers.is_empty()
+        || first_bottom(&b.text).and_then(|v| f.tiers.iter().find(|x| first_bottom(&x.text).is_some_and(|y| y <= v))).is_some_and(|x| x.tier <= t));
+    let bench = fams.iter().filter(|(f, t)| bench_ok(f, *t)).min_by(|a, b| a.0.chaos.partial_cmp(&b.0.chaos).unwrap_or(std::cmp::Ordering::Equal)).map(|(f, _)| f.key.clone());
+    let mut rest: Vec<(&Family, u32)> = fams.iter().filter(|(f, _)| Some(&f.key) != bench.as_ref() && !f.tiers.is_empty()).copied().collect();
+    rest.sort_by(|a, b| a.0.chaos.partial_cmp(&b.0.chaos).unwrap_or(std::cmp::Ordering::Equal));
+
+    // Roll the hardest one or two together (more at once gets too unlikely).
+    let roll: Vec<(&Family, u32)> = rest.iter().take(2).copied().collect();
+    if !roll.is_empty() {
+        let names = roll.iter().map(|(f, _)| f.text.replace('\n', " / ")).collect::<Vec<_>>().join(" and ");
+        let ways: Vec<Way> = if roll.len() == 1 {
+            ways(base, ilvl, influences, &roll[0].0.key, roll[0].1, &[], "", price).into_iter().filter(|w| w.group != "Add a mod" && w.method != "Crafting bench").take(4).collect()
+        } else {
+            plan(base, ilvl, influences, &roll.iter().map(|(f, t)| (f.key.clone(), *t)).collect::<Vec<_>>(), price).into_iter().take(4).collect()
+        };
+        add_total(&mut total, cheapest(&ways));
+        steps.push(Step { title: format!("Roll {names}"), detail: "The hardest mods first: reroll the whole item until they're on it. Keep the item when they are.".into(), ways });
+    }
+
+    // Then add the others one at a time with Exalted Orbs, on the item as it is by then.
+    let roll_pool = rollable(&tags, ilvl, &[]);
+    let groups: HashMap<&str, usize> = roll_pool.iter().map(|(i, _, _, g)| (d.mods[*i].group.as_str(), *g)).collect();
+    let mut used: HashSet<usize> = HashSet::new();
+    let (mut pre, mut suf) = (0, 0);
+    let take = |f: &Family, used: &mut HashSet<usize>, pre: &mut i32, suf: &mut i32| {
+        if let Some(m) = d.mods.iter().find(|m| format!("{}|{}", m.gen, m.r#type) == f.key) { if let Some(g) = groups.get(m.group.as_str()) { used.insert(*g); } }
+        if f.affix == "prefix" { *pre += 1 } else { *suf += 1 }
+    };
+    for (f, _) in &roll { take(f, &mut used, &mut pre, &mut suf); }
+    // The bench mod's slot is kept free.
+    let bench_fam = bench.as_ref().and_then(|k| fams.iter().find(|(f, _)| &f.key == k)).map(|(f, _)| *f);
+    let (bpre, bsuf) = match bench_fam { Some(f) if f.affix == "prefix" => (1, 0), Some(_) => (0, 1), None => (0, 0) };
+    for (f, t) in rest.iter().skip(roll.len()) {
+        let wanted: HashSet<&str> = f.tiers.iter().filter(|x| x.tier <= *t).map(|x| x.name.as_str()).collect();
+        let key = f.key.clone();
+        let is_target = |i: &usize| { let m = &d.mods[*i]; format!("{}|{}", m.gen, m.r#type) == key && wanted.contains(m.name.as_str()) };
+        let full = if f.affix == "prefix" { pre + bpre >= 3 } else { suf + bsuf >= 3 };
+        let chance = if full { 0.0 } else { add_one(&roll_pool, &used, pre, suf, 3, &is_target) };
+        let each = price("Exalted Orb");
+        let w = Way { group: "Add a mod".into(), method: "Exalted Orb".into(), chance, cost_each: each, average: each.filter(|_| chance > 0.0).map(|e| e / chance),
+            note: if full { format!("No free {} slot left: use fewer mods of this kind, or annul one", f.affix) }
+                else { "If it adds something else: Orb of Annulment (removes a random mod) or reroll and try again".into() } };
+        add_total(&mut total, w.average);
+        steps.push(Step { title: format!("Add {}", f.text.replace('\n', " / ")), detail: format!("One {} at a time. Tip: bench \"Cannot roll Attack/Caster Modifiers\" first to block those and raise the odds.", f.affix), ways: vec![w] });
+        take(f, &mut used, &mut pre, &mut suf);
+    }
+
+    // Finish at the bench.
+    if let Some(f) = bench_fam {
+        let b = &f.bench[0];
+        let each: Option<f64> = b.cost.iter().map(|(c, n)| price(c).or_else(|| (c == "Chaos Orb").then_some(1.0)).map(|v| v * *n as f64)).sum();
+        add_total(&mut total, each);
+        steps.push(Step { title: format!("Finish at the bench: {}", b.text.replace('\n', " / ")), detail: format!("Crafted last, in the free {} slot (one bench craft per item).", f.affix),
+            ways: vec![Way { group: "Guaranteed".into(), method: "Crafting bench".into(), chance: 1.0, cost_each: each, average: each, note: b.cost.iter().map(|(c, n)| format!("{n} × {c}")).collect::<Vec<_>>().join(", ") }] });
+    }
+    let skipped = fams.iter().filter(|(f, _)| f.tiers.is_empty() && Some(&f.key) != bench.as_ref()).count();
+    let note = if skipped > 0 { format!("{skipped} mod(s) only come from an essence or the bench and are left out of this route.") } else { String::new() };
+    Some(Recipe { steps, total, ilvl_needed, note })
+}
 /// A copied item, ready for the Crafting page: its base, item level, influences and mod lines.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct Start { pub base: String, pub ilvl: u32, pub influences: Vec<String>, pub have: Vec<String>, pub name: String, pub rarity: String }
@@ -628,7 +713,9 @@ pub struct Start { pub base: String, pub ilvl: u32, pub influences: Vec<String>,
 pub fn start(text: &str) -> Option<Start> {
     let item = crate::item::parse_item(text)?;
     let base = find_base(&item.base_type)?;
-    let have = crate::trade::mods(text).into_iter().filter(|m| m.kind == "explicit" || m.kind == "crafted" || m.kind == "fractured")
+    // "Searing Exarch Item", "Shaper Item"… mark the item; they aren't mods (21 Nov: they showed as suffixes, 5/3).
+    let marker = |t: &str| t.ends_with(" Item") && !t.chars().any(|c| c.is_ascii_digit());
+    let have = crate::trade::mods(text).into_iter().filter(|m| (m.kind == "explicit" || m.kind == "crafted" || m.kind == "fractured") && !marker(&m.text))
         .map(|m| {
             let kind = if m.kind == "fractured" || m.kind == "crafted" { format!("{}|", m.kind) } else { String::new() };
             match m.affix.as_deref() { Some(a @ ("prefix" | "suffix")) => format!("{a}|{kind}{}", m.text), _ => format!("{kind}{}", m.text) }
@@ -691,6 +778,19 @@ mod tests {
         // Chances of all mods add up to the 4–6 mods a rare gets.
         let sum: f64 = p.families.iter().map(|f| f.chaos).sum();
         assert!((sum - 4.4).abs() < 0.3, "{sum}");
+    }
+
+    #[test]
+    fn recipe_for_boots() {
+        let price = |n: &str| match n { "Chaos Orb" => Some(1.0), _ => Some(2.0) };
+        let p = pool("Paladin Boots", 86, &[], &[], &price).unwrap();
+        let find = |s: &str| p.families.iter().find(|f| f.text.contains(s) && !f.tiers.is_empty() && f.needs.is_none()).unwrap().key.clone();
+        let t = vec![(find("Movement Speed"), 2), (find("to maximum Life"), 7), (find("Chaos Resistance"), 2), (find("to Fire Resistance"), 3)];
+        let r = recipe("Paladin Boots", 86, &[], &t, &price).unwrap();
+        assert!(r.steps.len() >= 4, "{:#?}", r.steps);
+        assert!(r.steps[1].title.starts_with("Roll "));
+        assert!(r.steps.iter().any(|s| s.title.starts_with("Finish at the bench")), "{:#?}", r.steps);
+        assert!(r.total.is_some());
     }
 
     #[test]

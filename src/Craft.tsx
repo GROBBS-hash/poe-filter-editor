@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { friendly } from "./errors";
 import { usePersist } from "./usePersist";
 import { CurrencyIcon, ItemIcon } from "./icons";
+import "./craft-recipe.css";
 
 type Tier = { tier: number; name: string; lvl: number; text: string; weight: number; ok: boolean };
 type EssenceWay = { name: string; text: string; like_tier: number | null; price: number | null; corrupt: boolean };
@@ -177,6 +178,13 @@ export default function Craft() {
               ))}
               <div className="cr-tip-foot"><span>{pool.item_mods.filter((m) => m.affix === "prefix").length}/3 prefixes · {pool.item_mods.filter((m) => m.affix === "suffix").length}/3 suffixes</span>
                 <button className="link small" onClick={clearItem}>forget item</button></div>
+              <button className="primary cr-planall" onClick={() => {
+                // Every mod on the item that can be crafted, at its own tier or better, into the plan.
+                const seen = new Set<string>();
+                setPlan(pool.item_mods.filter((m) => m.key && m.kind !== "fractured" && !seen.has(m.key) && seen.add(m.key))
+                  .map((m) => { const f = fam(m.key); return { key: m.key!, tier: m.tier ?? Math.min(f?.tiers.length || 1, 2) }; }));
+              }} title="Puts every mod on this item into the plan and shows a step-by-step route to make it">
+                Plan this whole item</button>
             </div>
           ) : (
             <div className="card cr-empty">
@@ -185,6 +193,7 @@ export default function Craft() {
             </div>
           )}
           <PlanBox plan={plan} setPlan={setPlan} fam={fam} base={base} ilvl={ilvl} infl={infl} onPick={setPick} />
+          <RecipeBox plan={plan.filter((t) => fam(t.key))} base={base} ilvl={ilvl} infl={infl} />
         </div>
 
         {/* Every mod */}
@@ -380,6 +389,56 @@ function Detail({ fam, base, ilvl, infl, have, rarity, inPlan, onPlan }: { fam: 
         </ul>
       </details>
       <p className="muted small">Odds come from rolling the item here thousands of times: a good guide, not exact.</p>
+    </div>
+  );
+}
+
+
+type Step = { title: string; detail: string; ways: Way[] };
+type Recipe = { steps: Step[]; total: number | null; ilvl_needed: number; note: string };
+
+/** "How to make it": a step-by-step route for everything in the plan (base, roll the hardest mods, add the rest,
+ *  finish at the bench), each step with its cheapest ways. */
+function RecipeBox({ plan, base, ilvl, infl }: { plan: Target[]; base: string; ilvl: number; infl: string[] }) {
+  const [r, setR] = useState<Recipe | null>(null);
+  const [err, setErr] = useState("");
+  const [open, setOpen] = useState<number | null>(null);
+  useEffect(() => {
+    if (plan.length < 2) { setR(null); return; }
+    let live = true;
+    setR(null); setErr("");
+    invoke<Recipe | null>("craft_recipe", { base, ilvl, influences: infl, targets: plan.map((t) => [t.key, t.tier]) })
+      .then((x) => live && setR(x)).catch((e) => live && setErr(friendly(e)));
+    return () => { live = false; };
+  }, [JSON.stringify(plan), base, ilvl, infl.join(",")]);
+  if (plan.length < 2) return null;
+  return (
+    <div className="card rc">
+      <h2>How to make it <span className="muted small">a suggested route</span></h2>
+      {err && <p className="danger-text small">{err}</p>}
+      {!r && !err && <p className="muted small">Working out a route…</p>}
+      {r && <>
+        <ol className="rc-steps">
+          {r.steps.map((s, i) => {
+            const best = s.ways.find((w) => w.average != null) ?? s.ways[0];
+            return (
+              <li key={i} className="rc-step">
+                <button className="rc-head" onClick={() => setOpen(open === i ? null : i)} aria-expanded={open === i}>
+                  <span className="rc-num">{i + 1}</span>
+                  <span className="rc-title">{s.title}</span>
+                  {best && <span className="rc-best">{best.method}{best.chance < 0.995 ? ` · ${odds(best.chance)}` : ""}{best.average != null ? <> · ≈ <Chaos c={best.average} /></> : null}</span>}
+                </button>
+                {(open === i || s.ways.length === 0) && <div className="rc-body">
+                  <div className="muted small">{s.detail}</div>
+                  {s.ways.map((w, j) => <WayCard key={w.method} w={w} best={j === 0 && w.average != null} />)}
+                </div>}
+              </li>
+            );
+          })}
+        </ol>
+        <div className="rc-total">Roughly <b>{r.total != null ? <Chaos c={r.total} /> : "unknown (some prices missing)"}</b> in total, on average. Click a step for its options.</div>
+        {r.note && <p className="muted small">{r.note}</p>}
+      </>}
     </div>
   );
 }

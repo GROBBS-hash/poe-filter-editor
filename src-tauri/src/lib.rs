@@ -2071,6 +2071,14 @@ async fn craft_ways(state: State<'_, AppState>, base: String, ilvl: u32, influen
     tauri::async_runtime::spawn_blocking(move || filter_core::craft::ways(&base, ilvl, &influences, &key, min_tier, &have, &rarity, &price)).await.map_err(|e| e.to_string())
 }
 
+/// Crafting page: a step-by-step route to make an item with these mods.
+#[tauri::command]
+async fn craft_recipe(state: State<'_, AppState>, base: String, ilvl: u32, influences: Vec<String>, targets: Vec<(String, u32)>) -> Result<Option<filter_core::craft::Recipe>, String> {
+    let f = state.prices.lock().unwrap().get(&Game::Poe1).cloned();
+    let price = move |n: &str| f.as_ref().and_then(|f| price_of(f, None, n, ""));
+    tauri::async_runtime::spawn_blocking(move || filter_core::craft::recipe(&base, ilvl, &influences, &targets, &price)).await.map_err(|e| e.to_string())
+}
+
 /// Crafting page calculator: the chance each method gives several mods at once.
 #[tauri::command]
 async fn craft_plan(state: State<'_, AppState>, base: String, ilvl: u32, influences: Vec<String>, targets: Vec<(String, u32)>) -> Result<Vec<filter_core::craft::Way>, String> {
@@ -2480,7 +2488,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             price_build_item, buy_build_item, buy_base_item, trade_untick_one, overview,
-            craft_bases, craft_start, craft_pool, craft_ways, craft_plan,
+            craft_bases, craft_start, craft_pool, craft_ways, craft_plan, craft_recipe,
             create_profile,
             list_filters,
             set_active,

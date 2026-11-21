@@ -309,6 +309,11 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   elemental total and hidden, and the chaos total was skipped (bench craft only), so chaos vanished. Now the chaos
   total shows, unticked (trade_rules: bench_only).
 
+- Crafting route 21 Nov (0.2.31): `recipe()` (craft.rs) = `Step`s: base at the item level the tiers need; roll the two
+  hardest mods (lowest Chaos chance) via `plan()`/`ways()`; Exalted Orb for each other mod on the item as it is by then
+  (`add_one`, bench slot kept free); one bench craft last on the hardest mod the bench reaches; `craft_recipe` command;
+  `RecipeBox` in Craft.tsx (styles in src/craft-recipe.css). `start()` drops "<X> Item" marker lines.
+
 - Local stats 21 Nov (0.2.30): armour/weapons tried the site's "(Local)" stat first for every mod, so ES on a staff
   (Xirgil's Crank) and attack speed on gloves searched stats those items can't have. `local_fits` (trade.rs): weapons use
   local only for non-defence mods, armour only for non-weapon (damage/speed/crit/accuracy) mods.
@@ -648,7 +653,12 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 **Crafted chaos (21 Nov, 0.2.18)**
 - [x] (Confirmed 21 Nov.) Ctrl+D on gear with a crafted "X and Chaos Resistances": "+N% total to Chaos Resistance" is there to tick.
 
-**Corrupted jewels (21 Nov, next release)**
+**Crafting route (21 Nov, 0.2.31)**
+- [ ] Crafting with a copied item: "Plan this whole item" puts its mods in the plan; "How to make it" lists numbered steps
+      (base + item level, roll the hardest mods, Exalted the rest, finish at the bench) with odds, cost and a total;
+      click a step for its other options. "Searing Exarch Item" / "Eater of Worlds Item" no longer count as suffixes.
+
+**Corrupted jewels (21 Nov, 0.2.31)**
 - [ ] Tiers → Jewels → Jewels: a "Corrupted rare jewels" card; Show them / Hide them / Back to NeverSink's; after F4,
       corrupted rare Cobalt / Crimson / Viridian jewels show highlighted.
 - [ ] F2 with "Only corrupted ones" ticked: a gold note says to pick a colour or Hide (ticking alone saves nothing).
