@@ -30,6 +30,7 @@ function since(at: number, now: number) {
 export default function TradesWindow() {
   const [list, setList] = useState<Entry[]>([]);
   const [hits, setHits] = useState<Hit[]>([]);
+  const [alerts, setAlerts] = useState<{ id: number; text: string }[]>([]);
   const [err, setErr] = useState("");
   const [now, setNow] = useState(Date.now());
   const next = useRef(1);
@@ -53,13 +54,14 @@ export default function TradesWindow() {
     const un2 = listen<Omit<Hit, "id" | "at" | "sent">>("live-hit", (e) => {
       setHits((h) => [{ ...e.payload, id: next.current++, at: Date.now(), sent: [] }, ...h].slice(0, 6));
     });
+    const un3 = listen<string>("price-alert", (e) => setAlerts((a) => [{ id: next.current++, text: e.payload }, ...a].slice(0, 6)));
     const t = setInterval(() => setNow(Date.now()), 30000);
-    return () => { un.then((f) => f()); un2.then((f) => f()); clearInterval(t); };
+    return () => { un.then((f) => f()); un2.then((f) => f()); un3.then((f) => f()); clearInterval(t); };
   }, []);
 
   // Fit the window to the list; hide it when there's nothing left.
   useEffect(() => {
-    if (list.length === 0 && hits.length === 0) { invoke("hide_trades_window"); return; }
+    if (list.length === 0 && hits.length === 0 && alerts.length === 0) { invoke("hide_trades_window"); return; }
     if (!box.current) return;
     const h = Math.ceil(box.current.getBoundingClientRect().height) + 4;
     getCurrentWindow().setSize(new LogicalSize(340, Math.max(80, Math.min(700, h)))).then(() => invoke("keep_on_screen")).catch(() => {});
@@ -81,12 +83,19 @@ export default function TradesWindow() {
     catch (e) { setErr(friendly(e)); }
   };
 
-  if (list.length === 0 && hits.length === 0) return null;
+  if (list.length === 0 && hits.length === 0 && alerts.length === 0) return null;
   return (
     <div className="qm th" ref={box}>
       <WinBar compact title="Trades" onClose={() => invoke("hide_trades_window")} closeTip="Hide (new trades show it again)">
-        <button className="link small" onClick={() => { setList([]); setHits([]); }} title="Clear the list">Clear all</button>
+        <button className="link small" onClick={() => { setList([]); setHits([]); setAlerts([]); }} title="Clear the list">Clear all</button>
       </WinBar>
+      {alerts.map((a) => (
+        <div key={a.id} className="th-row th-live">
+          <div className="th-top"><b className="th-item">● Price alert</b>
+            <button className="th-x" onClick={() => setAlerts((x) => x.filter((y) => y.id !== a.id))} title="Dismiss">×</button></div>
+          <div className="small">{a.text}</div>
+        </div>
+      ))}
       {hits.map((h) => (
         <div key={h.id} className="th-row th-live">
           <div className="th-top">

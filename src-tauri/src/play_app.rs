@@ -30,6 +30,24 @@ struct PlayStore {
     searches: Vec<SearchString>,
     /// The levelling overlay follows the zones you enter (off: you move it with the arrows).
     level_manual: bool,
+    /// Price alerts, checked against poe.ninja each hourly price update.
+    alerts: Vec<Alert>,
+}
+
+/// "Tell me when Mageblood is under 150 divines".
+#[derive(Serialize, serde::Deserialize, Clone, Debug, PartialEq, Default)]
+#[serde(default)]
+pub struct Alert {
+    /// The item's name as poe.ninja has it (a unique's name, or a currency/card/base name).
+    pub name: String,
+    /// "below" or "above".
+    pub when: String,
+    pub value: f64,
+    /// "chaos" or "divine".
+    pub unit: String,
+    /// Last price seen (chaos) and when the alert last went off (unix seconds), so it tells you once per crossing.
+    pub last: Option<f64>,
+    pub fired: Option<i64>,
 }
 
 #[derive(Default)]
@@ -838,5 +856,58 @@ mod stash_tests {
         assert_eq!(x, 597);
         let (_, _, s) = super::stash_cell((0, 0, 2560, 1440), 1, 1, true);
         assert_eq!(s, 35);
+    }
+}
+
+// ---------- price alerts ----------
+
+#[tauri::command]
+pub fn alerts_get(app: AppHandle) -> Vec<Alert> {
+    check_alerts(&app);
+    with_store(&app, |s| s.alerts.clone())
+}
+
+#[tauri::command]
+pub fn alerts_save(app: AppHandle, list: Vec<Alert>) -> Vec<Alert> {
+    with_store(&app, |s| {
+        // Keep what we knew about alerts that are still there.
+        let old = std::mem::take(&mut s.alerts);
+        s.alerts = list.into_iter().filter(|a| !a.name.trim().is_empty() && a.value > 0.0).map(|mut a| {
+            if let Some(o) = old.iter().find(|o| o.name == a.name && o.when == a.when && o.value == a.value && o.unit == a.unit) { a.last = o.last; a.fired = o.fired; }
+            a
+        }).collect();
+    });
+    save_store(&app);
+    alerts_get(app)
+}
+
+/// Each price update: an alert whose price has crossed its line tells you (in the trades pop-up, once per crossing).
+pub fn check_alerts(app: &AppHandle) {
+    let (items, divine) = {
+        let state = app.state::<AppState>();
+        let game = active_game(&state);
+        let prices = state.prices.lock().unwrap();
+        let Some(f) = prices.get(&game) else { return };
+        let div = f.items.iter().find(|i| i.name == "Divine Orb").map(|i| i.value).unwrap_or(0.0);
+        (f.items.clone(), div)
+    };
+    let mut fired = vec![];
+    with_store(app, |s| for a in s.alerts.iter_mut() {
+        let Some(now) = items.iter().filter(|i| i.name.eq_ignore_ascii_case(a.name.trim())).map(|i| i.value).reduce(f64::max) else { continue };
+        let line = a.value * if a.unit == "divine" && divine > 0.0 { divine } else { 1.0 };
+        let crossed = if a.when == "above" { now >= line } else { now <= line };
+        let was = a.last.map(|l| if a.when == "above" { l >= line } else { l <= line }).unwrap_or(false);
+        if crossed && !was {
+            a.fired = Some(unix());
+            let shown = if a.unit == "divine" && divine > 0.0 { format!("{:.1} div", now / divine) } else { format!("{:.0}c", now) };
+            fired.push(format!("{} is {} now (your alert: {} {} {})", a.name, shown, a.when, a.value, a.unit));
+        }
+        a.last = Some(now);
+    });
+    save_store(app);
+    if fired.is_empty() { return; }
+    if let Some(w) = app.get_webview_window("trades") {
+        for f in fired { let _ = w.emit("price-alert", f); }
+        if !w.is_visible().unwrap_or(false) { win_place::show_over_game(app, &w); }
     }
 }

@@ -193,6 +193,7 @@ fn start_price_updates(app: AppHandle) {
                 rebuild_priced(&app, &changed);
                 let _ = app.emit("prices-updated", ());
             }
+            play_app::check_alerts(&app);
             if hour % 6 == 0 {
                 update_neversink(&app);
             }
@@ -2702,7 +2703,7 @@ pub fn run() {
             play_app::maps_done, play_app::maps_history, play_app::maps_clear, play_app::watch_action, play_app::searches_get,
             play_app::searches_save, play_app::search_type, play_app::stash_highlight, play_app::sheets_list, play_app::sheets_add,
             play_app::sheets_remove, play_app::notes_get, play_app::notes_save, play_app::play_toggle, play_app::play_hide,
-            play_app::trade_price_check, play_app::show_stash_spot, play_app::hide_stash_spot,
+            play_app::trade_price_check, play_app::show_stash_spot, play_app::hide_stash_spot, play_app::alerts_get, play_app::alerts_save,
             open_rule,
             gear_picks,
             open_url,

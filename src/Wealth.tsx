@@ -16,7 +16,11 @@ export type Session = { name: string; league: string; tabs: number[]; start: num
 export type WealthView = { account: string; has_sessid: boolean; league: string; tabs: Tab[]; tracked: number[]; min: number; minutes: number;
   snapshots: Snapshot[]; missed: Valued[]; sessions: Session[]; current: Session | null; strategies: [string, number, number, number][];
   divine: number | null; now: number; profiles?: ScanProfile[]; active?: string | null; last_items?: Valued[];
-  rares?: number; rares_priced?: number; rares_todo?: number; count_rares?: boolean; guild?: boolean };
+  rares?: number; rares_priced?: number; rares_todo?: number; count_rares?: boolean; guild?: boolean;
+  cards?: CardSet[]; reprice?: Reprice[] };
+type CardSet = { name: string; have: number; set: number; each: number; icon: string };
+type Reprice = { name: string; tab: string; note: string; asking: number; worth: number; high: boolean; x: number; y: number };
+type Alert = { name: string; when: "below" | "above"; value: number; unit: "chaos" | "divine"; last: number | null; fired: number | null };
 
 /** Seconds a session has run (pauses taken out). */
 export function seconds(s: Session, now: number) {
@@ -415,6 +419,10 @@ export default function Wealth() {
         </div>
       )}
 
+      {connected && (v.reprice?.length ?? 0) > 0 && <RepriceCard list={v.reprice!} divine={v.divine} />}
+      {connected && (v.cards?.length ?? 0) > 0 && <CardSets list={v.cards!} divine={v.divine} />}
+      <PriceAlerts divine={v.divine} />
+
       {connected && (
         <div className="card">
           <h2>Earnings per strategy</h2>
@@ -501,6 +509,75 @@ function HighlightInStash({ names }: { names: string[] }) {
       <button onClick={() => go(true)} title="Open your stash in game first. Puts the search in with Ctrl+F.">Highlight in stash</button>
       <button className="link" onClick={() => go(false)}>Just copy the search</button>
       {note && <span className="muted small">{note}</span>}
+    </div>
+  );
+}
+
+/** Listed items priced well off poe.ninja: underpriced first (money left on the table). */
+function RepriceCard({ list, divine }: { list: Reprice[]; divine: number | null }) {
+  const [all, setAll] = useState(false);
+  return (
+    <div className="card">
+      <h2>Check your prices ({list.length})</h2>
+      <p className="muted small">Things you've listed for much less (under 70%) or much more (over 150%) than poe.ninja says they're worth, from your last scan.</p>
+      <table className="w-table"><tbody>
+        {(all ? list : list.slice(0, 8)).map((r, i) => (
+          <tr key={i}>
+            <td>{r.name}<div className="muted small">{r.tab} · {r.x + 1},{r.y + 1} · your note “{r.note}”</div></td>
+            <td className={r.high ? "muted" : "w-low"}>{r.high ? "Priced high" : "Underpriced"}</td>
+            <td className="small">you ask <Worth c={r.asking} divine={divine} /><br />worth <Worth c={r.worth} divine={divine} /></td>
+          </tr>
+        ))}
+      </tbody></table>
+      {list.length > 8 && <button className="link small" onClick={() => setAll(!all)}>{all ? "Show fewer" : `Show all ${list.length}`}</button>}
+    </div>
+  );
+}
+
+/** Divination cards you hold, nearest a full set first. */
+function CardSets({ list, divine }: { list: CardSet[]; divine: number | null }) {
+  const [all, setAll] = useState(false);
+  return (
+    <div className="card">
+      <h2>Divination cards</h2>
+      <p className="muted small">How close you are to each full set (all tabs together), and what one card sells for. Full sets can be turned in to Navali or Tane.</p>
+      <table className="w-table"><tbody>
+        {(all ? list : list.slice(0, 10)).map((c) => (
+          <tr key={c.name}>
+            <td>{c.icon && <img src={c.icon} alt="" width={24} height={24} />}</td>
+            <td>{c.name}<div className="w-setbar"><span style={{ width: `${Math.min(100, (c.have / c.set) * 100)}%` }} /></div></td>
+            <td className={c.have >= c.set ? "w-full" : "muted small"}>{c.have >= c.set ? `Full set${c.have >= c.set * 2 ? ` ×${Math.floor(c.have / c.set)}` : ""}` : `${c.have}/${c.set}`}</td>
+            <td className="small"><Worth c={c.each} divine={divine} /> each</td>
+          </tr>
+        ))}
+      </tbody></table>
+      {list.length > 10 && <button className="link small" onClick={() => setAll(!all)}>{all ? "Show fewer" : `Show all ${list.length}`}</button>}
+    </div>
+  );
+}
+
+/** "Tell me when Mageblood drops under 150 divines": checked against poe.ninja every hour; the alert pops up over the game. */
+function PriceAlerts({ divine }: { divine: number | null }) {
+  const [list, setList] = useState<Alert[] | null>(null);
+  useEffect(() => { invoke<Alert[]>("alerts_get").then(setList).catch(() => setList([])); }, []);
+  if (!list) return null;
+  const save = (l: Alert[]) => { setList(l); invoke<Alert[]>("alerts_save", { list: l }).then((x) => { if (x.length === l.length) setList(x); }).catch(() => {}); };
+  const edit = (i: number, p: Partial<Alert>) => save(list.map((a, j) => j === i ? { ...a, ...p } : a));
+  return (
+    <div className="card">
+      <h2>Price alerts</h2>
+      <p className="muted small">Type the item's name as poe.ninja has it (a unique's name, a currency, a card). Checked every hour; when it crosses your line it pops up over the game, once.</p>
+      {list.map((a, i) => (
+        <div key={i} className="row">
+          <input className="text" style={{ margin: 0, flex: 2 }} value={a.name} placeholder="Mageblood" onChange={(e) => setList(list.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} onBlur={() => save(list)} />
+          <select value={a.when} onChange={(e) => edit(i, { when: e.target.value as Alert["when"] })}><option value="below">drops below</option><option value="above">goes above</option></select>
+          <input className="num" type="number" min={0} value={a.value || ""} style={{ width: 80 }} onChange={(e) => setList(list.map((x, j) => j === i ? { ...x, value: +e.target.value } : x))} onBlur={() => save(list)} />
+          <select value={a.unit} onChange={(e) => edit(i, { unit: e.target.value as Alert["unit"] })}><option value="chaos">chaos</option><option value="divine">divines</option></select>
+          {a.last != null && <span className="muted small">now <Worth c={a.last} divine={divine} /></span>}
+          <button className="link" title="Remove" onClick={() => save(list.filter((_, j) => j !== i))}>✕</button>
+        </div>
+      ))}
+      <button onClick={() => setList([...list, { name: "", when: "below", value: 0, unit: "divine", last: null, fired: null }])}>Add an alert</button>
     </div>
   );
 }

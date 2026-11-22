@@ -2109,3 +2109,7 @@ button.tw-chip:hover { border-color: #59606b; color: var(--text); }
 .tw-map-verdict { margin: 6px 0 4px; padding: 7px 10px; border-radius: 8px; font-size: 15px; }
 .tw-map-verdict.ok { background: rgba(98,207,128,.14); border: 1px solid rgba(98,207,128,.5); } .tw-map-verdict.ok b { color: var(--green); }
 .tw-map-verdict.bad { background: rgba(240,133,124,.14); border: 1px solid rgba(240,133,124,.5); } .tw-map-verdict.bad b { color: var(--red); }
+.w-setbar { height: 4px; border-radius: 2px; background: var(--input); margin-top: 3px; max-width: 160px; overflow: hidden; }
+.w-setbar > span { display: block; height: 100%; background: var(--gold); }
+.w-full { color: var(--green); font-weight: 650; }
+.w-low { color: #ffcf8a; font-weight: 600; }

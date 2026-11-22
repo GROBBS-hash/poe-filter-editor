@@ -201,6 +201,9 @@ pub struct WealthView {
     count_rares: bool,
     divine: Option<f64>,
     now: u64,
+    /// Divination cards from the last scan, nearest a full set first; listed items priced well off poe.ninja.
+    cards: Vec<wealth::CardSet>,
+    reprice: Vec<wealth::Reprice>,
 }
 
 fn view(app: &AppHandle) -> WealthView {
@@ -217,9 +220,10 @@ fn view(app: &AppHandle) -> WealthView {
         account: s.poe_account, has_sessid: !s.poesessid.trim().is_empty(), league,
         tracked: s.wealth_tabs, min: s.wealth_min, minutes: s.earn_minutes.max(1),
         strategies: wealth::by_strategy(&st.sessions),
-        tabs: st.tabs, snapshots: st.snapshots, missed: st.missed, last_items: st.last_items, sessions: st.sessions, current: st.current,
+        tabs: st.tabs, snapshots: st.snapshots, missed: st.missed, last_items: st.last_items.clone(), sessions: st.sessions, current: st.current,
         profiles: st.profiles, active: st.active,
         divine: divine(app), now: now(),
+        cards: wealth::card_sets(&st.last_items), reprice: wealth::reprice(&st.last_items, &currency_rates(app)),
     }
 }
 

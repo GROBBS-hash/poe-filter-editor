@@ -78,6 +78,12 @@ pub struct Valued {
     /// A rare priced from similar listings on the trade site (a rough guess, not poe.ninja).
     #[serde(default)]
     pub rare: bool,
+    /// Divination cards: how many make a full set.
+    #[serde(default)]
+    pub max_stack: Option<u32>,
+    /// Its price note ("~price 5 chaos": the item's own, or the tab's name), if listed.
+    #[serde(default)]
+    pub note: String,
 }
 
 pub fn value_item(item: &Value, tab: &str, lookup: Lookup) -> Option<Valued> {
@@ -100,6 +106,8 @@ pub fn value_item(item: &Value, tab: &str, lookup: Lookup) -> Option<Valued> {
         // A price note on the item, or on the whole tab (a tab named "~price 5 chaos" prices everything in it).
         listed: [item["note"].as_str().unwrap_or(""), tab].iter().any(|n| n.starts_with("~price") || n.starts_with("~b/o")),
         icon: item["icon"].as_str().unwrap_or("").to_string(), places: 1, rare: false,
+        max_stack: (frame == 6).then(|| item["maxStackSize"].as_u64().map(|m| m as u32)).flatten(),
+        note: [item["note"].as_str().unwrap_or(""), tab].iter().find(|n| n.starts_with("~price") || n.starts_with("~b/o")).map(|n| n.to_string()).unwrap_or_default(),
     })
 }
 
@@ -147,7 +155,7 @@ pub fn rares_in_tab(items: &Value, tab: &str) -> Vec<Rare> {
 /// A rare as a stash entry, at the price the trade site gave it.
 pub fn rare_valued(r: &Rare, chaos: f64) -> Valued {
     Valued { tab: r.tab.clone(), name: r.name.clone(), stack: 1, value: chaos, x: r.x, y: r.y, listed: r.listed,
-        icon: r.icon.clone(), places: 1, rare: true }
+        icon: r.icon.clone(), places: 1, rare: true, max_stack: None, note: String::new() }
 }
 
 /// The stash API's item as the game's Ctrl+C text (enough for the price check to read it).
@@ -574,7 +582,7 @@ Eater of Worlds Item"), "{t}");
     #[test]
     fn worth_selling_adds_up_stacks() {
         let it = |tab: &str, stack: u32, value: f64| Valued { tab: tab.into(), name: "Blighted Thread".into(), stack, value, x: 0, y: 0,
-            listed: false, icon: String::new(), places: 1, rare: false };
+            listed: false, icon: String::new(), places: 1, rare: false, max_stack: None, note: String::new() };
         // 3 + 7 threads at 1.2c each: neither stack reaches 10c, together they do.
         let v = vec![it("Dump 1", 3, 3.6), it("Dump 2", 7, 8.4), it("Dump 2", 0, 0.0)];
         let m = missed(&v, 10.0);
@@ -599,5 +607,68 @@ Eater of Worlds Item"), "{t}");
         assert_eq!(b[0].1, 2);
         // 300 + 900 chaos over 20 min + 60 min.
         assert!((b[0].3 - 900.0).abs() < 1e-6);
+    }
+}
+
+// ---------- divination card sets and repricing (22 Nov) ----------
+
+/// A divination card you're collecting: how many you have (over every tab) of a full set.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct CardSet { pub name: String, pub have: u32, pub set: u32, pub each: f64, pub icon: String }
+
+/// Your divination cards from the last scan, nearest to a full set first (full sets first of all).
+pub fn card_sets(items: &[Valued]) -> Vec<CardSet> {
+    let mut by: Vec<CardSet> = vec![];
+    for v in items.iter().filter(|v| v.max_stack.is_some()) {
+        match by.iter_mut().find(|c| c.name == v.name) {
+            Some(c) => c.have += v.stack,
+            None => by.push(CardSet { name: v.name.clone(), have: v.stack, set: v.max_stack.unwrap_or(1).max(1), each: v.value / v.stack.max(1) as f64, icon: v.icon.clone() }),
+        }
+    }
+    by.sort_by(|a, b| {
+        let fa = a.have as f64 / a.set as f64;
+        let fb = b.have as f64 / b.set as f64;
+        fb.total_cmp(&fa).then(b.each.total_cmp(&a.each))
+    });
+    by
+}
+
+/// A listed item whose price note is well off poe.ninja's value.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct Reprice { pub name: String, pub tab: String, pub note: String, pub asking: f64, pub worth: f64, pub high: bool, pub x: u32, pub y: u32 }
+
+/// Listed items priced under 70% or over 150% of poe.ninja (each, in chaos). `rates`: chaos per currency id.
+pub fn reprice(items: &[Valued], rates: &std::collections::HashMap<String, f64>) -> Vec<Reprice> {
+    let mut out: Vec<Reprice> = items.iter().filter(|v| !v.note.is_empty() && !v.rare).filter_map(|v| {
+        let price = v.note.trim_start_matches("~price").trim_start_matches("~b/o").trim();
+        let (amount, cur) = crate::whispers::read_price(price)?;
+        // "~price 10/20 chaos" style (a price for a part of a stack) isn't read.
+        let asking = amount * rates.get(&cur)?;
+        let worth = v.value / v.stack.max(1) as f64;
+        if worth < 1.0 { return None; }
+        let r = asking / worth;
+        (r < 0.7 || r > 1.5).then(|| Reprice { name: v.name.clone(), tab: v.tab.clone(), note: v.note.clone(), asking, worth, high: r > 1.5, x: v.x, y: v.y })
+    }).collect();
+    // Underpriced first (that's money lost), the biggest gap first.
+    out.sort_by(|a, b| a.high.cmp(&b.high).then((b.worth - b.asking).abs().total_cmp(&(a.worth - a.asking).abs())));
+    out
+}
+
+#[cfg(test)]
+mod card_tests {
+    use super::*;
+    fn v(name: &str, stack: u32, value: f64, max: Option<u32>, note: &str) -> Valued {
+        Valued { tab: "t".into(), name: name.into(), stack, value, x: 0, y: 0, listed: !note.is_empty(), icon: String::new(), places: 1, rare: false, max_stack: max, note: note.into() }
+    }
+    #[test]
+    fn sets_and_reprices() {
+        let items = vec![v("The Apothecary", 3, 3000.0, Some(5), ""), v("The Apothecary", 1, 1000.0, Some(5), ""), v("Rain of Chaos", 2, 2.0, Some(8), ""),
+            v("Divine Orb", 2, 360.0, None, "~price 1 chaos"), v("Exalted Orb", 1, 15.0, None, "~price 15 chaos")];
+        let c = card_sets(&items);
+        assert_eq!((c[0].name.as_str(), c[0].have, c[0].set), ("The Apothecary", 4, 5));
+        let rates: std::collections::HashMap<String, f64> = [("chaos".to_string(), 1.0)].into_iter().collect();
+        let r = reprice(&items, &rates);
+        assert_eq!(r.len(), 1);
+        assert!(r[0].name == "Divine Orb" && !r[0].high);
     }
 }
