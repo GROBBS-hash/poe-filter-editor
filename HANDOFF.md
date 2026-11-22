@@ -621,7 +621,7 @@ Confirmed in game so far: basic Ctrl+D price check (trade search returned listin
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
 **Next test session (planned 21 Nov night, for 22 Nov).** Walk him through it a few at a time, between maps.
-Latest release is 0.2.36; only the design fixes + main window looks (035b42c, 4d7ea7f, a9b298f) are unreleased.
+Latest release is 0.2.37 (22 Nov): everything below up to the Awakened looks is in it, so he can test it all in the installed editor.
 **He plays on the installed release** (`%LOCALAPPDATA%\PoE Filter Editor\poe-filter-editor.exe`), not the dev
 editor, so unreleased things (e.g. Settings → Main window look) only reach him after a release.
 **22 Nov results:** 1. Grouped layout, low confidence and Dragon Turn +57 seen working; he wanted low confidence more
@@ -631,10 +631,10 @@ isn't released. Also: the "search straight away" setting reworded ("Search rares
 plain explanation underneath). Flat layout confirmed. He picked menu mock-up A (six small groups, each with a
 "what's in here" line) with C's colours (blue = filter, amber = your changes, green = playing, purple = money and
 items) and Settings mock-up 1 (side menu: Hotkeys, Price check, Trading, Maps and area, Looks, AI). Both built
-22 Nov, not released yet. Group colours only show in the Colourful look; the calm looks keep gold/grey headings.
+22 Nov, in 0.2.37. Group colours only show in the Colourful look; the calm looks keep gold/grey headings.
 Price window: he wants Awakened PoE Trade as the template, made nicer: everything needed one click away (nothing
 behind "More"), the item's own picture, currency icons, game icons everywhere. Round 2 mock-ups (answer first, chips,
-strip, ladder…) passed over. Built 22 Nov, not released yet: three new looks (Style button / Settings → Looks):
+strip, ladder…) passed over. Built 22 Nov, in 0.2.37: three new looks (Style button / Settings → Looks):
 **Awakened** (item picture + filter chips under it: base only, ilvl band, Vaal-orb corrupted toggle for uniques, and
 the "Also searching for" filters shown as chips; stats; Search; price; listings; bottom bar with icons: Trade site,
 Craft, Save search, Saved, Style, Layout, Report), **Awakened + price** (adds a price bar under the item with
@@ -652,7 +652,7 @@ picks one (then maybe make it the default and drop the looks he doesn't use).
 
 **Batch mode (21 Nov, in 0.2.36)**
 - [x] (Confirmed 22 Nov, "seems good".) Box was cut off at its fixed 250×64 size; it now fits itself to its text
-  (not released yet; check the box shows its close button and whole second line).
+  (in 0.2.37; check the box shows its close button and whole second line).
 - [ ] Press F3 in game: the editor no longer pops up over the game; a small "Batch mode · N items" box shows instead
   (drag it anywhere, it remembers). Ctrl+C items: it says "Added: …" or "Already listed: …". Press F3 again: the
   editor opens on Batch mode with the list. Each row says what the filter does now ("now Hidden"); hidden items start
@@ -802,7 +802,7 @@ picks one (then maybe make it the default and drop the looks he doesn't use).
       top of Filters, My edits, Themes, Prices, Maps, Atlas, Crafting and Settings cut to one line; the detail moved
       into the "?" next to the heading.
 - [ ] Price window: two layouts + low confidence + Cogwork numbers (21 Nov, in 0.2.34). 22 Nov: Grouped, low
-      confidence, +57 Int and Flat confirmed in game; low confidence changed from amber to red (not released yet).
+      confidence, +57 Int and Flat confirmed in game; low confidence changed from amber to red (in 0.2.37).
       **Grouped** (default): headings Minimum rolls · Defences (at 20% quality) · Totals (all mods added up) · Base mods
       (implicit) · Prefixes "1 of 2 used" · Suffixes "3 of 4 used" (open-slot rows sit inside their group, "1 open
       prefix · room to craft") · Base and item level · For sale now. **Flat** (like Awakened): no stat headings, a tag
@@ -818,7 +818,7 @@ picks one (then maybe make it the default and drop the looks he doesn't use).
       scan profiles, earnings tabs and Find in stash use them like any other tab. Off: they leave the list, profiles
       and earnings tabs. Checked live 21 Nov: his login reads the guild stash (3 tabs: normal, currency, quad).
       Endpoint: character-window/get-guild-stash-items (same POESESSID and rate limits as get-stash-items).
-- [ ] Design review fixes + main window looks (21 Nov, not released yet). Whole-app impeccable critique scored 28/40
+- [ ] Design review fixes + main window looks (21 Nov, in 0.2.37). Whole-app impeccable critique scored 28/40
       (saved in .impeccable/critique/). Done from it: small grey text readable everywhere (--muted lifted), faded
       price-window rows and roll ranges clearer, no labels under 11px; wording (Setup says Filters, atlas key says
       Atlas page, "More > Style/Layout", Help shows his own hotkeys, "Rebuild filter", "Save report" not "Save for
