@@ -389,12 +389,13 @@ pub fn plan(base: &str, ilvl: u32, influences: &[String], targets: &[(String, u3
         let a = simulate_all(&roll, TRIALS, Roll { magic: true, tag: None, jewel }, None, &all);
         out.push(way("Reroll", "Orb of Alteration".into(), a, cost("Orb of Alteration"), "Rerolls a magic item: 1–2 mods, then Regal Orb".into()));
     }
+    out.extend(magic_then_regal(&roll, &fams.iter().map(|(f, _)| f.affix == "prefix").collect::<Vec<_>>(), &all, jewel, &cost));
     let mut tags_seen: Vec<&str> = Vec::new();
     for (f, _) in &fams { for t in &f.tags { if HARVEST.iter().any(|(h, _)| h == t) && !tags_seen.contains(&t.as_str()) { tags_seen.push(t) } } }
     for t in tags_seen {
         let name = HARVEST.iter().find(|(h, _)| *h == t).map(|(_, n)| *n).unwrap_or(t);
         let h = simulate_all(&roll, TRIALS, Roll { magic: false, tag: Some(t), jewel }, None, &all);
-        out.push(way("Reroll", format!("Harvest reforge: {name}"), h, None, format!("Rerolls a rare keeping at least one {} mod (costs lifeforce)", name.to_lowercase())));
+        out.push(way("Reroll", format!("Harvest reforge: {name}"), h, harvest_cost(t, &cost), format!("Rerolls a rare keeping at least one {} mod (costs lifeforce)", name.to_lowercase())));
     }
     // Essences: one target guaranteed, the rest have to roll.
     let groups: HashMap<&str, usize> = roll.iter().map(|(i, _, _, g)| (d.mods[*i].group.as_str(), *g)).collect();
@@ -426,12 +427,99 @@ pub fn plan(base: &str, ilvl: u32, influences: &[String], targets: &[(String, u3
         .then(b.chance.partial_cmp(&a.chance).unwrap_or(std::cmp::Ordering::Equal)));
     out
 }
+/// The cheap way for 2–3 mods: Alteration (and Augmentation) until a magic item has one prefix and / or one suffix you
+/// want, then a Regal Orb for the last one; on a miss, scour, Transmute and start again. `prefix[t]` / `masks[t]` per
+/// target (which pool slots count for it). Each split of the targets into "on the magic item" and "from the Regal" is
+/// tried; the cheapest of each kind is kept.
+fn magic_then_regal(pool: &[(usize, f64, bool, usize)], prefix: &[bool], masks: &[Vec<bool>], jewel: bool, cost: &dyn Fn(&str) -> Option<f64>) -> Vec<Way> {
+    let n = prefix.len();
+    if n == 0 || n > 3 { return vec![] }
+    let cap = side_cap(jewel);
+    let (alt, aug, regal, scour, trans) = (cost("Orb of Alteration"), cost("Orb of Augmentation"), cost("Regal Orb"), cost("Orb of Scouring"), cost("Orb of Transmutation"));
+    let is_t = |t: usize| move |i: &usize| pool.iter().zip(&masks[t]).any(|((j, ..), m)| *m && j == i);
+    let group_of = |t: usize| pool.iter().zip(&masks[t]).find(|(_, m)| **m).map(|((_, _, _, g), _)| *g);
+    let magic = Roll { magic: true, tag: None, jewel };
+    let mut best: Vec<Way> = Vec::new();
+    let mut keep = |w: Way| {
+        if w.chance <= 0.0 || w.average.is_none() { return }
+        match best.iter_mut().find(|b| b.method == w.method) {
+            Some(b) if b.average.unwrap_or(f64::MAX) <= w.average.unwrap_or(f64::MAX) => {}
+            Some(b) => *b = w,
+            None => best.push(w),
+        }
+    };
+    // Every split: the magic item holds `m` (at most one prefix, one suffix), the Regal adds the rest (0 or 1 mod).
+    for bits in 1u32..(1 << n) {
+        let m: Vec<usize> = (0..n).filter(|t| bits & (1 << t) != 0).collect();
+        let r: Vec<usize> = (0..n).filter(|t| bits & (1 << t) == 0).collect();
+        if r.len() > 1 || m.iter().filter(|t| prefix[**t]).count() > 1 || m.iter().filter(|t| !prefix[**t]).count() > 1 { continue }
+        // Ways to get the magic part, each with its average cost: Alteration for all of it, or (two mods) Alteration
+        // until one shows alone, then Augmentation for the other.
+        let mut make: Vec<(String, Option<f64>)> = Vec::new();
+        let sets: Vec<Vec<bool>> = m.iter().map(|t| masks[*t].clone()).collect();
+        let p = simulate_all(pool, TRIALS, magic, None, &sets);
+        if p > 0.0 { make.push(("Alteration".into(), alt.map(|a| a / p))) }
+        if m.len() == 2 {
+            for (a, b) in [(m[0], m[1]), (m[1], m[0])] {
+                // One mod, and it's `a` (a magic item gets 1 mod half the time).
+                let one = 0.5 * add_one(pool, &HashSet::new(), 0, 0, 1, &is_t(a));
+                let used: HashSet<usize> = group_of(a).into_iter().collect();
+                let (pre, suf) = if prefix[a] { (1, 0) } else { (0, 1) };
+                let pg = add_one(pool, &used, pre, suf, 1, &is_t(b));
+                if one > 0.0 && pg > 0.0 { make.push(("Alteration + Augmentation".into(), (|| Some((alt? / one + aug?) / pg))())) }
+            }
+        }
+        for (how, c) in make {
+            let Some(c) = c else { continue };
+            if r.is_empty() {
+                // Plain Alteration for both is already in the list.
+                if how == "Alteration" { continue }
+                keep(Way { group: "Reroll".into(), method: format!("Orb of {how}").replace("Orb of Alteration + Augmentation", "Orb of Alteration + Orb of Augmentation"),
+                    chance: p, cost_each: alt, average: Some(c), note: "On a magic item (Orb of Transmutation first); a Regal Orb then makes it rare".into(), ..Default::default() });
+                continue;
+            }
+            let last = r[0];
+            let used: HashSet<usize> = m.iter().filter_map(|t| group_of(*t)).collect();
+            let pre = m.iter().filter(|t| prefix[**t]).count() as i32;
+            let suf = m.len() as i32 - pre;
+            let pr = add_one(pool, &used, pre, suf, cap, &is_t(last));
+            if pr <= 0.0 { continue }
+            // Each go: the magic part, a Regal; on a miss an Orb of Scouring and a Transmute to start again.
+            let avg = (|| Some((c + regal?) / pr + (scour? + trans?) * (1.0 / pr - 1.0)))();
+            let method = if how == "Alteration" { "Alteration + Regal Orb".to_string() } else { "Alteration + Augmentation + Regal Orb".to_string() };
+            // When the Regal adds a mod on the other side, there's still room on this one: an Exalted Orb has a go
+            // before starting again.
+            let other_side = |i: &usize| pool.iter().any(|(j, _, p, _)| j == i && *p != prefix[last]);
+            let q = add_one(pool, &used, pre, suf, cap, &other_side);
+            let (pre2, suf2) = if prefix[last] { (pre, suf + 1) } else { (pre + 1, suf) };
+            if q > 0.0 && (m.len() as i32 + 1) < cap * 2 && (if prefix[last] { suf2 } else { pre2 }) <= cap {
+                let pe = add_one(pool, &used, pre2, suf2, cap, &is_t(last));
+                let s = pr + q * pe;
+                let avg2 = (|| Some((c + regal? + q * cost("Exalted Orb")?) / s + (scour? + trans?) * (1.0 / s - 1.0)))();
+                keep(Way { group: "Reroll".into(), method: format!("{method} + Exalted Orb"), chance: s, cost_each: regal, average: avg2,
+                    note: format!("As Alteration + Regal, but when the Regal adds a {} instead, an Exalted Orb tries for the last mod ({:.1}%) before you scour",
+                        if prefix[last] { "suffix" } else { "prefix" }, pe * 100.0), ..Default::default() });
+            }
+            keep(Way { group: "Reroll".into(), method, chance: pr, cost_each: regal, average: avg,
+                note: format!("Alteration{} until the magic item has the {} you want, then a Regal Orb ({:.0}% it adds the last one); on a miss, scour and start again",
+                    if how == "Alteration" { "" } else { " (Augmentation for the second)" }, if m.len() == 1 { "mod" } else { "two mods" }, pr * 100.0), ..Default::default() });
+        }
+    }
+    best
+}
+
 /// Chance one added mod (Exalted / Regal / Augmentation) is a target: its weight over everything that can still go on.
 fn add_one(pool: &[(usize, f64, bool, usize)], used: &HashSet<usize>, pre: i32, suf: i32, side_max: i32, is_target: &dyn Fn(&usize) -> bool) -> f64 {
     let open: Vec<&(usize, f64, bool, usize)> = pool.iter().filter(|(_, _, p, g)| !used.contains(g) && if *p { pre < side_max } else { suf < side_max }).collect();
     let total: f64 = open.iter().map(|(_, w, ..)| w).sum();
     if total <= 0.0 { return 0.0 }
     open.iter().filter(|(i, ..)| is_target(i)).map(|(_, w, ..)| w).sum::<f64>() / total
+}
+
+/// What one Harvest reforge of this kind costs in chaos (its lifeforce at poe.ninja prices).
+fn harvest_cost(tag: &str, cost: &dyn Fn(&str) -> Option<f64>) -> Option<f64> {
+    let (_, kind, n) = routes::HARVEST_COST.iter().find(|(t, ..)| *t == tag)?;
+    Some(n * cost(&format!("{kind} Crystallised Lifeforce"))?)
 }
 
 /// Harvest reforges: "Reforge … including a <kind> modifier".
@@ -641,7 +729,7 @@ pub fn ways(base: &str, ilvl: u32, influences: &[String], key: &str, min_tier: u
             "Rerolls a magic item: 1–2 mods. Then Regal Orb to make it rare and keep it".into()));
         for (tag, name) in HARVEST.iter().filter(|(t, _)| fam.tags.iter().any(|x| x == t)) {
             let h = hit(&simulate_with(&roll, TRIALS, Roll { magic: false, tag: Some(tag), jewel }));
-            out.push(way("Reroll", format!("Harvest reforge: {name}"), h, None,
+            out.push(way("Reroll", format!("Harvest reforge: {name}"), h, harvest_cost(tag, &cost),
                 format!("Rerolls a rare keeping at least one {} mod (Horticrafting station, costs lifeforce)", name.to_lowercase())));
         }
         // Fossils: each one that helps, and the best pairs.
@@ -902,5 +990,45 @@ mod tests {
         // Planned with no item: the trade text uses the real base and its enchant.
         let text = search::plan_item_text(&p, &[(get("Thunderstruck").key.clone(), 1)]);
         assert!(text.contains("\nLarge Cluster Jewel\n") && text.contains("grant: 12% increased Lightning Damage (enchant)"), "{text}");
+    }
+
+    /// poe.ninja prices on 22 Nov 2026 (Covens league).
+    fn ninja(n: &str) -> Option<f64> {
+        Some(match n { "Chaos Orb" => 1.0, "Divine Orb" => 214.0, "Exalted Orb" => 0.81, "Orb of Alteration" => 0.2155, "Orb of Augmentation" => 0.1892,
+            "Regal Orb" => 0.3367, "Orb of Scouring" => 0.79, "Orb of Transmutation" => 0.036, "Orb of Annulment" => 7.0, "Dense Fossil" => 14.3,
+            "Metallic Fossil" => 13.7, "Prismatic Fossil" => 10.6, "Primitive Chaotic Resonator" => 1.02, "Potent Chaotic Resonator" => 0.74,
+            x if x.contains("Lifeforce") => 0.02, x if x.contains("Fossil") => 5.0, x if x.contains("Resonator") => 1.0, _ => return None })
+    }
+
+    #[test]
+    fn jewel_two_prefixes_alt_regal() {
+        // GROBBS, 0.2.40: Cobalt Jewel 86, lightning cast speed + energy shield (both prefixes). Chaos Orb came out
+        // cheapest (~952c); Alteration for one, Regal for the other is the real answer.
+        let b = "Cobalt Jewel";
+        let p = pool(b, 86, &[], &[], &ninja).unwrap();
+        let find = |s: &str| p.families.iter().find(|f| f.text.contains(s) && f.affix == "prefix").unwrap().key.clone();
+        let t = vec![(find("Cast Speed with Lightning Skills"), 9), (find("increased maximum Energy Shield"), 9)];
+        let w = plan(b, 86, &[], &t, &ninja);
+        let chaos = w.iter().find(|w| w.method == "Chaos Orb").unwrap().average.unwrap();
+        let alt = w.iter().find(|w| w.method == "Alteration + Regal Orb").unwrap_or_else(|| panic!("{w:?}"));
+        assert!(alt.average.unwrap() < chaos, "{} vs chaos {chaos}", alt.average.unwrap());
+        // With an Exalted Orb when the Regal lands on the suffix side: cheaper still.
+        let ex = w.iter().find(|w| w.method == "Alteration + Regal Orb + Exalted Orb").unwrap();
+        assert!(ex.average.unwrap() < alt.average.unwrap());
+        // Harvest reforges are priced now (lifeforce), and "Defence" (energy shield) is the cheapest of all.
+        assert!(w.iter().filter(|w| w.method.starts_with("Harvest")).all(|w| w.average.is_some()), "{w:?}");
+        assert_eq!(w[0].method, "Harvest reforge: Defence", "{w:?}");
+        // The routes agree: Alteration + Regal beats spamming Chaos Orbs.
+        let r = routes::routes(b, 86, &[], &t, &[], &ninja).unwrap();
+        let cost = |id: &str| r.routes.iter().find(|x| x.id == id).and_then(|x| x.cost).unwrap_or(f64::MAX);
+        let all: Vec<_> = r.routes.iter().map(|r| (&r.id, r.cost.map(|c| c.round()))).collect();
+        assert!(cost("regal") < chaos, "{all:?}");
+        assert!(r.routes[0].cost.unwrap() <= cost("regal"), "{all:?}");
+        // A prefix + a suffix: Alteration (+ Augmentation) is offered and beats Chaos too.
+        let suf = p.families.iter().find(|f| f.text.contains("to Intelligence") && f.affix == "suffix").unwrap().key.clone();
+        let w = plan(b, 86, &[], &[t[1].clone(), (suf, 9)], &ninja);
+        let price = |m: &str| w.iter().find(|w| w.method == m).and_then(|w| w.average).unwrap_or_else(|| panic!("{m}: {w:?}"));
+        assert!(price("Orb of Alteration") < price("Chaos Orb"), "{w:?}");
+        price("Orb of Alteration + Orb of Augmentation");
     }
 }

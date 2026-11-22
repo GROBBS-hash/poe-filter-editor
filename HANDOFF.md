@@ -66,6 +66,16 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
     count, and a "Start from a Large Cluster Jewel with …, item level N+" box above the columns (the route's first step
     says the same). Build window: Craft button on every non-unique jewel (Timeless / Prismatic still hidden).
   - Tests: `jewel_rules`, `cluster_from_his_build`, `three_notable_cluster`, `jewel_alt_regal`.
+  - Fix after his 0.2.40 test (Cobalt Jewel, lightning cast speed + energy shield, both prefixes: the Plan said Chaos
+    Orb was cheapest). The Plan box only offered Alteration for at most 1 prefix + 1 suffix. Now `magic_then_regal`
+    tries every split of 2–3 planned mods into "on the magic item" (Alteration, or Alteration + Augmentation) and "from
+    the Regal", pricing a miss as Scouring + Transmutation and a fresh start; plus a "+ Exalted Orb" version (the Regal
+    lands on the other side, so an Exalt still has a go). Harvest reforges in the Plan box and the single-mod list are
+    now priced (lifeforce, same table as the routes). The "Alteration, then Regal" route got the Exalt follow-up too.
+    With poe.ninja prices that case reads: Harvest reforge Defence ~150–190c, Alteration + Regal + Exalt ~600c,
+    Alteration + Regal ~890c, Chaos ~950c. It's really that dear because a Cobalt jewel can roll ~45 prefixes (about 55
+    Alterations, then a 1-in-73 Regal). Fossil prices checked live: Dense Fossil 14.31c on poe.ninja (the app showed
+    13.9–14.9c), so the lookup is right. Test `jewel_two_prefixes_alt_regal`.
 - **Play tools (22 Nov, from the "what do players want" research: Exile UI, Exiled Exchange 2, PoE Overlay, Path of
   Leveling, Reddit/forum asks).** Built on branch `ccr-26676017-7ecilq` while he was out; merged and released in 0.2.39 (22 Nov).
   Core `core/src/journey.rs` (tested), app `src-tauri/src/play_app.rs`, front end `src/Play.tsx` + `src/play.css`,
@@ -713,6 +723,9 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Craft on his Large lightning cluster: the Crafting page opens on "Large Cluster Jewel: Lightning Damage" with
   Overshock, Thunderstruck, Widespread Destruction and the life regen planned; the "Start from…" box names the
   enchant, 8 passives and item level 50+; "How to make it" lists routes cheapest first (no bench / essence steps).
+- [ ] (0.2.40 fix) Cobalt Jewel, lightning cast speed + energy shield in the plan: the Plan box now lists Harvest
+  reforge Defence first, then "Alteration + Regal Orb + Exalted Orb" and "Alteration + Regal Orb", all cheaper than
+  Chaos Orbs. Does that match what he'd do?
 - [ ] Do the odds feel right next to Craft of Exile for a cluster he actually crafts? (Weights and mod counts were
   matched against Craft of Exile on 22 Nov.)
 

@@ -142,7 +142,7 @@ fn plus(a: Option<f64>, b: Option<f64>) -> Option<f64> { Some(a? + b?) }
 fn side_word(prefix: bool, n: usize) -> String { format!("{n} {}{}", if prefix { "prefix" } else { "suffix" }, if n == 1 { "" } else { "es" }) }
 
 /// Harvest reforge cost in lifeforce, by tag (Maxroll's 3.24 list; unchanged in 3.30's notes).
-const HARVEST_COST: [(&str, &str, f64); 11] = [("life", "Wild", 75.0), ("defences", "Primal", 50.0), ("physical", "Vivid", 50.0), ("fire", "Wild", 50.0),
+pub(crate) const HARVEST_COST: [(&str, &str, f64); 11] = [("life", "Wild", 75.0), ("defences", "Primal", 50.0), ("physical", "Vivid", 50.0), ("fire", "Wild", 50.0),
     ("cold", "Vivid", 50.0), ("lightning", "Primal", 50.0), ("chaos", "Vivid", 100.0), ("attack", "Wild", 75.0), ("caster", "Primal", 75.0),
     ("speed", "Vivid", 150.0), ("critical", "Primal", 150.0)];
 
@@ -571,11 +571,27 @@ pub fn routes(base: &str, ilvl: u32, influences: &[String], targets: &[(String, 
                     b.step(format!("Make it magic with {}", names(&h)), "Orb of Transmutation on a white base, then Alteration.", magic_ways);
                     let p = add_one(&cx.roll, &used, s.pre, s.suf, side, &|i: &usize| cx.is_t(last, *i));
                     let first = b.steps.last().and_then(|s| s.ways.first()).and_then(|w| w.average);
-                    let avg = (|| Some((regal? + first?) / p - first?))().filter(|_| p > 0.0);
+                    // A miss: Orb of Scouring + Transmutation, then the magic step again.
+                    let restart = plus(cx.c("Orb of Scouring"), cx.c("Orb of Transmutation"));
+                    let avg = (|| Some((regal? + first?) / p - first? + restart? * (1.0 / p - 1.0)))().filter(|_| p > 0.0);
+                    let mut ways = vec![way("Reroll", "Regal Orb", p, regal, avg, "Adds one random mod: you want it to be this one", if p > 0.0 { 1.0 / p } else { 0.0 }, 1, None)];
+                    // The Regal lands on the other side: this side still has room, so an Exalted Orb has a go first.
+                    let lp = cx.t[last].prefix;
+                    let q = add_one(&cx.roll, &used, s.pre, s.suf, side, &|i: &usize| cx.roll.iter().any(|(j, _, pp, _)| j == i && *pp != lp));
+                    let (pre2, suf2) = if lp { (s.pre, s.suf + 1) } else { (s.pre + 1, s.suf) };
+                    if q > 0.0 && s.pre + s.suf + 1 < side * 2 && pre2 <= side && suf2 <= side {
+                        let pe = add_one(&cx.roll, &used, pre2, suf2, side, &|i: &usize| cx.is_t(last, *i));
+                        let sp = p + q * pe;
+                        let ex = cx.c("Exalted Orb");
+                        let avg2 = (|| Some((regal? + first? + q * ex?) / sp - first? + restart? * (1.0 / sp - 1.0)))().filter(|_| sp > 0.0);
+                        ways.push(way("Reroll", "Regal Orb, then Exalted Orb", sp, regal, avg2,
+                            format!("If the Regal adds a {} instead, an Exalted Orb tries for it ({:.1}%) before you scour", if lp { "suffix" } else { "prefix" }, pe * 100.0),
+                            if sp > 0.0 { (1.0 + q) / sp } else { 0.0 }, 1, None));
+                    }
+                    sort_ways(&mut ways);
                     b.step(format!("Regal Orb for {}", cx.t[last].text),
-                        "Makes it rare with one more mod. If it adds something else, scour it and make it magic again (or try an Exalted Orb later).",
-                        vec![way("Reroll", "Regal Orb", p, regal, avg, "Adds one random mod: you want it to be this one", if p > 0.0 { 1.0 / p } else { 0.0 }, 1, None)]);
-                    if let Some(r) = b.done("regal", "Alteration, then Regal for the last mod", "Alteration for two mods, then the Regal Orb rolls the third: no Exalted Orbs.".into()) { out.push(r) }
+                        "Makes it rare with one more mod. If it isn't the one, scour it and make it magic again.", ways);
+                    if let Some(r) = b.done("regal", "Alteration, then Regal for the last mod", "Alteration for the first mod(s), then the Regal Orb rolls the last one.".into()) { out.push(r) }
                 }
             }
         }
