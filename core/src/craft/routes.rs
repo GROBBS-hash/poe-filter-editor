@@ -59,14 +59,14 @@ impl Seed {
 /// an essence's mod, or only one side (Eldritch Chaos: 1–3 new mods there). `cap` = the most prefixes / suffixes the
 /// item may end with (room left for later steps).
 #[derive(Clone, Copy)]
-struct Cfg<'a> { magic: bool, tag: Option<&'a str>, forced: Option<(bool, Option<usize>)>, side: Option<bool>, cap: (i32, i32) }
-impl Default for Cfg<'_> { fn default() -> Self { Cfg { magic: false, tag: None, forced: None, side: None, cap: (3, 3) } } }
+struct Cfg<'a> { magic: bool, tag: Option<&'a str>, forced: Option<(bool, Option<usize>)>, side: Option<bool>, cap: (i32, i32), jewel: bool }
+impl Default for Cfg<'_> { fn default() -> Self { Cfg { magic: false, tag: None, forced: None, side: None, cap: (3, 3), jewel: false } } }
 
 /// Chance one roll gives every target (each target = the pool slots that count for it) and fits in `cap`.
 fn sim(pool: &[Slot], cfg: Cfg, seed: &Seed, targets: &[Vec<bool>]) -> f64 {
     let d = data();
     let mut rng = Rng(0x51A7_E5ED_C0FF_EE11 ^ ((pool.len() as u64) << 7) ^ (targets.len() as u64));
-    let side_max = if cfg.magic { 1 } else { 3 };
+    let side_max = if cfg.magic { 1 } else { side_cap(cfg.jewel) };
     let tagged: Vec<bool> = pool.iter().map(|(i, ..)| cfg.tag.is_some_and(|t| d.mods[*i].tags.iter().any(|x| x == t))).collect();
     let mut used: Vec<usize> = Vec::with_capacity(8);
     let mut got = vec![false; targets.len()];
@@ -81,7 +81,7 @@ fn sim(pool: &[Slot], cfg: Cfg, seed: &Seed, targets: &[Vec<bool>]) -> f64 {
         let new = match cfg.side {
             Some(_) => if r < 0.5 { 1 } else if r < 0.85 { 2 } else { 3 },
             None if cfg.magic => if r < 0.5 { 1 } else { 2 },
-            None => { let n = if r < 8.0 / 12.0 { 4 } else if r < 11.0 / 12.0 { 5 } else { 6 }; (n - pre - suf).max(1) }
+            None => (rare_count(r, cfg.jewel) - pre - suf).max(1),
         };
         for step in 0..new {
             let only_tag = step == 0 && cfg.tag.is_some();
@@ -121,6 +121,10 @@ struct Ctx<'a> {
     fixed: Seed,
     armour: bool,
     influenced: bool,
+    /// A jewel: 2 prefixes + 2 suffixes, 3–4 mods on a rare, no bench locks or fracturing.
+    jewel: bool,
+    /// The most prefixes / suffixes (3, or 2 on a jewel).
+    side: i32,
 }
 
 fn way(group: &str, method: impl Into<String>, chance: f64, each: Option<f64>, average: Option<f64>, note: impl Into<String>, tries: f64, risk: u8, check: Option<&str>) -> Way {
@@ -202,13 +206,13 @@ impl Ctx<'_> {
         let d = data();
         if want.is_empty() { return vec![] }
         let mut out = Vec::new();
-        let cfg = Cfg { cap, ..Default::default() };
+        let cfg = Cfg { cap, jewel: self.jewel, ..Default::default() };
         // A mod only an essence makes: that essence it is.
         let only_ess: Vec<usize> = want.iter().copied().filter(|t| !self.t[*t].natural).collect();
         if only_ess.len() > 1 { return vec![] }
         let all = self.masks(&self.roll, want);
         if !locked && only_ess.is_empty() {
-            out.push(reroll("Chaos Orb", sim(&self.roll, cfg, seed, &all), self.c("Chaos Orb"), "Rerolls the whole item: 4–6 new mods", None));
+            out.push(reroll("Chaos Orb", sim(&self.roll, cfg, seed, &all), self.c("Chaos Orb"), format!("Rerolls the whole item: {} new mods", rare_words(self.jewel)), None));
             if alt && seed.pre + seed.suf == 0 && want.iter().filter(|t| self.t[**t].prefix).count() <= 1 && want.iter().filter(|t| !self.t[**t].prefix).count() <= 1 {
                 let a = sim(&self.roll, Cfg { magic: true, ..cfg }, seed, &all);
                 let regal = self.c("Regal Orb");
@@ -263,7 +267,8 @@ impl Ctx<'_> {
     /// hit; `good_side` = how many of those are on the target's side).
     fn slam(&self, t: usize, seed: &Seed, good: usize, good_side: usize) -> Vec<Way> {
         let x = &self.t[t];
-        if seed.side(x.prefix) >= 3 { return vec![] }
+        let cap = self.side;
+        if seed.side(x.prefix) >= cap { return vec![] }
         let used: HashSet<usize> = seed.groups.iter().copied().collect();
         let is_t = |i: &usize| self.is_t(t, *i);
         let mut out = Vec::new();
@@ -279,15 +284,15 @@ impl Ctx<'_> {
         let (ex, an) = (self.c("Exalted Orb"), self.c("Orb of Annulment"));
         let (pre, suf) = (seed.pre, seed.suf);
         let junk = (pre + suf) as usize - good.min((pre + suf) as usize);
-        let p = add_one(&self.roll, &used, pre, suf, 3, &is_t);
+        let p = add_one(&self.roll, &used, pre, suf, cap, &is_t);
         let (avg, tries) = annul(p, ex, an, good, junk);
         out.push(way("Add a mod", "Exalted Orb + Orb of Annulment", p, ex, avg,
             "Exalt; if it adds something else, annul (it may take a mod you want instead)", tries, 2, None));
         // Fill the other side at the bench first, so the Exalt can only land on this side.
-        if seed.side(!x.prefix) < 3 {
+        if seed.side(!x.prefix) < cap {
             if let Some((what, cost)) = self.filler(!x.prefix, &seed.groups) {
-                let (fp, fs) = if x.prefix { (pre, 3) } else { (3, suf) };
-                let p = add_one(&self.roll, &used, fp, fs, 3, &is_t);
+                let (fp, fs) = if x.prefix { (pre, cap) } else { (cap, suf) };
+                let p = add_one(&self.roll, &used, fp, fs, cap, &is_t);
                 let (avg, tries) = annul(p, ex, an, good, junk + 1);
                 out.push(way("Add a mod", "Bench filler + Exalted Orb", p, ex, plus(avg, Some(cost)),
                     format!("Bench-craft {what} to fill the {}es, then Exalt (annul on a miss); remove the craft after", if x.prefix { "suffix" } else { "prefix" }), tries + 1.0, 2, None));
@@ -295,7 +300,7 @@ impl Ctx<'_> {
         }
         // "Cannot roll Attack / Caster Modifiers" (1 Divine, a suffix) takes those out of the Exalt's pool.
         for (tag, name) in [("attack", "Attack"), ("caster", "Caster")] {
-            if self.t.iter().any(|y| y.tags.iter().any(|g| g == tag)) { continue }
+            if self.jewel || self.t.iter().any(|y| y.tags.iter().any(|g| g == tag)) { continue }
             if !(if x.prefix { suf < 3 } else { suf + 1 < 3 }) { continue }
             let pool: Vec<Slot> = self.roll.iter().copied().filter(|(i, ..)| !data().mods[*i].tags.iter().any(|g| g == tag)).collect();
             let p2 = add_one(&pool, &used, pre, suf + 1, 3, &is_t);
@@ -318,7 +323,7 @@ impl Ctx<'_> {
         }
         // Lock the other side, Exalt, scour on a miss (only when this side has nothing you want yet).
         let other_good = good - good_side;
-        if good_side == 0 && other_good > 0 && seed.side(x.prefix) + 1 < 3 {
+        if !self.jewel && good_side == 0 && other_good > 0 && seed.side(x.prefix) + 1 < 3 {
             let lock = self.lock(!x.prefix, other_good);
             let (fp, fs) = if x.prefix { (pre + 1, suf) } else { (pre, suf + 1) };
             let p = add_one(&self.roll, &used, fp, fs, 3, &is_t);
@@ -338,7 +343,13 @@ impl Ctx<'_> {
 struct Build { steps: Vec<Step>, cost: Option<f64>, clicks: f64, risk: u8, checks: Vec<String>, ok: bool, crafted: bool }
 impl Build {
     fn new(base: &str, ilvl: u32) -> Self {
-        Build { steps: vec![Step { title: format!("Get a {base} of item level {ilvl}+"), detail: format!("The tiers you want need item level {ilvl}."), ways: vec![] }],
+        let first = match cluster_info(base) {
+            Some(c) => Step { title: format!("Get a {} with \"{}\", item level {ilvl}+", c.size, c.enchant.join(" / ")),
+                detail: format!("Fewer passives is better ({} is the fewest a {} has: fewer small passives before the notables). The notables you want need item level {ilvl}. \"Buy base\" in the build window searches for it.",
+                    c.min, c.size), ways: vec![] },
+            None => Step { title: format!("Get a {base} of item level {ilvl}+"), detail: format!("The tiers you want need item level {ilvl}."), ways: vec![] },
+        };
+        Build { steps: vec![first],
             cost: Some(0.0), clicks: 0.0, risk: 0, checks: vec![], ok: true, crafted: false }
     }
     fn step(&mut self, title: impl Into<String>, detail: impl Into<String>, ways: Vec<Way>) {
@@ -381,15 +392,18 @@ pub fn routes(base: &str, ilvl: u32, influences: &[String], targets: &[(String, 
         fixed.add(prefix, m.key.as_deref().and_then(|k| fam_group(k)));
     }
     let armour = matches!(class.as_str(), "Helmet" | "Gloves" | "Boots" | "Body Armour");
-    let cx = Ctx { class, tags, ilvl, roll, price, t, fixed, armour, influenced: !influences.is_empty() };
+    let jewel = jewel_tags(&tags);
+    let side = side_cap(jewel);
+    let cx = Ctx { class, tags, ilvl, roll, price, t, fixed, armour, influenced: !influences.is_empty() && !jewel, jewel, side };
     let n = cx.t.len();
     let ilvl_needed = cx.t.iter().filter_map(|x| x.fam.tiers.iter().filter(|y| y.tier <= x.tier).map(|y| y.lvl).min()).max().unwrap_or(1);
     let mut note = if needs.is_empty() { String::new() } else { format!("Not in these routes: {}. ", needs.join("; ")) };
 
     // Too many for one item?
     let (np, ns) = (cx.t.iter().filter(|x| x.prefix).count() as i32 + cx.fixed.pre, cx.t.iter().filter(|x| !x.prefix).count() as i32 + cx.fixed.suf);
-    if np > 3 || ns > 3 {
-        return Some(Routes { routes: vec![], ilvl_needed, note: "A rare holds at most 3 prefixes and 3 suffixes: take some mods out of the plan.".into(), divine: cx.div() })
+    if np > side || ns > side {
+        return Some(Routes { routes: vec![], ilvl_needed, note: format!("A rare {} holds at most {side} prefixes and {side} suffixes: take some mods out of the plan.",
+            if jewel { "jewel" } else { "item" }), divine: cx.div() })
     }
     // Mods only the bench makes go last (more than one needs "Can have up to 3 Crafted Modifiers"); otherwise the
     // bench finishes the hardest mod it can make well enough.
@@ -430,7 +444,20 @@ pub fn routes(base: &str, ilvl: u32, influences: &[String], targets: &[(String, 
         by_hard(&mut rest);
         for t in rest {
             let gs = good.iter().filter(|g| cx.t[**g].prefix == cx.t[t].prefix).count();
-            let ways = cx.slam(t, seed, good.len(), gs);
+            let mut ways = cx.slam(t, seed, good.len(), gs);
+            // An Exalted Orb on its own; on a miss the whole item is made again (on a jewel an annul too often takes a
+            // mod you want, and there's no bench to help).
+            if jewel || ways.is_empty() {
+                let used: HashSet<usize> = seed.groups.iter().copied().collect();
+                let p = if seed.side(cx.t[t].prefix) < side { add_one(&cx.roll, &used, seed.pre, seed.suf, side, &|i: &usize| cx.is_t(t, *i)) } else { 0.0 };
+                let ex = cx.c("Exalted Orb");
+                let avg = (|| Some(ex? / p + b.cost? * (1.0 / p - 1.0)))().filter(|_| p > 0.0);
+                if p > 0.0 {
+                    ways.push(way("Add a mod", "Exalted Orb", p, ex, avg, "Adds one random mod; if it's something else, start the item again from the top",
+                        1.0 / p, 1, None));
+                    sort_ways(&mut ways);
+                }
+            }
             if ways.first().is_some_and(|w| w.method.starts_with("Bench") || w.method.starts_with("Lock")) { b.crafted = true }
             b.step(format!("Add {}", cx.t[t].text), format!("One {} at a time, onto the item as it is now.", if cx.t[t].prefix { "prefix" } else { "suffix" }), ways);
             seed.add(cx.t[t].prefix, cx.t[t].group);
@@ -438,7 +465,7 @@ pub fn routes(base: &str, ilvl: u32, influences: &[String], targets: &[(String, 
         }
     };
     let cap_for = |later: &[usize]| -> (i32, i32) {
-        (3 - res_room(true) - later.iter().filter(|i| cx.t[**i].prefix).count() as i32, 3 - res_room(false) - later.iter().filter(|i| !cx.t[**i].prefix).count() as i32)
+        (side - res_room(true) - later.iter().filter(|i| cx.t[**i].prefix).count() as i32, side - res_room(false) - later.iter().filter(|i| !cx.t[**i].prefix).count() as i32)
     };
     let names = |v: &[usize]| v.iter().map(|i| cx.t[*i].text.clone()).collect::<Vec<_>>().join(" + ");
     let mut out: Vec<Route> = Vec::new();
@@ -456,7 +483,7 @@ pub fn routes(base: &str, ilvl: u32, influences: &[String], targets: &[(String, 
     for a_pre in [true, false] {
         let a: Vec<usize> = work.iter().copied().filter(|i| cx.t[*i].prefix == a_pre).collect();
         let bside: Vec<usize> = work.iter().copied().filter(|i| cx.t[*i].prefix != a_pre).collect();
-        if a.is_empty() || bside.is_empty() { continue }
+        if a.is_empty() || bside.is_empty() || jewel { continue }
         if bside.iter().any(|i| !cx.t[*i].natural) { continue }
         let mut b = Build::new(base, ilvl_needed);
         let side = if a_pre { "prefixes" } else { "suffixes" };
@@ -499,12 +526,12 @@ pub fn routes(base: &str, ilvl: u32, influences: &[String], targets: &[(String, 
             let rest: Vec<usize> = work.iter().copied().filter(|i| !h.contains(i)).collect();
             let mut b = Build::new(base, ilvl_needed);
             let all = cx.masks(&cx.roll, &h);
-            let pa = sim(&cx.roll, Cfg { magic: true, ..Default::default() }, &Seed::default(), &all);
+            let pa = sim(&cx.roll, Cfg { magic: true, jewel, ..Default::default() }, &Seed::default(), &all);
             let alt = cx.c("Orb of Alteration");
             let mut ways = vec![reroll(if h.len() == 2 { "Orb of Alteration (both at once)" } else { "Orb of Alteration" }, pa, alt, "Rerolls a magic item: 1–2 mods", None)];
             if h.len() == 2 {
                 // Alteration until the harder one shows alone, then Augmentation for the other.
-                let one = sim(&cx.roll, Cfg { magic: true, cap: if cx.t[h[0]].prefix { (1, 0) } else { (0, 1) }, ..Default::default() }, &Seed::default(), &cx.masks(&cx.roll, &h[..1]));
+                let one = sim(&cx.roll, Cfg { magic: true, jewel, cap: if cx.t[h[0]].prefix { (1, 0) } else { (0, 1) }, ..Default::default() }, &Seed::default(), &cx.masks(&cx.roll, &h[..1]));
                 let s1 = cx.seed_with(&h[..1]);
                 let pg = add_one(&cx.roll, &s1.groups.iter().copied().collect::<HashSet<usize>>(), s1.pre, s1.suf, 1, &|i: &usize| cx.is_t(h[1], *i));
                 let aug = cx.c("Orb of Augmentation");
@@ -516,12 +543,13 @@ pub fn routes(base: &str, ilvl: u32, influences: &[String], targets: &[(String, 
             }
             sort_ways(&mut ways);
             ways.retain(|w| w.chance > 0.0);
+            let magic_ways = ways.clone();
             b.step(format!("Make it magic with {}", names(&h)), "Orb of Transmutation on a white base, then Alteration.", ways);
             // Regal: its new mod has to land where there's room.
             let s = cx.seed_with(&h);
             let room = cap_for(&rest);
             let used: HashSet<usize> = s.groups.iter().copied().collect();
-            let open: Vec<&Slot> = cx.roll.iter().filter(|(_, _, p, g)| !used.contains(g) && if *p { s.pre < 3 } else { s.suf < 3 }).collect();
+            let open: Vec<&Slot> = cx.roll.iter().filter(|(_, _, p, g)| !used.contains(g) && if *p { s.pre < side } else { s.suf < side }).collect();
             let total: f64 = open.iter().map(|x| x.1).sum();
             let ok: f64 = open.iter().filter(|(_, _, p, _)| if *p { s.pre < room.0 } else { s.suf < room.1 }).map(|x| x.1).sum();
             let pr = if total > 0.0 { ok / total } else { 0.0 };
@@ -536,6 +564,20 @@ pub fn routes(base: &str, ilvl: u32, influences: &[String], targets: &[(String, 
             finish(&mut b, &mut seed, &mut good, &rest);
             bench_finish(&mut b);
             if let Some(r) = b.done("magic", "Magic first: Alteration, then Regal", "Alteration (cheap) for the two hardest mods, Regal, then add the rest.".into()) { out.push(r) }
+            // One mod left: the Regal Orb itself can hit it (the usual way to make a 3-notable cluster jewel).
+            if let [last] = rest[..] {
+                if cx.t[last].natural && reserved.is_empty() {
+                    let mut b = Build::new(base, ilvl_needed);
+                    b.step(format!("Make it magic with {}", names(&h)), "Orb of Transmutation on a white base, then Alteration.", magic_ways);
+                    let p = add_one(&cx.roll, &used, s.pre, s.suf, side, &|i: &usize| cx.is_t(last, *i));
+                    let first = b.steps.last().and_then(|s| s.ways.first()).and_then(|w| w.average);
+                    let avg = (|| Some((regal? + first?) / p - first?))().filter(|_| p > 0.0);
+                    b.step(format!("Regal Orb for {}", cx.t[last].text),
+                        "Makes it rare with one more mod. If it adds something else, scour it and make it magic again (or try an Exalted Orb later).",
+                        vec![way("Reroll", "Regal Orb", p, regal, avg, "Adds one random mod: you want it to be this one", if p > 0.0 { 1.0 / p } else { 0.0 }, 1, None)]);
+                    if let Some(r) = b.done("regal", "Alteration, then Regal for the last mod", "Alteration for two mods, then the Regal Orb rolls the third: no Exalted Orbs.".into()) { out.push(r) }
+                }
+            }
         }
     }
 
@@ -558,8 +600,8 @@ pub fn routes(base: &str, ilvl: u32, influences: &[String], targets: &[(String, 
                 let mut b = Build::new(base, ilvl_needed);
                 b.step(format!("Roll {}", names(&h)), "Reroll until they're on, with room left for the rest.", ways);
                 let mut seed = cx.seed_with(&h);
-                seed.pre = seed.pre.max(cap.0.min(3));
-                seed.suf = seed.suf.max(cap.1.min(3));
+                seed.pre = seed.pre.max(cap.0.min(side));
+                seed.suf = seed.suf.max(cap.1.min(side));
                 let mut good = h.clone();
                 finish(&mut b, &mut seed, &mut good, &rest);
                 bench_finish(&mut b);
@@ -578,7 +620,7 @@ pub fn routes(base: &str, ilvl: u32, influences: &[String], targets: &[(String, 
     {
         let mut w: Vec<usize> = work.iter().copied().filter(|i| cx.t[*i].natural).collect();
         by_hard(&mut w);
-        if let Some(&f) = w.first().filter(|_| cx.fixed.pre + cx.fixed.suf == 0 && work.len() >= 2) {
+        if let Some(&f) = w.first().filter(|_| !jewel && cx.fixed.pre + cx.fixed.suf == 0 && work.len() >= 2) {
             let mut b = Build::new(base, ilvl_needed);
             let ways = cx.spam(&[f], &Seed::default(), (3, 3), false, false);
             let make = ways.first().and_then(|w| w.average);
@@ -633,7 +675,7 @@ pub fn routes(base: &str, ilvl: u32, influences: &[String], targets: &[(String, 
     {
         let good: Vec<usize> = (0..n).filter(|i| cx.t[*i].fam.have.is_some_and(|h| h > 0 && h <= cx.t[*i].tier)).collect();
         let missing: Vec<usize> = work.iter().copied().filter(|i| !good.contains(i)).collect();
-        if !good.is_empty() && !missing.is_empty() {
+        if !jewel && !good.is_empty() && !missing.is_empty() {
             let gp = good.iter().filter(|i| cx.t[**i].prefix).count();
             let a_pre = gp * 2 >= good.len();
             let keep: Vec<usize> = good.iter().copied().filter(|i| cx.t[*i].prefix == a_pre).collect();
@@ -733,5 +775,53 @@ mod tests {
         let k = r.routes.iter().find(|x| x.id == "keep").expect("keep route");
         assert!(k.steps[1].title.contains("prefixes"), "{:#?}", k.steps);
         assert!(!k.checks.is_empty());
+    }
+}
+
+
+#[cfg(test)]
+mod jewel_tests {
+    use super::*;
+    fn price(n: &str) -> Option<f64> {
+        Some(match n { "Chaos Orb" => 1.0, "Divine Orb" => 220.0, "Exalted Orb" => 0.8, "Orb of Annulment" => 7.0, "Orb of Scouring" => 0.8,
+            "Orb of Alteration" => 0.2, "Orb of Augmentation" => 0.2, "Regal Orb" => 0.3, x if x.contains("Lifeforce") => 0.02,
+            x if x.contains("Resonator") => 1.0, x if x.contains("Fossil") => 2.0, _ => 2.0 })
+    }
+
+    #[test]
+    fn three_notable_cluster() {
+        let b = "Large Cluster Jewel: Lightning Damage";
+        let p = pool(b, 84, &[], &[], &price).unwrap();
+        let find = |s: &str| p.families.iter().find(|f| f.text.ends_with(s)).unwrap().key.clone();
+        let t = vec![(find("Overshock"), 1), (find("Thunderstruck"), 1), (find("Widespread Destruction"), 1)];
+        let r = routes(b, 84, &[], &t, &[], &price).unwrap();
+        let ids: Vec<&str> = r.routes.iter().map(|r| r.id.as_str()).collect();
+        assert_eq!(r.ilvl_needed, 50);
+        // No bench locks, fracturing or Eldritch on a jewel; the Regal can roll the last notable.
+        assert!(!ids.iter().any(|i| i.starts_with("lock") || *i == "fracture" || i.starts_with("eldritch") || *i == "keep"), "{ids:?}");
+        assert!(ids.contains(&"regal") && ids.contains(&"spam"), "{ids:?}");
+        assert!(r.routes[0].badges.contains(&"Cheapest".to_string()));
+        for w in r.routes.windows(2) { assert!(w[0].cost.unwrap_or(f64::MAX) <= w[1].cost.unwrap_or(f64::MAX)) }
+        // Step one says which base to buy: size, enchant, item level.
+        let first = &r.routes[0].steps[0].title;
+        assert!(first.contains("Large Cluster Jewel") && first.contains("12% increased Lightning Damage") && first.contains("50+"), "{first}");
+        // No step uses the bench or an essence.
+        assert!(r.routes.iter().all(|x| x.steps.iter().all(|s| s.ways.iter().all(|w| !w.method.contains("Bench") && !w.method.contains("Essence")))));
+        // Harvest reforges are offered.
+        assert!(r.routes.iter().any(|x| x.steps.iter().any(|s| s.ways.iter().any(|w| w.method.starts_with("Harvest reforge")))));
+    }
+
+    #[test]
+    fn jewel_alt_regal() {
+        // One prefix + one suffix on a Cobalt Jewel: routes come out; three suffixes don't fit.
+        let b = "Cobalt Jewel";
+        let p = pool(b, 84, &[], &[], &price).unwrap();
+        let find = |s: &str, a: &str| p.families.iter().find(|f| f.text.contains(s) && f.affix == a).unwrap().key.clone();
+        let t = vec![(find("increased maximum Energy Shield", "prefix"), 1), (find("to Intelligence", "suffix"), 1)];
+        let r = routes(b, 84, &[], &t, &[], &price).unwrap();
+        assert!(r.routes.iter().any(|x| x.id == "magic"), "{:?}", r.routes.iter().map(|r| &r.id).collect::<Vec<_>>());
+        let three: Vec<(String, u32)> = p.families.iter().filter(|f| f.affix == "suffix" && !f.tiers.is_empty()).take(3).map(|f| (f.key.clone(), 9)).collect();
+        let r = routes(b, 84, &[], &three, &[], &price).unwrap();
+        assert!(r.routes.is_empty() && r.note.contains("2 suffixes"), "{}", r.note);
     }
 }

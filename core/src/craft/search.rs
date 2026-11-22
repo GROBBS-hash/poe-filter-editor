@@ -163,7 +163,12 @@ pub fn plan_item_text(pool: &Pool, targets: &[(String, u32)]) -> String {
         let (text, _) = best_text(f, *tier);
         for line in text.split(" / ").flat_map(|l| l.lines()) { lines.push(lowest_roll(line)); }
     }
-    format!("Item Class: {}\nRarity: Rare\nPlanned Item\n{}\n--------\nItem Level: {}\n--------\n{}\n", game_class(&pool.class), pool.base, pool.ilvl, lines.join("\n"))
+    // A cluster jewel: its real base, and the enchant that makes it this kind of cluster.
+    let (base, enchant) = match crate::craft::cluster_info(&pool.base) {
+        Some(c) => (c.size, format!("{}\n--------\n", c.enchant.iter().map(|e| format!("Added Small Passive Skills grant: {e} (enchant)")).collect::<Vec<_>>().join("\n"))),
+        None => (pool.base.clone(), String::new()),
+    };
+    format!("Item Class: {}\nRarity: Rare\nPlanned Item\n{base}\n--------\nItem Level: {}\n--------\n{enchant}{}\n", game_class(&pool.class), pool.ilvl, lines.join("\n"))
 }
 
 /// The game's item class name ("Staff" -> "Staves", "Ring" -> "Rings"; "Thrusting One Hand Sword" copies as "Thrusting One Hand Swords").
@@ -171,6 +176,7 @@ fn game_class(c: &str) -> String {
     match c {
         "Staff" => "Staves".into(),
         "Warstaff" => "Warstaves".into(),
+        "AbyssJewel" => "Abyss Jewels".into(),
         _ if c.ends_with('s') => c.into(),
         _ => format!("{c}s"),
     }

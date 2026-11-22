@@ -31,9 +31,10 @@ function PriceButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-/** "Craft": opens the editor's Crafting page with this item, to see how to make it (uniques can't be crafted). */
+/** "Craft": opens the editor's Crafting page with this item, to see how to make it (uniques can't be crafted; jewels,
+ *  abyss jewels and cluster jewels can). */
 function CraftButton({ it }: { it: PobGear }) {
-  if (it.rarity === "unique" || !it.copy || it.slot.startsWith("Flask") || it.base.includes("Jewel")) return null;
+  if (it.rarity === "unique" || !it.copy || it.slot.startsWith("Flask") || /Timeless|Prismatic Jewel/.test(it.base)) return null;
   return (
     <button className="bv-price" title="How to craft this item (opens the Crafting page with it)"
       onClick={(e) => { e.stopPropagation(); try { localStorage.setItem(CRAFT_ITEM_KEY, CRAFT_PLAN_MARK + (it.copy ?? "")); } catch { /* not passed */ } invoke("open_editor", { tab: "craft" }); }}>Craft</button>

@@ -46,6 +46,26 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **Crafting jewels and cluster jewels (22 Nov, not released yet).** After his 0.2.39 test ("crafting is important for
+  clusters especially"). `tools/build_craft_data.mjs` now keeps normal jewels (Cobalt, Crimson, Viridian), abyss jewels
+  (Murderous / Searching / Hypnotic / Ghastly Eye) and cluster jewels: one crafting base per enchant
+  ("Large Cluster Jewel: Lightning Damage", 55 of them, the enchant's tag added, so each notable has the game's weight
+  for that enchant). Mods carry their domain (`dom`): jewel mods only roll on jewels and the other way round (the
+  base's tags get a "dom:…" tag, `weight()` checks it). Fossils carry `only` (Hollow / Glyphic). Prismatic and
+  Timeless are unique-only, Assembled Eye left out.
+  - Engine (`core/src/craft.rs`, `routes.rs`): jewels hold 2 prefixes + 2 suffixes, a rare gets 3 mods (2 in 3) or
+    4 (1 in 3), checked against Craft of Exile on his Large lightning cluster (Chaos Orb → Thunderstruck 5.2% there,
+    5.05% here; with Widespread Destruction 0.41% / 0.42%; weights 364 / 727 identical). No influences, essences,
+    bench crafts, bench locks, fracturing or Eldritch on jewels; Harvest reforges, fossils (CoE lists them for
+    clusters too), Alteration / Augmentation / Regal / Exalted are. New route for any item: "Alteration, then Regal
+    for the last mod" (the Regal rolls the third mod; the usual 3-notable cluster craft). When a slam on a jewel misses
+    there's no fixing it, so "Exalted Orb" there is priced as "start again from the top". `craft::start` reads a
+    cluster's enchant line (or PoB's "Cluster Jewel Skill:") → its crafting base, and "Adds N Passive Skills".
+    `plan_item_text` writes the real base + enchant for "buy instead".
+  - Crafting page: influences hidden for jewels, "x/2 prefixes", the card shows the cluster's enchant and passive
+    count, and a "Start from a Large Cluster Jewel with …, item level N+" box above the columns (the route's first step
+    says the same). Build window: Craft button on every non-unique jewel (Timeless / Prismatic still hidden).
+  - Tests: `jewel_rules`, `cluster_from_his_build`, `three_notable_cluster`, `jewel_alt_regal`.
 - **Play tools (22 Nov, from the "what do players want" research: Exile UI, Exiled Exchange 2, PoE Overlay, Path of
   Leveling, Reddit/forum asks).** Built on branch `ccr-26676017-7ecilq` while he was out; merged and released in 0.2.39 (22 Nov).
   Core `core/src/journey.rs` (tested), app `src-tauri/src/play_app.rs`, front end `src/Play.tsx` + `src/play.css`,
@@ -687,6 +707,14 @@ Everything below was built since GROBBS last tested and has only been checked wi
 (move them to "Confirmed in game") as he reports back, and add new features here as they land.
 Confirmed in game so far: basic Ctrl+D price check (trade search returned listings); 20 Nov: weapon + armour
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
+
+**Crafting jewels and cluster jewels (22 Nov, not released yet):**
+- [ ] Build window → Jewels tab: every non-unique jewel (clusters, Cobalt etc., abyss jewels) has a Craft button.
+- [ ] Craft on his Large lightning cluster: the Crafting page opens on "Large Cluster Jewel: Lightning Damage" with
+  Overshock, Thunderstruck, Widespread Destruction and the life regen planned; the "Start from…" box names the
+  enchant, 8 passives and item level 50+; "How to make it" lists routes cheapest first (no bench / essence steps).
+- [ ] Do the odds feel right next to Craft of Exile for a cluster he actually crafts? (Weights and mod counts were
+  matched against Craft of Exile on 22 Nov.)
 
 **Play tools (22 Nov, released in 0.2.39):**
 - [ ] F8 levelling window: opens over the game without taking focus; moves to the next step when you enter a zone;

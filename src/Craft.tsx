@@ -14,9 +14,10 @@ type BenchWay = { text: string; cost: [string, number][] };
 type Family = { key: string; affix: "prefix" | "suffix"; text: string; tags: string[]; tiers: Tier[]; chaos: number; have: number | null;
   essences: EssenceWay[]; bench: BenchWay[]; fossils_more: string[]; fossils_none: string[]; needs: string | null };
 type ItemMod = { text: string; affix: string | null; tier: number | null; key: string | null; needs: string | null; kind: string; how: string | null };
-type Pool = { base: string; class: string; ilvl: number; influences: string[]; families: Family[]; item_mods: ItemMod[] };
+type Cluster = { size: string; enchant: string[]; min: number; max: number };
+type Pool = { base: string; class: string; ilvl: number; influences: string[]; families: Family[]; item_mods: ItemMod[]; side: number; jewel: boolean; cluster: Cluster | null };
 type Way = { group: string; method: string; chance: number; cost_each: number | null; average: number | null; note: string };
-type Start = { base: string; ilvl: number; influences: string[]; have: string[]; name: string; rarity: string };
+type Start = { base: string; ilvl: number; influences: string[]; have: string[]; name: string; rarity: string; passives: number | null };
 type Target = { key: string; tier: number };
 
 const INFLUENCES = ["Shaper", "Elder", "Crusader", "Redeemer", "Hunter", "Warlord"];
@@ -74,6 +75,8 @@ export default function Craft() {
   const [paste, setPaste] = useState(false);
   /** Which non-clickable mod of your item has its "how to get it" note open. */
   const [how, setHow] = useState<number | null>(null);
+  /** A copied cluster jewel: how many passives it adds. */
+  const [passives, setPassives] = useState<number | null>(null);
   const [showRoutes, setShowRoutes] = useState(false);
   /** An item from your build arrived: plan all its mods once its mods are read, then forget it (you don't own it). */
   const planWanted = useRef(false);
@@ -82,9 +85,9 @@ export default function Craft() {
 
   const fromText = async (text: string) => {
     const s = await invoke<Start | null>("craft_start", { text }).catch(() => null);
-    if (!s) { setErr("That doesn't look like gear you can craft on (armour, weapons, jewellery, quivers, shields)."); return; }
+    if (!s) { setErr("That doesn't look like something you can craft on (armour, weapons, jewellery, quivers, shields, jewels, cluster jewels)."); return; }
     // PoB doesn't keep item levels (its copies say 1): an item to make from your build is planned at 86, where every tier rolls.
-    setErr(""); setBase(s.base); setIlvl(planWanted.current && s.ilvl < 68 ? 86 : s.ilvl); setInfl(s.influences); setHave(s.have); setRarity(s.rarity); setItemName(s.name); setItemText(text);
+    setErr(""); setBase(s.base); setIlvl(planWanted.current && s.ilvl < 68 ? 86 : s.ilvl); setInfl(s.influences); setHave(s.have); setRarity(s.rarity); setItemName(s.name); setItemText(text); setPassives(s.passives);
     setPick(null); setPaste(false); setPlan([]);
   };
   // An item sent from the Ctrl+D window (now, or while this page was closed).
@@ -135,7 +138,9 @@ export default function Craft() {
   const routePlan = useMemo(() => plan.filter((t) => fam(t.key)), [plan, pool]);
   const routes = useRoutes(routePlan, base, ilvl, infl, have);
 
-  const clearItem = () => { setHave([]); setItemName(""); setItemText(""); setRarity(""); };
+  const clearItem = () => { setHave([]); setItemName(""); setItemText(""); setRarity(""); setPassives(null); };
+  /** The picture and name the game uses ("Large Cluster Jewel", not the page's "Large Cluster Jewel: Lightning Damage"). */
+  const realBase = pool?.cluster?.size ?? base;
   const toggleInfl = (i: string) => setInfl(infl.includes(i) ? infl.filter((x) => x !== i) : [...infl, i].slice(-2));
   const inPlan = (k: string) => plan.some((t) => t.key === k);
   const addPlan = (f: Family) => { if (!inPlan(f.key)) setPlan([...plan, { key: f.key, tier: Math.min(f.tiers.length || 1, 2) }]); };
@@ -151,11 +156,11 @@ export default function Craft() {
         <label className="cr-field cr-ilvl">Item level
           <input type="number" min={1} max={100} value={ilvl} onChange={(e) => setIlvl(+e.target.value)} />
         </label>
-        <div className="cr-field">Influence
+        {!pool?.jewel && <div className="cr-field">Influence
           <div className="cr-infl">{INFLUENCES.map((i) => (
             <button key={i} className={`cr-inf ${infl.includes(i) ? "on" : ""}`} style={{ "--ic": INF_COLOUR[i] } as CSSProperties} onClick={() => toggleInfl(i)} title={`${i} influence`}>
               <InfIcon name={i} size={18} />{i}</button>))}</div>
-        </div>
+        </div>}
         <div className="cr-bar-end">
           <button onClick={async () => { try { const t = await navigator.clipboard.readText(); if (t.includes("Item Class:")) { fromText(t); return; } } catch { /* fall back */ } setPaste(true); }}>
             Use a copied item</button>
@@ -167,6 +172,7 @@ export default function Craft() {
       </div>
       {paste && <textarea className="text cr-paste" autoFocus placeholder="Paste the item here (Ctrl+V). In game: hover it and press Ctrl+C." onChange={(e) => e.target.value.includes("Item Class:") && fromText(e.target.value)} />}
       {err && <p className="danger-text small">{err}</p>}
+      {pool?.cluster && <ClusterBase c={pool.cluster} passives={passives} need={routes.r?.ilvl_needed ?? null} />}
 
       <div className="cr-cols">
         {/* Your item + plan */}
@@ -181,13 +187,14 @@ export default function Craft() {
                 return (
                   <div className={`cr-tip-head ${syms.length ? "has-sym" : ""}`} style={{ color: RARITY_COLOUR[rarity] ?? "#ddd" }}>
                     {syms.length > 0 && sym(syms[0])}
-                    <ItemIcon base={base} size={44} />
+                    <ItemIcon base={realBase} size={44} />
                     <div><div className="cr-tip-name">{itemName}</div>
-                    {itemName !== base && <div className="cr-tip-name">{base}</div>}</div>
+                    {itemName !== realBase && <div className="cr-tip-name">{realBase}</div>}</div>
                     {syms.length > 0 && sym(syms[1] ?? syms[0])}
                   </div>
                 );
               })()}
+              {pool.cluster && <div className="cr-tip-meta">{passives ? "Adds " + passives + " Passive Skills · " : ""}{pool.cluster.enchant.join(" / ")}</div>}
               <div className="cr-tip-meta">Item level {ilvl}{infl.length ? <> · {infl.map((i) => <InfIcon key={i} name={i} />)} {infl.join(" + ")}</> : null}</div>
               {pool.item_mods.length === 0 && <div className="cr-tip-meta">No mods read: copy it with Ctrl+Alt+C for tiers.</div>}
               {pool.item_mods.map((m, i) => (
@@ -204,7 +211,7 @@ export default function Craft() {
                   {m.how && (how === i || m.kind === "fractured") && <div className="cr-how">{m.how}</div>}
                 </div>
               ))}
-              <div className="cr-tip-foot"><span>{pool.item_mods.filter((m) => m.affix === "prefix").length}/3 prefixes · {pool.item_mods.filter((m) => m.affix === "suffix").length}/3 suffixes</span>
+              <div className="cr-tip-foot"><span>{pool.item_mods.filter((m) => m.affix === "prefix").length}/{pool.side} prefixes · {pool.item_mods.filter((m) => m.affix === "suffix").length}/{pool.side} suffixes</span>
                 <button className="link small" onClick={clearItem}>forget item</button></div>
               <button className="primary cr-planall" onClick={() => planAll(pool)} title="Puts every mod on this item into the plan and shows a step-by-step route to make it">
                 Plan this whole item</button>
@@ -233,7 +240,7 @@ export default function Craft() {
             {busy && <span className="muted small">Rolling…</span>}
           </div>
           <div className="cr-legend small">
-            {pool && <span className="muted">{pool.class} · item level {pool.ilvl}</span>}
+            {pool && <span className="muted">{pool.cluster ? pool.cluster.size : pool.class === "AbyssJewel" ? "Abyss jewel" : pool.class} · item level {pool.ilvl}{pool.jewel ? " · up to " + pool.side + " prefixes + " + pool.side + " suffixes" : ""}</span>}
             <button className="link small" onClick={() => setExtras(!extras)}>{extras ? "Hide" : "Show"} bench / essence only</button>
           </div>
           {(["prefix", "suffix"] as const).map((a) => {
@@ -292,6 +299,22 @@ function WayCard({ w, best }: { w: Way; best: boolean }) {
         <div className="cr-odds">{odds(w.chance)}</div>
         <div className="small">{w.chance < 0.995 ? (w.average != null ? <>≈ <Chaos c={w.average} /></> : <Chaos c={null} />) : <Chaos c={w.cost_each} />}</div>
         {w.chance < 0.995 && w.cost_each != null && <div className="muted small">each <Chaos c={w.cost_each} /></div>}
+      </div>
+    </div>
+  );
+}
+
+/** A cluster jewel: which base to start from (the enchant decides the notables, fewer passives is better). */
+function ClusterBase({ c, passives, need }: { c: Cluster; passives: number | null; need: number | null }) {
+  return (
+    <div className="card cr-cluster small">
+      <ItemIcon base={c.size} size={30} />
+      <div>
+        <b>Start from a {c.size}</b> with the enchant <b>"{c.enchant.join(" / ")}"</b>
+        {" "}and {passives ? passives + " passives" : c.min + " passives (the fewest: " + c.min + "–" + c.max + ")"}
+        {need && need > 1 ? <>, item level <b>{need}+</b> for the notables in your plan</> : null}.
+        <div className="muted">The enchant decides which notables can roll; the item level decides which of them. "Buy base" in the build window finds one.
+          Jewels take no essences or bench crafts: use Alteration, Augmentation, Regal, Exalted Orbs, fossils and Harvest reforges.</div>
       </div>
     </div>
   );

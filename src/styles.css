@@ -1452,6 +1452,9 @@ main.content .card h2 { font-size: 19px; font-weight: 500; letter-spacing: .02em
 @media (max-width: 1200px) { .cr-cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .cr-cols > .cr-col:first-child { grid-column: 1 / -1; height: auto; } }
 .cr-col > .card { margin-bottom: 10px; }
 .cr-empty b { display: block; margin-bottom: 4px; color: var(--text); }
+/* A cluster jewel: which base to start from */
+.cr-cluster { display: flex; gap: 10px; align-items: flex-start; margin-top: 10px; line-height: 1.5; }
+.cr-cluster .muted { margin-top: 2px; }
 
 /* Your item, drawn like the game tooltip */
 .cr-tip { background: #0c0b0a; border: 1px solid #5a4126; border-radius: 10px; overflow: hidden; margin-bottom: 10px; }

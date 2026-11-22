@@ -4,6 +4,9 @@
 //! Odds come from rolling the item many times here (like Craft of Exile's simulator, much simpler): a rare gets
 //! 4 mods (8 in 12), 5 (3 in 12) or 6 (1 in 12), at most 3 prefixes and 3 suffixes, one mod per group,
 //! each picked by its weight.
+//! Jewels (normal, abyss and cluster) follow their own rules: at most 2 prefixes and 2 suffixes, a rare gets 3 or 4
+//! mods, and their mods come from the jewel's own mod list (domain). A cluster jewel's base is listed once per enchant
+//! ("Large Cluster Jewel: Lightning Damage"), since the enchant decides which notables roll and how often.
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::OnceLock;
@@ -12,15 +15,45 @@ pub mod routes;
 pub mod search;
 
 #[derive(Debug, Deserialize)]
-struct RawMod { id: String, name: String, gen: String, lvl: u32, text: String, r#type: String, group: String, tags: Vec<String>, sw: Vec<(String, f64)>, src: String }
+struct RawMod { id: String, name: String, gen: String, lvl: u32, text: String, r#type: String, group: String, tags: Vec<String>, sw: Vec<(String, f64)>, src: String,
+    #[serde(default)] dom: String }
 #[derive(Debug, Deserialize)]
 struct RawEssence { name: String, corrupt: bool, mods: HashMap<String, String> }
 #[derive(Debug, Deserialize)]
-struct RawFossil { name: String, more: Vec<(String, f64)>, less: Vec<(String, f64)> }
+struct RawFossil { name: String, more: Vec<(String, f64)>, less: Vec<(String, f64)>, #[serde(default)] only: Vec<String> }
 #[derive(Debug, Deserialize)]
 struct RawBench { r#mod: String, classes: Vec<String>, cost: Vec<(String, u32)> }
 #[derive(Debug, Deserialize)]
-struct Data { bases: HashMap<String, (String, u32, Vec<String>)>, mods: Vec<RawMod>, essences: Vec<RawEssence>, fossils: Vec<RawFossil>, bench: Vec<RawBench> }
+struct RawCluster { size: String, enchant: Vec<String>, min: u32, max: u32 }
+#[derive(Debug, Deserialize)]
+struct Data { bases: HashMap<String, (String, u32, Vec<String>, String)>, mods: Vec<RawMod>, essences: Vec<RawEssence>, fossils: Vec<RawFossil>, bench: Vec<RawBench>,
+    #[serde(default)] clusters: HashMap<String, RawCluster> }
+
+/// A cluster jewel base: the real base name, its enchant and how many passives it can have.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct ClusterInfo { pub size: String, pub enchant: Vec<String>, pub min: u32, pub max: u32 }
+
+/// "Large Cluster Jewel: Lightning Damage" -> its real base and enchant.
+pub fn cluster_info(base: &str) -> Option<ClusterInfo> {
+    data().clusters.get(base).map(|c| ClusterInfo { size: c.size.clone(), enchant: c.enchant.clone(), min: c.min, max: c.max })
+}
+
+/// The chance a rare jewel gets 4 mods instead of 3 (checked 22 Nov 2026 against Craft of Exile on a Large lightning
+/// cluster: a Chaos Orb gives Thunderstruck 5.2% there, 5.05% here; Thunderstruck + Widespread Destruction 0.41% / 0.42%).
+const JEWEL_FOUR: f64 = 1.0 / 3.0;
+
+/// How many mods a fresh rare gets (`r` = a random number 0–1).
+fn rare_count(r: f64, jewel: bool) -> i32 {
+    if jewel { if r < 1.0 - JEWEL_FOUR { 3 } else { 4 } } else if r < 8.0 / 12.0 { 4 } else if r < 11.0 / 12.0 { 5 } else { 6 }
+}
+/// The most prefixes (or suffixes) a rare holds.
+fn side_cap(jewel: bool) -> i32 { if jewel { 2 } else { 3 } }
+/// "4–6" / "3–4": the mods a rare reroll gives.
+fn rare_words(jewel: bool) -> &'static str { if jewel { "3–4" } else { "4–6" } }
+/// The base is a jewel (its tags carry the jewel's mod domain, see `tagset`).
+fn jewel_tags(tags: &HashSet<String>) -> bool { !tags.contains("dom:") }
+/// The base is a jewel of any kind (normal, abyss, cluster).
+pub fn is_jewel(base: &str) -> bool { data().bases.get(base).is_some_and(|b| !b.3.is_empty()) }
 
 fn data() -> &'static Data {
     static D: OnceLock<Data> = OnceLock::new();
@@ -61,7 +94,13 @@ pub struct Family {
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
-pub struct Pool { pub base: String, pub class: String, pub ilvl: u32, pub influences: Vec<String>, pub families: Vec<Family>, pub item_mods: Vec<ItemMod> }
+pub struct Pool { pub base: String, pub class: String, pub ilvl: u32, pub influences: Vec<String>, pub families: Vec<Family>, pub item_mods: Vec<ItemMod>,
+    /// The most prefixes (and suffixes) a rare holds: 3, or 2 on a jewel.
+    pub side: u32,
+    /// A jewel (no influences, its own mod list).
+    pub jewel: bool,
+    /// A cluster jewel: its real base, enchant and passive count.
+    pub cluster: Option<ClusterInfo> }
 
 /// A mod on the item you brought, and the family it belongs to (to click through).
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -167,8 +206,12 @@ pub fn base_names() -> Vec<String> {
 }
 
 fn tagset(base: &str, influences: &[String]) -> Option<(String, HashSet<String>)> {
-    let (class, _, tags) = data().bases.get(base)?;
+    let (class, _, tags, dom) = data().bases.get(base)?;
     let mut set: HashSet<String> = tags.iter().cloned().collect();
+    // Which mod list it rolls from ("dom:" = normal items).
+    set.insert(format!("dom:{dom}"));
+    // Jewels can't be influenced.
+    let influences: &[String] = if dom.is_empty() { influences } else { &[] };
     for inf in influences {
         if let Some((_, t)) = INFLUENCE_TAGS.iter().find(|(n, _)| n.eq_ignore_ascii_case(inf)) {
             for tag in tags { set.insert(format!("{tag}_{t}")); }
@@ -185,6 +228,8 @@ fn influence_of(m: &RawMod, tags: &HashSet<String>) -> Option<String> {
 
 /// A mod's weight on this base: the first of its tags the base has decides.
 fn weight(m: &RawMod, tags: &HashSet<String>) -> f64 {
+    // Only mods from the base's own mod list (jewel mods never roll on a ring, and the other way round).
+    if !tags.contains(&format!("dom:{}", m.dom)) { return 0.0 }
     m.sw.iter().find(|(t, _)| tags.contains(t)).map(|(_, w)| *w).unwrap_or(0.0)
 }
 
@@ -196,6 +241,9 @@ fn fossil_factor(m: &RawMod, fossils: &[&RawFossil]) -> f64 {
     }
     f
 }
+
+/// The fossil can go on this base (Hollow / Glyphic only on some kinds of item).
+fn fossil_ok(fo: &RawFossil, tags: &HashSet<String>) -> bool { fo.only.is_empty() || fo.only.iter().any(|t| tags.contains(t)) }
 
 /// Small fast random numbers (no extra crate needed); seeded so the same question gives the same answer.
 struct Rng(u64);
@@ -220,26 +268,30 @@ fn group_id(g: &str) -> usize {
     m.get(g).copied().unwrap_or(usize::MAX)
 }
 
-/// How an item gets rolled: a rare (4–6 mods, 3+3) or magic (1–2 mods, 1+1); `tag` = Harvest's "keeps at least one
-/// mod of this kind" (the first mod is picked among those).
+/// How an item gets rolled: a rare (4–6 mods, 3+3; a jewel 3–4, 2+2) or magic (1–2 mods, 1+1); `tag` = Harvest's
+/// "keeps at least one mod of this kind" (the first mod is picked among those).
 #[derive(Clone, Copy)]
-struct Roll<'a> { magic: bool, tag: Option<&'a str> }
-const RARE: Roll = Roll { magic: false, tag: None };
+struct Roll<'a> { magic: bool, tag: Option<&'a str>, jewel: bool }
+impl Roll<'_> {
+    fn rare(jewel: bool) -> Self { Roll { magic: false, tag: None, jewel } }
+    fn side_max(&self) -> i32 { if self.magic { 1 } else { side_cap(self.jewel) } }
+    fn count(&self, r: f64) -> i32 { if self.magic { if r < 0.5 { 1 } else { 2 } } else { rare_count(r, self.jewel) } }
+}
 
 /// Rolls a rare `trials` times; counts how often each mod lands.
-fn simulate(pool: &[(usize, f64, bool, usize)], trials: u32) -> HashMap<usize, u32> { simulate_with(pool, trials, RARE) }
+fn simulate(pool: &[(usize, f64, bool, usize)], trials: u32, jewel: bool) -> HashMap<usize, u32> { simulate_with(pool, trials, Roll::rare(jewel)) }
 
 fn simulate_with(pool: &[(usize, f64, bool, usize)], trials: u32, roll: Roll) -> HashMap<usize, u32> {
     let d = data();
     let mut rng = Rng(0x9E37_79B9_7F4A_7C15);
     let mut counts = vec![0u32; pool.len()];
     let mut used: Vec<usize> = Vec::with_capacity(6);
-    let side_max = if roll.magic { 1 } else { 3 };
+    let side_max = roll.side_max();
     let tagged: Vec<bool> = pool.iter().map(|(i, ..)| roll.tag.is_some_and(|t| d.mods[*i].tags.iter().any(|x| x == t))).collect();
     for _ in 0..trials {
         let r = rng.next();
         // Magic: one or two mods, about even (a rough guide); rare: 4 (8 in 12), 5 (3 in 12), 6 (1 in 12).
-        let n = if roll.magic { if r < 0.5 { 1 } else { 2 } } else if r < 8.0 / 12.0 { 4 } else if r < 11.0 / 12.0 { 5 } else { 6 };
+        let n = roll.count(r);
         let (mut pre, mut suf) = (0, 0);
         used.clear();
         for step in 0..n {
@@ -269,14 +321,14 @@ fn simulate_with(pool: &[(usize, f64, bool, usize)], trials: u32, roll: Roll) ->
 fn simulate_all(pool: &[(usize, f64, bool, usize)], trials: u32, roll: Roll, forced: Option<(bool, Option<usize>)>, targets: &[Vec<bool>]) -> f64 {
     let d = data();
     let mut rng = Rng(0x2545_F491_4F6C_DD1D);
-    let side_max = if roll.magic { 1 } else { 3 };
+    let side_max = roll.side_max();
     let tagged: Vec<bool> = pool.iter().map(|(i, ..)| roll.tag.is_some_and(|t| d.mods[*i].tags.iter().any(|x| x == t))).collect();
     let mut used: Vec<usize> = Vec::with_capacity(6);
     let mut got = vec![false; targets.len()];
     let mut wins = 0u32;
     for _ in 0..trials {
         let r = rng.next();
-        let n = if roll.magic { if r < 0.5 { 1 } else { 2 } } else if r < 8.0 / 12.0 { 4 } else if r < 11.0 / 12.0 { 5 } else { 6 };
+        let n = roll.count(r);
         let (mut pre, mut suf) = (0, 0);
         used.clear();
         got.iter_mut().for_each(|g| *g = false);
@@ -325,20 +377,23 @@ pub fn plan(base: &str, ilvl: u32, influences: &[String], targets: &[(String, u3
     let n_pre = fams.iter().filter(|(f, _)| f.affix == "prefix").count();
     let n_suf = fams.len() - n_pre;
     let mut out = Vec::new();
-    if n_pre > 3 || n_suf > 3 { return vec![way("Reroll", "Not possible".into(), 0.0, None, "A rare holds at most 3 prefixes and 3 suffixes".into())] }
+    let jewel = jewel_tags(&tags);
+    let cap = side_cap(jewel) as usize;
+    if n_pre > cap || n_suf > cap { return vec![way("Reroll", "Not possible".into(), 0.0, None, format!("A rare {} holds at most {cap} prefixes and {cap} suffixes", if jewel { "jewel" } else { "item" }))] }
+    let rare = Roll::rare(jewel);
     let roll = rollable(&tags, ilvl, &[]);
     let all = sets(&roll, None);
-    let c = simulate_all(&roll, TRIALS, RARE, None, &all);
-    out.push(way("Reroll", "Chaos Orb".into(), c, cost("Chaos Orb"), "Rerolls a rare item: 4–6 new mods".into()));
+    let c = simulate_all(&roll, TRIALS, rare, None, &all);
+    out.push(way("Reroll", "Chaos Orb".into(), c, cost("Chaos Orb"), format!("Rerolls a rare item: {} new mods", rare_words(jewel))));
     if n_pre <= 1 && n_suf <= 1 {
-        let a = simulate_all(&roll, TRIALS, Roll { magic: true, tag: None }, None, &all);
+        let a = simulate_all(&roll, TRIALS, Roll { magic: true, tag: None, jewel }, None, &all);
         out.push(way("Reroll", "Orb of Alteration".into(), a, cost("Orb of Alteration"), "Rerolls a magic item: 1–2 mods, then Regal Orb".into()));
     }
     let mut tags_seen: Vec<&str> = Vec::new();
     for (f, _) in &fams { for t in &f.tags { if HARVEST.iter().any(|(h, _)| h == t) && !tags_seen.contains(&t.as_str()) { tags_seen.push(t) } } }
     for t in tags_seen {
         let name = HARVEST.iter().find(|(h, _)| *h == t).map(|(_, n)| *n).unwrap_or(t);
-        let h = simulate_all(&roll, TRIALS, Roll { magic: false, tag: Some(t) }, None, &all);
+        let h = simulate_all(&roll, TRIALS, Roll { magic: false, tag: Some(t), jewel }, None, &all);
         out.push(way("Reroll", format!("Harvest reforge: {name}"), h, None, format!("Rerolls a rare keeping at least one {} mod (costs lifeforce)", name.to_lowercase())));
     }
     // Essences: one target guaranteed, the rest have to roll.
@@ -349,7 +404,7 @@ pub fn plan(base: &str, ilvl: u32, influences: &[String], targets: &[(String, u3
         for e in f.essences.iter().filter(|e| e.like_tier.is_some_and(|x| x <= *t)).take(1) {
             let Some(raw) = d.essences.iter().find(|r| r.name == e.name).and_then(|r| r.mods.get(class)).and_then(|id| by_name.get(id.as_str())) else { continue };
             let rest = sets(&roll, Some(n));
-            let x = if rest.is_empty() { 1.0 } else { simulate_all(&roll, TRIALS, RARE, Some((raw.gen == "p", groups.get(raw.group.as_str()).copied())), &rest) };
+            let x = if rest.is_empty() { 1.0 } else { simulate_all(&roll, TRIALS, rare, Some((raw.gen == "p", groups.get(raw.group.as_str()).copied())), &rest) };
             out.push(way("Reroll", e.name.clone(), x, e.price, format!("Always gives {}; the others have to roll", e.text.replace('\n', " / "))));
         }
     }
@@ -360,7 +415,7 @@ pub fn plan(base: &str, ilvl: u32, influences: &[String], targets: &[(String, u3
     for (a, f) in helpful.iter().enumerate() { for g in helpful.iter().skip(a + 1) { combos.push(vec![*f, *g]); } }
     let mut tried: Vec<Way> = combos.into_iter().take(10).map(|fs| {
         let pool = rollable(&tags, ilvl, &fs);
-        let x = simulate_all(&pool, TRIALS, RARE, None, &sets(&pool, None));
+        let x = simulate_all(&pool, TRIALS, rare, None, &sets(&pool, None));
         let res = ["Primitive Chaotic Resonator", "Potent Chaotic Resonator", "Powerful Chaotic Resonator", "Prime Chaotic Resonator"][fs.len() - 1];
         let each: Option<f64> = fs.iter().map(|f| price(&f.name)).chain(std::iter::once(price(res))).sum();
         way("Reroll", fs.iter().map(|f| f.name.as_str()).collect::<Vec<_>>().join(" + "), x, each, format!("Rerolls a rare with these fossils in a {res}"))
@@ -389,8 +444,9 @@ const TRIALS: u32 = 20_000;
 pub fn pool(base: &str, ilvl: u32, influences: &[String], have: &[String], price: &dyn Fn(&str) -> Option<f64>) -> Option<Pool> {
     let d = data();
     let (class, tags) = tagset(base, influences)?;
+    let influences: &[String] = if jewel_tags(&tags) { &[] } else { influences };
     let roll = rollable(&tags, ilvl, &[]);
-    let counts = simulate(&roll, TRIALS);
+    let counts = simulate(&roll, TRIALS, jewel_tags(&tags));
     // Families: every mod that can roll on this base at any level, by type.
     let mut fams: Vec<Family> = Vec::new();
     let mut by_key: HashMap<String, usize> = HashMap::new();
@@ -453,7 +509,7 @@ pub fn pool(base: &str, ilvl: u32, influences: &[String], have: &[String], price
     }
     // Fossils.
     for fam in fams.iter_mut() {
-        for fo in &d.fossils {
+        for fo in d.fossils.iter().filter(|fo| fossil_ok(fo, &tags)) {
             if fo.more.iter().any(|(t, w)| *w > 100.0 && fam.tags.contains(t)) { fam.fossils_more.push(fo.name.clone()); }
             if fo.less.iter().chain(fo.more.iter()).any(|(t, w)| *w == 0.0 && fam.tags.contains(t)) { fam.fossils_none.push(fo.name.clone()); }
         }
@@ -490,7 +546,7 @@ pub fn pool(base: &str, ilvl: u32, influences: &[String], have: &[String], price
             kind: kind.to_string(), how: how_to(shape_strip(line), kind, found.is_some()) });
     }
     // Armour pieces: the bench and essences only add a defence the base has (no Evasion crafts on a pure Armour helmet).
-    let (_, _, base_tags) = &d.bases[base];
+    let (_, _, base_tags, _) = &d.bases[base];
     if let Some(def) = base_tags.iter().find(|t| t.ends_with("_armour") && t.as_str() != "ward_armour") {
         let (ar, ev, es) = (def.contains("str"), def.contains("dex"), def.contains("int"));
         fams.retain(|f| {
@@ -501,7 +557,8 @@ pub fn pool(base: &str, ilvl: u32, influences: &[String], have: &[String], price
     }
     fams.retain(|f| !f.text.is_empty());
     fams.sort_by(|a, b| a.affix.cmp(&b.affix).then(b.chaos.partial_cmp(&a.chaos).unwrap_or(std::cmp::Ordering::Equal)));
-    Some(Pool { base: base.to_string(), class, ilvl, influences: influences.to_vec(), families: fams, item_mods })
+    let jewel = jewel_tags(&tags);
+    Some(Pool { base: base.to_string(), class, ilvl, influences: influences.to_vec(), families: fams, item_mods, side: side_cap(jewel) as u32, jewel, cluster: cluster_info(base) })
 }
 
 /// The ways to get one family at `min_tier` or better (1 = best), cheapest first. `have` = the item's mod lines and
@@ -520,6 +577,8 @@ pub fn ways(base: &str, ilvl: u32, influences: &[String], key: &str, min_tier: u
         group: group.into(), method, chance, cost_each: each, average: each.filter(|_| chance > 0.0).map(|e| e / chance), note, ..Default::default() };
     let mut out = Vec::new();
     let roll = rollable(&tags, ilvl, &[]);
+    let jewel = jewel_tags(&tags);
+    let cap = side_cap(jewel);
     let natural = !fam.tiers.is_empty() && fam.tiers.iter().any(|t| t.ok && t.tier <= min_tier);
     // Needs an influence the item doesn't have: a conqueror / Shaper / Elder Exalted Orb adds it with one of its mods.
     if let Some(n) = fam.needs.as_ref().filter(|n| !influences.contains(n)) {
@@ -531,7 +590,7 @@ pub fn ways(base: &str, ilvl: u32, influences: &[String], key: &str, min_tier: u
         let orb = format!("{n}'s Exalted Orb");
         let x = add_one(&only, &HashSet::new(), 0, 0, 3, &is_target);
         out.push(way("Add a mod", orb.clone(), x, cost(&orb), format!("Makes a non-influenced rare {n} and adds one {n} mod (needs a free {} slot)", fam.affix)));
-        let c = hit(&simulate(&ipool, TRIALS));
+        let c = hit(&simulate(&ipool, TRIALS, jewel));
         out.push(way("Reroll", format!("Chaos Orb on a {n} item"), c, cost("Chaos Orb"), format!("Once the item is {n}, Chaos Orbs can roll it too")));
         out.sort_by(|a, b| a.average.unwrap_or(f64::MAX).partial_cmp(&b.average.unwrap_or(f64::MAX)).unwrap_or(std::cmp::Ordering::Equal));
         return out;
@@ -575,26 +634,26 @@ pub fn ways(base: &str, ilvl: u32, influences: &[String], key: &str, min_tier: u
 
     if natural {
         // Reroll the whole item.
-        let c = hit(&simulate(&roll, TRIALS));
-        out.push(way("Reroll", "Chaos Orb".into(), c, cost("Chaos Orb"), "Rerolls a rare item: 4–6 new mods".into()));
-        let a = hit(&simulate_with(&roll, TRIALS, Roll { magic: true, tag: None }));
+        let c = hit(&simulate(&roll, TRIALS, jewel));
+        out.push(way("Reroll", "Chaos Orb".into(), c, cost("Chaos Orb"), format!("Rerolls a rare item: {} new mods", rare_words(jewel))));
+        let a = hit(&simulate_with(&roll, TRIALS, Roll { magic: true, tag: None, jewel }));
         out.push(way("Reroll", "Orb of Alteration".into(), a, cost("Orb of Alteration"),
             "Rerolls a magic item: 1–2 mods. Then Regal Orb to make it rare and keep it".into()));
         for (tag, name) in HARVEST.iter().filter(|(t, _)| fam.tags.iter().any(|x| x == t)) {
-            let h = hit(&simulate_with(&roll, TRIALS, Roll { magic: false, tag: Some(tag) }));
+            let h = hit(&simulate_with(&roll, TRIALS, Roll { magic: false, tag: Some(tag), jewel }));
             out.push(way("Reroll", format!("Harvest reforge: {name}"), h, None,
                 format!("Rerolls a rare keeping at least one {} mod (Horticrafting station, costs lifeforce)", name.to_lowercase())));
         }
         // Fossils: each one that helps, and the best pairs.
         let helpful: Vec<&RawFossil> = d.fossils.iter().filter(|f| fam.fossils_more.contains(&f.name)).collect();
-        let blockers: Vec<&RawFossil> = d.fossils.iter().filter(|f| !fam.fossils_none.contains(&f.name) && !helpful.iter().any(|h| h.name == f.name)
+        let blockers: Vec<&RawFossil> = d.fossils.iter().filter(|f| fossil_ok(f, &tags) && !fam.fossils_none.contains(&f.name) && !helpful.iter().any(|h| h.name == f.name)
             && f.more.iter().all(|(_, w)| *w <= 100.0) && f.less.iter().any(|(_, w)| *w == 0.0)).collect();
         let mut combos: Vec<Vec<&RawFossil>> = helpful.iter().map(|f| vec![*f]).collect();
         for (a, f) in helpful.iter().enumerate() {
             for g in helpful.iter().skip(a + 1).chain(blockers.iter()) { combos.push(vec![*f, *g]); }
         }
         let mut tried: Vec<Way> = combos.into_iter().take(12).map(|fs| {
-            let c = hit(&simulate(&rollable(&tags, ilvl, &fs), TRIALS));
+            let c = hit(&simulate(&rollable(&tags, ilvl, &fs), TRIALS, jewel));
             let res = ["Primitive Chaotic Resonator", "Potent Chaotic Resonator", "Powerful Chaotic Resonator", "Prime Chaotic Resonator"][fs.len() - 1];
             let each: Option<f64> = fs.iter().map(|f| price(&f.name)).chain(std::iter::once(price(res))).sum();
             way("Reroll", fs.iter().map(|f| f.name.as_str()).collect::<Vec<_>>().join(" + "), c, each, format!("Rerolls a rare with these fossils in a {res}"))
@@ -607,22 +666,22 @@ pub fn ways(base: &str, ilvl: u32, influences: &[String], key: &str, min_tier: u
         let side_full = |max: i32| if fam.affix == "prefix" { pre >= max } else { suf >= max };
         if !already {
             match rarity {
-                "Rare" if !side_full(3) && pre + suf < 6 => {
-                    let x = add_one(&roll, &used, pre, suf, 3, &is_target);
+                "Rare" if !side_full(cap) && pre + suf < cap * 2 => {
+                    let x = add_one(&roll, &used, pre, suf, cap, &is_target);
                     out.push(way("Add a mod", "Exalted Orb".into(), x, cost("Exalted Orb"), format!("Adds one mod to your item ({pre} prefixes, {suf} suffixes now)")));
                 }
                 "Magic" if pre + suf < 2 && !side_full(1) => {
                     let x = add_one(&roll, &used, pre, suf, 1, &is_target);
                     out.push(way("Add a mod", "Orb of Augmentation".into(), x, cost("Orb of Augmentation"), "Adds the missing mod to your magic item".into()));
-                    let r = add_one(&roll, &used, pre, suf, 3, &is_target);
+                    let r = add_one(&roll, &used, pre, suf, cap, &is_target);
                     out.push(way("Add a mod", "Regal Orb".into(), r, cost("Regal Orb"), "Makes your magic item rare, adding one mod".into()));
                 }
-                "Magic" if !side_full(3) => {
-                    let r = add_one(&roll, &used, pre, suf, 3, &is_target);
+                "Magic" if !side_full(cap) => {
+                    let r = add_one(&roll, &used, pre, suf, cap, &is_target);
                     out.push(way("Add a mod", "Regal Orb".into(), r, cost("Regal Orb"), "Makes your magic item rare, adding one mod".into()));
                 }
                 "" => {
-                    let x = add_one(&roll, &HashSet::new(), 0, 0, 3, &is_target);
+                    let x = add_one(&roll, &HashSet::new(), 0, 0, cap, &is_target);
                     out.push(way("Add a mod", "Exalted Orb".into(), x, cost("Exalted Orb"),
                         format!("On a rare with a free {} slot (rough: the real odds depend on its other mods; bring the item for exact ones)", fam.affix)));
                 }
@@ -640,11 +699,13 @@ pub struct Step { pub title: String, pub detail: String, pub ways: Vec<Way> }
 
 /// A copied item, ready for the Crafting page: its base, item level, influences and mod lines.
 #[derive(Debug, Clone, Serialize, PartialEq)]
-pub struct Start { pub base: String, pub ilvl: u32, pub influences: Vec<String>, pub have: Vec<String>, pub name: String, pub rarity: String }
+pub struct Start { pub base: String, pub ilvl: u32, pub influences: Vec<String>, pub have: Vec<String>, pub name: String, pub rarity: String,
+    /// A cluster jewel: how many passives it adds ("Adds 8 Passive Skills").
+    pub passives: Option<u32> }
 
 pub fn start(text: &str) -> Option<Start> {
     let item = crate::item::parse_item(text)?;
-    let base = find_base(&item.base_type)?;
+    let base = if item.base_type.ends_with("Cluster Jewel") { cluster_base(&item.base_type, text)? } else { find_base(&item.base_type)? };
     // "Searing Exarch Item", "Shaper Item"… mark the item; they aren't mods (21 Nov: they showed as suffixes, 5/3).
     let marker = |t: &str| t.ends_with(" Item") && !t.chars().any(|c| c.is_ascii_digit());
     let have = crate::trade::mods(text).into_iter().filter(|m| (m.kind == "explicit" || m.kind == "crafted" || m.kind == "fractured") && !marker(&m.text))
@@ -659,8 +720,24 @@ pub fn start(text: &str) -> Option<Start> {
             have.push(format!("quality|{kind}|{pct}"));
         }
     }
-    Some(Start { base, ilvl: item.item_level.unwrap_or(84), influences: item.influences.clone(), have,
+    let passives = text.lines().find_map(|l| l.trim().strip_prefix("Adds ")?.split(" Passive Skill").next()?.parse().ok());
+    Some(Start { base, ilvl: item.item_level.unwrap_or(84), influences: item.influences.clone(), have, passives,
         name: item.name.clone().unwrap_or_else(|| item.base_type.clone()), rarity: item.rarity.clone() })
+}
+
+/// A copied cluster jewel's crafting base, from its enchant: "Added Small Passive Skills grant: 12% increased
+/// Lightning Damage" (or PoB's "Cluster Jewel Skill: affliction_lightning_damage") -> "Large Cluster Jewel: Lightning Damage".
+pub fn cluster_base(size: &str, text: &str) -> Option<String> {
+    let d = data();
+    let lines: Vec<&str> = text.lines().map(|l| l.trim().trim_end_matches("(enchant)").trim()).collect();
+    let granted: Vec<&str> = lines.iter().filter_map(|l| l.strip_prefix("Added Small Passive Skills grant: ")).collect();
+    let skill = lines.iter().find_map(|l| l.strip_prefix("Cluster Jewel Skill: ")).map(str::trim);
+    let mut found: Vec<&String> = d.clusters.iter().filter(|(_, c)| c.size == size)
+        .filter(|(n, c)| granted.iter().any(|g| c.enchant.iter().any(|e| e.eq_ignore_ascii_case(g)))
+            || skill.is_some_and(|s| d.bases.get(*n).is_some_and(|b| b.2.iter().any(|t| t == s))))
+        .map(|(n, _)| n).collect();
+    found.sort();
+    found.first().map(|s| s.to_string())
 }
 
 /// The game's file names for currency -> what it's called.
@@ -761,5 +838,69 @@ mod tests {
         assert!(w.iter().any(|w| w.method == "Exalted Orb" && w.chance > 0.0), "{w:?}");
         assert!(w.iter().any(|w| w.method == "Chaos Orb" && w.chance > 0.0 && w.chance < life.chaos));
         assert!(w.iter().any(|w| w.method.contains("Fossil")), "{w:?}");
+    }
+
+    #[test]
+    fn jewel_rules() {
+        let none = |_: &str| None;
+        assert!(is_jewel("Cobalt Jewel") && is_jewel("Hypnotic Eye Jewel") && !is_jewel("Eternal Burgonet"));
+        let p = pool("Cobalt Jewel", 84, &["Shaper".into()], &[], &none).unwrap();
+        assert!(p.jewel && p.side == 2 && p.influences.is_empty() && p.cluster.is_none());
+        // Its own mods only (no flat life or ring mods), no essences, no bench.
+        assert!(p.families.iter().any(|f| f.text.contains("increased maximum Life")));
+        assert!(!p.families.iter().any(|f| f.text.contains("to maximum Life") || f.text.contains("Item Rarity")), "item mods leaked in");
+        assert!(p.families.iter().all(|f| f.essences.is_empty() && f.bench.is_empty() && f.needs.is_none()));
+        assert!(p.families.iter().any(|f| !f.fossils_more.is_empty()));
+        // A rare jewel gets 3 or 4 mods (2 in 3 / 1 in 3): 3.33 on average.
+        let sum: f64 = p.families.iter().map(|f| f.chaos).sum();
+        assert!((sum - 3.33).abs() < 0.05, "{sum}");
+        // Abyss jewels roll flat life; normal items never see jewel mods.
+        let a = pool("Hypnotic Eye Jewel", 84, &[], &[], &none).unwrap();
+        assert!(a.families.iter().any(|f| f.text.contains("to maximum Life")));
+        let ring = pool("Two-Stone Ring", 84, &[], &[], &none).unwrap();
+        assert!(!ring.jewel && ring.side == 3 && !ring.families.iter().any(|f| f.text.starts_with("Added Small Passive")));
+        // Three prefixes don't fit on a jewel.
+        let pre: Vec<(String, u32)> = p.families.iter().filter(|f| f.affix == "prefix" && !f.tiers.is_empty()).take(3).map(|f| (f.key.clone(), 9)).collect();
+        let w = plan("Cobalt Jewel", 84, &[], &pre, &none);
+        assert!(w.len() == 1 && w[0].chance == 0.0 && w[0].note.contains("2 prefixes"), "{w:?}");
+        // On a rare jewel with 2 prefixes, no Exalted Orb for a third.
+        let life = p.families.iter().find(|f| f.text.contains("increased maximum Life")).unwrap();
+        let es = p.families.iter().find(|f| f.text.contains("increased maximum Energy Shield") && f.affix == "prefix").unwrap();
+        let mana = p.families.iter().find(|f| f.text.contains("increased maximum Mana") && f.affix == "prefix").unwrap();
+        let have = vec![format!("prefix|{}", es.tiers[0].text), format!("prefix|{}", mana.tiers[0].text)];
+        let w = ways("Cobalt Jewel", 84, &[], &life.key, 9, &have, "Rare", &|_| Some(1.0));
+        assert!(!w.iter().any(|w| w.method == "Exalted Orb"), "{w:?}");
+        assert!(!w.iter().any(|w| w.group == "Guaranteed"), "{w:?}");
+    }
+
+    const LARGE: &str = "Item Class: Jewels\nRarity: Rare\nEagle Glisten\nLarge Cluster Jewel\n--------\nItem Level: 84\n--------\nAdds 8 Passive Skills (enchant)\n2 Added Passive Skills are Jewel Sockets (enchant)\nAdded Small Passive Skills grant: 12% increased Lightning Damage (enchant)\n--------\nAdded Small Passive Skills also grant: Regenerate 0.15% of Life per Second\n1 Added Passive Skill is Overshock\n1 Added Passive Skill is Thunderstruck\n1 Added Passive Skill is Widespread Destruction\n";
+
+    #[test]
+    fn cluster_from_his_build() {
+        let none = |_: &str| None;
+        let s = start(LARGE).unwrap();
+        assert_eq!(s.base, "Large Cluster Jewel: Lightning Damage");
+        assert_eq!(s.passives, Some(8));
+        assert_eq!(s.have.len(), 4, "{:?}", s.have);
+        let p = pool(&s.base, s.ilvl, &[], &s.have, &none).unwrap();
+        let c = p.cluster.as_ref().unwrap();
+        assert_eq!((c.size.as_str(), c.min, c.max), ("Large Cluster Jewel", 8, 12));
+        assert_eq!(c.enchant, vec!["12% increased Lightning Damage".to_string()]);
+        // Its notables are found, with the item level they need; another enchant's notables can't roll.
+        let get = |n: &str| p.families.iter().find(|f| f.text.ends_with(n)).unwrap_or_else(|| panic!("{n}"));
+        assert_eq!(get("Thunderstruck").tiers[0].lvl, 50);
+        assert_eq!(get("Widespread Destruction").affix, "suffix");
+        assert!(get("Overshock").have.is_some() && get("Thunderstruck").have.is_some());
+        assert!(!p.families.iter().any(|f| f.text.ends_with("Life from Death")));
+        // The game's weights (Craft of Exile shows the same: 364 / 727 for this enchant).
+        assert_eq!(get("Thunderstruck").tiers[0].weight, 364.0);
+        assert_eq!(get("Widespread Destruction").tiers[0].weight, 727.0);
+        // A Chaos Orb gives Thunderstruck about 5.2% of the time (Craft of Exile: 5.198%).
+        assert!((get("Thunderstruck").chaos - 0.052).abs() < 0.006, "{}", get("Thunderstruck").chaos);
+        // A Large enchant isn't on a Medium.
+        assert!(cluster_base("Medium Cluster Jewel", LARGE).is_none());
+        // Planned with no item: the trade text uses the real base and its enchant.
+        let text = search::plan_item_text(&p, &[(get("Thunderstruck").key.clone(), 1)]);
+        assert!(text.contains("\nLarge Cluster Jewel\n") && text.contains("grant: 12% increased Lightning Damage (enchant)"), "{text}");
     }
 }
