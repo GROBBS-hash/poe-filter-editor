@@ -640,7 +640,10 @@ the "Also searching for" filters shown as chips; stats; Search; price; listings;
 Craft, Save search, Saved, Style, Layout, Report), **Awakened + price** (adds a price bar under the item with
 cheapest / typical / listed tiles) and **Awakened tooltip** (same inside the game's tooltip frame). Also: exalted
 orb picture on exalt prices, orb pictures in the market tiles (Split look too). Next: he tries them in game and
-picks one (then maybe make it the default and drop the looks he doesn't use).
+picks one (then maybe make it the default and drop the looks he doesn't use). 22 Nov after 0.2.37: **Awakened +
+price is his favourite so far** (not final). Base mods with no roll range (same on every item of that base, e.g.
+Cogwork's four) are now hidden behind "4 base mods the same on every Cogwork Ring · show", like Awakened's "Show
+hidden" (`hide_const_roll`); only when the copy had ranges (advanced copy), never ticked ones or maps. Not released.
 1. Price window (Ctrl+D on a rare): stats in groups (Minimum rolls, Prefixes "1 of 2 used", Suffixes...); More → Layout
    → Flat gives one list with a tag on each row. An item with under 5 listed shows amber "low confidence".
    Cogwork Ring (Dragon Turn): Intelligence reads +57 (not +46).

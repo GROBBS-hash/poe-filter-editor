@@ -571,6 +571,8 @@ export default function TradeWindow() {
   const nextLayout = () => { const n = layout === "flat" ? "grouped" : "flat"; setLayout(n); try { localStorage.setItem(TW_LAYOUT_KEY, n); } catch { /* not kept */ } };
   /** Flat layout: show the mods that are already counted in a total. */
   const [showInTotals, setShowInTotals] = useState(false);
+  /** Base mods that are the same on every item of this base are tucked away (like Awakened's "Show hidden"). */
+  const [showFixed, setShowFixed] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
   const [preset, setPreset] = useState<number | null>(0);
   // Awakened-style tabs: price this item, or price it as a crafting base. Your own search is kept while you look.
@@ -633,7 +635,7 @@ export default function TradeWindow() {
     const a = listen<Check>("price-check", (e) => {
       const c = e.payload;
       setCheck(c); setSetup(c.setup); setRes(null); setSearched(null); setBulk(null); setErr(c.error ? friendly(c.error) : ""); setCopied(null); setPay("chaos"); setMinStock(false); setShowFixers(false);
-      setSaving(null); setShowSaved(!c.setup); setPreset(null); setMapMods(false); setReporting(null); setReported(""); setAsBase(false); setOwnSetup(null); setUntick(null); window.scrollTo(0, 0);
+      setSaving(null); setShowSaved(!c.setup); setPreset(null); setMapMods(false); setReporting(null); setReported(""); setAsBase(false); setOwnSetup(null); setUntick(null); setShowFixed(false); window.scrollTo(0, 0);
       invoke<Saved[]>("saved_list").then(setSaved).catch(() => {});
       if (c.bulk) {
         // Worth half a divine or more: sellers mostly take divines, so ask for those first.
@@ -831,7 +833,12 @@ export default function TradeWindow() {
         const flat = layout === "flat";
         const order = displayOrder(setup.filters.map((_, i) => i).filter((i) => shown(setup.filters[i])), setup.filters);
         const tucked = flat ? order.filter((i) => inATotal(setup.filters[i], setup.filters)) : [];
-        const rows = flat && !showInTotals ? order.filter((i) => !tucked.includes(i)) : order;
+        // Like Awakened: a base mod with no roll range (the same on every item of this base, e.g. the Cogwork Ring's
+        // "-1 Prefix Modifier allowed") never changes the search, so it's hidden until asked for. Only when the copy
+        // showed ranges at all (the advanced copy), and never a ticked one or a map's.
+        const advanced = setup.filters.some((f) => f.range != null);
+        const fixed = advanced && !check.map ? order.filter((i) => { const f = setup.filters[i]; return f.kind === "implicit" && f.range == null && !f.enabled; }) : [];
+        const rows = order.filter((i) => !(flat && !showInTotals && tucked.includes(i)) && (showFixed || !fixed.includes(i)));
         return (
         <div className={`tw-stats ${flat ? "flat" : ""}`}>
           {rows.map((i, k) => {
@@ -862,6 +869,12 @@ export default function TradeWindow() {
               </React.Fragment>
             );
           })}
+          {fixed.length > 0 && (
+            <button className="link small tw-tucked" onClick={() => setShowFixed(!showFixed)}
+              title="Base mods that are the same on every item of this base: ticking them doesn't change the search">
+              {showFixed ? `Hide the ${fixed.length} fixed base mod${fixed.length > 1 ? "s" : ""}`
+                : `${fixed.length} base mod${fixed.length > 1 ? "s" : ""} the same on every ${setup.base || it.base_type || "item like this"} · show`}</button>
+          )}
           {tucked.length > 0 && (
             <button className="link small tw-tucked" onClick={() => setShowInTotals(!showInTotals)}>
               {showInTotals ? `Hide the ${tucked.length} mods counted in the totals` : `${tucked.length} mod${tucked.length > 1 ? "s are" : " is"} inside the totals above · show`}</button>
