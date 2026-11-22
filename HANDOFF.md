@@ -79,7 +79,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Settings → Map tracker → Loot per map (`PoeLogin` in Wealth.tsx). Expired-login messages point to the button.
   Tested live: his saved login gives his account name, a made-up session gives none (test `account_name_from_profile_page`).
   Not tried: the window itself (only his installed editor was running; a second copy would clash).
-- **Map tracker pauses by itself, clearer key wording (23 Nov, not released yet).** He reported the timer kept running
+- **Map tracker pauses by itself, clearer key wording (23 Nov, released in 0.2.45).** He reported the timer kept running
   when he alt-tabbed or pressed Escape. Cause: Set up was never pressed (his `play.json` had an empty `menu.hud`), and
   alt-tab was deliberately ignored. Now (`play_app::start_pause_watch`): the normal bottom bar is learnt by itself 4 s+
   into a map, once 3 readings a second apart agree (<10% changed), and again when the game window changes size; another
@@ -811,7 +811,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
   open the right part of Settings (and Map mods).
 - [ ] Settings → Hotkeys and Help → "What each key does in game" use the same words as Home.
 
-**Map tracker pauses by itself, clearer key wording (23 Nov, not released yet):**
+**Map tracker pauses by itself, clearer key wording (23 Nov, released in 0.2.45):**
 - [ ] Enter a map and play normally for 10 s (nothing open). Then press Escape: within ~2 s the tracker says paused
   and the clock stops; close it and it goes on. Same with the passive tree.
 - [ ] Alt-tab to another program for a few seconds: the clock stops; back in the game it goes on. Clicking the
