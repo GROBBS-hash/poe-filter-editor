@@ -760,7 +760,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Blight oils tab (F11) and the exchange check on Play tools.
 
 **Next test session (planned 21 Nov night, for 22 Nov).** Walk him through it a few at a time, between maps.
-Latest release is 0.2.40 (22 Nov, adds jewel and cluster crafting, cheat sheets look A, scrolling play windows; 0.2.39 added the Play tools + QoL wave 2 above); everything below is in it (0.2.38 added fixed base mods hidden, mod source badges, docked price window).
+Latest release is 0.2.41 (22 Nov, adds jewel Alteration + Regal routes and clearer Syndicate rows; 0.2.40 added jewel and cluster crafting, cheat sheets look A, scrolling play windows; 0.2.39 added the Play tools + QoL wave 2 above); everything below is in it (0.2.38 added fixed base mods hidden, mod source badges, docked price window).
 **He plays on the installed release** (`%LOCALAPPDATA%\PoE Filter Editor\poe-filter-editor.exe`), not the dev
 editor, so unreleased things (e.g. Settings → Main window look) only reach him after a release.
 **22 Nov results:** 1. Grouped layout, low confidence and Dragon Turn +57 seen working; he wanted low confidence more
