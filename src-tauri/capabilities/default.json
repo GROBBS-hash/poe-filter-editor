@@ -14,7 +14,8 @@
     "tracker",
     "searches",
     "sheet",
-    "notes"
+    "notes",
+    "stashbox"
   ],
   "permissions": [
     "core:default",

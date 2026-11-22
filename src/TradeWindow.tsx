@@ -450,11 +450,19 @@ function ModList({ title, lines, cls, mark }: { title: string; lines: string[]; 
 }
 
 /** Ctrl+D on a map: its mods, the ones you can't run in red. */
-function MapCheck({ map }: { map: MapInfo }) {
+function MapCheck({ map, rarity, corrupted }: { map: MapInfo; rarity: string; corrupted: boolean }) {
   const bad = map.mods.filter((m) => m.warn);
   const [copied, setCopied] = useState("");
+  // The one-word answer first (22 Nov): run it or not, and what to do if not.
+  const fix = corrupted ? "It's corrupted: put it aside (or sell it)."
+    : rarity === "Rare" ? "Reroll it with a Chaos Orb (or Scour + Alchemy)."
+    : rarity === "Magic" ? "Reroll it with an Orb of Alteration."
+    : "";
   return (
     <div className="tw-map">
+      {!map.unidentified && <div className={`tw-map-verdict ${bad.length ? "bad" : "ok"}`}>
+        <b>{bad.length ? "Don't run" : "Safe to run"}</b>{bad.length > 0 && fix && <span className="small"> · {fix}</span>}
+      </div>}
       <div className={`tw-map-head ${bad.length ? "bad" : map.unidentified ? "" : "ok"}`}>
         {map.unidentified ? "Unidentified: its mods are hidden until you identify it."
           : bad.length ? `⚠ ${bad.length} mod${bad.length > 1 ? "s" : ""} you can't run` : "✓ Nothing on your can't-run list"}
@@ -802,7 +810,7 @@ export default function TradeWindow() {
       )}
       {it.rarity === "Unique" && !it.name && it.base_type && <BaseUniques base={it.base_type} divine={divine} />}
 
-      {check.map && <MapCheck map={check.map} />}
+      {check.map && <MapCheck map={check.map} rarity={it.rarity} corrupted={/\nCorrupted/.test(setup?.raw ?? "")} />}
       {check.compare && check.compare.length > 0 && <CompareBlock list={check.compare} />}
 
       {check.map && mapModCount > 0 && (

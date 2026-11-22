@@ -133,3 +133,79 @@ mod tests {
         assert_eq!(command("thanks", "Bob", "").as_deref(), Some("@Bob thanks, good luck!"));
     }
 }
+
+// ---------- is your price right? (22 Nov) ----------
+
+/// What a trade whisper's price looks like next to poe.ninja: your asking price vs what the item is worth.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct PriceCheck {
+    /// Your asking price in chaos.
+    pub asking: f64,
+    /// poe.ninja's value for what they're buying, in chaos.
+    pub worth: f64,
+    /// "low" (you may be underpriced), "fair", "high" (a good sale for you).
+    pub verdict: String,
+}
+
+/// "5 chaos" / "2.5 divine" / "360 Chaos Orb" -> (amount, currency id like "divine").
+pub fn read_price(price: &str) -> Option<(f64, String)> {
+    let p = price.trim();
+    let (num, rest) = p.split_once(' ')?;
+    let amount: f64 = num.replace(',', "").parse().ok()?;
+    let word = rest.trim().trim_end_matches('.').to_lowercase();
+    let short = |id: &str| match id { "div" | "divines" => "divine", "ex" | "exalt" | "exalts" => "exalted", "c" | "chaos orb" => "chaos", x => x }.to_string();
+    let id = crate::trade::CURRENCY_NAMES.iter().find(|(id, name)| word == *id || word == name.to_lowercase() || word == format!("{}s", name.to_lowercase()))
+        .map(|(id, _)| id.to_string()).unwrap_or_else(|| short(&word));
+    Some((amount, id))
+}
+
+/// What the item a buyer asks for is worth: "Tabula Rasa Simple Robe" (a unique by name), or "2 Divine Orb" (bulk).
+pub fn item_worth(item: &str, items: &[crate::prices::PriceItem]) -> Option<f64> {
+    let item = item.trim();
+    // Bulk: "<count> <name>".
+    if let Some((n, rest)) = item.split_once(' ') {
+        if let Ok(count) = n.parse::<f64>() {
+            if let Some(v) = items.iter().filter(|i| i.name.eq_ignore_ascii_case(rest.trim()) && i.cat != "SkillGem").map(|i| i.value).reduce(f64::max) {
+                return Some(v * count);
+            }
+        }
+    }
+    // A unique: its name starts the text and its base is in it; the longest name wins.
+    items.iter().filter(|i| i.cat.starts_with("Unique") && !i.name.is_empty() && item.starts_with(&i.name) && item.contains(&i.base))
+        .max_by_key(|i| i.name.len()).map(|i| i.value)
+        .or_else(|| items.iter().filter(|i| i.name.eq_ignore_ascii_case(item) && i.cat != "SkillGem").map(|i| i.value).reduce(f64::max))
+}
+
+/// Your asking price against poe.ninja. `rates`: chaos per currency id.
+pub fn check_price(item: &str, price: &str, items: &[crate::prices::PriceItem], rates: &std::collections::HashMap<String, f64>) -> Option<PriceCheck> {
+    let (amount, cur) = read_price(price)?;
+    let asking = amount * rates.get(&cur)?;
+    let worth = item_worth(item, items)?;
+    if worth <= 0.0 { return None; }
+    let r = asking / worth;
+    let verdict = if r < 0.7 { "low" } else if r > 1.3 { "high" } else { "fair" };
+    Some(PriceCheck { asking, worth, verdict: verdict.into() })
+}
+
+#[cfg(test)]
+mod price_tests {
+    use super::*;
+    use crate::prices::PriceItem;
+
+    fn it(name: &str, base: &str, cat: &str, v: f64) -> PriceItem {
+        serde_json::from_value(serde_json::json!({ "name": name, "base": base, "cat": cat, "value": v })).unwrap()
+    }
+
+    #[test]
+    fn checks_asking_prices() {
+        let items = vec![it("Tabula Rasa", "Simple Robe", "UniqueArmour", 20.0), it("Divine Orb", "Divine Orb", "Currency", 180.0)];
+        let rates: std::collections::HashMap<String, f64> = [("chaos".to_string(), 1.0), ("divine".to_string(), 180.0)].into_iter().collect();
+        assert_eq!(read_price("2.5 divine"), Some((2.5, "divine".into())));
+        assert_eq!(read_price("360 Chaos Orb"), Some((360.0, "chaos".into())));
+        let c = check_price("Tabula Rasa Simple Robe", "5 chaos", &items, &rates).unwrap();
+        assert_eq!((c.asking, c.worth, c.verdict.as_str()), (5.0, 20.0, "low"));
+        let c = check_price("2 Divine Orb", "360 Chaos Orb", &items, &rates).unwrap();
+        assert_eq!(c.verdict, "fair");
+        assert!(check_price("Doom Grip Titan Gauntlets", "1 divine", &items, &rates).is_none());
+    }
+}

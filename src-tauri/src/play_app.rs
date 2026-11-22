@@ -49,6 +49,13 @@ struct Live {
     laps: Vec<i64>,
     /// The last Ctrl+D map check: (when, map name, mods), attached to the next map you open.
     map_check: Option<(i64, String, Vec<String>)>,
+    /// This play session (starts with the first game event after 30 quiet minutes): start, last event, deaths,
+    /// levels gained, experience at the start.
+    sess_start: i64,
+    sess_last: i64,
+    sess_deaths: u32,
+    sess_levels: u32,
+    sess_xp_start: Option<u64>,
 }
 
 static STORE: Mutex<Option<PlayStore>> = Mutex::new(None);
@@ -150,6 +157,19 @@ pub fn on_line(app: &AppHandle, line: &str) {
             MapChange::None => {}
         }
     }
+    // The session: a new one after 30 quiet minutes.
+    with_live(|l| {
+        let now = unix();
+        if l.sess_start == 0 || now - l.sess_last > 30 * 60 {
+            l.sess_start = now; l.sess_deaths = 0; l.sess_levels = 0; l.sess_xp_start = l.xp.last().map(|x| x.1);
+        }
+        l.sess_last = now;
+        match &ev {
+            PlayEvent::Slain { name, .. } if l.character.as_ref().map_or(true, |c| &c.0 == name) => l.sess_deaths += 1,
+            PlayEvent::Level { .. } => l.sess_levels += 1,
+            _ => {}
+        }
+    });
     match &ev {
         PlayEvent::Area { id, level, time, .. } => {
             with_live(|l| { l.zone = Some((id.clone(), *level, *time)); l.zone_name.clear(); });
@@ -366,6 +386,25 @@ pub struct TrackerView {
     pub watch_running: bool,
     pub laps: Vec<i64>,
     pub now: i64,
+    pub session: Option<SessionSummary>,
+}
+
+/// End of session card: what this play session added up to.
+#[derive(Serialize, Clone)]
+pub struct SessionSummary {
+    pub start: i64,
+    /// Seconds from the first to the latest game event.
+    pub played: i64,
+    pub maps: usize,
+    pub map_time: i64,
+    pub per_hour: f64,
+    pub deaths: u32,
+    pub levels: u32,
+    pub xp_gained: Option<u64>,
+    /// Sum of "about made" over the session's maps (when an earnings session ran).
+    pub made: Option<f64>,
+    /// The map that made the most, or else the quickest.
+    pub best: Option<MapRun>,
 }
 
 #[derive(Serialize, Clone)]
@@ -376,10 +415,10 @@ pub fn play_view(app: AppHandle) -> PlayView { PlayView { tracker: tracker_view(
 
 fn tracker_view(app: &AppHandle) -> TrackerView {
     let now = unix();
-    let (current, inside, recent, today, all) = with_store(app, |s| {
+    let (current, inside, recent, today, all, all_runs) = with_store(app, |s| {
         let h = &s.maps.history;
         (s.maps.current.clone(), s.maps.inside, h.iter().rev().take(8).cloned().collect::<Vec<_>>(),
-            journey::map_stats(h, now - 12 * 3600), journey::map_stats(h, 0))
+            journey::map_stats(h, now - 12 * 3600), journey::map_stats(h, 0), h.iter().rev().take(200).rev().cloned().collect::<Vec<_>>())
     });
     let current_inside = current.as_ref().map(|c| c.time_inside(inside, now)).unwrap_or(0);
     with_live(|l| {
@@ -387,13 +426,26 @@ fn tracker_view(app: &AppHandle) -> TrackerView {
         let last = l.xp.last().map(|x| x.1);
         let next = last.and_then(journey::to_next);
         let watch_ms = l.watch_acc + l.watch_since.map(|t| unix_ms() - t).unwrap_or(0);
+        let session = (l.sess_start > 0).then(|| {
+            let runs: Vec<MapRun> = all_runs.iter().filter(|r| r.start >= l.sess_start).cloned().collect();
+            let st = journey::map_stats(&runs, 0);
+            let made: Vec<f64> = runs.iter().filter_map(|r| r.made).collect();
+            let best = runs.iter().filter(|r| r.made.is_some()).max_by(|a, b| a.made.unwrap_or(0.0).total_cmp(&b.made.unwrap_or(0.0)))
+                .or_else(|| runs.iter().filter(|r| r.in_map > 60).min_by_key(|r| r.in_map)).cloned();
+            SessionSummary {
+                start: l.sess_start, played: (l.sess_last - l.sess_start).max(now - l.sess_start).max(0), maps: runs.len(),
+                map_time: runs.iter().map(|r| r.in_map).sum(), per_hour: st.per_hour, deaths: l.sess_deaths, levels: l.sess_levels,
+                xp_gained: match (l.sess_xp_start, l.xp.last()) { (Some(a), Some(b)) if b.1 >= a => Some(b.1 - a), _ => None },
+                made: (!made.is_empty()).then(|| made.iter().sum()), best,
+            }
+        });
         TrackerView {
             current, inside, current_inside, recent, today, all,
             xp_per_hour: rate, xp_left: next.map(|n| n.0), xp_frac: next.map(|n| n.1),
             xp_minutes: match (rate, next) { (Some(r), Some((left, _))) if r > 0.0 => Some(left as f64 / r * 60.0), _ => None },
             xp_char: l.xp_char.as_ref().map(|c| c.0.clone()), xp_level: l.xp_char.as_ref().map(|c| c.1),
             xp_note: l.xp_note.clone(),
-            watch_ms, watch_running: l.watch_since.is_some(), laps: l.laps.clone(), now,
+            watch_ms, watch_running: l.watch_since.is_some(), laps: l.laps.clone(), now, session,
         }
     })
 }
@@ -693,5 +745,76 @@ mod tests {
         assert_eq!(super::wiki_page("Unique", Some("Tabula Rasa"), "Simple Robe"), "Tabula Rasa");
         assert_eq!(super::wiki_page("Rare", Some("Doom Grip"), "Titan Gauntlets"), "Titan Gauntlets");
         assert_eq!(super::wiki_page("Normal", None, "Superior Leather Belt"), "Leather Belt");
+    }
+}
+
+// ---------- trades: is the price right, and where's the item ----------
+
+/// The trades pop-up asks this for each whisper: your asking price next to what poe.ninja says it's worth.
+#[tauri::command]
+pub fn trade_price_check(app: AppHandle, item: String, price: String) -> Option<filter_core::whispers::PriceCheck> {
+    let rates = currency_rates(&app);
+    let state = app.state::<AppState>();
+    let game = active_game(&state);
+    let prices = state.prices.lock().unwrap();
+    filter_core::whispers::check_price(&item, &price, &prices.get(&game)?.items, &rates)
+}
+
+/// Where a stash cell is on screen: (x, y, size) in physical pixels, from the game's drawing area.
+/// The stash grid sits at a fixed share of the game's height (like the panel width the price window docks beside):
+/// at 1080 tall, the 12x12 grid starts about 16 px in and 161 px down, cells about 52.8 px. Quad tabs: 24x24, half size.
+/// `left`/`top` are the whisper's 1-based cell.
+pub fn stash_cell(game: (i32, i32, i32, i32), left: u32, top: u32, quad: bool) -> (i32, i32, i32) {
+    let (gx, gy, _gw, gh) = game;
+    let h = gh as f64;
+    let cell = h * 52.8 / 1080.0 / if quad { 2.0 } else { 1.0 };
+    let x0 = gx as f64 + h * 16.0 / 1080.0;
+    let y0 = gy as f64 + h * 161.0 / 1080.0;
+    let x = x0 + (left.saturating_sub(1)) as f64 * cell;
+    let y = y0 + (top.saturating_sub(1)) as f64 * cell;
+    (x.round() as i32, y.round() as i32, cell.round() as i32)
+}
+
+/// Draws a box on the stash square the buyer's item is in (for about 20 seconds; it never takes clicks).
+#[tauri::command]
+pub fn show_stash_spot(app: AppHandle, left: u32, top: u32, quad: bool) -> Result<(), String> {
+    let game = game_client_rect().ok_or("Can't find the game window")?;
+    let w = app.get_webview_window("stashbox").ok_or("no window")?;
+    // A whisper past 12 can only be a quad tab.
+    let quad = quad || left > 12 || top > 12;
+    let (x, y, size) = stash_cell(game, left, top, quad);
+    let pad = 4;
+    win_place::placing();
+    let _ = w.set_size(tauri::PhysicalSize::new((size + pad * 2) as u32, (size + pad * 2) as u32));
+    let _ = w.set_position(PhysicalPosition::new(x - pad, y - pad));
+    let _ = w.set_ignore_cursor_events(true);
+    let front = game_in_front();
+    let _ = w.show();
+    if front { focus_game(); }
+    let gen = STASH_GEN.fetch_add(1, Ordering::Relaxed) + 1;
+    let app2 = app.clone();
+    thread::spawn(move || {
+        thread::sleep(Duration::from_secs(20));
+        if STASH_GEN.load(Ordering::Relaxed) == gen { if let Some(w) = app2.get_webview_window("stashbox") { let _ = w.hide(); } }
+    });
+    Ok(())
+}
+static STASH_GEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+#[tauri::command]
+pub fn hide_stash_spot(app: AppHandle) {
+    if let Some(w) = app.get_webview_window("stashbox") { let _ = w.hide(); }
+}
+
+#[cfg(test)]
+mod stash_tests {
+    #[test]
+    fn cells() {
+        // 1920x1080 game at the screen's corner: first cell, then the 12th across.
+        assert_eq!(super::stash_cell((0, 0, 1920, 1080), 1, 1, false), (16, 161, 53));
+        let (x, _, _) = super::stash_cell((0, 0, 1920, 1080), 12, 1, false);
+        assert_eq!(x, 597);
+        let (_, _, s) = super::stash_cell((0, 0, 2560, 1440), 1, 1, true);
+        assert_eq!(s, 35);
     }
 }

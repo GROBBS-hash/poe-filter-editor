@@ -24,7 +24,29 @@ type TrackerView = {
   current: MapRun | null; inside: boolean; current_inside: number; recent: MapRun[]; today: MapStats; all: MapStats;
   xp_per_hour: number | null; xp_left: number | null; xp_frac: number | null; xp_minutes: number | null; xp_char: string | null;
   xp_level: number | null; xp_note: string; watch_ms: number; watch_running: boolean; laps: number[]; now: number;
+  session: SessionSummary | null;
 };
+type SessionSummary = { start: number; played: number; maps: number; map_time: number; per_hour: number; deaths: number; levels: number;
+  xp_gained: number | null; made: number | null; best: MapRun | null };
+
+/** The end-of-session card: what tonight added up to. */
+function SessionCard({ s, compact }: { s: SessionSummary; compact?: boolean }) {
+  const items: [string, string][] = [
+    ["Played", mmss(s.played)],
+    ["Maps", s.maps ? `${s.maps}${s.per_hour ? ` · ${s.per_hour.toFixed(1)}/h` : ""}` : "none"],
+    ...(s.made != null ? [["Made", `≈ ${Math.round(s.made)}c`] as [string, string]] : []),
+    ...(s.xp_gained != null ? [["XP gained", big(s.xp_gained)] as [string, string]] : []),
+    ...(s.levels ? [["Levels", `+${s.levels}`] as [string, string]] : []),
+    ["Deaths", String(s.deaths)],
+  ];
+  return (
+    <div className={compact ? "trk-sec" : ""}>
+      {compact && <div className="pw-small">This session</div>}
+      <div className="trk-grid">{items.map(([k, v]) => <span key={k}>{k} <b>{v}</b></span>)}</div>
+      {s.best && !compact && <p className="muted small">Best map: {s.best.name} ({tier(s.best)}){s.best.made != null ? `, about ${Math.round(s.best.made)}c` : `, ${mmss(s.best.in_map)}`}</p>}
+    </div>
+  );
+}
 type PlayView = { tracker: TrackerView };
 export type SearchString = { name: string; text: string };
 type SearchView = { saved: SearchString[]; made: SearchString[] };
@@ -177,6 +199,7 @@ export function TrackerWindow() {
           </span>
         </div>
         {v.laps.length > 0 && <div className="pw-small">{v.laps.slice(0, 4).map((l) => mmss(l / 1000)).join(" · ")}</div>}
+        {v.session && v.session.played > 300 && <SessionCard s={v.session} compact />}
       </div>
     </div>
   );
@@ -337,12 +360,14 @@ export default function PlayTools() {
   const [sheets, setSheets] = useState<Sheet[]>([]);
   const [runs, setRuns] = useState<MapRun[]>([]);
   const [msg, setMsg] = useState("");
+  const [session, setSession] = useState<SessionSummary | null>(null);
   useEffect(() => {
+    invoke<PlayView>("play_view").then((p) => setSession(p.tracker.session)).catch(() => {});
     invoke<LevelView>("level_view").then(setLv).catch(() => {});
     invoke<SearchView>("searches_get").then((v) => setSearches(v.saved)).catch(() => {});
     invoke<Sheet[]>("sheets_list").then(setSheets).catch(() => {});
     invoke<MapRun[]>("maps_history").then(setRuns).catch(() => {});
-    const un = listen("play-update", () => invoke<MapRun[]>("maps_history").then(setRuns));
+    const un = listen<PlayView>("play-update", (e) => { setSession(e.payload.tracker.session); invoke<MapRun[]>("maps_history").then(setRuns); });
     return () => { un.then((f) => f()); };
   }, []);
   const setOpts = (o: Partial<RouteOptions>, manual?: boolean) => {
@@ -378,6 +403,12 @@ export default function PlayTools() {
           <Tile title="Wiki" k={k("key_wiki", "Alt+W")}>Hover an item and press the key: its wiki page opens in your browser (uniques by name, the rest by base).</Tile>
         </div>
       </div>
+
+      {session && <div className="card">
+        <h2>This session</h2>
+        <p className="muted small">Started {new Date(session.start * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}. A new session starts after 30 minutes without playing.</p>
+        <SessionCard s={session} />
+      </div>}
 
       {lv && <div className="card">
         <h2>Levelling route</h2>

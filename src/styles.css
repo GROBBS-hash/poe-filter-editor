@@ -2099,3 +2099,13 @@ button.tw-chip:hover { border-color: #59606b; color: var(--text); }
 .tw-kind.tw-kind-crafted, .tw-tag.crafted { background: #1f3f78; border-color: #3e6fc4; color: #d7e6ff; }
 .tw-kind.tw-kind-fractured { background: #6b4a22; border-color: #b07a35; color: #ffe4c0; }
 .tw-kind.tw-kind-mutated { background: #6a1f45; border-color: #b0407a; color: #ffd6ea; }
+
+/* Trades: price verdict + stash spot (22 Nov) */
+.th-check { font-size: 12px; margin-top: 2px; }
+.th-check.low { color: #ffcf8a; } .th-check.fair { color: var(--text-2); } .th-check.high { color: var(--green); }
+.th-tab .link { padding: 0 4px; }
+.stashbox { position: fixed; inset: 0; border: 3px solid var(--gold); border-radius: 4px; box-shadow: 0 0 0 2px rgba(0,0,0,.6), 0 0 14px rgba(220,178,90,.8); animation: stash-pulse 1s ease-in-out infinite alternate; }
+@keyframes stash-pulse { from { opacity: 1; } to { opacity: .45; } }
+.tw-map-verdict { margin: 6px 0 4px; padding: 7px 10px; border-radius: 8px; font-size: 15px; }
+.tw-map-verdict.ok { background: rgba(98,207,128,.14); border: 1px solid rgba(98,207,128,.5); } .tw-map-verdict.ok b { color: var(--green); }
+.tw-map-verdict.bad { background: rgba(240,133,124,.14); border: 1px solid rgba(240,133,124,.5); } .tw-map-verdict.bad b { color: var(--red); }

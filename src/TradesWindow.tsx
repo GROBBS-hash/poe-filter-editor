@@ -8,7 +8,8 @@ import { WinBar } from "./WinFrame";
 type Whisper = { time: string; from: string; message: string; item: string | null; price: string | null; league: string | null;
   tab: string | null; left: number | null; top: number | null };
 type LogEvent = ({ kind: "whisper" } & Whisper) | { kind: "joined"; name: string } | { kind: "left"; name: string };
-type Entry = { id: number; w: Whisper; here: boolean; pressed: string[]; at: number };
+type PriceCheck = { asking: number; worth: number; verdict: "low" | "fair" | "high" };
+type Entry = { id: number; w: Whisper; here: boolean; pressed: string[]; at: number; check?: PriceCheck | null };
 type Listing = { amount: number; currency: string; chaos: number | null; account: string; indexed: string; whisper: string; instant?: boolean; ilvl: number | null };
 type Hit = { id: number; search: string; listings: Listing[]; url: string; at: number; sent: number[] };
 
@@ -40,7 +41,11 @@ export default function TradesWindow() {
       if (ev.kind === "whisper") {
         if (!ev.item) return; // only trade requests
         const { kind: _k, ...w } = ev;
-        setList((l) => [{ id: next.current++, w, here: false, pressed: [], at: Date.now() }, ...l].slice(0, 12));
+        const id = next.current++;
+        setList((l) => [{ id, w, here: false, pressed: [], at: Date.now() }, ...l].slice(0, 12));
+        // Your asking price next to poe.ninja: underpriced, fair, or a good sale.
+        if (w.item && w.price) invoke<PriceCheck | null>("trade_price_check", { item: w.item, price: w.price })
+          .then((check) => setList((l) => l.map((x) => x.id === id ? { ...x, check } : x))).catch(() => {});
       } else {
         setList((l) => l.map((x) => (x.w.from === ev.name ? { ...x, here: ev.kind === "joined" } : x)));
       }
@@ -110,7 +115,13 @@ export default function TradesWindow() {
             {x.here && <span className="th-here">in your area</span>}
             <span>{since(x.at, now)}</span>
           </div>
-          {x.w.tab && <div className="muted small">Tab “{x.w.tab}”{x.w.left != null ? ` · left ${x.w.left}, top ${x.w.top}` : ""}</div>}
+          {x.check && <div className={`th-check ${x.check.verdict}`}>{x.check.verdict === "low" ? `Underpriced? poe.ninja says about ${Math.round(x.check.worth)}c`
+            : x.check.verdict === "high" ? `Good sale: poe.ninja says about ${Math.round(x.check.worth)}c` : `Fair price (poe.ninja about ${Math.round(x.check.worth)}c)`}</div>}
+          {x.w.tab && <div className="muted small th-tab">Tab “{x.w.tab}”{x.w.left != null ? ` · left ${x.w.left}, top ${x.w.top}` : ""}
+            {x.w.left != null && x.w.top != null && <>
+              <button className="link small" title="Open that stash tab, then click: a box shows which square the item is in" onClick={() => invoke("show_stash_spot", { left: x.w.left, top: x.w.top, quad: false }).catch((e) => setErr(friendly(e)))}>Show in stash</button>
+              {x.w.left <= 12 && x.w.top <= 12 && <button className="link small" title="The same, for a quad tab" onClick={() => invoke("show_stash_spot", { left: x.w.left, top: x.w.top, quad: true }).catch((e) => setErr(friendly(e)))}>(quad)</button>}
+            </>}</div>}
           <div className="th-btns">
             {BUTTONS.map(([a, label, tip]) => (
               <button key={a} className={x.pressed.includes(a) ? "done" : ""} title={tip} onClick={() => press(x, a)}>{label}</button>

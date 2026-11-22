@@ -205,6 +205,20 @@
         "skipTaskbar": true,
         "visible": false,
         "shadow": false
+      },
+      {
+        "label": "stashbox",
+        "title": "Stash spot",
+        "width": 60,
+        "height": 60,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "visible": false,
+        "shadow": false,
+        "focus": false
       }
     ],
     "security": {

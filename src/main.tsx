@@ -13,7 +13,8 @@ import { LevelWindow, NotesWindow, SearchesWindow, SheetWindow, TrackerWindow } 
 import "./styles.css";
 
 const label = getCurrentWindow().label;
-const PLAY: Record<string, () => React.ReactElement> = { level: LevelWindow, tracker: TrackerWindow, searches: SearchesWindow, sheet: SheetWindow, notes: NotesWindow };
+const StashBox = () => <div className="stashbox" />;
+const PLAY: Record<string, () => React.ReactElement> = { stashbox: StashBox, level: LevelWindow, tracker: TrackerWindow, searches: SearchesWindow, sheet: SheetWindow, notes: NotesWindow };
 document.body.classList.add(label === "overlay" || label === "build" || label === "trade" || label === "trades" || label === "earnings" || label === "atlas" || label === "batch" || label in PLAY ? "overlay" : "main");
 if (label === "trade") document.body.classList.add("scroll");
 
