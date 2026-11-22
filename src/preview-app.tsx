@@ -184,7 +184,9 @@ mockIPC((cmd, args) => {
   if (cmd === "item_status") {
     const it = (args as { item: { base_type: string } }).item;
     const hidden = it.base_type === "Iron Ring";
-    return { status: { verdict: { visibility: hidden ? "Hide" : "Show", reason: "", by_user_edit: false } } };
+    return { area_level: 83, stackable: false, status: { assumptions: [], by_stack: [], verdict: { visibility: hidden ? "Hide" : "Show", reason: "", by_user_edit: false, uncertain: [], decided_by: "",
+      style: { font_size: 40, text: [255, 255, 255, 255], border: null, background: [0, 0, 0, 200] },
+      source: { kind: "neversink", label: "", type_path: ["currency"], tier: "t4chaos", section: "Currency", tier_name: "Tier 4 · about a Chaos Orb", conds: ["stackable currency"] } } } };
   }
   // The "Corrupted rare jewels" switch on the Jewels page: one saved edit, highlighted or restyled.
   if (cmd === "get_rule" && String((args as { label?: string }).label ?? "").includes("Corrupted Rare every Jewels")) {

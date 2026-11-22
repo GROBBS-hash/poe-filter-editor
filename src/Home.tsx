@@ -60,7 +60,7 @@ export default function Home({ profile, keys, go, search }: {
       <button className="home-search" onClick={search}>
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zm10 17-5.2-5.2" /></svg>
         <span>Search items, pages and help</span>
-        <kbd>Ctrl+K</kbd>
+        <kbd>Ctrl+F</kbd>
       </button>
 
       <div className="home-grid">

@@ -83,7 +83,7 @@ const MENU: { group: string; sub?: string; colour?: string; items: MenuItem[] }[
     { id: "themes", name: "Themes", hint: "Recolour the whole filter in one go" },
   ] },
   { group: "How items look", sub: "Change any item, NeverSink's tiers, or colour by price", colour: G_FILTER, items: [
-    { id: "find", name: "Find", hint: "Look up any item and change how it shows, or just type what you want" },
+    { id: "find", name: "Change an item", hint: "The item you picked in Search (Ctrl+F): change how it drops, or describe a change in your own words" },
     { id: "tiers", name: "Tiers", hint: "NeverSink's ranked item lists: move items up or down, hide them, change their look" },
     { id: "prices", name: "Price tiers", hint: "Make valuable items stand out using poe.ninja prices (off until you turn it on)" },
   ] },
@@ -179,6 +179,8 @@ export default function App() {
   const [searching, setSearching] = useState(false);
   /** An item picked in the Ctrl+K search, for the Find page to show. */
   const [findPick, setFindPick] = useState<{ base_type: string; item_class: string } | null>(null);
+  /** A change typed in the search box ("hide normal 2h swords"), for the Change an item page to work out. */
+  const [askStart, setAskStart] = useState<{ text: string; n: number } | null>(null);
   /** A help question picked in the search, for Help to open. */
   const [helpStart, setHelpStart] = useState(0);
   /** The main window's look (Settings → Main window look): "colourful" (a colour per page) or "calm" (plain icons, gold for
@@ -240,18 +242,14 @@ export default function App() {
     return () => { a.then((f) => f()); c.then((f) => f()); d.then((f) => f()); o.then((f) => f()); g.then((f) => f()); window.removeEventListener("focus", onFocus); window.removeEventListener("goto-tab", onGoto); };
   }, [refresh]);
 
-  // Keyboard: Ctrl+F jumps to Find and into its search box; Ctrl+1…9 opens the menu's pages in order;
+  // Keyboard: Ctrl+F opens the one search box (Ctrl+K too; 23 Nov he asked for Ctrl+F); Ctrl+1…9 opens the menu's pages in order;
   // Alt+← goes back to the page you were on before.
   useEffect(() => {
     const pages = MENU.flatMap((g) => g.items.map((i) => i.id));
     const onKey = (e: KeyboardEvent) => {
-      if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "k") {
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && (e.key.toLowerCase() === "f" || e.key.toLowerCase() === "k")) {
         e.preventDefault();
         setSearching((s) => !s);
-      } else if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "f") {
-        e.preventDefault();
-        setTab("find");
-        setTimeout(() => (document.querySelector("main.content input[type=search], main.content input.text, main.content input:not([type])") as HTMLInputElement | null)?.focus(), 80);
       } else if (e.ctrlKey && !e.altKey && /^[1-9]$/.test(e.key) && pages[+e.key - 1]) {
         e.preventDefault();
         setTab(pages[+e.key - 1]);
@@ -297,7 +295,7 @@ export default function App() {
   };
   const item = (i: MenuItem) => {
     const n = pages.indexOf(i.id) + 1;
-    const here = i.id === "find" ? "Ctrl+F" : n >= 1 && n <= 9 ? `Ctrl+${n}` : "";
+    const here = n >= 1 && n <= 9 ? `Ctrl+${n}` : "";
     const g = gameKey(i.id);
     return (
       <button key={i.id} className={`menu-item ${tab === i.id ? "on" : ""}`} title={here ? `${i.hint} (${here} in the editor)` : i.hint} onClick={() => setTab(i.id)}>
@@ -320,8 +318,8 @@ export default function App() {
             <option key={p.id} value={p.id}>{p.name} ({p.game === "Poe1" ? "PoE 1" : "PoE 2"})</option>
           ))}
         </select>
-        <button className="side-search" onClick={() => setSearching(true)} title="Find items, pages and help answers">
-          <Icon d={ICONS.find} /><span>Search</span><kbd>Ctrl+K</kbd>
+        <button className="side-search" onClick={() => setSearching(true)} title="Find any item, Tiers rule, page or help answer, or type a change in your own words">
+          <Icon d={ICONS.find} /><span>Search</span><kbd>Ctrl+F</kbd>
         </button>
         <nav className="menu">
           {MENU.map((g) => (
@@ -351,8 +349,7 @@ export default function App() {
       {tab === "themes" && <Themes profile={active} onChange={refresh} />}
       {tab === "settings" && <SettingsPage />}
       {tab === "home" && <Home profile={active} keys={keys} go={(t) => setTab(t as Tab)} search={() => setSearching(true)} />}
-      {tab === "find" && <Find onChange={refresh} pick={findPick} profileId={active?.id}
-        goTier={(h) => { setTab("tiers"); setFocus({ kind: "neversink", label: h.title, type_path: h.type_path, tier: h.tier, section: null, tier_name: null }); }} />}
+      {tab === "find" && <Find onChange={refresh} pick={findPick} ask={askStart} openSearch={() => setSearching(true)} />}
       {tab === "help" && <Help key={helpStart} start={helpStart} keys={keys} go={(t) => setTab(t as Tab)} />}
       {tab === "gear" && <Gear />}
       {tab === "build" && <MyBuild />}
@@ -375,6 +372,7 @@ export default function App() {
       goPage={(id) => setTab(id as Tab)}
       goHelp={(i) => { setHelpStart(i); setTab("help"); }}
       goItem={(f) => { setFindPick({ ...f }); setTab("find"); }}
+      goAsk={(text) => { setAskStart({ text, n: Date.now() }); setTab("find"); }}
       profileId={active?.id}
       goTier={(h) => { setTab("tiers"); setFocus({ kind: "neversink", label: h.title, type_path: h.type_path, tier: h.tier, section: null, tier_name: null }); }} />}
     </>

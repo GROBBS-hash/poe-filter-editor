@@ -13,6 +13,7 @@ type Found = { base_type: string; item_class: string };
 export type TierHit = { type_path: string[]; tier: string | null; title: string; sub: string; text: string; icon: string | null };
 type TierSection = { type_path: string[]; title: string; group: string; tiers: { tier: string; name: string; bases: string[]; conds?: { words: string }[] }[] };
 type Hit =
+  | { kind: "ask"; text: string }
   | { kind: "tier"; hit: TierHit }
   | { kind: "page"; page: Page }
   | { kind: "help"; q: string; index: number }
@@ -45,9 +46,9 @@ export function matchTiers(tiers: TierHit[], q: string, max = 8): TierHit[] {
 }
 
 /** Ctrl+K: one box that finds items, pages and help answers. Enter opens the highlighted one. */
-export default function Search({ pages, onClose, goPage, goHelp, goItem, goTier, profileId }: {
+export default function Search({ pages, onClose, goPage, goHelp, goItem, goTier, goAsk, profileId }: {
   pages: Page[]; onClose: () => void; goPage: (id: string) => void; goHelp: (index: number) => void; goItem: (f: Found) => void;
-  goTier?: (h: TierHit) => void; profileId?: string;
+  goTier?: (h: TierHit) => void; goAsk?: (text: string) => void; profileId?: string;
 }) {
   const tiers = useTierHits(goTier ? profileId : undefined);
   const [q, setQ] = useState("");
@@ -70,7 +71,9 @@ export default function Search({ pages, onClose, goPage, goHelp, goItem, goTier,
     const helpHits = FAQ.map((f, index) => ({ kind: "help" as const, q: f.q, index })).filter((h) => matches(h.q, s)).slice(0, 4);
     const itemHits = items.map((item) => ({ kind: "item" as const, item }));
     const tierHits = matchTiers(tiers, s).map((hit) => ({ kind: "tier" as const, hit }));
-    return [...tierHits, ...itemHits, ...pageHits.slice(0, 5), ...helpHits];
+    // Three words or more reads like a request ("hide normal 2h swords"): offer to make it (it asks before changing anything).
+    const askHit = goAsk && s.split(/\s+/).length >= 3 ? [{ kind: "ask" as const, text: s }] : [];
+    return [...itemHits, ...tierHits, ...pageHits.slice(0, 5), ...helpHits, ...askHit];
   }, [q, items, pages, tiers]);
 
   useEffect(() => { setSel(0); }, [q, items.length]);
@@ -81,6 +84,7 @@ export default function Search({ pages, onClose, goPage, goHelp, goItem, goTier,
     if (h.kind === "page") goPage(h.page.id);
     else if (h.kind === "help") goHelp(h.index);
     else if (h.kind === "tier") goTier?.(h.hit);
+    else if (h.kind === "ask") goAsk?.(h.text);
     else goItem(h.item);
   };
   const onKey = (e: React.KeyboardEvent) => {
@@ -91,13 +95,13 @@ export default function Search({ pages, onClose, goPage, goHelp, goItem, goTier,
   };
 
   let lastKind = "";
-  const heading: Record<Hit["kind"], string> = { tier: "Tiers page", item: "Items", page: "Pages", help: "Help" };
+  const heading: Record<Hit["kind"], string> = { ask: "Make a change", tier: "Tiers page", item: "Items", page: "Pages", help: "Help" };
   return (
     <div className="srch-back" onMouseDown={onClose}>
       <div className="srch" role="dialog" aria-label="Search" onMouseDown={(e) => e.stopPropagation()} onKeyDown={onKey}>
         <div className="srch-in">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zm10 17-5.2-5.2" /></svg>
-          <input ref={input} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Type an item, a page or a question" spellCheck={false} />
+          <input ref={input} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Type an item, a Tiers rule, a page, or a change like “hide normal 2h swords”" spellCheck={false} />
           <kbd>Esc</kbd>
         </div>
         <ul className="srch-list" ref={list}>
@@ -105,8 +109,8 @@ export default function Search({ pages, onClose, goPage, goHelp, goItem, goTier,
           {hits.map((h, i) => {
             const head = h.kind !== lastKind ? <li key={`h-${h.kind}`} className="srch-head">{heading[h.kind]}</li> : null;
             lastKind = h.kind;
-            const label = h.kind === "tier" ? h.hit.title : h.kind === "page" ? h.page.name : h.kind === "help" ? h.q : h.item.base_type;
-            const sub = h.kind === "tier" ? h.hit.sub : h.kind === "page" ? h.page.hint : h.kind === "help" ? "How do I…?" : `${h.item.item_class} · change how it drops`;
+            const label = h.kind === "ask" ? `“${h.text}”` : h.kind === "tier" ? h.hit.title : h.kind === "page" ? h.page.name : h.kind === "help" ? h.q : h.item.base_type;
+            const sub = h.kind === "ask" ? "the editor works out what you mean and asks before changing anything" : h.kind === "tier" ? h.hit.sub : h.kind === "page" ? h.page.hint : h.kind === "help" ? "How do I…?" : `${h.item.item_class} · change how it drops`;
             const icon = h.kind === "tier" ? h.hit.icon : h.kind === "item" ? h.item.base_type : null;
             return [head,
               <li key={`${h.kind}-${i}`} className={i === sel ? "srch-hit on" : "srch-hit"} onMouseEnter={() => setSel(i)} onClick={() => open(h)}>

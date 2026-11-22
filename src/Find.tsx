@@ -1,5 +1,3 @@
-import { usePersist } from "./usePersist";
-import { matchTiers, useTierHits, type TierHit } from "./Search";
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import ItemPanel from "./ItemPanel";
@@ -64,12 +62,8 @@ function Chips({ value, onPick }: { value: string; onPick: (c: string) => void }
   );
 }
 
-export default function Find({ onChange, view = "find", pick, profileId, goTier }: { onChange: () => void; view?: "find" | "presets"; pick?: Found | null;
-  profileId?: string; goTier?: (h: TierHit) => void }) {
-  const [q, setQ] = usePersist("find.q", "");
-  const tiers = useTierHits(view === "find" ? profileId : undefined);
-  const tierHits = q.trim().length >= 2 ? matchTiers(tiers, q, 6) : [];
-  const [results, setResults] = useState<Found[]>([]);
+export default function Find({ onChange, view = "find", pick, ask, openSearch }: { onChange: () => void; view?: "find" | "presets"; pick?: Found | null;
+  ask?: { text: string; n: number } | null; openSearch?: () => void }) {
   const [chosen, setChosen] = useState<Found | null>(null);
   const [presets, setPresets] = useState<Preset[]>([]);
   const [weapon, setWeapon] = useState("Two Hand Maces");
@@ -80,24 +74,21 @@ export default function Find({ onChange, view = "find", pick, profileId, goTier 
   const [askText, setAskText] = useState("");
   const [asking, setAsking] = useState(false);
   const [planned, setPlanned] = useState<{ plan: Plan | null; used_ai: boolean } | null>(null);
-  const timer = useRef<number | undefined>(undefined);
 
   useEffect(() => { invoke<Preset[]>("list_farm_presets").then(setPresets).catch(() => {}); }, []);
-  // An item picked in the Ctrl+K search: show it straight away.
-  useEffect(() => { if (pick) { setQ(pick.base_type); setChosen(pick); } }, [pick]);
-  useEffect(() => {
-    window.clearTimeout(timer.current);
-    if (!q.trim()) { setResults([]); return; }
-    timer.current = window.setTimeout(() => invoke<Found[]>("search_items", { q }).then(setResults).catch(() => setResults([])), 150);
-  }, [q]);
+  // A change typed in the search box: work it out straight away (the plan still asks "Do it?").
+  useEffect(() => { if (ask?.text) { setAskText(ask.text); void runAsk(ask.text); } }, [ask?.n]); // eslint-disable-line react-hooks/exhaustive-deps
+  // An item picked in the search box (Ctrl+F): show it straight away.
+  useEffect(() => { if (pick) setChosen(pick); }, [pick]);
 
   const done = (m: string) => { setMsg(m); onChange(); };
-  const askNow = async () => {
-    if (!askText.trim()) return;
+  const runAsk = async (text: string) => {
+    if (!text.trim()) return;
     setAsking(true);
     setPlanned(null);
-    try { setPlanned(await invoke("ask", { text: askText })); } catch (e) { setMsg(String(e)); } finally { setAsking(false); }
+    try { setPlanned(await invoke("ask", { text })); } catch (e) { setMsg(String(e)); } finally { setAsking(false); }
   };
+  const askNow = () => runAsk(askText);
   const doPlan = async (p: Plan) => {
     try { await carryOut(p); setPlanned(null); setAskText(""); done(`Done: ${p.summary}. Press F4 in game.`); }
     catch (e) { setMsg(String(e)); }
@@ -127,32 +118,11 @@ export default function Find({ onChange, view = "find", pick, profileId, goTier 
     <>
       {view === "find" && <>
       <div className="card">
-        <h2>Find an item, item type or Tiers rule</h2>
-        <input className="text" autoFocus placeholder="Try “2h mace”, “chaos orb”, “quality gems”, “corpses”…" value={q}
-          onChange={(e) => { setQ(e.target.value); setChosen(null); }} />
-        {results.length > 0 && !chosen && (
-          <ul className="results">
-            {results.map((r) => (
-              <li key={r.item_class + r.base_type} onClick={() => setChosen(r)}>
-                {r.base_type ? <><span className="with-icon"><ItemIcon base={r.base_type} size={24} />{r.base_type}</span><span className="muted small">{r.item_class}</span></>
-                  : <><span><b>Every {r.item_class}</b></span><span className="muted small">whole item type</span></>}
-              </li>
-            ))}
-          </ul>
-        )}
-        {!chosen && tierHits.length > 0 && (
-          <>
-            <div className="muted small find-sub">On the Tiers page</div>
-            <ul className="results">
-              {tierHits.map((h) => (
-                <li key={h.type_path.join(">") + (h.tier ?? "")} onClick={() => goTier?.(h)}>
-                  <span className="with-icon">{h.icon && <ItemIcon base={h.icon} size={24} />}{h.title}</span><span className="muted small">{h.sub}</span>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-        {q.trim() && results.length === 0 && tierHits.length === 0 && <div className="muted small">No matches.</div>}
+        <div className="row between">
+          <h2>{chosen ? <span className="with-icon">{chosen.base_type && <ItemIcon base={chosen.base_type} size={26} />}{chosen.base_type || `Every ${chosen.item_class}`}</span> : "Pick an item"}</h2>
+          <button className={chosen ? "" : "primary"} onClick={openSearch}>{chosen ? "Another item" : "Search"} <kbd>Ctrl+F</kbd></button>
+        </div>
+        {!chosen && <div className="muted small">Search (Ctrl+F) finds any item, item type or Tiers rule. Pick an item and you can change how it drops here.</div>}
         {chosen && (
           <div className="find-panel qm">
             <ItemPanel key={chosen.item_class + chosen.base_type} inGame={false}
@@ -161,8 +131,9 @@ export default function Find({ onChange, view = "find", pick, profileId, goTier 
           </div>
         )}
       </div>
+
       <div className="card">
-        <h2>Or describe a change in your own words</h2>
+        <h2>Describe a change in your own words</h2>
         <div className="muted small" style={{ marginBottom: 6 }}>Type what you want and the editor makes the change for you (it asks before doing anything).</div>
         <div className="row">
           <input className="text grow" placeholder="e.g. show gold over 500 in a purple highlight · hide normal 2h swords · icon only for wisdom scrolls"
