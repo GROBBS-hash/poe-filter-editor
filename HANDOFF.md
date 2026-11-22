@@ -742,7 +742,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Wealth → Worth selling → "Highlight in stash" lights up those items.
 - [x] F11 opens and both tabs work (22 Nov). He asked for game pictures and a better layout: done as look A (he picked it
   from three mock-ups): oil pictures, coloured Syndicate divisions, reward cards with pictures, cost in chaos/divine.
-- [ ] F11 look A: pictures show for oils and most Syndicate rewards; ticking oils lists recipes that use them
+- [x] F11 look A (confirmed 22 Nov, he asked for oil names too: added): pictures show for oils and most Syndicate rewards; ticking oils lists recipes that use them
   ("you have 2 of 3", missing oils faded); marking cells sticks; added pictures show as tabs.
 - [ ] Map tracker window scrolls when its content is taller than the window (the session summary used to be cut off).
 - [ ] Notes window (set a key first) saves as you type; Esc gives the game back its focus.

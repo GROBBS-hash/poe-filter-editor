@@ -403,7 +403,9 @@ export function AnointLookup() {
         <tbody>{list.map((a) => { const c = cost(a.oils); const div = prices["Divine Orb"]; return (
           <tr key={a.name}>
             <td className="who">{a.name}{have.length > 0 && (got(a) === 3 ? <span className="oil-can">✓ you have all three</span> : <span className="oil-can part">you have {got(a)} of 3</span>)}</td>
-            <td className="oil-pics" title={a.oils.join(" + ")}>{a.oils.map((o, i) => <span key={i} className={have.length && !have.includes(o) ? "oil-miss" : ""}><ItemIcon name={`${o} Oil`} size={22} /></span>)}<span className="sr">{a.oils.join(" + ")}</span></td>
+            <td className="oil-pics" title={a.oils.join(" + ")}>{[...new Set(a.oils)].map((o) => { const n = a.oils.filter((x) => x === o).length; return (
+              <span key={o} className={`oil-need ${have.length && !have.includes(o) ? "oil-miss" : ""}`}><ItemIcon name={`${o} Oil`} size={22} />{o}{n > 1 && <b>×{n}</b>}</span>
+            ); })}</td>
             <td className="oil-does">{a.stats.map((st, i) => <span key={i}>{st}</span>)}</td>
             <td className="num">{c == null ? "" : div && c >= div ? <span className="oil-cost">{(c / div).toFixed(1)}<CurrencyIcon id="divine" /></span> : <span className="oil-cost">{Math.round(c)}<CurrencyIcon id="chaos" /></span>}</td>
           </tr>
