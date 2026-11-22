@@ -81,3 +81,33 @@ export function MainTitleBar() {
     </div>
   );
 }
+const SCALES = [1, 1.2, 1.4, 1.6, 1.8, 2];
+
+/**
+ * Bigger / smaller for a window over the game (23 Nov: "can we have an option to enlarge" the map tracker): scales the
+ * text and pictures and grows the window to match, from its normal size `base` (logical pixels). Remembered on this PC.
+ */
+export function useWinScale(key: string, base: [number, number]) {
+  const [scale, setScale] = useState(() => {
+    try { const v = parseFloat(localStorage.getItem(`scale-${key}`) ?? ""); return SCALES.includes(v) ? v : 1; } catch { return 1; }
+  });
+  useEffect(() => {
+    document.documentElement.style.setProperty("zoom", String(scale));
+    import("@tauri-apps/api/dpi").then(({ LogicalSize }) =>
+      getCurrentWindow().setSize(new LogicalSize(Math.round(base[0] * scale), Math.round(base[1] * scale)))).catch(() => {});
+    try { localStorage.setItem(`scale-${key}`, String(scale)); } catch { /* not kept */ }
+  }, [scale]); // eslint-disable-line react-hooks/exhaustive-deps
+  const i = SCALES.indexOf(scale);
+  return { scale, bigger: () => setScale(SCALES[Math.min(SCALES.length - 1, i + 1)]), smaller: () => setScale(SCALES[Math.max(0, i - 1)]),
+    canBigger: i < SCALES.length - 1, canSmaller: i > 0 };
+}
+
+/** The A− / A+ buttons for a window's title bar. */
+export function SizeButtons({ s }: { s: ReturnType<typeof useWinScale> }) {
+  return (
+    <span className="win-size" title={`Size ${Math.round(s.scale * 100)}%`}>
+      <button className="link" onClick={s.smaller} disabled={!s.canSmaller} aria-label="Smaller">A−</button>
+      <button className="link" onClick={s.bigger} disabled={!s.canBigger} aria-label="Bigger">A+</button>
+    </span>
+  );
+}

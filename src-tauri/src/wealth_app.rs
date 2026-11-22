@@ -66,6 +66,12 @@ pub(crate) fn with_lookup<T>(app: &AppHandle, f: impl FnOnce(wealth::Lookup) -> 
     let Some(f) = prices.get(&game) else { return None };
     let look = |name: Option<&str>, base: &str, kind: &str| -> Option<f64> {
         match kind {
+            // An unidentified unique (no name yet) could be any unique on its base: count the cheapest one that drops on
+            // the ground, not the best (23 Nov: an unidentified Legion Sword counted as 2 div in the map tracker).
+            "unique" if name.map_or(true, str::is_empty) => filter_core::prices::uniques_on_base(f, base).last().map(|u| u.1)
+                .or_else(|| price_of(f, None, base, "Unique")),
+            // The most it could be, for "8c – 2 div" on the map tracker.
+            "unique-max" => price_of(f, None, base, "Unique"),
             "unique" => price_of(f, name, base, "Unique"),
             // Gems come in many levels/qualities: count the cheapest, so totals don't run away.
             "gem" => f.items.iter().filter(|i| i.name == base && i.cat.contains("Gem")).map(|i| i.value).reduce(f64::min),

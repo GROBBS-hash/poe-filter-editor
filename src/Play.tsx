@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ResizeGrips, WinBar } from "./WinFrame";
+import { ResizeGrips, SizeButtons, WinBar, useWinScale } from "./WinFrame";
 import { CurrencyIcon, ItemIcon } from "./icons";
 import { PoeLogin } from "./Wealth";
 import syndicate from "./data/syndicate.json";
@@ -24,7 +24,9 @@ export type MapRun = {
   deaths: number; portals: number; mods: string[]; made: number | null; paused?: number; loot?: LootLine[];
 };
 /** One thing a map gave you (loot.rs). cat: currency, cards, uniques, maps, scarabs, fragments, gems, gear, other. */
-export type LootLine = { name: string; cat: string; stack: number; value: number; icon: string; tier?: number | null };
+export type LootLine = { name: string; cat: string; stack: number; value: number; icon: string; tier?: number | null; high?: number | null };
+/** A loot line's worth; an unidentified unique shows its range ("8c – 2 div"): counted at the low end. */
+const lootWorth = (l: LootLine, divine: number | null) => l.high != null && l.high > l.value ? `${chaosOrDiv(l.value, divine)} – ${chaosOrDiv(l.high, divine)}` : chaosOrDiv(l.value, divine);
 export type LootPrefs = { on: boolean; hide: string[]; min_chaos: number };
 type PauseInfo = { on: boolean; ready: boolean; esc_ready: boolean; note: string };
 type MapStats = { runs: number; avg_inside: number; avg_cycle: number; per_hour: number; deaths: number; avg_made: number | null };
@@ -193,6 +195,7 @@ function LevelChips({ v }: { v: LevelView }) {
 /** The map tracker (F9): this map's time (stops in menus), maps per hour, deaths, loot per map, a stopwatch. */
 export function TrackerWindow() {
   const [v, setV] = useState<TrackerView | null>(null);
+  const size = useWinScale("tracker", [280, 360]);
   const [now, setNow] = useState(Date.now());
   const keys = useKeys();
   useEsc("tracker");
@@ -212,7 +215,7 @@ export function TrackerWindow() {
   const c = v.current;
   return (
     <div className="bo pw">
-      <WinBar title="Map tracker" hint={`Esc / ${keys.key_tracker || "F9"}`} onClose={() => invoke("play_hide", { label: "tracker" })} />
+      <WinBar title="Map tracker" hint={`Esc / ${keys.key_tracker || "F9"}`} onClose={() => invoke("play_hide", { label: "tracker" })}><SizeButtons s={size} /></WinBar>
       <div className="bo-body">
         {c ? <>
           <div className="pw-row between"><span className="trk-name">{c.name} <span className="pw-small">{tier(c)}</span></span>
@@ -553,7 +556,7 @@ function LootList({ loot, prefs, divine }: { loot: LootLine[]; prefs: LootPrefs 
           <div className="loot-kind-h"><span className="loot-dot" style={{ background: col }} />{name}<span>{chaosOrDiv(ls.reduce((a, b) => a + b.value, 0), divine)}</span></div>
           {big.map((l) => <div key={l.name} className="loot-row">{l.icon ? <img src={l.icon} alt="" /> : <span className="loot-ico"><span className="loot-dot" style={{ background: col }} /></span>}
             <span className="loot-name"><TierTag t={l.tier} />{l.stack > 1 && <span className="muted">{l.stack}× </span>}{l.name}</span>
-            <span className="loot-v">{l.value > 0 ? chaosOrDiv(l.value, divine) : "no price"}</span></div>)}
+            <span className="loot-v" title={l.high ? "Unidentified: counted as the cheapest unique on this base" : undefined}>{l.value > 0 ? lootWorth(l, divine) : "no price"}</span></div>)}
           {small.length > 0 && <div className="muted small" style={{ paddingLeft: 26 }}>+ {small.length} under {min}c ({Math.round(small.reduce((a, b) => a + b.value, 0))}c)</div>}
         </div>
       );
@@ -586,7 +589,7 @@ function TrackerLoot({ v }: { v: TrackerView }) {
           <div key={l.name + l.cat} className={`loot-row ${i === 0 && (l.tier === 1 || (v.divine != null && l.value >= v.divine * 0.5)) ? "hero" : ""}`}>
             {l.icon ? <img src={l.icon} alt="" /> : <span className="loot-ico"><span className="loot-dot" style={{ background: kindOf(l.cat)[2] }} /></span>}
             <span className="loot-name"><TierTag t={l.tier} />{l.stack > 1 && <span className="pw-small">{l.stack}× </span>}{l.name}</span>
-            <span className="loot-v">{chaosOrDiv(l.value, v.divine)}</span>
+            <span className="loot-v" title={l.high ? "Unidentified: counted as the cheapest unique on this base" : undefined}>{lootWorth(l, v.divine)}</span>
           </div>
         ))}</div>
         {rest > 0 && <div className="pw-small">+ {rest} smaller drop{rest > 1 ? "s" : ""}</div>}

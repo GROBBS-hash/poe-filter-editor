@@ -48,6 +48,13 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **Map tracker: bigger/smaller, honest unidentified uniques (23 Nov, not released yet).** He asked to enlarge the tracker
+  and saw an unidentified Legion Sword counted as a 2 div tier 1 drop (fixed itself after the map).
+  - A− / A+ in the tracker's title bar (`useWinScale` / `SizeButtons` in WinFrame.tsx): 100–200% in steps of 20; CSS zoom
+    on the page and the window grown to match (base 280×360), remembered on this PC (localStorage). Other windows can use it.
+  - Unidentified uniques (no name) count at the cheapest ground-drop unique on their base (`with_lookup` "unique" with no
+    name; "unique-max" = the best one) and the line shows the range, "8c – 2 div" (`LootLine.high`); the tier and the
+    totals use the low end. Stash worth counts them the same way now. Test `unidentified_unique_counts_low`.
 - **F2 read a rare as its base's unique (23 Nov, released in 0.2.47).** He pressed F2 on a rare unidentified Twilight
   Regalia (Red-Maps filter, Shaper's Realm) and got "The only unique Twilight Regalia: Mantle of Dreams". A ground label
   has no item level, and without one the filter hides rares in maps, so `label_distance` gave "rare" the 200k hidden
@@ -875,6 +882,8 @@ Confirmed in game so far: basic Ctrl+D price check (trade search returned listin
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
 **Tiers: step conditions, jewels first (23 Nov, released in 0.2.46):**
+- [ ] (not released yet) Map tracker: A+ makes it bigger (text and window), A− smaller; it stays that size next time.
+- [ ] (not released yet) An unidentified unique in a map shows "low – high" in the tracker and counts the low price.
 - [ ] (0.2.47) F2 on an unidentified rare on the ground (e.g. Twilight Regalia) says Rare, not "the only unique …".
 - [ ] (0.2.47) Tiers → Corpses: every corpse shows its price. Tick "Hide items here worth under", type 5:
   cheap corpses get struck through; after F4 a single 1c corpse is hidden but a stack worth 5c+ still shows.

@@ -26,6 +26,7 @@ const L = (name: string, cat: string, stack: number, value: number, icon = "", t
   ({ name, cat, stack, value, icon: icon ? CDN + icon : "", tier });
 const parkLoot = [
   L("Divine Orb", "currency", 1, 212, "Currency/CurrencyModValues.png"),
+  { ...L("Unidentified Legion Sword", "uniques", 1, 8, "", 3), high: 424 },
   L("Ashes of the Stars Onyx Amulet", "uniques", 1, 95, "", 2),
   L("The Nurse", "cards", 1, 38, "Divination/InventoryIcon.png"),
   L("Chaos Orb", "currency", 23, 23, "Currency/CurrencyRerollRare.png"),

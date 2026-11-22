@@ -20,6 +20,9 @@ pub struct LootLine {
     /// Uniques: 1 (worth a divine or more), 2 (10 chaos or more) or 3.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tier: Option<u8>,
+    /// An unidentified unique: the most it could be worth (value is the cheapest unique on that base).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub high: Option<f64>,
 }
 
 /// The kinds, in the order they're shown, with their names.
@@ -124,11 +127,15 @@ pub fn lines(new: &[Value], lookup: Lookup, divine: f64) -> Vec<LootLine> {
             }
         };
         // An unidentified unique only says its base.
-        let name = if cat == "uniques" && i["identified"] == false && i["name"].as_str().unwrap_or("").is_empty() { format!("Unidentified {name}") } else { name };
+        let unid = cat == "uniques" && i["identified"] == false && i["name"].as_str().unwrap_or("").is_empty();
+        let name = if unid { format!("Unidentified {name}") } else { name };
         let value = v.as_ref().map(|v| v.value).unwrap_or(0.0);
+        // Could be a pricier unique on the same base: remember the top, so the line says "8c – 2 div".
+        let base = i["baseType"].as_str().or(i["typeLine"].as_str()).unwrap_or("");
+        let high = unid.then(|| lookup(None, base, "unique-max")).flatten().map(|h| h * stack as f64).filter(|h| *h > value + 0.5);
         let tier = (cat == "uniques").then(|| unique_tier(value / stack as f64, divine));
         let icon = i["icon"].as_str().unwrap_or("").to_string();
-        add(&mut out, LootLine { name, cat: cat.into(), stack, value, icon, tier });
+        add(&mut out, LootLine { name, cat: cat.into(), stack, value, icon, tier, high });
     }
     sort(&mut out);
     out
@@ -136,7 +143,10 @@ pub fn lines(new: &[Value], lookup: Lookup, divine: f64) -> Vec<LootLine> {
 
 fn add(into: &mut Vec<LootLine>, l: LootLine) {
     match into.iter_mut().find(|x| x.name == l.name && x.cat == l.cat) {
-        Some(x) => { x.stack += l.stack; x.value += l.value; if x.icon.is_empty() { x.icon = l.icon; } }
+        Some(x) => {
+            if x.high.is_some() || l.high.is_some() { x.high = Some(x.high.unwrap_or(x.value) + l.high.unwrap_or(l.value)); }
+            x.stack += l.stack; x.value += l.value; if x.icon.is_empty() { x.icon = l.icon; }
+        }
         None => into.push(l),
     }
 }
@@ -202,6 +212,19 @@ mod tests {
         let mut run = ls.clone();
         merge(&mut run, lines(&[cur("e", "Chaos Orb", 4)], &price, 200.0));
         assert_eq!(run.iter().find(|l| l.name == "Chaos Orb").unwrap().stack, 17);
+    }
+
+    /// An unidentified unique counts at the cheapest unique on its base, with the top as "high" (23 Nov: an
+    /// unidentified Legion Sword showed as a 2 div tier 1 drop).
+    #[test]
+    fn unidentified_unique_counts_low() {
+        let sword = json!({"id": "s", "inventoryId": "MainInventory", "frameType": 3, "identified": false, "name": "",
+            "typeLine": "Legion Sword", "baseType": "Legion Sword", "w": 1, "h": 4, "icon": "x.png"});
+        let price = |name: Option<&str>, _base: &str, k: &str| -> Option<f64> {
+            match (k, name) { ("unique-max", _) => Some(400.0), ("unique", Some(n)) if !n.is_empty() => Some(400.0), ("unique", _) => Some(3.0), _ => None }
+        };
+        let ls = lines(&[sword], &price, 200.0);
+        assert_eq!((ls[0].name.as_str(), ls[0].value, ls[0].high, ls[0].tier), ("Unidentified Legion Sword", 3.0, Some(400.0), Some(3)));
     }
 
     #[test]

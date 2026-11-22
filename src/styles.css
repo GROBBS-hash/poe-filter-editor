@@ -2177,3 +2177,11 @@ button.tw-chip:hover { border-color: #59606b; color: var(--text); }
 /* poe.ninja worth on each item of a Tiers step; struck through when "hide if worth under" hides it. */
 .chip-price { margin-left: 4px; padding: 0 6px; border-radius: 999px; font-size: 11px; background: color-mix(in srgb, var(--gold) 16%, transparent); color: var(--gold); white-space: nowrap; }
 .chip-price.below { background: transparent; color: var(--muted); text-decoration: line-through; }
+/* A− / A+ in a window's title bar (map tracker). */
+.win-size { display: inline-flex; gap: 2px; margin-right: 4px; }
+.win-size button { font-size: 12px; padding: 1px 5px; border-radius: 4px; color: var(--text-2); }
+.win-size button:hover:not(:disabled) { color: var(--gold); background: var(--raised); }
+.win-size button:disabled { opacity: .35; }
+.win-bar .bo-title { white-space: nowrap; }
+.win-bar .win-hint { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.loot-v { white-space: nowrap; }
