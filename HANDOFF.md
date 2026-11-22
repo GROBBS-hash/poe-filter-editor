@@ -46,7 +46,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
-- **Map tracker: timer stops in menus, loot per map, div per hour (22 Nov, not released yet).** After his 0.2.41 test.
+- **Map tracker: timer stops in menus, loot per map, div per hour (22 Nov, released in 0.2.42).** After his 0.2.41 test.
   - **Pause:** the game doesn't log the Escape menu or skill tree, so (like Exile UI's "screen checks") the editor
     samples ~110 dots of the game's bottom bar once a second (only inside a map, only with the game in front;
     `screen::sample_points`, one tiny BitBlt) and compares them with a picture saved by **Settings → Map tracker →
@@ -743,7 +743,7 @@ Everything below was built since GROBBS last tested and has only been checked wi
 Confirmed in game so far: basic Ctrl+D price check (trade search returned listings); 20 Nov: weapon + armour
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
-**Map tracker: menus, loot, div per hour (22 Nov, not released yet):**
+**Map tracker: menus, loot, div per hour (22 Nov, released in 0.2.42):**
 - [ ] Settings → Map tracker → **Set up**: click it, click into the game within 5 s with nothing open. Then in a map,
   open the passive tree: within ~2 s the tracker tag says "paused" and the clock stops; close it and it goes on.
 - [ ] Same with the Escape menu. If it doesn't stop: press **Escape menu**, click into the game and press Escape
@@ -1227,7 +1227,14 @@ when the game window isn't found. Check in game: the window's spot, and that it 
    "search every tab" done 21 Nov; guild stash built 21 Nov on branch `guild-stash` (awaiting approval); crafting planner done (0.2.32).
 3. Price check polish: done 21 Nov (Awakened ideas: unique roll ranges, anoints, cluster jewels, flasks, heist,
    influences, "Also searching for"). Waiting on his in-game check.
-4. Deferred earlier: PoE 2 coverage. Batch mode tidy-up done 21 Nov (see "Batch mode"). (Installer + auto-update done 21 Nov: see "Installer and updates".)
+4. **One-click login instead of POESESSID** (he asked 22 Nov). GGG's OAuth ("Log in with pathofexile.com", what Sidekick /
+   WealthyExile use) is closed to new apps: the developer docs say "We are currently unable to process new applications"
+   (checked 22 Nov). If it reopens: public client, authorization code + PKCE, loopback redirect (http://127.0.0.1:<port>/callback,
+   fixed at registration), scopes account:characters + account:stashes, 10 h access / 7 day refresh tokens, User-Agent
+   "OAuth {clientId}/{version} (contact: …)"; its character endpoint still returns experience, so XP per hour could come
+   back. Doable now without GGG: a "Log in" button opening pathofexile.com's own login page in a small app window and
+   reading the POESESSID cookie when he's logged in (Tauri 2.12 has ). Waiting on his go-ahead.
+5. Deferred earlier: PoE 2 coverage. Batch mode tidy-up done 21 Nov (see "Batch mode"). (Installer + auto-update done 21 Nov: see "Installer and updates".)
 
 ## Known caveats
 - This cloud workspace can't reach pathofexile.com / poe.ninja / poeprices.info, so network code is only tested by
