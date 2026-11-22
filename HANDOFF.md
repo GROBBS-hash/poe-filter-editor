@@ -48,6 +48,18 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **Tiers: every gear rule of NeverSink's (23 Nov, not released yet).** Second group after jewels (see next entry).
+  Gear now lists, in NeverSink's order: Rare gear by item tier, 6-linked items, Influenced gear, Searing Exarch / Eater of
+  Worlds implicits, Special mods (veiled, Incursion, Delve, beasts, mercenary…), High-quality bases, Crafting bases
+  (by item level), Corrupted gear (twice-corrupted, corrupted rings/quivers), Enchanted and anointed, Sockets and links
+  (5-links, R-G-B, 6 sockets), Fractured bases, Veiled items, Exotic bases, Rare gear by base, Rare rings and amulets,
+  Rare belts. Every step of these is listed, also the ones that pick by item class (`sections` now uses `section_at`
+  for the Gear group too), with plain names (`gear_tier_name` / `step_name` in tiers.rs, per section, so NeverSink's
+  shared words like "any" or "t1" can mean different things) and a picture per section (`SECTION_ICON`).
+  "+ Add a condition" on gear (`ADD_GEAR`): item level, item tier, rarity, corrupted, corruption mod, number of mods,
+  identified, quality, links, sockets, fractured, mirrored, area level. New condition words: Exarch / Eater implicit
+  level, socket colours ("linked R-G-B sockets", "an abyss socket", not editable). Test `gear_step_conditions`
+  (crafting bases lowered from 86 to 84 catch an item level 84 Crystal Belt). Next group: flasks, gems, currency, maps.
 - **Tiers: change NeverSink's step conditions, jewels first (23 Nov, not released yet).** He said the jewel section "isn't good
   enough, we can't set ilvl … how many mods … corrupted, NeverSink does this really well", then "revise EVERY section".
   He picked mock-up **C "NeverSink's own steps, click any condition to change it"** (and: "remember icons for items").
@@ -817,6 +829,10 @@ Confirmed in game so far: basic Ctrl+D price check (trade search returned listin
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
 **Tiers: step conditions, jewels first (23 Nov, not released yet):**
+- [ ] Tiers → Gear: the menu lists 17 gear sections (Influenced gear, Crafting bases, Sockets and links…), each with a
+  picture, and every step has a plain name. Crafting bases → "Tier 1 bases, item level 86+" → click "item level 86+",
+  set 84: item level 84 Crystal Belts / Conquest Lamellars now show with that look after F4.
+- [ ] Gear + Add a condition → "Number of mods" on a Rare gear step: only identified rares with that many mods match.
 - [ ] Tiers → Abyss jewels: every step shows a picture and its conditions as chips. Click "item level 86+" on
   "Rare, very high item level", change it to 84, Save: the chip turns gold. Press F4; a rare abyss jewel of item level
   84–85 now gets that step's look. "Back to NeverSink's" in the same box undoes it.

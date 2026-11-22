@@ -24,6 +24,7 @@ pub const NUMBERS: &[(&str, &str)] = &[
     ("LinkedSockets", "links"), ("Sockets", "sockets"), ("GemLevel", "gem level"), ("MapTier", "map tier"),
     ("EnchantmentPassiveNum", "passives"), ("CorruptedMods", "corruption mods"), ("UnidentifiedItemTier", "item tier"),
     ("MemoryStrands", "memory strands"), ("DropLevel", "drop level"), ("ModCount", "mods"), ("Width", "width"), ("Height", "height"),
+    ("HasSearingExarchImplicit", "Exarch implicit level"), ("HasEaterOfWorldsImplicit", "Eater implicit level"),
 ];
 /// Yes/no conditions and their words for True / False.
 pub const YESNO: &[(&str, &str, &str)] = &[
@@ -115,6 +116,14 @@ pub fn conds_of(lines: &[String]) -> Vec<Cond> {
 
 /// A condition in plain words, and how it's edited.
 pub fn words(key: &str, value: &str) -> (String, &'static str) {
+    // Socket colours ("RGB", "6W") aren't a plain number: show them, don't offer a number box.
+    if matches!(key, "Sockets" | "SocketGroup") && value.chars().any(|c| c.is_ascii_alphabetic()) {
+        let letters: String = value.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
+        let w = if letters == "A" { "an abyss socket".to_string() } else if letters.chars().all(|c| "RGBW".contains(c)) {
+            let l = letters.chars().map(String::from).collect::<Vec<_>>().join("-");
+            if key == "SocketGroup" { format!("linked {l} sockets") } else { format!("{l} sockets") } } else { format!("sockets {letters}") };
+        return (w, "fixed");
+    }
     if let Some((_, name)) = NUMBERS.iter().find(|n| n.0 == key) { return (number_words(name, value), "number"); }
     if let Some((_, yes, no)) = YESNO.iter().find(|n| n.0 == key) {
         return ((if value.trim().eq_ignore_ascii_case("true") { *yes } else { *no }).to_string(), "yesno");

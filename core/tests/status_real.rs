@@ -166,3 +166,20 @@ fn jewel_step_conditions() {
     assert!(!low.decided_by.contains("anyrare"));
     assert!(high.decided_by.contains("anyrare"));
 }
+
+/// Gear chips (23 Nov): "Tier 1 bases, item level 86+" lowered to 84 catches an item level 84 Crystal Belt.
+#[test]
+fn gear_step_conditions() {
+    use filter_core::rules::{apply, Rule};
+    let mut segs = parse_filter(&std::fs::read_to_string(SRC).unwrap());
+    let belt = || { let mut it = parse_item("Item Class: Belts\nRarity: Normal\nCrystal Belt\n--------\nItem Level: 84\n").unwrap(); fill_class(&mut it); it };
+    let before = status(&segs, &belt(), Some(83), false).verdict;
+    assert!(!before.decided_by.contains("t1_86"), "{}", before.decided_by);
+    let mut c = std::collections::BTreeMap::new();
+    c.insert("ItemLevel".to_string(), ">= 84".to_string());
+    let rule = Rule::Tier { type_path: vec!["crafting".into(), "generalgear".into()], tier: "t1_86".into(), show: None, actions: None, min_stack: None, min_item_tier: None, conds: Some(c) };
+    assert!(apply(&mut segs, &[rule], "\n").is_empty());
+    let after = status(&segs, &belt(), Some(83), false).verdict;
+    println!("before {} by {}; after {} by {}", before.visibility, before.decided_by, after.visibility, after.decided_by);
+    assert!(after.decided_by.contains("t1_86"), "{}", after.decided_by);
+}

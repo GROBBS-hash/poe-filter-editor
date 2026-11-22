@@ -27,7 +27,12 @@ const SECTION_ICON: Record<string, { item?: string; url?: string; badge?: string
   "Essences": { item: "Deafening Essence of Greed" }, "Fossils": { item: "Dense Fossil" }, "Oils": { item: "Golden Oil" },
   "Delirium orbs": { item: "Fine Delirium Orb" }, "Omens": { item: "Omen of Amelioration" }, "Tattoos": { item: "Tattoo of the Arohongui Warrior" },
   "Lifeforce": { item: "Vivid Crystallised Lifeforce" }, "Runegrafts": { item: "Runegraft of Blasphemy" },
-  "Rare gear by item tier": { item: "Hubris Circlet" }, "Fractured bases": { item: "Fractured Fossil" }, "Veiled items": { item: "Veiled Chaos Orb" },
+  "Rare gear by item tier": { item: "Hubris Circlet" }, "6-linked items": { item: "Orb of Fusing" },
+  "Influenced gear": { item: "Crusader's Exalted Orb" }, "Searing Exarch implicits": { item: "Exceptional Eldritch Ember" },
+  "Eater of Worlds implicits": { item: "Exceptional Eldritch Ichor" }, "Special mods (veiled, Incursion…)": { item: "Veiled Exalted Orb" },
+  "High-quality bases": { item: "Blacksmith's Whetstone" }, "Crafting bases": { item: "Exalted Orb" }, "Corrupted gear": { item: "Vaal Orb" },
+  "Enchanted and anointed": { item: "Golden Oil" }, "Sockets and links": { item: "Jeweller's Orb" }, "Rare gear by base": { item: "Regal Orb" },
+  "Rare rings and amulets": { item: "Amethyst Ring" }, "Rare belts": { item: "Stygian Vise" }, "Fractured bases": { item: "Fractured Fossil" }, "Veiled items": { item: "Veiled Chaos Orb" },
   "Jewels": { item: "Cobalt Jewel" }, "Abyss jewels": { item: "Searching Eye Jewel" }, "Cluster jewels": { item: "Large Cluster Jewel" },
   "Cluster jewels (cheap)": { item: "Small Cluster Jewel" }, "Special jewels": { item: "Timeless Jewel" }, "Jewels while levelling": { item: "Crimson Jewel" },
 };
@@ -256,6 +261,11 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
             {section.group === "Jewels" && section.title === "Jewels" && (
               <CorruptedJewels onDone={(p, m) => done(p, m)} />
             )}
+            {section.group === "Gear" && !isExtra && (
+              <div className="note">An item takes the <b>first step it fits</b>, from the top. <b>Click a condition</b> (gold edge) to change it,
+                e.g. "item level 86+" on crafting bases, or <b>+ Add a condition</b>: item tier, number of mods, corrupted, quality, links…
+                Your changes survive NeverSink updates.</div>
+            )}
             {section.group === "Jewels" && (
               <div className="note">A jewel takes the <b>first step it fits</b>, from the top. <b>Click a condition</b> (gold edge) to change
                 it, e.g. raise “item level 84+” to 86+, or <b>+ Add a condition</b> such as corrupted, a corruption mod, or how many mods.
@@ -297,7 +307,7 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
                     {t.min_item_tier != null && <StackBox label="item tier" title="Lowest item tier (shown on the label in 3.30) this row applies to"
                       value={t.min_item_tier} onSave={(n) => setTier(t, { minItemTier: n })} />}
                     <LookButton className="tier-look" onClick={() => setEditing(editing === key ? null : key)}>
-                      <Preview s={fromCurrent(t.style, "Currency")} text={t.bases[0] ?? SECTION_ICON[section.title]?.item ?? t.name} />
+                      <Preview s={fromCurrent(t.style, "Currency")} text={t.bases[0] ?? (section.group === "Jewels" ? SECTION_ICON[section.title]?.item : null) ?? t.name} />
                     </LookButton>
                     <span className="tier-tools">
                       <button className="link small" title="Copy this tier's look"
@@ -315,7 +325,7 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
                         onSave={(s) => { setEditing(null); setTier(t, { style: s }); }} />
                     </div>
                   )}
-                  {t.conds && <StepConds conds={t.conds.filter((c) => !(c.key === "StackSize" && t.min_stack != null) && !(c.key === "UnidentifiedItemTier" && t.min_item_tier != null))} changed={t.changed ?? []} jewels={section.group === "Jewels"} cluster={section.title.startsWith("Cluster")}
+                  {t.conds && <StepConds conds={t.conds.filter((c) => !(c.key === "StackSize" && t.min_stack != null) && !(c.key === "UnidentifiedItemTier" && t.min_item_tier != null))} changed={t.changed ?? []} menu={section.group === "Jewels" ? (section.title.startsWith("Cluster") ? "cluster" : "jewels") : section.group === "Gear" ? "gear" : "any"}
                     onSet={(set, undo, m) => setConds(t, set, undo, m)} />}
                   <div className="tier-items">
                     {items.map((b) => (

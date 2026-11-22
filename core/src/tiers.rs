@@ -119,9 +119,23 @@ const KNOWN: &[(&str, &str, &str)] = &[
     ("viscera", "League currency", "Viscera"),
     ("gold", "Currency", "Gold"),
     ("gear->tiered", "Gear", "Rare gear by item tier"),
+    // The rest of NeverSink's gear rules (23 Nov: "revise every section, his is very thorough"), in his order.
+    ("6l", "Gear", "6-linked items"),
+    ("influenced->all", "Gear", "Influenced gear"),
+    ("rare->exarch", "Gear", "Searing Exarch implicits"),
+    ("rare->eater", "Gear", "Eater of Worlds implicits"),
+    ("exoticmods", "Gear", "Special mods (veiled, Incursion…)"),
+    ("crafting->qualityperfection", "Gear", "High-quality bases"),
+    ("crafting->generalgear", "Gear", "Crafting bases"),
+    ("exotic->corruptions", "Gear", "Corrupted gear"),
+    ("exotic->enchanted", "Gear", "Enchanted and anointed"),
+    ("socketslinks", "Gear", "Sockets and links"),
     ("exotic->fractured", "Gear", "Fractured bases"),
     ("rare->exotic->veiled", "Gear", "Veiled items"),
     ("exoticbases", "Gear", "Exotic bases"),
+    ("rr", "Gear", "Rare gear by base"),
+    ("rr->amuring", "Gear", "Rare rings and amulets"),
+    ("rr->belts", "Gear", "Rare belts"),
     // Jewels (21 Nov: he looked for the jewel rules here and couldn't find them).
     ("jewels->generic", "Jewels", "Jewels"),
     ("jewels->abyss", "Jewels", "Abyss jewels"),
@@ -225,6 +239,61 @@ fn special_tier_name(t: &str) -> Option<String> {
     }.to_string())
 }
 
+/// Step names in the gear sections, in plain words (NeverSink's own words only make sense to him). `key` is the
+/// section ("influenced->all"), checked against what each rule catches (23 Nov).
+fn gear_tier_name(key: &str, t: &str) -> Option<String> {
+    let inf = |s: &str| { let mut c = s.chars(); c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default() };
+    Some(match key {
+        "influenced->all" => {
+            if let Some(i) = t.strip_prefix("t1bases") { return Some(format!("Tier 1 · best {} bases", inf(i))); }
+            if t == "t2classesinfluencedshared" { return Some("Tier 2 · item types any influence wants".into()); }
+            if let Some(i) = t.strip_prefix("t2classes") { return Some(format!("Tier 2 · item types {} wants", inf(i))); }
+            match t { "t1exotic" => "Tier 1 · exotic bases", "t1top" => "Tier 1 · top bases", "t2high" => "Tier 2 · good bases, high item level",
+                "any86" => "Any influenced, item level 86+", "any" => "Any other influenced", _ => return None }
+        }
+        "rare->exarch" | "rare->eater" => match t { "anyhigh" => "Good bases with the implicit", "any" => "Any with the implicit", _ => return None },
+        "6l" => match t { "hightier" => "Good bases", "others" => "Any other 6-link", _ => return None },
+        "crafting->generalgear" => {
+            let (tier, lvl) = t.strip_prefix('t')?.split_once('_')?;
+            return Some(format!("Tier {tier} bases, item level {lvl}+"));
+        }
+        "crafting->qualityperfection" => match t {
+            "qualchancing" => "Bases to chance (high quality)", "armors1q1" => "Top armour bases, best quality", "armors1q2" => "Top armour bases, high quality",
+            "weapont1q1" => "Top weapons, best quality", "weapont2q1" => "Good weapons, best quality", "weapont1q2" => "Top weapons, high quality",
+            "weapont2q2" => "Good weapons, high quality", "anyoverqualityperf" => "Anything with very high quality", "anyoverqualityhigh" => "Anything with high quality",
+            _ => return None },
+        "socketslinks" => match t {
+            "5linksleveling" => "5-links while levelling", "5link6sockets" => "5-link with 6 sockets", "5links" => "5-links in maps",
+            "rgbsmall1" | "rgbsmall2" => "Small R-G-B items (vendor for a Chromatic Orb)", "rgbmedium" => "Medium R-G-B items", "rgblarge" => "Big R-G-B items",
+            "6sockets4h" => "6 sockets, small items", "6sockets" => "6 sockets (vendor for 7 Jeweller's Orbs)", _ => return None },
+        "exotic->corruptions" => match t {
+            "doublecorruptedjwlry" => "Twice-corrupted jewellery", "doublecorruptedany" => "Twice-corrupted rares",
+            "singlecorruptedquivers" => "Corrupted quivers", "singlecorrupteditems" => "Corrupted rings", _ => return None },
+        "exotic->enchanted" => match t { "exotic" => "Enchanted gear", "anointedamulets" => "Anointed amulets", "anointedrings" => "Anointed rings", _ => return None },
+        "exoticmods" => match t {
+            "fracturedveiled" => "Fractured, with a veiled mod", "fracturedincursion" => "Fractured, with an Incursion mod", "duoveil" => "Two veiled mods",
+            "exoticveiled" => "Veiled jewels", "incursionspeedtraps" => "Incursion: speed and trap boots", "incursioncaster" => "Incursion: caster mods",
+            "incursionelemental" => "Incursion: elemental mods", "incursionjwlry" => "Incursion: jewellery", "incursionglovehelm" => "Incursion: gloves and helmets",
+            "incursionattack" => "Incursion: attack mods", "incursionlifechest" => "Incursion: life body armours", "incursionminion" => "Incursion: minion mods",
+            "incursionmagic" => "Incursion: magic items", "incursionrandom" => "Incursion: any other", "necropoliscraft" => "Necropolis crafted mods",
+            "bestiaryvaluable" => "Beast mods (valuable)", "bestiaryother" => "Beast mods (other)", "delvefractured" => "Delve mods, fractured",
+            "delve" => "Delve mods", "mercenaryothers" => "Mercenary mods", "mercenaryweapons" => "Mercenary weapons", "warband" => "Warband mods",
+            "essence" => "Essence-only mods", "crafting" => "Crafted mods", _ => return None },
+        "exotic->fractured" => match t { "fractt3" => "Lower fractured bases", _ => return None },
+        // NeverSink ranks the bases in these: tier 1 = the most wanted ones.
+        "rr" | "rr->amuring" | "rr->belts" | "rare->exotic->veiled" | "exoticbases" => {
+            let n: u32 = t.strip_prefix('t')?.parse().ok()?;
+            return Some(match n { 1 => "Tier 1 · best bases".into(), 2 => "Tier 2 · good bases".into(), n => format!("Tier {n} · other bases") });
+        }
+        _ => return None,
+    }.to_string())
+}
+
+/// A step's name in its section: gear sections have their own words, the rest `tier_name`.
+pub fn step_name(key: &str, t: &str) -> String {
+    gear_tier_name(key, t).unwrap_or_else(|| if key == "gold" { gold_name(t) } else { tier_name(t) })
+}
+
 /// The Tiers tab's name for a NeverSink section, when it lists it.
 pub fn section_title(type_path: &[String]) -> Option<String> {
     let key = type_path.join("->");
@@ -279,7 +348,7 @@ pub fn sections(segs: &[Segment]) -> Vec<Section> {
         // The same tier can appear twice (e.g. a campaign copy); keep the first.
         if found[i].tiers.iter().any(|t| t.tier == tier) { continue; }
         found[i].tiers.push(TierRow {
-            name: if key == "gold" { gold_name(&tier) } else { tier_name(&tier) },
+            name: step_name(&key, &tier),
             tier, visibility: b.visibility.clone(), style: style_of(&b.lines), bases, note: note_of(&b.lines),
             min_stack: b.lines.iter().find_map(|l| l.trim().strip_prefix("StackSize >=").and_then(|n| n.trim().parse().ok())),
             min_item_tier: b.lines.iter().find_map(|l| l.trim().strip_prefix("UnidentifiedItemTier >=").and_then(|n| n.trim().parse().ok())),
@@ -295,7 +364,7 @@ pub fn sections(segs: &[Segment]) -> Vec<Section> {
     // Jewels too (abyss steps pick by item class, not by item, so they'd be missing), and any known section that
     // has steps but no item list.
     let whole: Vec<&(&str, &str, &str)> = KNOWN.iter()
-        .filter(|k| k.1 == LEVELLING || k.1 == "Jewels" || !found.iter().any(|s| s.type_path.join("->") == k.0)).collect();
+        .filter(|k| k.1 == LEVELLING || k.1 == "Jewels" || k.1 == "Gear" || !found.iter().any(|s| s.type_path.join("->") == k.0)).collect();
     for (key, group, title) in whole {
         let path: Vec<String> = key.split("->").map(String::from).collect();
         let Some(mut sec) = section_at(segs, &path) else { continue };
@@ -335,7 +404,7 @@ pub fn section_at(segs: &[Segment], type_path: &[String]) -> Option<Section> {
         let base_note = note_of(&b.lines);
         if !base_note.is_empty() { note.push(base_note); }
         tiers.push(TierRow {
-            name: tier_name(&tier), tier, visibility: b.visibility.clone(), style: style_of(&b.lines),
+            name: step_name(&type_path.join("->"), &tier), tier, visibility: b.visibility.clone(), style: style_of(&b.lines),
             bases: b.base_types(), note: note.join(", "),
             min_stack: b.lines.iter().find_map(|l| l.trim().strip_prefix("StackSize >=").and_then(|n| n.trim().parse().ok())),
             min_item_tier: b.lines.iter().find_map(|l| l.trim().strip_prefix("UnidentifiedItemTier >=").and_then(|n| n.trim().parse().ok())),

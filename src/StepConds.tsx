@@ -30,7 +30,24 @@ const ADD_JEWEL: Addable[] = [
   { key: "Mirrored", label: "Mirrored or not", kind: "yesno", start: "False" },
 ];
 
-const RARITIES: [string, string][] = [["Normal", "white"], ["Magic", "magic"], ["Rare", "rare"], ["Unique", "unique"]];
+const ADD_GEAR: Addable[] = [
+  { key: "ItemLevel", label: "Item level", kind: "number", start: ">= 84", hint: "Higher item level can roll better mods" },
+  { key: "UnidentifiedItemTier", label: "Item tier", kind: "number", start: ">= 4", hint: "The tier shown on unidentified rare labels" },
+  { key: "Rarity", label: "Rarity", kind: "rarity", start: "Rare" },
+  { key: "Corrupted", label: "Corrupted or not", kind: "yesno", start: "False" },
+  { key: "CorruptedMods", label: "Has a corruption mod", kind: "number", start: ">= 1", hint: "The extra mod a Vaal Orb can add" },
+  { key: "ModCount", label: "Number of mods (identified items)", kind: "number", start: ">= 5", also: { Identified: "True" },
+    hint: "Only works once an item is identified, so this also adds “identified”" },
+  { key: "Identified", label: "Identified or not", kind: "yesno", start: "True" },
+  { key: "Quality", label: "Quality", kind: "number", start: ">= 20" },
+  { key: "LinkedSockets", label: "Links", kind: "number", start: ">= 5" },
+  { key: "Sockets", label: "Sockets", kind: "number", start: ">= 6" },
+  { key: "FracturedItem", label: "Fractured or not", kind: "yesno", start: "True" },
+  { key: "Mirrored", label: "Mirrored or not", kind: "yesno", start: "False" },
+  { key: "AreaLevel", label: "Area level (where it drops)", kind: "number", start: ">= 68", hint: "68+ = maps, below = the campaign" },
+];
+
+const RARITIES: [string, string][] =[["Normal", "white"], ["Magic", "magic"], ["Rare", "rare"], ["Unique", "unique"]];
 const YES_WORDS: Record<string, [string, string]> = {
   Corrupted: ["corrupted", "not corrupted"], Identified: ["identified", "unidentified"], Mirrored: ["mirrored", "not mirrored"],
   FracturedItem: ["fractured", "not fractured"], SynthesisedItem: ["synthesised", "not synthesised"], Replica: ["replica", "not replica"],
@@ -42,6 +59,7 @@ const NUM_NAME: Record<string, string> = {
   ItemLevel: "item level", AreaLevel: "area level", Quality: "quality", StackSize: "stack size", LinkedSockets: "links",
   Sockets: "sockets", GemLevel: "gem level", MapTier: "map tier", EnchantmentPassiveNum: "passives", CorruptedMods: "corruption mods",
   UnidentifiedItemTier: "item tier", MemoryStrands: "memory strands", DropLevel: "drop level", ModCount: "mods", Width: "width", Height: "height",
+  HasSearingExarchImplicit: "Exarch implicit level", HasEaterOfWorldsImplicit: "Eater implicit level",
 };
 
 /** ">= 86" -> [">=", 86]; two lines (68+ and up to 74) -> the first. */
@@ -128,15 +146,17 @@ function Editor({ cond, changed, onSave, onRemove, onUndo, onClose }: {
 }
 
 /** A step's conditions as chips: click one to change it, "+ Add a condition" for more. Changed ones are gold. */
-export default function StepConds({ conds, changed, jewels, cluster, onSet }: {
-  conds: Cond[]; changed: string[]; jewels: boolean; cluster?: boolean;
+export default function StepConds({ conds, changed, menu, onSet }: {
+  conds: Cond[]; changed: string[]; menu: "jewels" | "cluster" | "gear" | "any";
   onSet: (set: Record<string, string>, undo: string[], msg: string) => void;
 }) {
   const [open, setOpen] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   // Conditions you removed aren't in the step any more: show them crossed out so they can come back.
   const removed = changed.filter((k) => !conds.some((c) => c.key === k));
-  const offer = (jewels ? ADD_JEWEL : ADD_ANY).filter((a) => !conds.some((c) => c.key === a.key) && (cluster || a.key !== "EnchantmentPassiveNum"));
+  const jewels = menu === "jewels" || menu === "cluster";
+  const offer = (jewels ? ADD_JEWEL : menu === "gear" ? ADD_GEAR : ADD_ANY)
+    .filter((a) => !conds.some((c) => c.key === a.key) && (menu === "cluster" || a.key !== "EnchantmentPassiveNum"));
   const shown = conds.filter((c) => c.key !== "Class" || !jewels);
   return (
     <div className="conds">
