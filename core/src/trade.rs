@@ -140,6 +140,9 @@ pub struct TradeSetup {
     /// Search corrupted (Some(true)) or not corrupted (Some(false)) only; None = either.
     #[serde(default)]
     pub corrupted: Option<bool>,
+    /// Instant buyout only (Some(true)) or any listing (Some(false)) for this search; None = your Settings choice.
+    #[serde(default)]
+    pub buyout: Option<bool>,
 }
 
 /// How to price an item as a crafting base (Awakened PoE Trade's "base item" preset): same base, at least this
@@ -558,11 +561,13 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
         let value = if whole { 0.0 } else { value };
         let mut min = if m.values.is_empty() || whole { None } else { Some(min_for(value)) };
         let mut max = None;
-        // Uniques (Awakened's roll ranges): every mod that rolls is searched "about as good as yours": 10% of its range
-        // below your roll, exactly your roll when it's perfect. Fixed mods and plain copies (no ranges) stay unticked.
+        // Uniques: every mod that rolls is ticked at exactly your roll (23 Nov: he wanted the price window to open with the
+        // unique's own numbers; it used to start 10% of each range below, Awakened-style; the -10% / -20% buttons loosen it).
+        // Fixed mods and plain copies (no ranges) stay unticked.
         if unique && !whole && value > 0.0 && m.kind != "enchant" {
             if let (Some(roll), Some(w)) = (m.roll, m.width) {
-                let slack = if roll >= 0.999 { 0.0 } else { w * 0.1 };
+                let _ = roll;
+                let slack = 0.0;
                 let lo = value - slack;
                 min = Some(if value.fract() == 0.0 && w >= 5.0 { lo.floor() } else { (lo * 10.0).floor() / 10.0 });
                 enabled = !junk;
@@ -634,6 +639,7 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
         base_only: !matches!(item.rarity.as_str(), "Rare" | "Magic") || !gear || nothing_picked || flask || heist_mission,
         // Uniques: corrupted or not, like yours (a corrupted one can't be changed, and its implicit is part of the price).
         corrupted: (item.rarity == "Unique" && !item.item_class.contains("Gem")).then_some(item.corrupted),
+        buyout: None,
         ilvl_min: (gear && nothing_picked && !heist_mission && item.rarity != "Unique").then_some(item.item_level).flatten(),
         ilvl_max: (gear && nothing_picked && !heist_mission && item.rarity != "Unique").then_some(item.item_level).flatten().and_then(|l| ilvl_band(l).1),
         links_min: (links >= 5).then_some(links),

@@ -627,7 +627,7 @@ fn price_check(app: AppHandle) {
                     let item = p.item;
                     let category = filter_core::trade::category(&item.item_class).map(|c| if item.base_type.ends_with("Cluster Jewel") { "jewel.cluster" } else { c }).map(String::from);
                     let s = filter_core::trade::TradeSetup { item: item.clone(), filters: vec![], base_only: true, ilvl_min: None, ilvl_max: None,
-                        links_min: None, gem_level: None, unknown: vec![], unknown_kinds: vec![], category, raw: String::new(), misc: vec![], base: String::new(), base_item: None, affix_max: None, corrupted: None };
+                        links_min: None, gem_level: None, unknown: vec![], unknown_kinds: vec![], category, raw: String::new(), misc: vec![], base: String::new(), base_item: None, affix_max: None, corrupted: None, buyout: None };
                     PriceCheck { ninja: ninja_price(&app, &item), setup: Some(s), league, from_ground: true, error: None, bulk: None, map: None, divine: None, compare: vec![], instant_all: false, trend: None, sold: None }
                 }
                 Err(e) => PriceCheck { setup: None, ninja: None, league, from_ground: true, error: Some(e), bulk: None, map: None, divine: None, compare: vec![], instant_all: false, trend: None, sold: None },
@@ -803,7 +803,9 @@ fn currency_rates(app: &AppHandle) -> std::collections::HashMap<String, f64> {
 fn trade_query(app: &AppHandle, poe2: bool, setup: &filter_core::trade::TradeSetup) -> serde_json::Value {
     let mut q = filter_core::trade::query(setup);
     // Instant buyout only (the default): prices you can actually buy at, no whisper-and-wait sellers.
-    if app.state::<AppState>().store.lock().unwrap().settings.price_buyout_only { q["query"]["status"]["option"] = serde_json::json!("securable"); }
+    // The price window's "Instant buyout only" chip can switch it for one search; otherwise your Settings choice (on).
+    let buyout = setup.buyout.unwrap_or_else(|| app.state::<AppState>().store.lock().unwrap().settings.price_buyout_only);
+    if buyout { q["query"]["status"]["option"] = serde_json::json!("securable"); }
     if let Ok(types) = trade_api::item_types(&app.state::<AppState>().data_dir, poe2) { types.fix_query(&mut q); }
     q
 }

@@ -48,6 +48,12 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **Price window: tier badges on totals, exact unique rolls, buyout switch (23 Nov, not released yet).** From his screenshots.
+  - Total rows (+94% total Elemental Resistance, total Life…) had no T1/T2 badge: `trade_rules::totals` now gives them the
+    best tier among the mods adding up to them, and a lone mod's roll bar / range / affix (tooltip says "best tier among the mods").
+  - Uniques open at exactly your rolls (was 10% of each range below, Awakened-style); the −10% / −20% buttons still loosen.
+  - "Instant buyout only" was a label that said "click to switch": now a real switch for that search (`TradeSetup.buyout`,
+    None = Settings, which defaults to on, as he wants); off reads "Any seller". The other grey labels come from the item.
 - **F2 shows which rule decides the item; one clearer Find page (23 Nov, not released yet).** He asked "a way for our user
   to see what rule is currently applied" and why there are three searches.
   - F2 card: a "Shown by / Hidden by" box (`RuleLine` in ItemPanel.tsx) under the chips: "Crafting bases › Tier 1 bases,
@@ -892,6 +898,8 @@ Confirmed in game so far: basic Ctrl+D price check (trade search returned listin
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
 **Tiers: step conditions, jewels first (23 Nov, released in 0.2.46):**
+- [ ] (not released yet) Ctrl+D: resist / life total rows show a T badge; a unique opens with its own numbers; "Instant buyout
+  only" can be clicked off ("Any seller") and back on, then Search again.
 - [ ] (not released yet) F2 on any item: a "Shown by" box names the Tiers section and step (with its conditions); click opens it.
 - [ ] (not released yet) Find page: typing "quality gem" lists the Tiers gem sections under the items.
 - [ ] (not released yet) Map tracker: A+ makes it bigger (text and window), A− smaller; it stays that size next time.

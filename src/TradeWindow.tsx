@@ -39,7 +39,7 @@ function SourceTag({ s }: { s: string }) {
   if (!x) return null;
   return <span className={`tw-src tw-src-${s}`} title={x[2]}>{x[1] && <img src={`/mod-icons/${x[1]}.png`} alt="" width={16} height={16} />}{x[0]}</span>;
 }
-type Setup = { item: Item; filters: StatFilter[]; unknown_kinds?: string[]; base_only: boolean; ilvl_min: number | null; ilvl_max?: number | null; links_min: number | null;
+type Setup = { buyout?: boolean | null; item: Item; filters: StatFilter[]; unknown_kinds?: string[]; base_only: boolean; ilvl_min: number | null; ilvl_max?: number | null; links_min: number | null;
   gem_level: number | null; unknown: string[]; category: string | null; raw?: string; misc?: string[]; base?: string; affix_max?: [number, number] | null;
   /** Awakened-style "search as a base": why it's a crafting base, which mods to keep, item level, influences. */
   base_item?: { why: string[]; ids: string[]; ilvl_min: number | null; misc: string[] } | null;
@@ -123,7 +123,7 @@ const needsTrade = (c: Check) => {
     || (!c.setup.category && !c.map && it.item_class !== "Maps");
 };
 /** What a search depends on: when this changes after a search, the old prices no longer match the filters. */
-const searchKey = (s: Setup) => JSON.stringify([s.filters.map((f) => [f.enabled, f.min, f.max ?? null]), s.base_only, s.ilvl_min, s.ilvl_max ?? null, s.links_min, s.misc ?? [], s.corrupted ?? null]);
+const searchKey = (s: Setup) => JSON.stringify([s.filters.map((f) => [f.enabled, f.min, f.max ?? null]), s.base_only, s.ilvl_min, s.ilvl_max ?? null, s.links_min, s.misc ?? [], s.corrupted ?? null, s.buyout ?? null]);
 
 /** Item-level band where base prices jump (75, 82, 84, 86 unlock better mod tiers): [low, high or null]. */
 const ilvlBand = (l: number): [number, number | null] => l <= 67 ? [1, 67] : l <= 74 ? [68, 74] : l <= 81 ? [75, 81] : l <= 83 ? [82, 83] : l <= 85 ? [84, 85] : [86, null];
@@ -774,7 +774,7 @@ export default function TradeWindow() {
       </div>
 
       {awk && !check.bulk && (setup.category || hidden.length > 0 || it.rarity === "Unique") && (
-        <div className="tw-chips" title="What the search asks for besides the ticked stats. Gold ones are on; click to switch.">
+        <div className="tw-chips" title="What the search asks for besides the ticked stats. Buttons switch on (gold) and off; the grey labels come from the item itself.">
           {setup.category && it.rarity !== "Unique" && (
             <button className={`tw-chip ${setup.base_only ? "on" : ""}`} onClick={() => setSetup({ ...setup, base_only: !setup.base_only })}>
               <ItemIcon base={setup.base || it.base_type || null} size={18} />{setup.base || it.base_type} only</button>
@@ -789,7 +789,15 @@ export default function TradeWindow() {
               onClick={() => setSetup({ ...setup, corrupted: setup.corrupted != null ? null : it.corrupted })}>
               <CurrencyIcon id="vaal" size={18} />{it.corrupted ? "Corrupted only" : "Not corrupted only"}</button>
           )}
-          {hidden.map((h) => <span key={h} className="tw-chip fixed">{/online/i.test(h) && <span className="tw-online-dot" />}{h}</span>)}
+          {(() => {
+            const on = hidden[0] === "Instant buyout only";
+            return hidden.length > 0 && (
+              <button className={`tw-chip ${on ? "on" : ""}`} title={on ? "Only sellers you can buy from straight away. Click to include whisper-and-wait sellers too (this search only)."
+                : "Includes sellers you have to whisper. Click for instant buyout only (the usual)."}
+                onClick={() => setSetup({ ...setup, buyout: !on })}>{on ? "Instant buyout only" : "Any seller"}</button>
+            );
+          })()}
+          {hidden.slice(1).map((h) => <span key={h} className="tw-chip fixed">{/online/i.test(h) && <span className="tw-online-dot" />}{h}</span>)}
         </div>
       )}
       {heroTop && hero}
@@ -895,7 +903,7 @@ export default function TradeWindow() {
                   <span className={`tw-label mod-${f.kind}`}>{label}{open && <span className="tw-room"> room to craft</span>}
                     {f.source && <SourceTag s={f.source} />}
                     {!flat && KIND[f.kind] && f.kind !== "pseudo" && f.kind !== "implicit" && <span className={`tw-kind tw-kind-${f.kind}`}>{KIND[f.kind]}</span>}
-                    {f.tier != null && <span className={`tw-tier ${tierClass(f.tier)}`} title="Tier 1 is the best this mod can roll">T{f.tier}</span>}
+                    {f.tier != null && <span className={`tw-tier ${tierClass(f.tier)}`} title={f.kind === "pseudo" ? "The best tier among the mods adding up to this total (tier 1 is the best a mod can roll)" : "Tier 1 is the best this mod can roll"}>T{f.tier}</span>}
                     {f.roll != null && <Roll r={f.roll} range={f.range} tier={f.tier} />}</span>
                   {flat && <span className={`tw-tag ${tag.split(" ").pop()} ${tag.includes("crafted") ? "crafted" : ""}`}>{tag}</span>}
                   <input className="tw-min" type="number" value={f.min ?? ""} placeholder="min" onWheel={(e) => wheel(i, f, e)}

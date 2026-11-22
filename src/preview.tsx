@@ -94,7 +94,7 @@ mockIPC(async (cmd, args) => {
   if (cmd === "trade_hidden") {
     // Shaped like core's trade::describe (the real one reads the search it would send).
     const s = (args as Json).setup as Json;
-    const out = ["Instant buyout only"];
+    const out = [s.buyout === false ? "Any listing" : "Instant buyout only"];
     if (s.item.rarity === "Unique" && s.item.name) out.push(`Named ${s.item.name}`);
     if (s.base_only || s.item.rarity === "Unique") out.push(`Base: ${s.base || s.item.base_type}`);
     if (s.item.rarity !== "Unique" && s.category) out.push("Not unique");

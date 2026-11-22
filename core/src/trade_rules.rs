@@ -124,10 +124,16 @@ pub fn totals(mods: &[ModLine], item: &Item, index: &StatIndex, skip: &[usize]) 
         // and hidden, so chaos vanished: 21 Nov, his Demon Cowl.)
         let bench_only = std::ptr::eq(rule.sources, CHAOS_RES) && used.len() == 1 && mods[used[0].0].kind == "crafted";
         let total = total.floor();
+        // The tier badge (23 Nov: totals had none): the best tier among the mods adding up to it; with a single mod, its
+        // roll bar and affix too.
+        let tiered: Vec<&ModLine> = used.iter().map(|(i, _)| &mods[*i]).filter(|m| m.tier.is_some()).collect();
+        let tier = tiered.iter().filter_map(|m| m.tier).min();
+        let one = (used.len() == 1).then(|| &mods[used[0].0]);
         out.push(StatFilter {
             id, label: rule.text.replace('#', &total.to_string()), value: total, min: Some(total),
             enabled: !unique && !bench_only && rule.tick_at.map(|t| total >= t).unwrap_or(false),
-            kind: "pseudo".into(), tier: None, junk: false, roll: None, range: None, affix: None, max: None, source: None,
+            kind: "pseudo".into(), tier, junk: false, roll: one.and_then(|m| m.roll), range: one.and_then(|m| m.range.clone()),
+            affix: one.and_then(|m| m.affix.clone()), max: None, source: None,
         });
         if !unique { hide.extend(used.iter().filter(|(_, keep)| !keep).map(|(i, _)| *i)); }
     }
@@ -355,6 +361,10 @@ mod tests {
         assert!(get("pseudo.pseudo_total_elemental_resistance").unwrap().enabled && get("pseudo.pseudo_total_chaos_resistance").unwrap().enabled);
         let fire = get("pseudo.pseudo_total_fire_resistance").unwrap();
         assert_eq!((fire.value, fire.enabled), (55.0, false));
+        // Totals carry a tier badge: the best of their mods (fire T2 + fire-and-chaos T3), and a lone mod's roll too.
+        assert_eq!(fire.tier, Some(2));
+        let chaos = get("pseudo.pseudo_total_chaos_resistance").unwrap();
+        assert_eq!((chaos.tier, chaos.range.as_deref()), (Some(3), Some("11–15")));
         assert!(get("pseudo.pseudo_total_cold_resistance").is_none() && get("pseudo.pseudo_total_resistance").is_none());
         // Folded into totals: gone from the list, fire+chaos too (both totals count it). Strength also gives life: kept.
         assert!(get("explicit.life").is_none() && get("explicit.fire").is_none() && get("explicit.firechaos").is_none());
@@ -512,7 +522,7 @@ mod polish_tests {
         let s = setup(t, &idx()).unwrap();
         let life = s.filters.iter().find(|f| f.id == "explicit.life").unwrap();
         assert!(life.enabled);
-        assert_eq!(life.min, Some(88.0), "10% of the 80-100 range below 90");
+        assert_eq!(life.min, Some(90.0), "exactly your roll (23 Nov: he wanted the unique's own numbers)");
         let ms = s.filters.iter().find(|f| f.id == "explicit.ms").unwrap();
         assert!(!ms.enabled, "a fixed mod is the same on every copy");
         assert_eq!(s.corrupted, Some(false));
