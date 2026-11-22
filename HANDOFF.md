@@ -48,14 +48,14 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
-- **F2 read a rare as its base's unique (23 Nov, not released yet).** He pressed F2 on a rare unidentified Twilight
+- **F2 read a rare as its base's unique (23 Nov, released in 0.2.47).** He pressed F2 on a rare unidentified Twilight
   Regalia (Red-Maps filter, Shaper's Realm) and got "The only unique Twilight Regalia: Mantle of Dreams". A ground label
   has no item level, and without one the filter hides rares in maps, so `label_distance` gave "rare" the 200k hidden
   penalty and the unique won; the hover box's "rare" was then judged against the same item-level-less item. Now
   `label_distance` tries item levels (none, 75, 84, 86) for non-unique gear with no item level and keeps the closest,
   and `apply_tooltip_checked` compares with the box's item level. On his filter: rare 5531 vs unique 221748 (was 204731
   vs 221748). Test `ground_rare_isnt_read_as_its_unique`.
-- **Tiers: prices on items, "hide if worth under" anywhere, search, pictures, clearer menu (23 Nov, not released yet).**
+- **Tiers: prices on items, "hide if worth under" anywhere, search, pictures, clearer menu (23 Nov, released in 0.2.47).**
   After his 0.2.46 look ("we need pictures for everything", group names "too blended in", search found nothing for
   "quality", "only show corpses worth x chaos").
   - Every item chip shows its poe.ninja worth ("3c", "20 div"; uniques "up to …" = best unique on that base).
@@ -875,12 +875,12 @@ Confirmed in game so far: basic Ctrl+D price check (trade search returned listin
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
 **Tiers: step conditions, jewels first (23 Nov, released in 0.2.46):**
-- [ ] (not released yet) F2 on an unidentified rare on the ground (e.g. Twilight Regalia) says Rare, not "the only unique …".
-- [ ] (not released yet) Tiers → Corpses: every corpse shows its price. Tick "Hide items here worth under", type 5:
+- [ ] (0.2.47) F2 on an unidentified rare on the ground (e.g. Twilight Regalia) says Rare, not "the only unique …".
+- [ ] (0.2.47) Tiers → Corpses: every corpse shows its price. Tick "Hide items here worth under", type 5:
   cheap corpses get struck through; after F4 a single 1c corpse is hidden but a stack worth 5c+ still shows.
-- [ ] (not released yet) Ctrl+K → "quality gems" → Enter opens Quality and level gems.
+- [ ] (0.2.47) Ctrl+K → "quality gems" → Enter opens Quality and level gems.
 - [ ] Pictures on Heist items, flasks, cards and league items (arrive with the next price download, no release needed).
-- [ ] (not released yet) Tiers menu: group names in gold capitals with a line.
+- [ ] (0.2.47) Tiers menu: group names in gold capitals with a line.
 - [ ] Tiers menu: new groups Flasks and gems, Heist, League items; Uniques shows 6-link / corrupted / 6-socket steps.
   Quality and level gems → "Level 20, 20% quality" → click "quality 20+", set 18: 18% level 20 gems show after F4.
 - [ ] Currency step → + Add a condition → Stack size 5: only stacks of 5+ get that step's look.
