@@ -324,7 +324,7 @@ fn stash_page(kind: &str, account: &str, sessid: &str, league: &str, poe2: bool,
 
 fn stash_error(e: &str) -> String {
     if e.contains("403") || e.to_lowercase().contains("forbidden") {
-        "pathofexile.com said no: your login has expired. Press \"Log in with pathofexile.com\" (Wealth page or Settings → Map tracker) again.".into()
+        "pathofexile.com said no: your login has expired. Press \"Log in with pathofexile.com\" (Stash worth page or Settings → Map tracker) again.".into()
     } else if e.contains("404") || e.to_lowercase().contains("not found") {
         "pathofexile.com couldn't find that account or league: check your account name (with its #1234) and league.".into()
     } else { e.replace("trade site", "pathofexile.com") }

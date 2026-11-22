@@ -274,7 +274,7 @@ export function SearchesWindow() {
         {err && <div className="error small">{err}</div>}
         {v && v.made.length > 0 && <><div className="ss-head">Made for you</div><div className="ss-list">{v.made.map(item)}</div></>}
         {v && <><div className="ss-head">Saved</div><div className="ss-list">{v.saved.map(item)}</div></>}
-        <div className="pw-small" style={{ marginTop: 8 }}>Add your own on the Play tools page.</div>
+        <div className="pw-small" style={{ marginTop: 8 }}>Add your own on the Game windows page.</div>
       </div>
     </div>
   );
@@ -504,7 +504,7 @@ export function ChoiceWindow() {
         </div>}
         {r && r.kind === "unknown" && r.priced.length === 0 && <div className="pw-small">Read this, but didn't recognise it as an altar, remnant or reward screen:
           <div className="small" style={{ marginTop: 4 }}>{r.lines.slice(0, 12).join(" · ")}</div></div>}
-        {r && r.kind !== "unknown" && <div className="pw-small" style={{ marginTop: 8 }}>A rough guide from the words on screen. Dangers come from your can't-run list (Maps page).</div>}
+        {r && r.kind !== "unknown" && <div className="pw-small" style={{ marginTop: 8 }}>A rough guide from the words on screen. Dangers come from your can't-run list (Map mods page).</div>}
       </div>
     </div>
   );
@@ -702,7 +702,7 @@ export default function PlayTools() {
   return (
     <div>
       <div className="card">
-        <h2>Play tools</h2>
+        <h2>What each window does</h2>
         <p className="muted small">Small windows over the game. They read the game's log file and copied item text only (nothing that reads the
           game's memory). Change the keys under Settings → Hotkeys.</p>
         <div className="pt-grid">

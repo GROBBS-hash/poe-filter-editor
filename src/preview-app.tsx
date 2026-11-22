@@ -28,6 +28,10 @@ const wealth = {
   strategies: [["Strand alch and go", 3, 2.5, 212]],
 };
 
+let savedSearches = [
+  { id: 1, name: "Stygian Vise, life + res", live: true, setup: { filters: [{ enabled: true, label: "+# to maximum Life" }, { enabled: true, label: "+#% total Elemental Resistance" }] } },
+  { id: 2, name: "Large Cluster Jewel: Lightning", live: false, setup: { filters: [{ enabled: true, label: "1 Added Passive Skill is Thunderstruck" }] } },
+];
 // Tiers → Map tiers: NeverSink-like map rules (whites T1-5, yellows T6-10, reds T11-16); hidden ones remembered here.
 const mapHidden = new Set<string>(["maps_d_t1", "maps_d_t2"]);
 let batchItems = [
@@ -129,6 +133,10 @@ mockIPC((cmd, args) => {
   // Real icons when the editor is running (vite serves the app's icon list), else none.
   if (cmd === "get_icons") return fetch("/preview-data/icons").then((r) => r.json()).catch(() => ({}));
   if (cmd === "get_settings") return { key_atlas: "F7" };
+  // Price check page: saved searches (Live on/off and delete work in the preview).
+  if (cmd === "saved_list") return savedSearches;
+  if (cmd === "saved_live") { const a = args as { id: number; on: boolean }; savedSearches = savedSearches.map((s) => s.id === a.id ? { ...s, live: a.on } : s); return savedSearches; }
+  if (cmd === "saved_delete") { const a = args as { id: number }; savedSearches = savedSearches.filter((s) => s.id !== a.id); return savedSearches; }
   { const p = playMock(cmd); if (p !== undefined) return p; }
   if (cmd === "price_names") return Object.fromEntries((args as { names: string[] }).names.map((n, i) => [n, n === "Divine Orb" ? 260 : [1, 1, 1, 1, 2, 2, 3, 4, 6, 9, 14, 30, 90, 600][i % 14]]));
   if (cmd === "atlas_list") return atlas;

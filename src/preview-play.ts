@@ -64,7 +64,7 @@ export const playView = {
 };
 
 export const searchView = {
-  made: [{ name: "Your build's gems", text: "arc|flame wa|frostbo|holy fl" }, { name: "Maps you can run (Maps page)", text: "\"!s def|t reg\"" }],
+  made: [{ name: "Your build's gems", text: "arc|flame wa|frostbo|holy fl" }, { name: "My map regex (Map mods page)", text: "\"!s def|t reg\"" }],
   saved: [{ name: "Movement speed", text: "\"y: +\\d\\d% m\"" }, { name: "3-links", text: "-\\w-\\w-" }, { name: "Chromatic (RGB)", text: "r-g-b|r-b-g|g-r-b|g-b-r|b-r-g|b-g-r" },
     { name: "Life and resistances", text: "\"to max.*life\" \"res\"" }, { name: "Quality gems", text: "quality: \\+" }],
 };

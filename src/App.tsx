@@ -25,11 +25,13 @@ import Atlas from "./Atlas";
 import Craft from "./Craft";
 import Home from "./Home";
 import Search from "./Search";
+import PriceCheck from "./PriceCheck";
+import { HOTKEYS, keyOf } from "./hotkeys";
 
 /** Where the main window's look is kept (Settings writes it too). */
 export const APP_LOOK_KEY = "app.look";
 
-type Tab = "home" | "help" | "find" | "presets" | "tiers" | "gear" | "build" | "maps" | "atlas" | "wealth" | "craft" | "play" | "edits" | "prices" | "themes" | "batch" | "profiles" | "settings";
+type Tab = "home" | "help" | "find" | "presets" | "tiers" | "gear" | "build" | "maps" | "atlas" | "wealth" | "pricecheck" | "craft" | "play" | "edits" | "prices" | "themes" | "batch" | "profiles" | "settings";
 
 /** Small line icons for the side menu. */
 /** Each page's colour: a tinted tile behind its menu icon (and page title) so the menu is easy to scan. */
@@ -37,7 +39,7 @@ const COLOURS: Record<Tab, string> = {
   find: "#6aa8ff", tiers: "#ff8a65", presets: "#b48cff", themes: "#ff7eb6", prices: "#5fd38a",
   edits: "#4fd1c5", batch: "#ffa95a",
   build: "#7ad0ff", gear: "#f0b45a",
-  maps: "#8bd67a", atlas: "#a78bfa", wealth: "#f5c542", craft: "#ff9f6b", play: "#6fd0a6",
+  maps: "#8bd67a", atlas: "#a78bfa", wealth: "#f5c542", pricecheck: "#f5c542", craft: "#ff9f6b", play: "#6fd0a6",
   profiles: "#9fb0c8", settings: "#9fb0c8", help: "#6aa8ff", home: "#e2b96f",
 };
 
@@ -55,6 +57,7 @@ const ICONS: Record<Tab, string> = {
   maps: "M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14",
   atlas: "M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 3v18M4 7.5l8 4.5 8-4.5",
   wealth: "M4 7h16v12H4zM4 7l2-3h12l2 3M9 12h6",
+  pricecheck: "M3 12V4h8l10 10-8 8zM7.5 7.5h.01",
   play: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2",
   craft: "M14 4l6 6-3 3-6-6zM11 7L4 14l2 2 7-7M6 16l-2 4 4-2M15 15l5 5",
   profiles: "M3 7h6l2 2h10v10H3zM3 7v12",
@@ -64,39 +67,43 @@ const ICONS: Record<Tab, string> = {
 
 type MenuItem = { id: Tab; name: string; hint: string };
 /** The groups' colours (22 Nov, GROBBS picked "more, smaller groups" with a colour per kind of group):
- *  blue = the filter, amber = your changes, green = playing, purple = money and items. */
+ *  blue = the filter, amber = your changes, green = playing, purple = money. */
 const G_FILTER = "#7fb2ea", G_CHANGES = "#e9b46a", G_PLAY = "#6fd0a6", G_MONEY = "#c9a3ea";
-/** Six small groups, each with a line saying what's in it. Settings and Help sit at the bottom. */
+/** Small groups, each with a line saying what's in it; Settings and Help sit at the bottom. Wording and grouping from
+ *  mock-up "B · Sorted by what you're doing" (22 Nov 2026): his build sits with the gear for it, the things used while
+ *  playing are together, and the price check has its own page under Money. Each hint is also the page's subtitle and
+ *  what Ctrl+K search matches, so it says plainly what's on the page. */
 const MENU: { group: string; sub?: string; colour?: string; items: MenuItem[] }[] = [
   { group: "", items: [
-    { id: "home", name: "Home", hint: "What's set up, what changed lately, and your hotkeys" },
+    { id: "home", name: "Home", hint: "Your filter at a glance, recent changes and your in-game keys" },
   ] },
-  { group: "Set up your filter", sub: "which filter, how strict, colours", colour: G_FILTER, items: [
-    { id: "profiles", name: "Filters", hint: "Your filters, strictness and NeverSink version" },
-    { id: "presets", name: "Presets", hint: "Levelling setup, build switches and league mechanics" },
-    { id: "themes", name: "Themes", hint: "Recolour the whole filter" },
+  { group: "Your loot filter", sub: "Which filter you use, how strict, and its colours", colour: G_FILTER, items: [
+    { id: "profiles", name: "Filters", hint: "Which filter you're editing, how strict it is, and its NeverSink version" },
+    { id: "presets", name: "Presets", hint: "Ready-made changes: levelling, your build's weapons and armour, league mechanics" },
+    { id: "themes", name: "Themes", hint: "Recolour the whole filter in one go" },
   ] },
-  { group: "Change what shows", sub: "items, tiers, prices", colour: G_FILTER, items: [
-    { id: "find", name: "Find", hint: "Search any item, or just say what you want" },
-    { id: "tiers", name: "Tiers", hint: "NeverSink's tier lists: re-rank, hide and restyle" },
-    { id: "prices", name: "Prices", hint: "Optional poe.ninja price tiers" },
+  { group: "How items look", sub: "Change any item, NeverSink's tiers, or colour by price", colour: G_FILTER, items: [
+    { id: "find", name: "Find", hint: "Look up any item and change how it shows, or just type what you want" },
+    { id: "tiers", name: "Tiers", hint: "NeverSink's ranked item lists: move items up or down, hide them, change their look" },
+    { id: "prices", name: "Price tiers", hint: "Make valuable items stand out using poe.ninja prices (off until you turn it on)" },
   ] },
-  { group: "Your changes", sub: "what you've changed, many at once", colour: G_CHANGES, items: [
-    { id: "edits", name: "My edits", hint: "Everything you've changed, history and preview" },
-    { id: "batch", name: "Batch mode", hint: "Edit lots of items in a row" },
+  { group: "Your changes", sub: "Everything you've changed. F2 and F3 change items in game", colour: G_CHANGES, items: [
+    { id: "edits", name: "My edits", hint: "Everything you've changed: undo it, see the history, preview drops" },
+    { id: "batch", name: "Batch mode", hint: "Collect items in game (F3, then Ctrl+C on each) and change them all at once" },
   ] },
-  { group: "Your character", sub: "build and gear while levelling", colour: G_PLAY, items: [
-    { id: "build", name: "My build", hint: "Your Path of Building gems, gear and tree, in game with F6" },
-    { id: "gear", name: "Levelling gear", hint: "Uniques for your level and skill, with trade links" },
-    { id: "play", name: "Play tools", hint: "Levelling route, map tracker, searches, cheat sheets and notes over the game" },
+  { group: "Build and gear", sub: "Your build at every stage, Act 1 to endgame, and gear for it", colour: G_PLAY, items: [
+    { id: "build", name: "My build", hint: "Your Path of Building build: gems, gear and tree for every stage, Act 1 to endgame" },
+    { id: "gear", name: "Unique finder", hint: "Uniques you can wear at your level that suit your skill, cheapest first, with trade links" },
+    { id: "craft", name: "Crafting", hint: "What can roll on an item, and the cheapest way to get the mods you want" },
   ] },
-  { group: "Endgame", sub: "maps and atlas strategy", colour: G_PLAY, items: [
-    { id: "maps", name: "Maps", hint: "Map regex for your stash, and buy maps you can run" },
-    { id: "atlas", name: "Atlas", hint: "Atlas strategies from maxroll or pathofexile.com, in game with F7" },
+  { group: "While you play", sub: "Windows over the game, maps you can run, your atlas tree", colour: G_PLAY, items: [
+    { id: "play", name: "Game windows", hint: "Windows over the game: levelling route (F8), map tracker (F9), searches (F10), cheat sheets (F11), notes" },
+    { id: "maps", name: "Map mods", hint: "Map mods your build can't run, a stash search for good maps, and maps to buy" },
+    { id: "atlas", name: "Atlas tree", hint: "Atlas tree plans from maxroll or pathofexile.com, over the game with F7" },
   ] },
-  { group: "Money and items", sub: "stash worth, crafting", colour: G_MONEY, items: [
-    { id: "wealth", name: "Wealth", hint: "Stash worth, things worth selling, earnings per strategy" },
-    { id: "craft", name: "Crafting", hint: "What can roll on a base, and the cheapest way to get the mod you want" },
+  { group: "Money", sub: "What items sell for, what your stash is worth, what you earn", colour: G_MONEY, items: [
+    { id: "pricecheck", name: "Price check", hint: "What an item sells for: hover it in game and press Ctrl+D. Plus your saved and live searches" },
+    { id: "wealth", name: "Stash worth", hint: "What your stash is worth, what to sell, and what each farming strategy earns" },
   ] },
 ];
 /** A page's colour: its group's colour, or its own (Home, Settings, Help). */
@@ -281,16 +288,17 @@ export default function App() {
 
   const current = ALL.find((i) => i.id === tab);
   const pages = MENU.flatMap((g) => g.items.map((i) => i.id));
-  // The in-game key for a page (from Settings): the only key shown in the menu, to keep it calm.
-  const gameKey: Partial<Record<Tab, [string, string]>> = { edits: [keys.key_quick_edit ?? "F2", "In game: change the item under your mouse"],
-    batch: [keys.key_batch ?? "F3", "In game: batch mode on/off"], build: [keys.key_build ?? "F6", "In game: show/hide your build"],
-    atlas: [keys.key_atlas ?? "F7", "In game: show/hide your atlas strategy"], prices: [keys.key_price ?? "Ctrl+D", "In game: price check the item under your mouse"],
-    profiles: [keys.key_reload ?? "F4", "In game: reload your filter"],
-    play: [keys.key_level ?? "F8", "In game: show/hide the levelling route (F9 map tracker, F10 searches, F11 cheat sheets)"] };
+  // The in-game key for a page (from Settings): the only key shown in the menu, to keep it calm. Hover = how it works.
+  const KEY_OF_PAGE: Partial<Record<Tab, string>> = { edits: "key_quick_edit", batch: "key_batch", build: "key_build",
+    atlas: "key_atlas", pricecheck: "key_price", profiles: "key_reload", play: "key_level" };
+  const gameKey = (t: Tab): [string, string] | null => {
+    const h = HOTKEYS.find((x) => x.setting === KEY_OF_PAGE[t]);
+    return h ? [keyOf(keys, h.setting), `In game: ${h.name}. ${h.how}`] : null;
+  };
   const item = (i: MenuItem) => {
     const n = pages.indexOf(i.id) + 1;
     const here = i.id === "find" ? "Ctrl+F" : n >= 1 && n <= 9 ? `Ctrl+${n}` : "";
-    const g = gameKey[i.id];
+    const g = gameKey(i.id);
     return (
       <button key={i.id} className={`menu-item ${tab === i.id ? "on" : ""}`} title={here ? `${i.hint} (${here} in the editor)` : i.hint} onClick={() => setTab(i.id)}>
         <span className="menu-ico" style={{ "--c": tabColour(i.id) } as CSSProperties}><Icon d={ICONS[i.id]} /></span><span>{i.name}</span>
@@ -326,7 +334,7 @@ export default function App() {
         </nav>
         <div className="menu-bottom">
           {BOTTOM.map(item)}
-          <div className="side-foot muted small" title="Alt+← goes back to the last page"><span className="menu-key game">F2</span> keys work in game</div>
+          <div className="side-foot muted small" title="Alt+← goes back to the last page"><span className="menu-key game">{keyOf(keys, "key_quick_edit")}</span> Gold keys work in game</div>
         </div>
       </aside>
 
@@ -350,6 +358,7 @@ export default function App() {
       {tab === "maps" && <Maps />}
       {tab === "atlas" && <Atlas />}
       {tab === "wealth" && <Wealth />}
+      {tab === "pricecheck" && <PriceCheck keys={keys} />}
       {tab === "play" && <PlayTools />}
       {tab === "craft" && <Craft />}
       {tab === "tiers" && <Tiers profile={active} onChange={refresh} focus={focus?.kind === "neversink" ? focus : null} />}

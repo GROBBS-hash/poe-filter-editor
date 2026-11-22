@@ -2116,3 +2116,32 @@ button.tw-chip:hover { border-color: #59606b; color: var(--text); }
 .w-setbar > span { display: block; height: 100%; background: var(--gold); }
 .w-full { color: var(--green); font-weight: 650; }
 .w-low { color: #ffcf8a; font-weight: 600; }
+
+/* ── Home "In game" card: keys grouped by what they're for, each with a short name and how it works
+   (22 Nov 2026, GROBBS picked hotkey card "C"; the wording lives in hotkeys.ts). ── */
+.home-kgroup { margin: 2px 0 14px; }
+.home-kgroup h4 { margin: 0 0 8px; font-size: 11.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-2);
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.home-kgroup h4 em { font-style: normal; text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--muted); }
+.home-kgroup h4::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.home-kgroup .home-keys-grid { gap: 14px 22px; }
+.home-kgroup .home-keys-grid > div { align-items: flex-start; }
+.home-kgroup .home-keys-grid kbd { flex: none; margin-top: 1px; }
+.home-kgroup .home-keys-grid > div > div > b { display: block; color: var(--text); font-weight: 600; }
+.home-kgroup .home-keys-grid > div > div > span { display: block; color: var(--muted); font-size: 12.5px; line-height: 1.4; margin-top: 1px; }
+
+/* ── Price check page (22 Nov 2026): how to use Ctrl+D, saved searches, links to its settings. ── */
+.pc-steps { margin: 6px 0 14px; padding-left: 22px; display: grid; gap: 6px; color: var(--text-2); }
+.pc-key { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 40%, var(--line)); background: var(--gold-bg); }
+.pc-also { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px 18px; border-top: 1px solid var(--line); padding-top: 12px; }
+.pc-also > div > b { display: block; color: var(--text); font-weight: 600; }
+.pc-also > div > span { color: var(--muted); font-size: 13px; }
+.pc-saved { list-style: none; margin: 4px 0 0; padding: 0; }
+.pc-saved li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.pc-saved li:last-child { border-bottom: none; }
+.pc-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Settings → Hotkeys and Help: each key's short name, then how it works (hotkeys.ts). */
+.key-label > b { display: block; color: var(--text); font-weight: 600; }
+.key-label > span { display: block; color: var(--muted); font-size: 12.5px; line-height: 1.35; margin-top: 1px; }
+.help-keys-h { margin-top: 18px !important; }

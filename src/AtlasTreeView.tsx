@@ -359,7 +359,7 @@ export function StrategyNotes({ s, v, open }: { s: AtlasStrategy; v: AtlasVarian
             : <p key={j}>{l.text}</p>)}
         </details>
       ))}
-      {sections.length === 0 && !s.device && !s.own_notes.trim() && <div className="muted small">No notes from the site for this one (add your own on the Atlas page).</div>}
+      {sections.length === 0 && !s.device && !s.own_notes.trim() && <div className="muted small">No notes from the site for this one (add your own on the Atlas tree page).</div>}
     </div>
   );
 }

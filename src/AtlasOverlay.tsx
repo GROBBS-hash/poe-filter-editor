@@ -60,8 +60,8 @@ export default function AtlasOverlay() {
       <WinBar title={<span title={s?.name}>{s ? s.name : "Atlas strategy"}</span>} hint={`drag to move · Esc / ${key} to hide`}
         onClose={() => invoke("hide_atlas_window")} />
       {!s ? (
-        <div className="ao-empty"><div className="empty">No atlas strategy yet. Paste a maxroll or pathofexile.com link on the Atlas page.<br />
-          <button className="primary empty-go" onClick={() => invoke("open_editor", { tab: "atlas" })}>Open the Atlas page</button></div></div>
+        <div className="ao-empty"><div className="empty">No atlas strategy yet. Paste a maxroll or pathofexile.com link on the Atlas tree page.<br />
+          <button className="primary empty-go" onClick={() => invoke("open_editor", { tab: "atlas" })}>Open the Atlas tree page</button></div></div>
       ) : (
         <>
           <div className="ao-head">

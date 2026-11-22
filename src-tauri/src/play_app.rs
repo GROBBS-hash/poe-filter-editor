@@ -831,7 +831,7 @@ pub fn searches_get(app: AppHandle) -> SearchView {
         let (s, left) = journey::gem_search(&gems, &journey::route().gems);
         made.push(SearchString { name: format!("My build's gems (vendor){}", if left.is_empty() { String::new() } else { format!(", {} didn't fit", left.len()) }), text: s });
     }
-    if let Ok(r) = map_regex_text(&app) { if !r.trim().is_empty() { made.push(SearchString { name: "My map regex (Maps page)".into(), text: r }); } }
+    if let Ok(r) = map_regex_text(&app) { if !r.trim().is_empty() { made.push(SearchString { name: "My map regex (Map mods page)".into(), text: r }); } }
     SearchView { saved: with_store(&app, |s| s.searches.clone()), made }
 }
 

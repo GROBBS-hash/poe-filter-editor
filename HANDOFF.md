@@ -38,7 +38,9 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 - **F2** quick edit: the item under the mouse (Ctrl+C in inventory, or reads the ground label + game hover box), shows
   what the filter does, **why** (rule box with "Modify this rule" → opens the main app on that rule), and buttons to change it.
 - **F3** batch mode, **F4** reload filter in game, **F5** cycle filters (off by default), **F6** build window (PoB gems/gear/tree).
-- **F7** atlas strategy window (`atlas`; Endgame → Atlas picks which one).
+- **F7** atlas strategy window (`atlas`; While you play → Atlas tree picks which one).
+- What each key does, in plain words, lives in one place: `src/hotkeys.ts` (Home's "In game" card, Settings → Hotkeys,
+  Help and the sidebar's gold key badges all read it). Change the wording there, not in the pages.
 - **Ctrl+D** price check (new, own window `trade`). Changeable in Settings; skipped quietly if another app owns it.
 - **Play windows (22 Nov):** **F8** levelling route, **F9** map tracker + XP/h + stopwatch, **F10** saved searches,
   **F11** cheat sheets (Syndicate, blight oils + his pictures), notes (no key by default), **Alt+W** wiki page of the hovered
@@ -46,6 +48,25 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **Clearer sidebar, hotkeys explained, Price check page (22 Nov, not released yet).** He said the sidebar's subheadings
+  didn't make sense ("Maps/Atlas too vague", "Your character" isn't only levelling) and the Home hotkey card would confuse
+  new players (what does F2 change?). He picked sidebar mock-up **B "Sorted by what you're doing"** and hotkey card **C
+  "Grouped by what they're for"**, and asked for the price check to have its own entry.
+  - Sidebar (`MENU` in App.tsx): Your loot filter (Filters, Presets, Themes) · How items look (Find, Tiers, **Price
+    tiers**) · Your changes (My edits, Batch mode) · Build and gear (My build, **Unique finder** = was Levelling gear,
+    Crafting) · While you play (**Game windows** = was Play tools, **Map mods** = was Maps, **Atlas tree** = was Atlas) ·
+    Money (**Price check**, new, Ctrl+D badge; **Stash worth** = was Wealth). Each group's line and each page's hint
+    rewritten to say what's there (the hint is also the page subtitle and what Ctrl+K matches). Ctrl+1…9 order unchanged.
+    Footer "F2 keys work in game" → "Gold keys work in game". Old page names fixed in visible text everywhere
+    (atlas window, map check, searches window, Settings, Help, three Rust messages).
+  - Keys: `src/hotkeys.ts` holds each key's short name, how it works and its group; `KeyList.tsx` draws the grouped list
+    (Change your filter · Look up an item · Windows over the game). Home's card now lists all 12 keys (was 8); Help has a
+    "What each key does in game" list; Settings → Hotkeys shows the same name + line, in the same order; sidebar badge
+    tooltips read "In game: name. how".
+  - **Price check page** (`PriceCheck.tsx`, tab `pricecheck`): how to use Ctrl+D (steps, and what it does on maps,
+    currency and gear), your saved searches with Go live / delete (same `saved_*` commands as the price window), and
+    buttons into Settings → Price check / Looks / Hotkeys and Map mods (sets `settings.section` then opens Settings).
+  - Preview: `preview-app.html` has sample saved searches. Checked: tsc, cargo check, every changed page in the preview.
 - **"Log in with pathofexile.com" button (22 Nov, released in 0.2.43).** He asked for one-click login like other tools.
   GGG's OAuth is closed to new apps (see Left to do), so: `wealth_app::poe_login` opens the site's own login page in
   a small editor window (label `poelogin`, deliberately not in `capabilities/default.json`, so the page has no access
@@ -760,6 +781,15 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
   with the website's login opens; log in; it closes by itself and the page says "Logged in as Name#1234" and loads tabs.
 - [ ] Clicking it again later logs in at once (the window may flash and close).
 - [ ] Settings → Map tracker → Loot per map shows "Logged in to pathofexile.com".
+
+**Clearer sidebar, hotkeys explained, Price check page (22 Nov, not released yet):**
+- [ ] Sidebar reads well: Your loot filter · How items look · Your changes · Build and gear · While you play · Money,
+  each with a line saying what's in it. New names: Price tiers, Unique finder, Game windows, Map mods, Atlas tree,
+  Price check, Stash worth. Hover a page: the hint makes sense. Anything still confusing?
+- [ ] Home → "In game" card: 12 keys in three groups, each with a name and how it works. Clear to a new player?
+- [ ] Price check page: steps make sense; your saved searches show; **Go live** / ✕ work; the four Settings buttons
+  open the right part of Settings (and Map mods).
+- [ ] Settings → Hotkeys and Help → "What each key does in game" use the same words as Home.
 
 **Map tracker: menus, loot, div per hour (22 Nov, released in 0.2.42):**
 - [ ] Settings → Map tracker → **Set up**: click it, click into the game within 5 s with nothing open. Then in a map,

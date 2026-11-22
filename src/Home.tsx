@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { ProfileInfo, STRICTNESS_NAMES } from "./types";
 import type { PobState } from "./BuildView";
 import { currentStrategy, type AtlasStore } from "./AtlasTreeView";
+import KeyList from "./KeyList";
 
 type Change = { index: number; at: number; what: string };
 type PriceInfo = { settings: { enabled: boolean }; info?: { league?: string; updated?: string | null } };
@@ -53,16 +54,6 @@ export default function Home({ profile, keys, go, search }: {
   const strat = currentStrategy(atlas);
   const updated = prices?.info?.updated ? ago(Date.parse(prices.info.updated) / 1000) : null;
 
-  const hotkeys: [string, string][] = [
-    [keys.key_quick_edit ?? "F2", "Change the item under your mouse"],
-    [keys.key_price ?? "Ctrl+D", "Price check an item"],
-    [keys.key_reload ?? "F4", "Load or reload this filter"],
-    [keys.key_batch ?? "F3", "Batch mode on or off"],
-    [keys.key_build ?? "F6", "Show or hide your build"],
-    [keys.key_atlas ?? "F7", "Show or hide your atlas strategy"],
-    [keys.key_level ?? "F8", "Levelling route over the game"],
-    [keys.key_tracker ?? "F9", "Map tracker, loot per map, stopwatch"],
-  ];
 
   return (
     <div className="home">
@@ -91,7 +82,7 @@ export default function Home({ profile, keys, go, search }: {
             : <ul className="home-list">{recent.map((c) => <li key={c.index}><span>{c.what}</span><span className="muted small">{ago(c.at)}</span></li>)}</ul>}
         </Tile>
 
-        <Tile title="Prices" action="Prices" onAction={() => go("prices")}>
+        <Tile title="Price tiers" action="Price tiers" onAction={() => go("prices")}>
           {prices === null ? <span className="muted">Not loaded</span> : prices.settings.enabled
             ? <><div><span className="home-on">On</span> valuable drops stand out by price</div>
                 <div className="muted small">{prices.info?.league ?? ""}{updated ? ` · updated ${updated}` : ""}</div></>
@@ -106,7 +97,7 @@ export default function Home({ profile, keys, go, search }: {
             : <span className="muted">No build yet. Paste a Path of Building link to see your gems, gear and tree in game.</span>}
         </Tile>
 
-        <Tile title="Atlas strategy" action="Atlas" onAction={() => go("atlas")}>
+        <Tile title="Atlas strategy" action="Atlas tree" onAction={() => go("atlas")}>
           {strat
             ? <><div className="home-big">{strat.name}</div><div className="muted small">{keys.key_atlas ?? "F7"} shows it in game</div></>
             : <span className="muted">None yet. Import one from maxroll or pathofexile.com.</span>}
@@ -119,9 +110,7 @@ export default function Home({ profile, keys, go, search }: {
 
       <section className="home-keys">
         <h3>In game</h3>
-        <div className="home-keys-grid">
-          {hotkeys.map(([k, what]) => <div key={what}><kbd>{k}</kbd><span>{what}</span></div>)}
-        </div>
+        <KeyList keys={keys} />
         <button className="link small" onClick={() => go("settings")}>Change hotkeys</button>
       </section>
     </div>

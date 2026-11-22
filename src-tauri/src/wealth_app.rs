@@ -31,7 +31,7 @@ fn who(app: &AppHandle) -> Result<(String, String, String, bool), String> {
     let state = app.state::<AppState>();
     let s = state.store.lock().unwrap().settings.clone();
     if s.poe_account.trim().is_empty() || s.poesessid.trim().is_empty() {
-        return Err("Set your account name and POESESSID on the Wealth page first".into());
+        return Err("Set your account name and POESESSID on the Stash worth page first".into());
     }
     let (poe2, league) = trade_league(app);
     Ok((s.poe_account.trim().to_string(), s.poesessid.trim().to_string(), league, poe2))

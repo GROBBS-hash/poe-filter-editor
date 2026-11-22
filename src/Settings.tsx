@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { TW_LAYOUTS, TW_LAYOUT_KEY, TW_STYLES, TW_STYLE_KEY } from "./TradeWindow";
 import { TrackerSettings } from "./Play";
+import { hotkey } from "./hotkeys";
 
 type Settings = {
   key_quick_edit: string; key_batch: string; key_reload: string; key_cycle: string; key_build: string; key_price?: string; key_atlas?: string;
@@ -14,13 +15,13 @@ type Settings = {
 };
 const CHAT_IDEAS = ["/hideout", "/kingsmarch", "/menagerie", "/delve", "/exit", "/invite", "/kick", "/afk"];
 
-/** Map mods you can't run are one list on the Maps page: Ctrl+D shows them in red and the map stash search hides them. */
+/** Map mods you can't run are one list on the Map mods page: Ctrl+D shows them in red and the map stash search hides them. */
 function MapCheckLink() {
   return (
     <div className="card">
       <h2>Map check</h2>
-      <p className="muted small">Mods you can't run are set on the Maps page; Ctrl+D and the stash search both use them.</p>
-      <div className="row"><button onClick={() => window.dispatchEvent(new CustomEvent("goto-tab", { detail: "maps" }))}>Open the Maps page</button></div>
+      <p className="muted small">Mods you can't run are set on the Map mods page; Ctrl+D and the stash search both use them.</p>
+      <div className="row"><button onClick={() => window.dispatchEvent(new CustomEvent("goto-tab", { detail: "maps" }))}>Open the Map mods page</button></div>
     </div>
   );
 }
@@ -44,7 +45,13 @@ function KeyBox({ value, onChange, disabled }: { value: string; onChange: (k: st
   );
 }
 
-/** A key box with a ✕ to have no key at all (the play windows can also be opened from the Play tools page). */
+/** A hotkey's short name and how it works, from hotkeys.ts (the same words as Home and Help). */
+function KeyLabel({ id }: { id: string }) {
+  const h = hotkey(id);
+  return <span className="key-label"><b>{h.name}</b><span>{h.how}</span></span>;
+}
+
+/** A key box with a ✕ to have no key at all (the play windows can also be opened from the Game windows page). */
 function ClearableKey({ value, onChange }: { value: string; onChange: (k: string) => void }) {
   return (
     <span className="row" style={{ margin: 0, flexWrap: "nowrap" }}>
@@ -97,21 +104,21 @@ export default function SettingsPage() {
         <h2>Hotkeys</h2>
         <p className="muted small">Click a box and press the key you want. Pick keys the game and your other tools don't use.</p>
         <div className="set-grid">
-          <span>Quick edit the item under your mouse</span><KeyBox value={s.key_quick_edit} onChange={(k) => set({ key_quick_edit: k })} />
-          <span>Batch mode on/off</span><KeyBox value={s.key_batch} onChange={(k) => set({ key_batch: k })} />
-          <span>Reload your filter in game</span><KeyBox value={s.key_reload} onChange={(k) => set({ key_reload: k })} />
-          <span>Show/hide your build (PoB)</span><KeyBox value={s.key_build ?? "F6"} onChange={(k) => set({ key_build: k })} />
-          <span>Price check the item under your mouse</span><KeyBox value={s.key_price ?? "Ctrl+D"} onChange={(k) => set({ key_price: k })} />
-          <span>Show/hide your atlas strategy (Atlas page)</span><KeyBox value={s.key_atlas ?? "F7"} onChange={(k) => set({ key_atlas: k })} />
-          <span>Show/hide the levelling route (Play tools)</span><ClearableKey value={s.key_level ?? "F8"} onChange={(k) => set({ key_level: k })} />
-          <span>Show/hide the map tracker and stopwatch</span><ClearableKey value={s.key_tracker ?? "F9"} onChange={(k) => set({ key_tracker: k })} />
-          <span>Open your saved stash and vendor searches</span><ClearableKey value={s.key_searches ?? "F10"} onChange={(k) => set({ key_searches: k })} />
-          <span>Show/hide cheat sheets (Syndicate and your pictures)</span><ClearableKey value={s.key_sheet ?? "F11"} onChange={(k) => set({ key_sheet: k })} />
-          <span>Show/hide your notes</span><ClearableKey value={s.key_notes ?? ""} onChange={(k) => set({ key_notes: k })} />
-          <span>Open the wiki page of the item under your mouse</span><ClearableKey value={s.key_wiki ?? "Alt+W"} onChange={(k) => set({ key_wiki: k })} />
-          <span>Read the altar, remnant or reward screen under your mouse</span><ClearableKey value={s.key_read ?? "Alt+R"} onChange={(k) => set({ key_read: k })} />
+          <KeyLabel id="key_quick_edit" /><KeyBox value={s.key_quick_edit} onChange={(k) => set({ key_quick_edit: k })} />
+          <KeyLabel id="key_batch" /><KeyBox value={s.key_batch} onChange={(k) => set({ key_batch: k })} />
+          <KeyLabel id="key_reload" /><KeyBox value={s.key_reload} onChange={(k) => set({ key_reload: k })} />
+          <KeyLabel id="key_price" /><KeyBox value={s.key_price ?? "Ctrl+D"} onChange={(k) => set({ key_price: k })} />
+          <KeyLabel id="key_wiki" /><ClearableKey value={s.key_wiki ?? "Alt+W"} onChange={(k) => set({ key_wiki: k })} />
+          <KeyLabel id="key_read" /><ClearableKey value={s.key_read ?? "Alt+R"} onChange={(k) => set({ key_read: k })} />
+          <KeyLabel id="key_build" /><KeyBox value={s.key_build ?? "F6"} onChange={(k) => set({ key_build: k })} />
+          <KeyLabel id="key_atlas" /><KeyBox value={s.key_atlas ?? "F7"} onChange={(k) => set({ key_atlas: k })} />
+          <KeyLabel id="key_level" /><ClearableKey value={s.key_level ?? "F8"} onChange={(k) => set({ key_level: k })} />
+          <KeyLabel id="key_tracker" /><ClearableKey value={s.key_tracker ?? "F9"} onChange={(k) => set({ key_tracker: k })} />
+          <KeyLabel id="key_searches" /><ClearableKey value={s.key_searches ?? "F10"} onChange={(k) => set({ key_searches: k })} />
+          <KeyLabel id="key_sheet" /><ClearableKey value={s.key_sheet ?? "F11"} onChange={(k) => set({ key_sheet: k })} />
+          <KeyLabel id="key_notes" /><ClearableKey value={s.key_notes ?? ""} onChange={(k) => set({ key_notes: k })} />
           <label className="check"><input type="checkbox" checked={s.cycle_enabled} onChange={(e) => set({ cycle_enabled: e.target.checked })} />
-            <span>Switch to your next filter (e.g. League Start → Strict 1 → Strict 2) and load it</span></label>
+            <span className="key-label"><b>{hotkey("key_cycle").name}</b><span>{hotkey("key_cycle").how} Off until you tick it.</span></span></label>
           <KeyBox value={s.key_cycle} disabled={!s.cycle_enabled} onChange={(k) => set({ key_cycle: k })} />
           <label className="check"><input type="checkbox" checked={s.build_with_tree ?? false} onChange={(e) => set({ build_with_tree: e.target.checked })} />
             <span>Open the build window (on its Tree tab) when the passive skill tree is opened in game; that key or Esc closes it.
@@ -124,7 +131,7 @@ export default function SettingsPage() {
         <h2>Price check</h2>
         <p className="muted small">What the price window shows besides the price.</p>
         <label className="check"><input type="checkbox" checked={s.price_compare ?? true} onChange={(e) => set({ price_compare: e.target.checked })} />
-          <span>Compare the item with your build's gear (needs a PoB link on the Build page)</span></label>
+          <span>Compare the item with your build's gear (needs a Path of Building link on the My build page)</span></label>
         <label className="check"><input type="checkbox" checked={s.price_rolls ?? true} onChange={(e) => set({ price_rolls: e.target.checked })} />
           <span>Show how well each mod rolled (a bar from the lowest to the highest roll)</span></label>
         <label className="check"><input type="checkbox" checked={s.price_buyout_only ?? true} onChange={(e) => set({ price_buyout_only: e.target.checked })} />

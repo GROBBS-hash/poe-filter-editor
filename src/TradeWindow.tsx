@@ -475,11 +475,11 @@ function MapCheck({ map, rarity, corrupted }: { map: MapInfo; rarity: string; co
         ))}
       </ul>
       <div className="row">
-        <button className="small" onClick={() => invoke<string>("map_regex_copy").then((r) => setCopied(r ? "Copied: paste it in your map stash search" : "Nothing to copy yet: set it up on the Maps page")).catch((e) => setCopied(String(e)))}>
+        <button className="small" onClick={() => invoke<string>("map_regex_copy").then((r) => setCopied(r ? "Copied: paste it in your map stash search" : "Nothing to copy yet: set it up on the Map mods page")).catch((e) => setCopied(String(e)))}>
           Copy map regex</button>
         {copied && <span className="muted small">{copied}</span>}
       </div>
-      <div className="muted small">Change which mods you can't run on the Maps page: this warning and the stash search use the same list.</div>
+      <div className="muted small">Change which mods you can't run on the Map mods page: this warning and the stash search use the same list.</div>
     </div>
   );
 }

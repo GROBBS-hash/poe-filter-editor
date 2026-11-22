@@ -1,4 +1,5 @@
 import { ReactNode, useState } from "react";
+import KeyList from "./KeyList";
 
 /** A small "?" that opens a short explanation under a heading. */
 export function Tip({ children }: { children: ReactNode }) {
@@ -26,7 +27,8 @@ export const FAQ: Faq[] = [
     q: "Price check an item",
     a: <>Hover the item in game and press <b>Ctrl+D</b>. The price window shows what it sells for, with the stats that matter
       already ticked. Change the ticks or minimums and move your mouse onto <b>Search</b> to look again. <b>More</b> at the
-      bottom has Style and Layout, to change how the window looks.</>,
+      bottom has Style and Layout, to change how the window looks. Your saved searches are on the <b>Price check</b> page.</>,
+    tab: ["pricecheck", "Open Price check"],
   },
   {
     q: "Work out how to craft a mod",
@@ -60,9 +62,9 @@ export const FAQ: Faq[] = [
   },
   {
     q: "Make valuable drops stand out using live prices",
-    a: <>Open <b>Prices</b> and switch on price tiering. Prices come from poe.ninja and update every hour; anything worth more
+    a: <>Open <b>Price tiers</b> and switch on price tiering. Prices come from poe.ninja and update every hour; anything worth more
       than your tier 1 amount gets the big Divine-style sound.</>,
-    tab: ["prices", "Open Prices"],
+    tab: ["prices", "Open Price tiers"],
   },
   {
     q: "Undo a change",
@@ -88,7 +90,6 @@ export const FAQ: Faq[] = [
 ];
 
 export default function Help({ go, start = 0, keys = {} }: { go: Go; start?: number; keys?: Record<string, string> }) {
-  const k = (id: string, d: string) => keys[id] || d;
   const [open, setOpen] = useState<number | null>(start);
   return (
     <div className="card">
@@ -106,9 +107,9 @@ export default function Help({ go, start = 0, keys = {} }: { go: Go; start?: num
           </li>
         ))}
       </ul>
-      <p className="muted small">Your hotkeys (change them in Settings): {k("key_quick_edit", "F2")} edit the item under your mouse ·
-        {" "}{k("key_price", "Ctrl+D")} price check · {k("key_batch", "F3")} batch mode · {k("key_reload", "F4")} load/reload this filter in game ·
-        {" "}{k("key_build", "F6")} your build · {k("key_atlas", "F7")} atlas strategy.</p>
+      <h2 className="help-keys-h">What each key does in game</h2>
+      <p className="muted small">Change them in Settings → Hotkeys.</p>
+      <KeyList keys={keys} all />
     </div>
   );
 }
