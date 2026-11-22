@@ -221,7 +221,8 @@ export default function Craft() {
 
         {/* How to make it: every route, wide (over the mod list and the detail) */}
         {showRoutes && routePlan.length >= 2 && <div className="cr-col rc-wide">
-          <RoutesPanel r={routes.r} err={routes.err} onClose={() => setShowRoutes(false)} itemText={itemText} />
+          <RoutesPanel r={routes.r} err={routes.err} onClose={() => setShowRoutes(false)} itemText={itemText}
+            plan={{ base, ilvl, infl, targets: routePlan.map((t) => [t.key, t.tier] as [string, number]) }} />
         </div>}
 
         {/* Every mod */}
@@ -324,6 +325,7 @@ function PlanBox({ plan, setPlan, fam, base, ilvl, infl, onPick }: { plan: Targe
       {err && <p className="danger-text small">{err}</p>}
       {targets.length >= 2 && !ways && !err && <p className="muted small">Rolling it thousands of times…</p>}
       {ways && ways.map((w, i) => <WayCard key={w.method} w={w} best={i === 0 && w.average != null} />)}
+      {targets.length > 0 && <CraftSearchBox base={base} ilvl={ilvl} infl={infl} targets={targets} />}
       {targets.length > 0 && <button className="link small" onClick={() => setPlan([])}>Clear the plan</button>}
     </div>
   );
@@ -465,6 +467,7 @@ function RouteSummary({ plan, r, err, onOpen, open }: { plan: Target[]; r: Route
       {r && !best && <p className="muted small">{r.note || "No route found for these mods."}</p>}
       {best && <>
         <div className="rc-sum-best"><span className="rc-sum-label">Cheapest</span><b>{best.name}</b><Cost c={best.cost} div={r.divine} /></div>
+        <Verdict best={best} div={r.divine} />
         <button className={open ? "" : "primary"} onClick={onOpen}>{open ? "Back to the mods" : `Compare all ${r.routes.length} routes →`}</button>
       </>}
     </div>
@@ -472,7 +475,8 @@ function RouteSummary({ plan, r, err, onOpen, open }: { plan: Target[]; r: Route
 }
 
 /** The wide panel: every route side by side, sortable, each with its steps and the options per step. */
-function RoutesPanel({ r, err, onClose, itemText }: { r: Routes | null; err: string; onClose: () => void; itemText: string }) {
+type PlanRef = { base: string; ilvl: number; infl: string[]; targets: [string, number][] };
+function RoutesPanel({ r, err, onClose, itemText, plan }: { r: Routes | null; err: string; onClose: () => void; itemText: string; plan: PlanRef }) {
   const [sort, setSort] = usePersist<Sort>("craft.routeSort", "cost");
   const [open, setOpen] = useState<string | null>(null);
   const routes = useMemo(() => {
@@ -495,7 +499,7 @@ function RoutesPanel({ r, err, onClose, itemText }: { r: Routes | null; err: str
         {([["cost", "Cheapest"], ["clicks", "Fewest clicks"], ["risk", "Safest"]] as [Sort, string][]).map(([k, label]) => (
           <button key={k} role="tab" aria-selected={sort === k} className={`chip ${sort === k ? "on" : ""}`} onClick={() => setSort(k)}>{label}</button>))}
       </div>}
-      {itemText && <BuyCheck text={itemText} best={r?.routes[0]?.cost ?? null} div={r?.divine ?? null} />}
+      <BuyCheck text={itemText} plan={plan} best={r?.routes[0]?.cost ?? null} div={r?.divine ?? null} />
       {r?.note && <p className="muted small rc-note">{r.note}</p>}
       <div className="rc-list">
         {routes.map((x) => <RouteCard key={x.id} x={x} div={r?.divine ?? null} open={shown === x.id} onToggle={() => setOpen(shown === x.id ? "" : x.id)} />)}
@@ -555,14 +559,18 @@ function RouteCard({ x, div, open, onToggle }: { x: Route; div: number | null; o
 }
 
 /** "Or just buy one": the same trade search as Ctrl+D, on a click. */
-function BuyCheck({ text, best, div }: { text: string; best: number | null; div: number | null }) {
+function BuyCheck({ text, plan, best, div }: { text: string; plan: PlanRef; best: number | null; div: number | null }) {
   const [res, setRes] = useState<BuyResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  useEffect(() => { setRes(null); setErr(""); }, [text]);
+  useEffect(() => { setRes(null); setErr(""); }, [text, JSON.stringify(plan)]);
   const go = async () => {
     setBusy(true); setErr("");
-    try { setRes(await invoke<BuyResult>("craft_buy", { text })); } catch (e) { setErr(friendly(e)); } finally { setBusy(false); }
+    try {
+      // A copied item: items like it. Planned from a blank base: an item with the planned mods at their tiers or better.
+      setRes(text ? await invoke<BuyResult>("craft_buy", { text })
+        : await invoke<BuyResult>("craft_buy_plan", { base: plan.base, ilvl: plan.ilvl, influences: plan.infl, targets: plan.targets }));
+    } catch (e) { setErr(friendly(e)); } finally { setBusy(false); }
   };
   const typical = res?.summary?.[1] ?? null;
   return (
@@ -570,14 +578,71 @@ function BuyCheck({ text, best, div }: { text: string; best: number | null; div:
       <ItemIcon name="Chaos Orb" size={22} />
       <div className="rc-buy-main">
         <b>Or just buy one</b>
-        {!res && !err && <span className="muted small">Searches the trade site for items like your copied one.</span>}
+        {!res && !err && <span className="muted small">{text ? "Searches the trade site for items like your copied one." : "Searches the trade site for this base with every planned mod at its tier or better."}</span>}
         {err && <span className="danger-text small">{err}</span>}
         {res && (res.summary ? <span className="small">{res.total.toLocaleString()} listed · lowest <Cost c={res.summary[0]} div={div} /> · typical <Cost c={res.summary[1]} div={div} />
-          {best != null && typical != null && <b className={typical < best ? "rc-buy-win" : ""}> · {typical < best ? "buying is cheaper" : "crafting is cheaper"}</b>}</span>
+          {best != null && typical != null && <b className={typical < best ? "rc-buy-win" : ""}> · {typical < best * 0.8 ? "buy it instead" : typical < best ? "buying is a bit cheaper" : "crafting is cheaper"}</b>}</span>
           : <span className="muted small">None listed like it right now.</span>)}
       </div>
       {res ? <button className="link small" onClick={() => invoke("open_url", { url: res.url })}>Open on trade ↗</button>
         : <button className="small" onClick={go} disabled={busy}>{busy ? "Searching…" : "Check the price"}</button>}
     </div>
   );
+}
+type CraftSearch = { text: string; parts: [string, string][]; too_long: boolean; notes: string[] };
+
+/** Crafting search (22 Nov): a stash search that lights the item up when a planned mod rolls. Put the item in your
+ *  stash tab, paste this into the stash search, spam orbs, stop when it glows. No Ctrl+C after every orb. */
+function CraftSearchBox({ base, ilvl, infl, targets }: { base: string; ilvl: number; infl: string[]; targets: Target[] }) {
+  const [all, setAll] = usePersist<boolean>("craft.search.all", false);
+  const [s, setS] = useState<CraftSearch | null>(null);
+  const [note, setNote] = useState("");
+  useEffect(() => {
+    let live = true;
+    invoke<CraftSearch | null>("craft_search", { base, ilvl, influences: infl, targets: targets.map((t) => [t.key, t.tier]), all })
+      .then((r) => live && setS(r)).catch(() => live && setS(null));
+    return () => { live = false; };
+  }, [JSON.stringify(targets), base, ilvl, infl.join(","), all]);
+  if (!s || !s.text) return null;
+  const flash = (t: string) => { setNote(t); setTimeout(() => setNote(""), 2500); };
+  const keep = async () => {
+    const v = await invoke<{ saved: { name: string; text: string }[] }>("searches_get");
+    const name = `Craft: ${base}`;
+    await invoke("searches_save", { list: [...v.saved.filter((x) => x.name !== name), { name, text: s.text }] });
+    flash("Added to your searches (F10)");
+  };
+  return (
+    <div className="cr-search">
+      <div className="row between" style={{ margin: "4px 0" }}>
+        <b>Crafting search</b>
+        <span className="row" style={{ margin: 0 }}>
+          <label className="check small" style={{ margin: 0 }}><input type="radio" checked={!all} onChange={() => setAll(false)} /> any of these</label>
+          <label className="check small" style={{ margin: 0 }}><input type="radio" checked={all} onChange={() => setAll(true)} /> all of them</label>
+        </span>
+      </div>
+      <p className="muted small" style={{ margin: "2px 0 6px" }}>Put the item in your stash tab, paste this into the stash search, then spam your orbs:
+        the item lights up the moment {all ? "it has all of these" : "one of these rolls"}.</p>
+      <code className="cr-search-text" title={s.text}>{s.text}</code>
+      <div className="row" style={{ margin: "6px 0 0" }}>
+        <button className="small" onClick={() => { invoke("copy_text", { text: s.text }); flash("Copied"); }}>Copy</button>
+        <button className="small" onClick={() => invoke("search_type", { text: s.text }).then(() => flash("Put in the game's search box")).catch((e) => flash(friendly(e)))}
+          title="Open your stash in game first">Put it in game</button>
+        <button className="small" onClick={keep}>Add to my searches</button>
+        <span className={`small ${s.too_long ? "danger-text" : "muted"}`}>{s.text.length}/250</span>
+        {note && <span className="muted small">{note}</span>}
+      </div>
+      {s.notes.map((n, i) => <p key={i} className="muted small" style={{ margin: "4px 0 0" }}>{n}</p>)}
+    </div>
+  );
+}
+
+/** One plain verdict on the cheapest route: easy, worth a try, or usually not worth crafting (then check the buy price). */
+function Verdict({ best, div }: { best: Route; div: number | null }) {
+  if (best.cost == null) return null;
+  const d = div ? best.cost / div : null;
+  const [cls, title, text] = d != null && d < 0.5 && best.risk === 0 ? ["good", "Easy craft", "Cheap and safe: go for it."]
+    : d != null && d > 30 ? ["bad", "Usually not worth crafting", `Expect about ${Math.round(d)} divines on average (luck swings it a lot). Compare with buying one first.`]
+    : d != null && d > 8 ? ["warn", "Pricey craft", `Expect about ${Math.round(d)} divines on average. Check the buy price before you start.`]
+    : ["ok", "Worth a try", best.risk === 2 ? "A step can lose mods: have spare currency." : best.risk === 1 ? "A step can fail and need redoing." : "Reasonable cost and risk."];
+  return <div className={`rc-verdict ${cls}`}><b>{title}</b> <span className="small">{text}</span></div>;
 }

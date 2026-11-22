@@ -2182,6 +2182,15 @@ async fn craft_routes(state: State<'_, AppState>, base: String, ilvl: u32, influ
     tauri::async_runtime::spawn_blocking(move || filter_core::craft::routes::routes(&base, ilvl, &influences, &targets, &have, &price)).await.map_err(|e| e.to_string())
 }
 
+/// Crafting page: a stash search that lights up the item when a planned mod rolls (craft in your stash tab).
+#[tauri::command]
+async fn craft_search(state: State<'_, AppState>, base: String, ilvl: u32, influences: Vec<String>, targets: Vec<(String, u32)>, all: bool) -> Result<Option<filter_core::craft::search::CraftSearch>, String> {
+    let f = state.prices.lock().unwrap().get(&Game::Poe1).cloned();
+    let price = move |n: &str| f.as_ref().and_then(|f| price_of(f, None, n, ""));
+    tauri::async_runtime::spawn_blocking(move || filter_core::craft::pool(&base, ilvl, &influences, &[], &price)
+        .map(|p| filter_core::craft::search::craft_search(&p, &targets, all))).await.map_err(|e| e.to_string())
+}
+
 /// Crafting page: what an item like the copied one costs on the trade site (the same search as Ctrl+D), to compare
 /// with crafting it. One search, only when you click.
 #[tauri::command(async)]
@@ -2189,6 +2198,21 @@ fn craft_buy(app: AppHandle, text: String) -> Result<TradeResult, String> {
     let (poe2, _) = trade_league(&app);
     let index = trade_api::stats(&app.state::<AppState>().data_dir, poe2)?;
     let setup = filter_core::trade::setup(&text, &index).ok_or("That doesn't look like an item")?;
+    trade_search(app, setup)
+}
+
+/// Crafting page with no copied item: what an item with the planned mods costs to buy (each mod at its chosen tier's
+/// lowest roll or better), to compare with crafting it.
+#[tauri::command(async)]
+fn craft_buy_plan(app: AppHandle, base: String, ilvl: u32, influences: Vec<String>, targets: Vec<(String, u32)>) -> Result<TradeResult, String> {
+    let price = |_: &str| None;
+    let pool = filter_core::craft::pool(&base, ilvl, &influences, &[], &price).ok_or("Unknown base")?;
+    let text = filter_core::craft::search::plan_item_text(&pool, &targets);
+    let (poe2, _) = trade_league(&app);
+    let index = trade_api::stats(&app.state::<AppState>().data_dir, poe2)?;
+    let mut setup = filter_core::trade::setup(&text, &index).ok_or("Couldn't make a search for these mods")?;
+    // Every planned mod counts, at least the tier's lowest roll.
+    for f in setup.filters.iter_mut() { if !f.junk { f.enabled = true; f.min = Some(f.value); } }
     trade_search(app, setup)
 }
 
@@ -2628,7 +2652,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             price_build_item, buy_build_item, buy_base_item, trade_untick_one, trade_hidden, overview,
-            craft_bases, craft_start, craft_pool, craft_ways, craft_plan, craft_routes, craft_buy,
+            craft_bases, craft_start, craft_pool, craft_ways, craft_plan, craft_routes, craft_buy, craft_search, craft_buy_plan,
             create_profile,
             list_filters,
             set_active,

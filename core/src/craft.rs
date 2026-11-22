@@ -9,6 +9,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::OnceLock;
 
 pub mod routes;
+pub mod search;
 
 #[derive(Debug, Deserialize)]
 struct RawMod { id: String, name: String, gen: String, lvl: u32, text: String, r#type: String, group: String, tags: Vec<String>, sw: Vec<(String, f64)>, src: String }
