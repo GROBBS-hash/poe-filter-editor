@@ -256,6 +256,69 @@ pub async fn wealth_setup(app: AppHandle, account: String, sessid: Option<String
     }).await.map_err(err)?
 }
 
+/// "Log in with pathofexile.com": opens the site's own login page in a small window of the editor. Once you're logged
+/// in there, your website login (POESESSID) and account name are saved for you and the window closes. The window is
+/// just the website: it has no access to the editor (it isn't in the app's capabilities). Your login stays in the
+/// editor's own browser storage, so next time it's one click. The result arrives as a "poe-login" event.
+#[tauri::command]
+pub fn poe_login(app: AppHandle) -> Result<(), String> {
+    if let Some(w) = app.get_webview_window("poelogin") {
+        let _ = w.unminimize();
+        let _ = w.show();
+        let _ = w.set_focus();
+        return Ok(());
+    }
+    let site: tauri::Url = "https://www.pathofexile.com/".parse().map_err(err)?;
+    let login: tauri::Url = "https://www.pathofexile.com/login".parse().map_err(err)?;
+    let w = tauri::WebviewWindowBuilder::new(&app, "poelogin", tauri::WebviewUrl::External(login))
+        .title("Log in to pathofexile.com · PoE Lodestone")
+        .inner_size(560.0, 780.0)
+        .center()
+        .focused(true)
+        .build()
+        .map_err(err)?;
+    thread::spawn(move || {
+        let tell = |ok: bool, account: Option<String>, error: Option<String>| {
+            let _ = app.emit("poe-login", serde_json::json!({ "ok": ok, "account": account, "error": error }));
+        };
+        let started = std::time::Instant::now();
+        let mut checked: Option<(String, String)> = None;
+        let mut last_check = std::time::Instant::now() - Duration::from_secs(60);
+        loop {
+            thread::sleep(Duration::from_millis(1200));
+            // Closed by you: stop quietly.
+            if app.get_webview_window("poelogin").is_none() { tell(false, None, None); return; }
+            if started.elapsed() > Duration::from_secs(20 * 60) { let _ = w.close(); tell(false, None, Some("The login window timed out".into())); return; }
+            let Ok(cookies) = w.cookies_for_url(site.clone()) else { continue };
+            let Some(sess) = cookies.iter().find(|c| c.name() == "POESESSID").map(|c| c.value().to_string()) else { continue };
+            let at = w.url().map(|u| u.to_string()).unwrap_or_default();
+            // The site hands every visitor a POESESSID: check it's a logged-in one when it or the page changes
+            // (and every 15 s anyway), never more often.
+            let changed = checked.as_ref() != Some(&(sess.clone(), at.clone()));
+            if !(changed || last_check.elapsed() > Duration::from_secs(15)) || last_check.elapsed() < Duration::from_secs(3) { continue; }
+            checked = Some((sess.clone(), at));
+            last_check = std::time::Instant::now();
+            match trade_api::account_for_session(&sess) {
+                Ok(Some(account)) => {
+                    let state = app.state::<AppState>();
+                    let saved = {
+                        let mut s = state.store.lock().unwrap();
+                        s.settings.poe_account = account.clone();
+                        s.settings.poesessid = sess;
+                        s.save(&state.store_path).map_err(err)
+                    };
+                    let _ = w.close();
+                    match saved { Ok(()) => tell(true, Some(account), None), Err(e) => tell(false, None, Some(e)) }
+                    return;
+                }
+                Ok(None) => {}
+                Err(_) => {} // the network hiccuped: try again on the next round
+            }
+        }
+    });
+    Ok(())
+}
+
 /// Which tabs earnings sessions watch, the "worth selling" level and how often to check.
 #[tauri::command]
 pub fn wealth_prefs(app: AppHandle, tracked: Vec<usize>, min: f64, minutes: u32) -> Result<WealthView, String> {

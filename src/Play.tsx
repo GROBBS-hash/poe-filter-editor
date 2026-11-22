@@ -4,6 +4,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ResizeGrips, WinBar } from "./WinFrame";
 import { CurrencyIcon, ItemIcon } from "./icons";
+import { PoeLogin } from "./Wealth";
 import syndicate from "./data/syndicate.json";
 import anoints from "./data/anoints.json";
 import "./play.css";
@@ -30,7 +31,7 @@ type MapStats = { runs: number; avg_inside: number; avg_cycle: number; per_hour:
 type TrackerView = {
   current: MapRun | null; inside: boolean; current_inside: number; paused: boolean; recent: MapRun[]; today: MapStats; all: MapStats;
   char_name: string | null; char_level: number | null; watch_ms: number; watch_running: boolean; laps: number[]; now: number;
-  session: SessionSummary | null; pause: PauseInfo; loot_prefs: LootPrefs; loot_note: string; divine: number | null;
+  session: SessionSummary | null; pause: PauseInfo; loot_prefs: LootPrefs; loot_note: string; divine: number | null; has_account?: boolean;
 };
 type SessionSummary = { start: number; played: number; maps: number; map_time: number; per_hour: number; deaths: number; levels: number;
   made: number | null; best: MapRun | null; loot: LootLine[]; loot_value: number; loot_maps: number; loot_secs: number };
@@ -639,8 +640,10 @@ export function TrackerSettings() {
       </div>
       <div className="card">
         <h2>Loot per map</h2>
-        <p className="muted small">What each map brought in: your bags on pathofexile.com as you go in and come out, priced with poe.ninja. Needs your account and
-          POESESSID (Wealth page). The site saves your character when you change zone, so the count is up to the last time you left the map.</p>
+        <p className="muted small">What each map brought in: your bags on pathofexile.com as you go in and come out, priced with poe.ninja. Needs you logged in to
+          pathofexile.com (button below). The site saves your character when you change zone, so the count is up to the last time you left the map.</p>
+        {lp.on && (v.has_account ? <p className="small" style={{ margin: "4px 0 8px" }}><span className="w-full">Logged in to pathofexile.com.</span> <span className="muted">If loot stops showing (you logged out on the website), log in again:</span></p> : null)}
+        {lp.on && <PoeLogin big={!v.has_account} onError={setMsg} />}
         <label className="check"><input type="checkbox" checked={lp.on} onChange={(e) => loot({ on: e.target.checked })} /><span>Count loot in maps</span></label>
         {lp.on && <>
           <p className="muted small" style={{ margin: "8px 0 2px" }}>Show these kinds (the rest still count in the total)</p>

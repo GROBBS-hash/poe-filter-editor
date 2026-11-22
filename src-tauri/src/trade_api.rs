@@ -231,6 +231,14 @@ mod tests {
         assert_eq!(super::parse_rules("8:10:60,15:60:300"), vec![(8, 10), (15, 60)]);
         assert!(super::site_url(false, "Standard", "abc").ends_with("/trade/search/Standard/abc"));
     }
+
+    #[test]
+    fn account_name_from_profile_page() {
+        let page = "<!DOCTYPE html><html lang=\"en\">\n<head>\n<title>View Profile - Path of Exile - Some_Name#1234</title><meta x>";
+        assert_eq!(super::account_from_page(page).as_deref(), Some("Some_Name#1234"));
+        assert_eq!(super::account_from_page("<title>Login - Path of Exile</title>"), None);
+        assert_eq!(super::account_from_page("no title"), None);
+    }
 }
 
 // ---------- your stash (wealth tracker) ----------
@@ -259,6 +267,27 @@ pub fn characters(account: &str, sessid: &str, poe2: bool) -> Result<Value, Stri
         Ok(v) => Ok(v),
         Err(e) => Err(e),
     }
+}
+
+/// Whose website login this POESESSID is: "Name#1234", or None when it isn't logged in. (pathofexile.com/my-account
+/// answers 401 to a logged-out session; logged in, its page title is "View Profile - Path of Exile - Name#1234".
+/// The old get-account-name call is gone, checked 22 Nov 2026.)
+pub fn account_for_session(sessid: &str) -> Result<Option<String>, String> {
+    let req = ureq::get("https://www.pathofexile.com/my-account")
+        .set("Cookie", &format!("POESESSID={}", sessid.trim())).set("User-Agent", UA).timeout(Duration::from_secs(15));
+    match req.call() {
+        Ok(r) => Ok(account_from_page(&r.into_string().unwrap_or_default())),
+        Err(ureq::Error::Status(401 | 403, _)) => Ok(None),
+        Err(e) => Err(format!("Couldn't reach pathofexile.com: {e}")),
+    }
+}
+
+/// The account name in the "View Profile" page's title.
+pub fn account_from_page(html: &str) -> Option<String> {
+    let start = html.find("<title>")? + 7;
+    let title = &html[start..start + html[start..].find("</title>")?];
+    let name = title.trim().strip_prefix("View Profile - Path of Exile - ")?.trim();
+    (!name.is_empty()).then(|| name.to_string())
 }
 
 /// One character's items (what it wears and its bags) plus `character` (name, level, lastLoginTime = its last zone
@@ -295,7 +324,7 @@ fn stash_page(kind: &str, account: &str, sessid: &str, league: &str, poe2: bool,
 
 fn stash_error(e: &str) -> String {
     if e.contains("403") || e.to_lowercase().contains("forbidden") {
-        "pathofexile.com said no: your POESESSID is wrong or has expired. Log in on pathofexile.com and copy it again.".into()
+        "pathofexile.com said no: your login has expired. Press \"Log in with pathofexile.com\" (Wealth page or Settings → Map tracker) again.".into()
     } else if e.contains("404") || e.to_lowercase().contains("not found") {
         "pathofexile.com couldn't find that account or league: check your account name (with its #1234) and league.".into()
     } else { e.replace("trade site", "pathofexile.com") }

@@ -234,6 +234,29 @@ function Profiles({ v, setV, setErr, busy }: { v: WealthView; setV: (w: WealthVi
 }
 
 /** Wealth tracker page: stash worth, things worth selling, and earnings per strategy. */
+/** "Log in with pathofexile.com": opens the site's login page in a small window; when you're logged in there, your
+ *  account and POESESSID are saved and onDone gets the account name ("Name#1234"). */
+export function PoeLogin({ onDone, onError, big }: { onDone?: (account: string) => void; onError?: (e: string) => void; big?: boolean }) {
+  const [waiting, setWaiting] = useState(false);
+  const [done, setDone] = useState("");
+  useEffect(() => {
+    const un = listen<{ ok: boolean; account: string | null; error: string | null }>("poe-login", (e) => {
+      setWaiting(false);
+      if (e.payload.ok && e.payload.account) { setDone(e.payload.account); onDone?.(e.payload.account); }
+      else if (e.payload.error) onError?.(e.payload.error);
+    });
+    return () => { un.then((f) => f()); };
+  }, []);
+  const go = () => { setWaiting(true); setDone(""); invoke("poe_login").catch((e) => { setWaiting(false); onError?.(friendly(e)); }); };
+  return (
+    <div className="row" style={{ margin: "8px 0" }}>
+      <button className={big ? "primary" : ""} onClick={go}>{waiting ? "Waiting for you to log in…" : "Log in with pathofexile.com"}</button>
+      {waiting && <span className="muted small">Log in in the window that opened (it closes by itself).</span>}
+      {done && !waiting && <span className="w-full small">Logged in as {done}</span>}
+    </div>
+  );
+}
+
 export default function Wealth() {
   const [v, setV] = useState<WealthView | null>(null);
   const [account, setAccount] = useState("");
@@ -247,7 +270,11 @@ export default function Wealth() {
   const [showSetup, setShowSetup] = useState(false);
 
   useEffect(() => {
-    invoke<WealthView>("wealth_get").then((w) => { setV(w); setAccount(w.account); }).catch((e) => setErr(friendly(e)));
+    invoke<WealthView>("wealth_get").then((w) => {
+      setV(w); setAccount(w.account);
+      // Logged in from Settings → Map tracker: read the tab list now, so the page is ready.
+      if (w.has_sessid && w.account && w.tabs.length === 0) loggedIn(w.account);
+    }).catch((e) => setErr(friendly(e)));
     const a = listen<[number, number, string]>("wealth-progress", (e) => setProgress(e.payload));
     const b = listen<WealthView>("earn-update", (e) => setV(e.payload));
     const c = listen<string>("earn-error", (e) => setErr(e.payload));
@@ -255,6 +282,8 @@ export default function Wealth() {
     return () => { a.then((f) => f()); b.then((f) => f()); c.then((f) => f()); clearInterval(t); };
   }, []);
 
+  // Logged in through the "Log in with pathofexile.com" window: connect straight away.
+  const loggedIn = (account: string) => { setAccount(account); run("setup", "wealth_setup", { account, sessid: null }).then((w) => { if (w) setShowSetup(false); }); };
   const run = async (label: string, cmd: string, args: Record<string, unknown> = {}): Promise<WealthView | null> => {
     setBusy(label); setErr(""); setProgress(null);
     let out: WealthView | null = null;
@@ -288,14 +317,14 @@ export default function Wealth() {
       {(!connected || showSetup) && (
         <div className="card">
           <h2>Connect your stash</h2>
-          <p className="muted small">The wealth tracker reads your stash tabs from pathofexile.com to value them. Path of Exile isn't
-            taking new apps for its "Sign in with Path of Exile" button yet, so it uses your website login code, <b>POESESSID</b>,
-            like Acquisition and Exilence do.</p>
+          <p className="muted small">The wealth tracker (and the map tracker's loot count) reads your stash and character from
+            pathofexile.com. Log in on the website's own page, in a small window here: the editor keeps your login and closes it.</p>
+          <PoeLogin onDone={loggedIn} onError={setErr} big />
           <ul className="w-safe small">
-            <li>Saved on this PC only, and only ever sent to pathofexile.com.</li>
-            <li>The app only reads your stash. Treat the code like a password: never paste it anywhere else.</li>
-            <li>Log out of pathofexile.com any time to cancel it; paste a new one after logging back in.</li>
+            <li>You type your password into pathofexile.com itself, never into the editor. The editor only keeps the website's login code (POESESSID), on this PC only, and only ever sends it to pathofexile.com.</li>
+            <li>The app only reads your stash and characters. Log out on pathofexile.com any time to cancel it, then log in here again.</li>
           </ul>
+          <details className="small" style={{ marginTop: 6 }}><summary className="muted">Or paste your POESESSID yourself</summary>
           <ol className="muted small w-steps">
             <li>Log in on pathofexile.com in your browser: <button className="link small" onClick={() => invoke("open_url", { url: "https://www.pathofexile.com/login" })}>open pathofexile.com</button></li>
             <li>Press F12, open <b>Application</b> (Chrome/Edge) or <b>Storage</b> (Firefox), then <b>Cookies → pathofexile.com</b>.</li>
@@ -311,6 +340,7 @@ export default function Wealth() {
               {busy === "setup" ? "Checking…" : "Connect"}</button>
             <span className="muted small">League: {v.league} (from your price settings)</span>
           </div>
+          </details>
         </div>
       )}
       {err && <div className="card note warn-text">{err}</div>}

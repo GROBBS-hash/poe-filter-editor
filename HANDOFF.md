@@ -46,6 +46,18 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **"Log in with pathofexile.com" button (22 Nov, not released yet).** He asked for one-click login like other tools.
+  GGG's OAuth is closed to new apps (see Left to do), so: `wealth_app::poe_login` opens the site's own login page in
+  a small editor window (label `poelogin`, deliberately not in `capabilities/default.json`, so the page has no access
+  to the app). A thread reads that window's POESESSID cookie (`Webview::cookies_for_url`) every 1.2 s; since the site
+  gives every visitor a POESESSID, it checks it with `trade_api::account_for_session` (pathofexile.com/my-account:
+  401 logged out, logged in the title is "View Profile - Path of Exile - Name#1234"; the old get-account-name call is
+  404 now) whenever the cookie or page changes (at most every 3 s, else every 15 s). Logged in: saves account +
+  POESESSID, closes the window, emits `poe-login`. The login stays in the editor's own browser storage, so the next
+  time is one click. Buttons: Wealth → Connect your stash (pasting POESESSID is now under "Or paste it yourself") and
+  Settings → Map tracker → Loot per map (`PoeLogin` in Wealth.tsx). Expired-login messages point to the button.
+  Tested live: his saved login gives his account name, a made-up session gives none (test `account_name_from_profile_page`).
+  Not tried: the window itself (only his installed editor was running; a second copy would clash).
 - **Map tracker: timer stops in menus, loot per map, div per hour (22 Nov, released in 0.2.42).** After his 0.2.41 test.
   - **Pause:** the game doesn't log the Escape menu or skill tree, so (like Exile UI's "screen checks") the editor
     samples ~110 dots of the game's bottom bar once a second (only inside a map, only with the game in front;
@@ -743,6 +755,12 @@ Everything below was built since GROBBS last tested and has only been checked wi
 Confirmed in game so far: basic Ctrl+D price check (trade search returned listings); 20 Nov: weapon + armour
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
+**Log in with pathofexile.com (22 Nov, not released yet):**
+- [ ] Wealth page → click your account name (top right of the stash card) → **Log in with pathofexile.com**: a window
+  with the website's login opens; log in; it closes by itself and the page says "Logged in as Name#1234" and loads tabs.
+- [ ] Clicking it again later logs in at once (the window may flash and close).
+- [ ] Settings → Map tracker → Loot per map shows "Logged in to pathofexile.com".
+
 **Map tracker: menus, loot, div per hour (22 Nov, released in 0.2.42):**
 - [ ] Settings → Map tracker → **Set up**: click it, click into the game within 5 s with nothing open. Then in a map,
   open the passive tree: within ~2 s the tracker tag says "paused" and the clock stops; close it and it goes on.
@@ -1232,8 +1250,7 @@ when the game window isn't found. Check in game: the window's spot, and that it 
    (checked 22 Nov). If it reopens: public client, authorization code + PKCE, loopback redirect (http://127.0.0.1:<port>/callback,
    fixed at registration), scopes account:characters + account:stashes, 10 h access / 7 day refresh tokens, User-Agent
    "OAuth {clientId}/{version} (contact: …)"; its character endpoint still returns experience, so XP per hour could come
-   back. Doable now without GGG: a "Log in" button opening pathofexile.com's own login page in a small app window and
-   reading the POESESSID cookie when he's logged in (Tauri 2.12 has `Webview::cookies_for_url`). Waiting on his go-ahead.
+   back. The "Log in with pathofexile.com" button (built 22 Nov, see Done) covers it until then.
 5. Deferred earlier: PoE 2 coverage. Batch mode tidy-up done 21 Nov (see "Batch mode"). (Installer + auto-update done 21 Nov: see "Installer and updates".)
 
 ## Known caveats

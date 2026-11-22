@@ -461,6 +461,8 @@ pub struct TrackerView {
     pub loot_note: String,
     /// The divine's price (chaos), to show totals in divines.
     pub divine: Option<f64>,
+    /// Logged in to pathofexile.com (account + POESESSID saved).
+    pub has_account: bool,
 }
 
 /// The menu check, for the Play tools page.
@@ -514,6 +516,7 @@ fn tracker_view(app: &AppHandle) -> TrackerView {
             s.loot.clone(), s.menu.clone(), s.pause_off)
     });
     let divine = currency_rates(app).get("divine").copied();
+    let has_account = account(app).is_some();
     with_live(|l| {
         let watch_ms = l.watch_acc + l.watch_since.map(|t| unix_ms() - t).unwrap_or(0);
         let session = (l.sess_start > 0).then(|| {
@@ -548,7 +551,7 @@ fn tracker_view(app: &AppHandle) -> TrackerView {
             current, inside, current_inside, paused, recent, today, all,
             char_name: l.site_char.as_ref().map(|c| c.0.clone()), char_level: l.site_char.as_ref().map(|c| c.1),
             watch_ms, watch_running: l.watch_since.is_some(), laps: l.laps.clone(), now, session,
-            pause, loot_prefs: prefs, loot_note: l.loot_note.clone(), divine,
+            pause, loot_prefs: prefs, loot_note: l.loot_note.clone(), divine, has_account,
         }
     })
 }
@@ -721,7 +724,7 @@ static LOOT_TX: Mutex<Option<std::sync::mpsc::Sender<LootJob>>> = Mutex::new(Non
 fn queue_loot(app: &AppHandle, job: LootJob) {
     if !with_store(app, |s| s.loot.on) { return; }
     if account(app).is_none() {
-        with_live(|l| l.loot_note = "Loot per map needs your account and POESESSID (Wealth page)".into());
+        with_live(|l| l.loot_note = "Loot per map needs you logged in: press \"Log in with pathofexile.com\" in Settings → Map tracker".into());
         return;
     }
     if let Some(tx) = LOOT_TX.lock().unwrap().as_ref() { let _ = tx.send(job); }
