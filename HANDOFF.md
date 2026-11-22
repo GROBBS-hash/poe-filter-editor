@@ -48,6 +48,26 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **Tiers: change NeverSink's step conditions, jewels first (23 Nov, not released yet).** He said the jewel section "isn't good
+  enough, we can't set ilvl … how many mods … corrupted, NeverSink does this really well", then "revise EVERY section".
+  He picked mock-up **C "NeverSink's own steps, click any condition to change it"** (and: "remember icons for items").
+  - Every step on the Tiers page now shows its conditions as chips (`core/src/conds.rs`: `conds_of` reads them, plain
+    words like "item level 86+", "up to 8 passives", "5+ mods", "item level 68–74"). Gold-edged chips open a small box
+    (at least / at most / exactly / from…to; yes/no; rarity ticks), "Remove this condition", "Back to NeverSink's".
+    "+ Add a condition": item level, corrupted, corruption mod (`CorruptedMods >= 1`), number of mods (identified only,
+    so it adds `Identified True` too; written as NeverSink's `HasExplicitMod >=N "a" "e" "i" "o" "u" "y"` trick, key
+    "ModCount"), cluster passives (cluster sections only), rarity, identified, mirrored; other sections also get
+    quality, area level, stack size, links, sockets, fractured. Class / named-mod lists / cluster enchants are shown, not editable.
+  - Stored as `Rule::Tier.conds` (keyword -> new value, "" = removed), applied by `Block::set_conds`; command
+    `set_tier_conds` (set + undo); `tiers::mark_changed` tells the page which chips you changed (filled gold). Survives
+    NeverSink updates like other tier edits.
+  - Jewel sections now list every step (abyss steps pick by item class, so they were missing before) with plain names
+    ("Corrupted rare, 5+ mods", "Rare, very high item level"…). Each step has an item picture; cluster / abyss / plain
+    jewels fall back to the game's own art (`JEWEL_ART` in icons.tsx; poe.ninja's list has none; Hypnotic Eye has no
+    known art URL). Jewels note: a jewel takes the first step it fits; ones that fit none stay hidden
+    (test `jewel_step_conditions`: rare jewels raised to item level 84+ hide a level 70 one, show a level 85 one).
+  - Next: the same chips are already on every section; review each group (currency stacks, gear, flasks, gems, maps…)
+    for the most useful "+ Add a condition" choices and NeverSink settings he'd want, one group at a time.
 - **Clearer sidebar, hotkeys explained, Price check page (22 Nov, released in 0.2.44).** He said the sidebar's subheadings
   didn't make sense ("Maps/Atlas too vague", "Your character" isn't only levelling) and the Home hotkey card would confuse
   new players (what does F2 change?). He picked sidebar mock-up **B "Sorted by what you're doing"** and hotkey card **C
@@ -795,6 +815,15 @@ Everything below was built since GROBBS last tested and has only been checked wi
 (move them to "Confirmed in game") as he reports back, and add new features here as they land.
 Confirmed in game so far: basic Ctrl+D price check (trade search returned listings); 20 Nov: weapon + armour
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
+
+**Tiers: step conditions, jewels first (23 Nov, not released yet):**
+- [ ] Tiers → Abyss jewels: every step shows a picture and its conditions as chips. Click "item level 86+" on
+  "Rare, very high item level", change it to 84, Save: the chip turns gold. Press F4; a rare abyss jewel of item level
+  84–85 now gets that step's look. "Back to NeverSink's" in the same box undoes it.
+- [ ] Tiers → Jewels → "Rare jewels" → + Add a condition → Item level, set it to 75: rare Cobalt/Crimson/Viridian jewels
+  below 75 stop showing in maps.
+- [ ] + Add a condition → "Number of mods" on a step: only identified jewels with that many mods match.
+- [ ] Cluster jewels: change "up to 8 passives" or the item level on a Large step; Cluster jewels show their picture.
 
 **Log in with pathofexile.com (22 Nov, released in 0.2.43):**
 - [ ] Wealth page → click your account name (top right of the stash card) → **Log in with pathofexile.com**: a window

@@ -40,6 +40,7 @@ let batchItems = [
   { item_class: "Body Armours", rarity: "Unique", name: "Tabula Rasa", base_type: "Simple Robe", item_level: 68, corrupted: false, mirrored: false, unidentified: false },
 ];
 let cjRule: { kind: string; style: Record<string, unknown> } | null = null;
+let tiersCache: unknown = null;
 const mapStyle = (b: string) => ({ font_size: 45, muted: false, text: b === "d" ? [255, 255, 255, 255] : [0, 0, 0, 255],
   background: b === "d" ? [20, 20, 0, 255] : b === "c" ? [235, 235, 120, 255] : [235, 235, 235, 255], border: b === "a" ? [255, 0, 0, 255] : null,
   beam: b === "d" ? "White" : "Yellow", minimap_parts: [b === "d" ? 2 : 1, b === "d" ? "White" : "Red", "Square"] });
@@ -158,7 +159,24 @@ mockIPC((cmd, args) => {
   if (cmd === "craft_routes") return fetch("/_craft_routes.json").then((r) => r.ok ? r.json() : null).catch(() => null);
   if (cmd === "craft_buy") return new Promise((ok) => setTimeout(() => ok({ summary: [380, 520], total: 37, url: "https://www.pathofexile.com/trade", divine: 221, listings: [] }), 600));
   // Tiers sections: public/_tiers.json when present (tierdump --json from a real filter), else none.
-  if (cmd === "get_tiers") return fetch("/_tiers.json").then((r) => r.ok ? r.json() : []).catch(() => []);
+  if (cmd === "get_tiers") return tiersCache ? JSON.parse(JSON.stringify(tiersCache))
+    : fetch("/_tiers.json").then((r) => r.ok ? r.json() : []).catch(() => []).then((s) => (tiersCache = s, JSON.parse(JSON.stringify(s))));
+  // Step condition chips: change the cached copy (words are rough here; the real app words them in Rust).
+  if (cmd === "set_tier_conds") {
+    const a = args as { typePath: string[]; tier: string; set: Record<string, string>; undo: string[] };
+    type C = { key: string; value: string; words: string; kind: string };
+    const sec = (tiersCache as { type_path: string[]; tiers: { tier: string; conds: C[]; changed?: string[] }[] }[] | null)
+      ?.find((s) => s.type_path.join(">") === a.typePath.join(">"));
+    const t = sec?.tiers.find((x) => x.tier === a.tier);
+    if (t) {
+      t.changed = [...new Set([...(t.changed ?? []).filter((k) => !a.undo.includes(k)), ...Object.keys(a.set)])];
+      for (const [k, v] of Object.entries(a.set)) {
+        t.conds = t.conds.filter((c) => c.key !== k);
+        if (v) t.conds.push({ key: k, value: v, words: `${k} ${v}`.replace(">= ", "").replace("True", "yes"), kind: k === "Rarity" ? "rarity" : ["True", "False"].includes(v) ? "yesno" : "number" });
+      }
+    }
+    return [];
+  }
   // Batch mode: three items collected in game.
   if (cmd === "batch_list") return batchItems;
   if (cmd === "batch_forget") { const k = (args as { keys: string[] | null }).keys; batchItems = k ? batchItems.filter((i) => !k.includes(`${i.rarity}|${i.base_type}|${i.rarity === "Unique" ? i.name ?? "" : ""}`)) : []; return null; }

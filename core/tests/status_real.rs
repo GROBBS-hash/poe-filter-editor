@@ -147,3 +147,22 @@ fn levelling_preset_on_real_filter() {
     let segs = build(&LevelOptions { aggressive: true, ..o.clone() });
     assert_eq!(status(&segs, &linked, Some(20), false).verdict.visibility, "Hide");
 }
+
+/// Tiers page chips (23 Nov): "Rare jewels" set to item level 84+ and "3+ mods" really changes what shows.
+#[test]
+fn jewel_step_conditions() {
+    use filter_core::rules::{apply, Rule};
+    let mut segs = parse_filter(&std::fs::read_to_string(SRC).unwrap());
+    let jewel = |ilvl: u32| { let mut it = parse_item(&format!("Item Class: Jewels\nRarity: Rare\nGloom Spark\nCobalt Jewel\n--------\nItem Level: {ilvl}\n--------\nUnidentified\n")).unwrap(); fill_class(&mut it); it };
+    let before = status(&segs, &jewel(70), Some(83), false).verdict;
+    assert_eq!((before.visibility.as_str(), before.decided_by.contains("anyrare")), ("Show", true), "{}", before.decided_by);
+    let mut c = std::collections::BTreeMap::new();
+    c.insert("ItemLevel".to_string(), ">= 84".to_string());
+    let rule = Rule::Tier { type_path: vec!["jewels".into(), "generic".into()], tier: "anyrare".into(), show: None, actions: None, min_stack: None, min_item_tier: None, conds: Some(c) };
+    assert!(apply(&mut segs, &[rule], "\n").is_empty());
+    let low = status(&segs, &jewel(70), Some(83), false).verdict;
+    let high = status(&segs, &jewel(85), Some(83), false).verdict;
+    println!("ilvl 70 -> {} by {}; ilvl 85 -> {} by {}", low.visibility, low.decided_by, high.visibility, high.decided_by);
+    assert!(!low.decided_by.contains("anyrare"));
+    assert!(high.decided_by.contains("anyrare"));
+}

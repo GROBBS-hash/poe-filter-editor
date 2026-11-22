@@ -86,6 +86,18 @@ impl Block {
         }
     }
 
+    /// Changes this step's conditions: each key's line(s) replaced by the new value, or removed when it's "".
+    pub fn set_conds(&mut self, edits: &crate::conds::CondEdits) {
+        let indent: String = self.lines.first().map(|l| l.chars().take_while(|c| *c == ' ' || *c == '\t').collect()).unwrap_or_else(|| "\t".into());
+        for (key, value) in edits {
+            let at = self.lines.iter().position(|l| crate::conds::line_is(l, key)).unwrap_or(0);
+            self.lines.retain(|l| !crate::conds::line_is(l, key));
+            let at = at.min(self.lines.len());
+            let new: Vec<String> = crate::conds::lines_for(key, value).into_iter().map(|l| format!("{indent}{l}{}", self.newline)).collect();
+            self.lines.splice(at..at, new);
+        }
+    }
+
     /// Replaces the block's look and sound lines with `actions`.
     pub fn replace_style(&mut self, actions: &[String]) {
         const STYLE: [&str; 14] = ["SetFontSize", "SetTextColor", "SetBorderColor", "SetBackgroundColor", "PlayAlertSound",

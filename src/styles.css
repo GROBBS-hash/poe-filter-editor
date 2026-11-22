@@ -2145,3 +2145,26 @@ button.tw-chip:hover { border-color: #59606b; color: var(--text); }
 .key-label > b { display: block; color: var(--text); font-weight: 600; }
 .key-label > span { display: block; color: var(--muted); font-size: 12.5px; line-height: 1.35; margin-top: 1px; }
 .help-keys-h { margin-top: 18px !important; }
+
+/* Tiers page: a step's conditions as chips (23 Nov). Gold edge = click to change, filled gold = you changed it. */
+.conds { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 7px 0 2px 30px; }
+.cond-wrap { position: relative; display: inline-flex; }
+.cond { font-size: 12.5px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--text-2); line-height: 1.4; }
+.cond.edit { border-color: color-mix(in srgb, var(--gold) 55%, var(--line)); color: var(--text); cursor: pointer; }
+.cond.edit:hover { background: var(--gold-bg); border-color: var(--gold); }
+.cond.fixed { cursor: default; opacity: .85; }
+.cond.changed { background: var(--gold-bg); border-color: var(--gold); color: var(--gold); }
+.cond.removed { text-decoration: line-through; border-style: dashed; color: var(--text-2); cursor: pointer; }
+.cond.add { border-style: dashed; color: var(--text-2); cursor: pointer; }
+.cond.add:hover { color: var(--gold); border-color: var(--gold); }
+.cond-pen { margin-left: 5px; font-size: 11px; opacity: .7; }
+.cond-edit { position: absolute; top: calc(100% + 6px); left: 0; z-index: 30; background: var(--raised); border: 1px solid var(--gold); border-radius: 9px;
+  padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; min-width: 260px; box-shadow: 0 8px 24px rgba(0,0,0,.45); }
+.cond-edit-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cond-edit input[type=number] { width: 64px; }
+.cond-rar { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
+.cond-rar.r-magic { color: #8888ff; } .cond-rar.r-rare { color: #ffff77; } .cond-rar.r-unique { color: #af6025; }
+.cond-menu { min-width: 300px; gap: 2px; padding: 6px; }
+.cond-menu-item { display: flex; flex-direction: column; align-items: flex-start; text-align: left; background: transparent; border: 0; padding: 6px 8px; border-radius: 6px; }
+.cond-menu-item:hover { background: var(--gold-bg); }
+.tier-name img, .tier-name .item-icon { flex: none; }

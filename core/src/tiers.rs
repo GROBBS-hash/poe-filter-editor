@@ -21,6 +21,24 @@ pub struct TierRow {
     /// "UnidentifiedItemTier >= N" (3.30 item tiers on rare gear).
     #[serde(default)]
     pub min_item_tier: Option<u32>,
+    /// The step's conditions as chips (item level, corrupted, mods…), as they'll be in game.
+    #[serde(default)]
+    pub conds: Vec<crate::conds::Cond>,
+    /// Which of them you changed (keys), so the page can mark them and offer "Back to NeverSink's".
+    #[serde(default)]
+    pub changed: Vec<String>,
+}
+
+/// Marks the conditions you changed on each step (from your tier rules).
+pub fn mark_changed(sections: &mut [Section], rules: &[crate::rules::Rule]) {
+    for s in sections.iter_mut() {
+        for t in s.tiers.iter_mut() {
+            t.changed = rules.iter().filter_map(|r| match r {
+                crate::rules::Rule::Tier { type_path, tier, conds: Some(c), .. } if *type_path == s.type_path && *tier == t.tier => Some(c.keys().cloned().collect::<Vec<_>>()),
+                _ => None,
+            }).flatten().collect();
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -198,6 +216,10 @@ fn special_tier_name(t: &str) -> Option<String> {
         "highlarge" => "Large, 8 passives", "large" => "Other large",
         "optimalhighmedium" => "Medium, up to 5 passives (best item level)", "highmedium" => "Medium, up to 5 passives",
         "medium" => "Other medium", "highsmall" => "Small (best item level)", "small" => "Other small",
+        "extramodcorruptedabyssjewel" => "Corrupted rare, 5+ mods", "corruptedabyssjewel" => "Corrupted rare",
+        "veryhighrare" => "Rare, very high item level", "veryhighmagic" => "White or magic, very high item level",
+        "highrare" => "Rare, high item level", "highmagic" => "White or magic, high item level",
+        "abyss" => "Abyss jewels while levelling", "generic" => "Jewels while levelling",
         "1modcorrupted" => "Corrupted, with a corruption mod", "1moduncorrupted" => "With a top mod (Shimmering, Vivid…)",
         _ => return None,
     }.to_string())
@@ -261,6 +283,7 @@ pub fn sections(segs: &[Segment]) -> Vec<Section> {
             tier, visibility: b.visibility.clone(), style: style_of(&b.lines), bases, note: note_of(&b.lines),
             min_stack: b.lines.iter().find_map(|l| l.trim().strip_prefix("StackSize >=").and_then(|n| n.trim().parse().ok())),
             min_item_tier: b.lines.iter().find_map(|l| l.trim().strip_prefix("UnidentifiedItemTier >=").and_then(|n| n.trim().parse().ok())),
+            conds: crate::conds::conds_of(&b.lines), changed: vec![],
         });
     }
     for s in found.iter_mut() {
@@ -269,7 +292,11 @@ pub fn sections(segs: &[Segment]) -> Vec<Section> {
     }
     // Levelling rules that aren't item lists (weapon steps, first areas…) still get their section.
     // Every step, with or without an item list (Act 1 gear's boots / quivers / jewellery steps have none).
-    for (key, group, title) in KNOWN.iter().filter(|k| k.1 == LEVELLING) {
+    // Jewels too (abyss steps pick by item class, not by item, so they'd be missing), and any known section that
+    // has steps but no item list.
+    let whole: Vec<&(&str, &str, &str)> = KNOWN.iter()
+        .filter(|k| k.1 == LEVELLING || k.1 == "Jewels" || !found.iter().any(|s| s.type_path.join("->") == k.0)).collect();
+    for (key, group, title) in whole {
         let path: Vec<String> = key.split("->").map(String::from).collect();
         let Some(mut sec) = section_at(segs, &path) else { continue };
         sec.group = group.to_string(); sec.title = title.to_string();
@@ -312,6 +339,7 @@ pub fn section_at(segs: &[Segment], type_path: &[String]) -> Option<Section> {
             bases: b.base_types(), note: note.join(", "),
             min_stack: b.lines.iter().find_map(|l| l.trim().strip_prefix("StackSize >=").and_then(|n| n.trim().parse().ok())),
             min_item_tier: b.lines.iter().find_map(|l| l.trim().strip_prefix("UnidentifiedItemTier >=").and_then(|n| n.trim().parse().ok())),
+            conds: crate::conds::conds_of(&b.lines), changed: vec![],
         });
     }
     if tiers.is_empty() { return None; }
@@ -549,14 +577,14 @@ mod tests {
         // Switching the upgrade borders off empties their look but keeps them as pass-through rules.
         let up = m.extras[0].tiers.clone();
         let mut off = crate::filter::parse_filter(&fixture());
-        let rules: Vec<Rule> = up.iter().map(|t| Rule::Tier { type_path: vec!["maps".into()], tier: t.clone(), show: None, actions: Some(vec![]), min_stack: None, min_item_tier: None }).collect();
+        let rules: Vec<Rule> = up.iter().map(|t| Rule::Tier { type_path: vec!["maps".into()], tier: t.clone(), show: None, actions: Some(vec![]), min_stack: None, min_item_tier: None, conds: None }).collect();
         apply(&mut off, &rules, "
 ");
         assert!(!super::map_tiers(&off).extras[0].on);
         // Hiding tiers 1-3 survives as tier rules.
         let mut segs = segs;
         let rules: Vec<Rule> = m.tiers.iter().filter(|t| t.map_tier < 4).map(|t| Rule::Tier {
-            type_path: vec!["maps".into()], tier: t.row.tier.clone(), show: Some(false), actions: None, min_stack: None, min_item_tier: None }).collect();
+            type_path: vec!["maps".into()], tier: t.row.tier.clone(), show: Some(false), actions: None, min_stack: None, min_item_tier: None, conds: None }).collect();
         assert!(apply(&mut segs, &rules, "\n").is_empty());
         let after = super::map_tiers(&segs);
         assert!(after.tiers.iter().all(|t| (t.row.visibility == "Hide") == (t.map_tier < 4)));
@@ -657,10 +685,10 @@ mod tests {
     fn tier_rule_hides_and_restyles() {
         let mut segs = parse_filter(&fixture());
         let rules = vec![
-            Rule::Tier { type_path: vec!["currency".into()], tier: "t5alchemy".into(), show: Some(false), actions: None, min_stack: None, min_item_tier: None },
-            Rule::Tier { type_path: vec!["gold".into()], tier: "stack2".into(), show: None, actions: None, min_stack: Some(800), min_item_tier: None },
+            Rule::Tier { type_path: vec!["currency".into()], tier: "t5alchemy".into(), show: Some(false), actions: None, min_stack: None, min_item_tier: None, conds: None },
+            Rule::Tier { type_path: vec!["gold".into()], tier: "stack2".into(), show: None, actions: None, min_stack: Some(800), min_item_tier: None, conds: None },
             Rule::Tier { type_path: vec!["divination".into()], tier: "t1".into(), show: None,
-                actions: Some(vec!["SetFontSize 45".into(), "SetTextColor 1 2 3 255".into()]), min_stack: None, min_item_tier: None },
+                actions: Some(vec!["SetFontSize 45".into(), "SetTextColor 1 2 3 255".into()]), min_stack: None, min_item_tier: None, conds: None },
         ];
         let w = apply(&mut segs, &rules, "\r\n");
         assert!(w.is_empty(), "{w:?}");

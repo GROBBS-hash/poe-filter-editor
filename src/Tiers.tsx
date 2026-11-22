@@ -6,6 +6,7 @@ import { ProfileInfo } from "./types";
 import StyleEditor, { CurrentStyle, CustomStyle, LookButton, Preview, fromCurrent } from "./StyleEditor";
 import { ItemIcon } from "./icons";
 import MapTiers, { MapSection } from "./MapTiers";
+import StepConds, { Cond } from "./StepConds";
 
 const CDN = "https://web.poecdn.com/image/Art/2DItems/";
 /** The picture next to each section in the menu: an item from the game ("×3" etc. for stacks). Sections not listed
@@ -46,7 +47,8 @@ function SectionIcon({ title, first }: { title: string; first?: string }) {
 
 const MAPS_KEY = "__maps";
 
-type TierRow = { tier: string; name: string; visibility: string; style: CurrentStyle; bases: string[]; note: string; min_stack: number | null; min_item_tier?: number | null };
+type TierRow = { tier: string; name: string; visibility: string; style: CurrentStyle; bases: string[]; note: string; min_stack: number | null; min_item_tier?: number | null;
+  conds?: Cond[]; changed?: string[] };
 
 /** "+ Add item": search any item and put it in this tier. */
 function AddItem({ onAdd }: { onAdd: (base: string) => void }) {
@@ -181,6 +183,8 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
       style: patch.style ?? null, minStack: patch.minStack ?? null, minItemTier: patch.minItemTier ?? null, reset: !!patch.reset }),
       patch.reset ? `${t.name} is back to NeverSink's.` : patch.style ? `${t.name} restyled.`
         : patch.minStack ? `${t.name} now applies to stacks of ${patch.minStack}+.` : `${t.name} ${patch.show ? "shown" : "hidden"}.`);
+  const setConds = (t: TierRow, set: Record<string, string>, undo: string[], m: string) =>
+    done(invoke("set_tier_conds", { id: profile.id, typePath: section!.type_path, tier: t.tier, set, undo }), `${t.name}: ${m}`);
   const addTo = (t: TierRow, base: string) => {
     // Already listed in an earlier section of this filter? Then that one wins in game; say so.
     const elsewhere = sections.find((x) => x !== section && x.tiers.some((y) => y.bases.includes(base)));
@@ -252,6 +256,11 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
             {section.group === "Jewels" && section.title === "Jewels" && (
               <CorruptedJewels onDone={(p, m) => done(p, m)} />
             )}
+            {section.group === "Jewels" && (
+              <div className="note">A jewel takes the <b>first step it fits</b>, from the top. <b>Click a condition</b> (gold edge) to change
+                it, e.g. raise “item level 84+” to 86+, or <b>+ Add a condition</b> such as corrupted, a corruption mod, or how many mods.
+                Jewels that fit no step stay hidden. Your changes survive NeverSink updates.</div>
+            )}
             {section.group === "Before maps" && (
               <div className="note">Rules for the campaign, before maps: each row is one step NeverSink shows while you level
                 (most only up to a certain area level). <b>Untick</b> a step to hide it, or change how it looks.</div>
@@ -280,14 +289,15 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
                   <div className="tier-head">
                     <label className="tier-name">
                       <input type="checkbox" checked={shown} onChange={(e) => setTier(t, { show: e.target.checked })} />
+                      <ItemIcon base={t.bases[0] ?? SECTION_ICON[section.title]?.item ?? null} size={26} />
                       <span>{t.name}</span>
-                      {t.note && (t.min_stack == null || isExtra) && <span className="muted small">{isExtra ? `Catches: ${t.note}` : t.note}</span>}
+                      {t.note && !t.conds && (t.min_stack == null || isExtra) && <span className="muted small">{isExtra ? `Catches: ${t.note}` : t.note}</span>}
                     </label>
                     {t.min_stack != null && <StackBox value={t.min_stack} onSave={(n) => setTier(t, { minStack: n })} />}
                     {t.min_item_tier != null && <StackBox label="item tier" title="Lowest item tier (shown on the label in 3.30) this row applies to"
                       value={t.min_item_tier} onSave={(n) => setTier(t, { minItemTier: n })} />}
                     <LookButton className="tier-look" onClick={() => setEditing(editing === key ? null : key)}>
-                      <Preview s={fromCurrent(t.style, "Currency")} text={t.bases[0] ?? t.name} />
+                      <Preview s={fromCurrent(t.style, "Currency")} text={t.bases[0] ?? SECTION_ICON[section.title]?.item ?? t.name} />
                     </LookButton>
                     <span className="tier-tools">
                       <button className="link small" title="Copy this tier's look"
@@ -305,6 +315,8 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
                         onSave={(s) => { setEditing(null); setTier(t, { style: s }); }} />
                     </div>
                   )}
+                  {t.conds && <StepConds conds={t.conds.filter((c) => !(c.key === "StackSize" && t.min_stack != null) && !(c.key === "UnidentifiedItemTier" && t.min_item_tier != null))} changed={t.changed ?? []} jewels={section.group === "Jewels"} cluster={section.title.startsWith("Cluster")}
+                    onSet={(set, undo, m) => setConds(t, set, undo, m)} />}
                   <div className="tier-items">
                     {items.map((b) => (
                       <span key={b} data-chip={`${key}|${b}`}
@@ -320,7 +332,7 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
                         {open ? "Show fewer" : `+${t.bases.length - SHOW_ITEMS} more`}
                       </button>
                     )}
-                    {!section.shared_bases && <AddItem onAdd={(b) => addTo(t, b)} />}
+                    {!section.shared_bases && t.bases.length > 0 && <AddItem onAdd={(b) => addTo(t, b)} />}
                   </div>
                 </div>
               );

@@ -1379,13 +1379,19 @@ fn rule_label(r: &Rule) -> String {
         Rule::MoveBase { type_path, base, to_tier } => {
             format!("Tier: {base} moved to {} {}", type_path.join(" > "), filter_core::tiers::tier_name(to_tier))
         }
-        Rule::Tier { type_path, tier, show, actions, min_stack, min_item_tier } => {
+        Rule::Tier { type_path, tier, show, actions, min_stack, min_item_tier, conds } => {
             let what = match (show, actions, min_stack) {
                 (Some(false), ..) => "hidden".to_string(),
                 (_, Some(_), _) => "restyled".to_string(),
                 (_, _, Some(n)) => format!("set to stacks of {n}+"),
                 _ if min_item_tier.is_some() => format!("set to item tier {}+", min_item_tier.unwrap_or(0)),
                 (Some(true), ..) => "shown".to_string(),
+                _ if conds.is_some() => {
+                    let c = conds.as_ref().unwrap();
+                    let w: Vec<String> = c.iter().map(|(k, v)| if v.is_empty() { format!("no {} condition", filter_core::conds::name_of(k)) }
+                        else { filter_core::conds::words(k, v).0 }).collect();
+                    format!("set to {}", w.join(", "))
+                }
                 _ => "changed".to_string(),
             };
             format!("Tier: {} {} {what}", type_path.join(" > "), filter_core::tiers::tier_name(tier))
@@ -1400,7 +1406,9 @@ fn get_tiers(state: State<AppState>, id: String) -> Result<Vec<filter_core::tier
     let game = store.profiles.get(&id).ok_or("Profile not found")?.game;
     let prices = state.prices.lock().unwrap();
     let (text, _) = render_profile(&store, &id, &filter_dir(game), prices.get(&game), None).map_err(err)?;
-    Ok(filter_core::tiers::sections(&parse_filter(&text)))
+    let mut s = filter_core::tiers::sections(&parse_filter(&text));
+    filter_core::tiers::mark_changed(&mut s, &store.resolved_rules(&id));
+    Ok(s)
 }
 
 /// One of NeverSink's rules that isn't a tier list ("Modify rule" on e.g. white 4-links).
@@ -1410,7 +1418,9 @@ fn get_rule_section(state: State<AppState>, id: String, type_path: Vec<String>) 
     let game = store.profiles.get(&id).ok_or("Profile not found")?.game;
     let prices = state.prices.lock().unwrap();
     let (text, _) = render_profile(&store, &id, &filter_dir(game), prices.get(&game), None).map_err(err)?;
-    Ok(filter_core::tiers::section_at(&parse_filter(&text), &type_path))
+    let mut s: Vec<_> = filter_core::tiers::section_at(&parse_filter(&text), &type_path).into_iter().collect();
+    filter_core::tiers::mark_changed(&mut s, &store.resolved_rules(&id));
+    Ok(s.pop())
 }
 
 #[tauri::command]
@@ -1726,12 +1736,31 @@ fn tier_edit(rules: &mut Vec<Rule>, type_path: &[String], tier: &str, show: Opti
         // Also undo items dragged into this tier.
         rules.retain(|r| !matches!(r, Rule::MoveBase { type_path: tp, to_tier, .. } if tp.as_slice() == type_path && to_tier == tier));
     } else {
-        let (old_show, old_actions, old_stack, old_it) = match old {
-            Some(Rule::Tier { show, actions, min_stack, min_item_tier, .. }) => (show, actions, min_stack, min_item_tier), _ => (None, None, None, None) };
+        let (old_show, old_actions, old_stack, old_it, old_conds) = match old {
+            Some(Rule::Tier { show, actions, min_stack, min_item_tier, conds, .. }) => (show, actions, min_stack, min_item_tier, conds), _ => (None, None, None, None, None) };
         rules.push(Rule::Tier { type_path: type_path.to_vec(), tier: tier.to_string(), show: show.or(old_show),
             actions: style.map(filter_core::rules::style_actions).or(old_actions), min_stack: min_stack.or(old_stack),
-            min_item_tier: min_item_tier.or(old_it) });
+            min_item_tier: min_item_tier.or(old_it), conds: old_conds });
     }
+}
+
+/// Changes a step's conditions (Tiers page chips): `set` keyword -> new value ("" removes that condition),
+/// `undo` puts those keywords back to NeverSink's.
+#[tauri::command]
+fn set_tier_conds(state: State<AppState>, id: String, type_path: Vec<String>, tier: String,
+                  set: std::collections::BTreeMap<String, String>, undo: Vec<String>) -> Result<Vec<String>, String> {
+    let mut store = state.store.lock().unwrap();
+    remember(&state, &store, &id, &format!("Step {}", filter_core::tiers::tier_name(&tier)));
+    let p = store.profiles.get_mut(&id).ok_or("Profile not found")?;
+    tier_edit(&mut p.rules, &type_path, &tier, None, None, None, None, false);
+    if let Some(Rule::Tier { conds, .. }) = p.rules.iter_mut().rev()
+        .find(|r| matches!(r, Rule::Tier { type_path: tp, tier: t, .. } if *tp == type_path && *t == tier)) {
+        let mut c = conds.take().unwrap_or_default();
+        for k in &undo { c.remove(k); }
+        c.extend(set);
+        *conds = if c.is_empty() { None } else { Some(c) };
+    }
+    save_and_build(&state, &store, &id)
 }
 
 /// Show/hide a whole tier, give it a new look, or put it back (reset).
@@ -2748,6 +2777,7 @@ pub fn run() {
             open_url,
             set_stack_tier,
             set_tier,
+            set_tier_conds,
             apply_level_preset,
             ask,
             get_history,

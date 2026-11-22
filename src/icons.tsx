@@ -32,10 +32,18 @@ export function useIcons(): Record<string, string> {
   return m;
 }
 
+/** Jewel bases poe.ninja's price lists leave out (cluster and abyss jewels): the game's own art (checked 23 Nov). */
+const JEWEL_CDN = "https://web.poecdn.com/image/Art/2DItems/Jewels/";
+const JEWEL_ART: Record<string, string> = {
+  "Small Cluster Jewel": "NewGemBase1", "Medium Cluster Jewel": "NewGemBase2", "Large Cluster Jewel": "NewGemBase3",
+  "Murderous Eye Jewel": "MurderousEye", "Searching Eye Jewel": "SearchingEye", "Ghastly Eye Jewel": "GhastlyEye",
+  "Crimson Jewel": "basicstr", "Viridian Jewel": "basicdex", "Cobalt Jewel": "basicint",
+};
+
 /** A unique's own picture first, then its base type's. */
 export function ItemIcon({ name, base, size = 32 }: { name?: string | null; base?: string | null; size?: number }) {
   const icons = useIcons();
-  const url = (name && icons[name]) || (base && icons[base]) || null;
+  const url = (name && icons[name]) || (base && icons[base]) || (base && JEWEL_ART[base] && JEWEL_CDN + JEWEL_ART[base] + ".png") || null;
   const [broken, setBroken] = useState(false);
   if (!url || broken) return null;
   return <img className="item-icon" src={url} alt="" width={size} height={size} loading="lazy" onError={() => setBroken(true)} />;
