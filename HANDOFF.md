@@ -48,14 +48,14 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
-- **One search, on Ctrl+F (23 Nov, not released yet).** He asked to merge the Find page and Ctrl+K and make Ctrl+F the key.
+- **One search, on Ctrl+F (23 Nov, released in 0.2.49).** He asked to merge the Find page and Ctrl+K and make Ctrl+F the key.
   - Ctrl+F opens the search box (Ctrl+K still works quietly); the sidebar button and Home show Ctrl+F. It lists items first,
     then Tiers rules, pages, help, and for 3+ words a "Make a change: “…”" row that runs the plain-words box.
   - The Find page is now **Change an item** (same menu spot, so Ctrl+1…9 are unchanged): no search box of its own; it
     shows the item you picked (with "Another item Ctrl+F") or a Search button, and the "Describe a change in your own
     words" box (a change typed in the search box arrives here and is worked out straight away; it still asks "Do it?").
   - preview-app.tsx: item_status sample now has the fields the panel needs.
-- **F2 one button, tracker fits its content, fairer "sells for about" (23 Nov, not released yet).** After his 0.2.48 test.
+- **F2 one button, tracker fits its content, fairer "sells for about" (23 Nov, released in 0.2.49).** After his 0.2.48 test.
   - F2: "Change this look" moved into the Shown by box, bottom right (the box itself is no longer a button; it went to the
     same place, he wanted one).
   - Map tracker: he meant "big enough to show everything", not zoom. The A−/A+ buttons are gone from it; `useFitHeight`
@@ -913,11 +913,11 @@ Confirmed in game so far: basic Ctrl+D price check (trade search returned listin
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
 **Tiers: step conditions, jewels first (23 Nov, released in 0.2.46):**
-- [ ] (not released yet) Ctrl+F opens the search box: pick an item and its edit panel opens; type "hide normal 2h swords"
+- [ ] (0.2.49) Ctrl+F opens the search box: pick an item and its edit panel opens; type "hide normal 2h swords"
   and Enter: the editor works out the change and asks "Do it?".
-- [ ] (not released yet) F2: one gold "Change this look" button inside the Shown by box.
-- [ ] (not released yet) Map tracker shows everything without scrolling (grows and shrinks with what it shows).
-- [ ] (not released yet) Ctrl+D "sells for about" sits near the 3rd cheapest listing.
+- [ ] (0.2.49) F2: one gold "Change this look" button inside the Shown by box.
+- [ ] (0.2.49) Map tracker shows everything without scrolling (grows and shrinks with what it shows).
+- [ ] (0.2.49) Ctrl+D "sells for about" sits near the 3rd cheapest listing.
 - [ ] (0.2.48) Ctrl+D: resist / life total rows show a T badge; a unique opens with its own numbers; "Instant buyout
   only" can be clicked off ("Any seller") and back on, then Search again.
 - [ ] (0.2.48) F2 on any item: a "Shown by" box names the Tiers section and step (with its conditions); click opens it.
