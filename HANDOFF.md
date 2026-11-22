@@ -47,7 +47,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 ## Done (recent sessions)
 - **Play tools (22 Nov, from the "what do players want" research: Exile UI, Exiled Exchange 2, PoE Overlay, Path of
-  Leveling, Reddit/forum asks).** Built on branch `ccr-26676017-7ecilq` while he was out, NOT merged/released yet.
+  Leveling, Reddit/forum asks).** Built on branch `ccr-26676017-7ecilq` while he was out; merged and released in 0.2.39 (22 Nov).
   Core `core/src/journey.rs` (tested), app `src-tauri/src/play_app.rs`, front end `src/Play.tsx` + `src/play.css`,
   main-window page "Play tools" (Your character group), windows `level`, `tracker`, `searches`, `sheet`, `notes`.
   - The Client.txt watcher (`start_whisper_watcher`) now always follows the log and hands every line to
@@ -683,7 +683,7 @@ Everything below was built since GROBBS last tested and has only been checked wi
 Confirmed in game so far: basic Ctrl+D price check (trade search returned listings); 20 Nov: weapon + armour
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
-**Play tools (22 Nov, branch `ccr-26676017-7ecilq`, not released yet):**
+**Play tools (22 Nov, released in 0.2.39):**
 - [ ] F8 levelling window: opens over the game without taking focus; moves to the next step when you enter a zone;
   ‹ › arrows; quest reward lines name your build's gems; "Type it" puts the gem search in a vendor's search box.
 - [ ] Levelling options on the Play tools page (league start, bandits, jump to act) keep your place.
@@ -710,7 +710,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Blight oils tab (F11) and the exchange check on Play tools.
 
 **Next test session (planned 21 Nov night, for 22 Nov).** Walk him through it a few at a time, between maps.
-Latest release is 0.2.38 (22 Nov): everything below is in it (0.2.38 added fixed base mods hidden, mod source badges, docked price window).
+Latest release is 0.2.39 (22 Nov, adds the Play tools + QoL wave 2 above); everything below is in it (0.2.38 added fixed base mods hidden, mod source badges, docked price window).
 **He plays on the installed release** (`%LOCALAPPDATA%\PoE Filter Editor\poe-filter-editor.exe`), not the dev
 editor, so unreleased things (e.g. Settings → Main window look) only reach him after a release.
 **22 Nov results:** 1. Grouped layout, low confidence and Dragon Turn +57 seen working; he wanted low confidence more
