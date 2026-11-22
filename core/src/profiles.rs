@@ -102,6 +102,14 @@ pub struct Settings {
     pub build_with_tree: bool,
     /// The game's passive skill tree key (P unless changed in the game's options).
     pub key_tree: String,
+    /// Play windows (22 Nov): levelling overlay, map tracker, search strings, cheat sheets, notes, and the wiki key.
+    /// Empty = no key. A key another program owns is skipped with a warning.
+    pub key_level: String,
+    pub key_tracker: String,
+    pub key_searches: String,
+    pub key_sheet: String,
+    pub key_notes: String,
+    pub key_wiki: String,
 }
 
 /// A hotkey that types one chat command in game.
@@ -119,7 +127,8 @@ impl Default for Settings {
             key_price: "Ctrl+D".into(), map_avoid: None,
             trade_helper: true, thanks_message: "thanks, good luck!".into(), chat_keys: vec![], map_tool: Default::default(),
             poe_account: String::new(), poesessid: String::new(), wealth_tabs: vec![], wealth_min: 10.0, earn_minutes: 3,
-            price_compare: true, price_rolls: true, price_instant_all: false, price_buyout_only: true, build_with_tree: false, key_tree: "P".into(), key_atlas: "F7".into() }
+            price_compare: true, price_rolls: true, price_instant_all: false, price_buyout_only: true, build_with_tree: false, key_tree: "P".into(), key_atlas: "F7".into(),
+            key_level: "F8".into(), key_tracker: "F9".into(), key_searches: "F10".into(), key_sheet: "F11".into(), key_notes: String::new(), key_wiki: "Alt+W".into() }
     }
 }
 

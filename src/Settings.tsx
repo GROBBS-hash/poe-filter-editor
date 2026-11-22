@@ -9,6 +9,7 @@ type Settings = {
   cycle_enabled: boolean; fallback_area_level: number; claude_api_key: string; map_avoid?: string[] | null;
   trade_helper?: boolean; thanks_message?: string; chat_keys?: { key: string; command: string }[];
   price_compare?: boolean; price_rolls?: boolean; price_instant_all?: boolean; price_buyout_only?: boolean; build_with_tree?: boolean; key_tree?: string;
+  key_level?: string; key_tracker?: string; key_searches?: string; key_sheet?: string; key_notes?: string; key_wiki?: string;
 };
 const CHAT_IDEAS = ["/hideout", "/kingsmarch", "/menagerie", "/delve", "/exit", "/invite", "/kick", "/afk"];
 
@@ -39,6 +40,16 @@ function KeyBox({ value, onChange, disabled }: { value: string; onChange: (k: st
         onChange(combo);
         (e.target as HTMLInputElement).blur();
       }} />
+  );
+}
+
+/** A key box with a ✕ to have no key at all (the play windows can also be opened from the Play tools page). */
+function ClearableKey({ value, onChange }: { value: string; onChange: (k: string) => void }) {
+  return (
+    <span className="row" style={{ margin: 0, flexWrap: "nowrap" }}>
+      <KeyBox value={value || "No key"} onChange={onChange} />
+      {value && <button className="link" title="No key" onClick={() => onChange("")}>✕</button>}
+    </span>
   );
 }
 
@@ -89,6 +100,12 @@ export default function SettingsPage() {
           <span>Show/hide your build (PoB)</span><KeyBox value={s.key_build ?? "F6"} onChange={(k) => set({ key_build: k })} />
           <span>Price check the item under your mouse</span><KeyBox value={s.key_price ?? "Ctrl+D"} onChange={(k) => set({ key_price: k })} />
           <span>Show/hide your atlas strategy (Atlas page)</span><KeyBox value={s.key_atlas ?? "F7"} onChange={(k) => set({ key_atlas: k })} />
+          <span>Show/hide the levelling route (Play tools)</span><ClearableKey value={s.key_level ?? "F8"} onChange={(k) => set({ key_level: k })} />
+          <span>Show/hide the map tracker and stopwatch</span><ClearableKey value={s.key_tracker ?? "F9"} onChange={(k) => set({ key_tracker: k })} />
+          <span>Open your saved stash and vendor searches</span><ClearableKey value={s.key_searches ?? "F10"} onChange={(k) => set({ key_searches: k })} />
+          <span>Show/hide cheat sheets (Syndicate and your pictures)</span><ClearableKey value={s.key_sheet ?? "F11"} onChange={(k) => set({ key_sheet: k })} />
+          <span>Show/hide your notes</span><ClearableKey value={s.key_notes ?? ""} onChange={(k) => set({ key_notes: k })} />
+          <span>Open the wiki page of the item under your mouse</span><ClearableKey value={s.key_wiki ?? "Alt+W"} onChange={(k) => set({ key_wiki: k })} />
           <label className="check"><input type="checkbox" checked={s.cycle_enabled} onChange={(e) => set({ cycle_enabled: e.target.checked })} />
             <span>Switch to your next filter (e.g. League Start → Strict 1 → Strict 2) and load it</span></label>
           <KeyBox value={s.key_cycle} disabled={!s.cycle_enabled} onChange={(k) => set({ key_cycle: k })} />

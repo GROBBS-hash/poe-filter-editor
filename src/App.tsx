@@ -20,6 +20,7 @@ import Gear from "./Gear";
 import MyBuild from "./MyBuild";
 import Maps from "./Maps";
 import Wealth from "./Wealth";
+import PlayTools from "./Play";
 import Atlas from "./Atlas";
 import Craft from "./Craft";
 import Home from "./Home";
@@ -28,7 +29,7 @@ import Search from "./Search";
 /** Where the main window's look is kept (Settings writes it too). */
 export const APP_LOOK_KEY = "app.look";
 
-type Tab = "home" | "help" | "find" | "presets" | "tiers" | "gear" | "build" | "maps" | "atlas" | "wealth" | "craft" | "edits" | "prices" | "themes" | "batch" | "profiles" | "settings";
+type Tab = "home" | "help" | "find" | "presets" | "tiers" | "gear" | "build" | "maps" | "atlas" | "wealth" | "craft" | "play" | "edits" | "prices" | "themes" | "batch" | "profiles" | "settings";
 
 /** Small line icons for the side menu. */
 /** Each page's colour: a tinted tile behind its menu icon (and page title) so the menu is easy to scan. */
@@ -36,7 +37,7 @@ const COLOURS: Record<Tab, string> = {
   find: "#6aa8ff", tiers: "#ff8a65", presets: "#b48cff", themes: "#ff7eb6", prices: "#5fd38a",
   edits: "#4fd1c5", batch: "#ffa95a",
   build: "#7ad0ff", gear: "#f0b45a",
-  maps: "#8bd67a", atlas: "#a78bfa", wealth: "#f5c542", craft: "#ff9f6b",
+  maps: "#8bd67a", atlas: "#a78bfa", wealth: "#f5c542", craft: "#ff9f6b", play: "#6fd0a6",
   profiles: "#9fb0c8", settings: "#9fb0c8", help: "#6aa8ff", home: "#e2b96f",
 };
 
@@ -54,6 +55,7 @@ const ICONS: Record<Tab, string> = {
   maps: "M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14",
   atlas: "M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 3v18M4 7.5l8 4.5 8-4.5",
   wealth: "M4 7h16v12H4zM4 7l2-3h12l2 3M9 12h6",
+  play: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2",
   craft: "M14 4l6 6-3 3-6-6zM11 7L4 14l2 2 7-7M6 16l-2 4 4-2M15 15l5 5",
   profiles: "M3 7h6l2 2h10v10H3zM3 7v12",
   settings: "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM19.4 15l1.6 1-2 3.4-1.8-.7a7 7 0 0 1-2 1.2L15 22h-4l-.3-2.1a7 7 0 0 1-2-1.2l-1.8.7-2-3.4 1.6-1a7 7 0 0 1 0-2.4l-1.6-1 2-3.4 1.8.7a7 7 0 0 1 2-1.2L11 2h4l.3 2.1a7 7 0 0 1 2 1.2l1.8-.7 2 3.4-1.6 1a7 7 0 0 1 0 2.4z",
@@ -86,6 +88,7 @@ const MENU: { group: string; sub?: string; colour?: string; items: MenuItem[] }[
   { group: "Your character", sub: "build and gear while levelling", colour: G_PLAY, items: [
     { id: "build", name: "My build", hint: "Your Path of Building gems, gear and tree, in game with F6" },
     { id: "gear", name: "Levelling gear", hint: "Uniques for your level and skill, with trade links" },
+    { id: "play", name: "Play tools", hint: "Levelling route, map tracker, searches, cheat sheets and notes over the game" },
   ] },
   { group: "Endgame", sub: "maps and atlas strategy", colour: G_PLAY, items: [
     { id: "maps", name: "Maps", hint: "Map regex for your stash, and buy maps you can run" },
@@ -282,7 +285,8 @@ export default function App() {
   const gameKey: Partial<Record<Tab, [string, string]>> = { edits: [keys.key_quick_edit ?? "F2", "In game: change the item under your mouse"],
     batch: [keys.key_batch ?? "F3", "In game: batch mode on/off"], build: [keys.key_build ?? "F6", "In game: show/hide your build"],
     atlas: [keys.key_atlas ?? "F7", "In game: show/hide your atlas strategy"], prices: [keys.key_price ?? "Ctrl+D", "In game: price check the item under your mouse"],
-    profiles: [keys.key_reload ?? "F4", "In game: reload your filter"] };
+    profiles: [keys.key_reload ?? "F4", "In game: reload your filter"],
+    play: [keys.key_level ?? "F8", "In game: show/hide the levelling route (F9 map tracker, F10 searches, F11 cheat sheets)"] };
   const item = (i: MenuItem) => {
     const n = pages.indexOf(i.id) + 1;
     const here = i.id === "find" ? "Ctrl+F" : n >= 1 && n <= 9 ? `Ctrl+${n}` : "";
@@ -346,6 +350,7 @@ export default function App() {
       {tab === "maps" && <Maps />}
       {tab === "atlas" && <Atlas />}
       {tab === "wealth" && <Wealth />}
+      {tab === "play" && <PlayTools />}
       {tab === "craft" && <Craft />}
       {tab === "tiers" && <Tiers profile={active} onChange={refresh} focus={focus?.kind === "neversink" ? focus : null} />}
       {tab === "presets" && <Find key="presets" view="presets" onChange={refresh} />}

@@ -4,14 +4,15 @@
 //!
 //! - "build" (F6) and "atlas" (F7): place and size; they have a resize grip.
 //! - "trades", "earnings" and "batch": place only (they size themselves to what they show).
+//! - Play windows (22 Nov): "sheet" and "notes" place and size; "level", "tracker" and "searches" place only.
 
 use super::*;
 use std::collections::HashMap;
 
 /// Windows whose size is remembered too.
-const SIZED: [&str; 2] = ["build", "atlas"];
+const SIZED: [&str; 4] = ["build", "atlas", "sheet", "notes"];
 /// Windows whose place is remembered.
-const PLACED: [&str; 5] = ["build", "atlas", "trades", "earnings", "batch"];
+const PLACED: [&str; 10] = ["build", "atlas", "trades", "earnings", "batch", "level", "tracker", "searches", "sheet", "notes"];
 
 #[derive(Serialize, serde::Deserialize, Clone, Copy, PartialEq)]
 struct Place { x: i32, y: i32, w: u32, h: u32 }

@@ -244,6 +244,19 @@ pub fn guild_stash_tab(account: &str, sessid: &str, league: &str, poe2: bool, in
     stash_page("get-guild-stash-items", account, sessid, league, poe2, index, with_tabs)
 }
 
+/// Your characters (name, league, class, level, experience) from pathofexile.com, signed in with your POESESSID.
+/// The map tracker reads experience from it for XP per hour.
+pub fn characters(account: &str, sessid: &str, poe2: bool) -> Result<Value, String> {
+    let url = format!("https://www.pathofexile.com/character-window/get-characters?accountName={}&realm={}",
+        enc(account), if poe2 { "poe2" } else { "pc" });
+    let req = ureq::get(&url).set("Cookie", &format!("POESESSID={}", sessid.trim()));
+    match call("stash", req, None) {
+        Ok(v) if v.get("error").is_some() => Err(stash_error(&v["error"]["message"].as_str().unwrap_or("").to_string())),
+        Ok(v) => Ok(v),
+        Err(e) => Err(e),
+    }
+}
+
 fn stash_page(kind: &str, account: &str, sessid: &str, league: &str, poe2: bool, index: usize, with_tabs: bool) -> Result<Value, String> {
     let url = format!("https://www.pathofexile.com/character-window/{kind}?accountName={}&realm={}&league={}&tabs={}&tabIndex={}",
         enc(account), if poe2 { "poe2" } else { "pc" }, enc(league), if with_tabs { 1 } else { 0 }, index);

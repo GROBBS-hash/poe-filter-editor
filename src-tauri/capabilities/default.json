@@ -9,7 +9,12 @@
     "trades",
     "earnings",
     "batch",
-    "atlas"
+    "atlas",
+    "level",
+    "tracker",
+    "searches",
+    "sheet",
+    "notes"
   ],
   "permissions": [
     "core:default",

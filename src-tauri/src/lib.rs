@@ -3,6 +3,7 @@ mod screen;
 mod trade_api;
 mod wealth_app;
 mod atlas_app;
+mod play_app;
 mod win_place;
 mod updates;
 
@@ -56,7 +57,7 @@ struct AppState {
 }
 
 #[derive(Clone, Copy, PartialEq)]
-enum HotAction { QuickEdit, Batch, Reload, Cycle, Build, Price, Atlas, Chat(usize) }
+enum HotAction { QuickEdit, Batch, Reload, Cycle, Build, Price, Atlas, Chat(usize), Play(&'static str), Wiki }
 
 /// (Re)registers hotkeys from settings. Errors name the key that failed.
 fn register_hotkeys(app: &AppHandle, s: &Settings) -> Result<(), String> {
@@ -69,12 +70,22 @@ fn register_hotkeys(app: &AppHandle, s: &Settings) -> Result<(), String> {
     }
     // Last, so a clash skips the atlas key and keeps the older ones.
     if !s.key_atlas.trim().is_empty() { wanted.push((s.key_atlas.as_str(), HotAction::Atlas)); }
+    // The play windows' keys (22 Nov): new, so like the atlas key a clash or a key another program owns skips just that one.
+    for (key, label) in [(&s.key_level, "level"), (&s.key_tracker, "tracker"), (&s.key_searches, "searches"), (&s.key_sheet, "sheet"), (&s.key_notes, "notes")] {
+        if !key.trim().is_empty() { wanted.push((key.as_str(), HotAction::Play(label))); }
+    }
+    if !s.key_wiki.trim().is_empty() { wanted.push((s.key_wiki.as_str(), HotAction::Wiki)); }
     let mut parsed = Vec::new();
     for (key, action) in wanted {
-        let sc: Shortcut = key.parse().map_err(|_| format!("“{key}” isn't a key the app understands"))?;
+        let soft = matches!(action, HotAction::Atlas | HotAction::Play(_) | HotAction::Wiki);
+        let sc: Shortcut = match key.parse() {
+            Ok(sc) => sc,
+            Err(_) if soft => { let _ = app.emit("hotkey-warning", format!("“{key}” isn't a key the app understands: pick another in Settings")); continue; }
+            Err(_) => return Err(format!("“{key}” isn't a key the app understands")),
+        };
         if parsed.iter().any(|(p, _): &(Shortcut, HotAction)| p.id() == sc.id()) {
-            // The atlas key is new: if it clashes with one he already uses, skip it rather than lose his other keys.
-            if action == HotAction::Atlas {
+            // The newer keys: if one clashes with a key he already uses, skip it rather than lose his other keys.
+            if soft {
                 let _ = app.emit("hotkey-warning", format!("The atlas strategy key “{key}” is already used for something else: pick another in Settings"));
                 continue;
             }
@@ -96,6 +107,9 @@ fn register_hotkeys(app: &AppHandle, s: &Settings) -> Result<(), String> {
             }
             Err(e) if action == HotAction::Atlas => {
                 let _ = app.emit("hotkey-warning", format!("Atlas strategy key unavailable (another program may own it): {e}"));
+            }
+            Err(e) if matches!(action, HotAction::Play(_) | HotAction::Wiki) => {
+                let _ = app.emit("hotkey-warning", format!("A play window key is unavailable (another program may own it): {e}"));
             }
             Err(e) if matches!(action, HotAction::Chat(_)) => {
                 let _ = app.emit("hotkey-warning", format!("A chat hotkey is unavailable (another program may own it): {e}"));
@@ -743,6 +757,10 @@ fn show_price(app: &AppHandle, payload: PriceCheck, text: &str, compare: bool) {
                 let bad = s.map_tool.bad.clone().unwrap_or_else(|| filter_core::mapregex::default_bad(&mods, s.map_avoid.as_deref()));
                 filter_core::maps::map_info_bad(&text, &mods, &bad)
             });
+            // The map tracker shows these mods on the next map you open.
+            if let Some(m) = payload.map.as_ref() {
+                play_app::note_map_check(it.name.as_deref().unwrap_or(&it.base_type), m.mods.iter().map(|x| x.text.clone()).collect());
+            }
         }
     }
     if let Some(it) = payload.setup.as_ref().map(|s| s.item.clone()) {
@@ -1212,13 +1230,16 @@ fn start_whisper_watcher(app: AppHandle) {
         loop {
             thread::sleep(Duration::from_millis(400));
             let state = app.state::<AppState>();
-            if !state.store.lock().unwrap().settings.trade_helper { continue; }
+            // The play windows (levelling, map tracker) read the log too, so it's always followed (22 Nov);
+            // only the trade pop-ups depend on the trade helper being on.
+            let trades_on = state.store.lock().unwrap().settings.trade_helper;
             if log.is_none() {
                 if last_look.elapsed() < Duration::from_secs(30) { continue; }
                 last_look = std::time::Instant::now();
                 let poe2 = active_game(&state) == Game::Poe2;
-                // Start at the end: only new whispers.
+                // Start at the end: only new whispers. Where you are and who you play come from the end of the log.
                 log = find_log(poe2, &[]).and_then(|p| std::fs::metadata(&p).ok().map(|m| (p, m.len())));
+                if let Some((p, _)) = &log { play_app::prime(&app, p); }
                 continue;
             }
             let Some((path, offset)) = log.as_mut() else { continue };
@@ -1235,6 +1256,8 @@ fn start_whisper_watcher(app: AppHandle) {
             let keep = match partial.rfind('\n') { Some(i) => partial.split_off(i + 1), None => continue };
             let lines = std::mem::replace(&mut partial, keep);
             for line in lines.lines() {
+                play_app::on_line(&app, line);
+                if !trades_on { continue; }
                 let Some(ev) = filter_core::whispers::parse_line(line) else { continue };
                 let is_trade = matches!(&ev, filter_core::whispers::LogEvent::Whisper(w) if w.item.is_some());
                 let Some(w) = app.get_webview_window("trades") else { continue };
@@ -2493,7 +2516,7 @@ pub fn run() {
         .plugin(tauri_plugin_window_state::Builder::default()
             .with_state_flags(tauri_plugin_window_state::StateFlags::SIZE | tauri_plugin_window_state::StateFlags::POSITION
                 | tauri_plugin_window_state::StateFlags::MAXIMIZED)
-            .with_denylist(&["overlay", "build", "trade", "trades", "earnings", "atlas", "batch"]).build())
+            .with_denylist(&["overlay", "build", "trade", "trades", "earnings", "atlas", "batch", "level", "tracker", "searches", "sheet", "notes"]).build())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(move |app, sc, ev| {
@@ -2527,6 +2550,10 @@ pub fn run() {
                         }
                     } else if action == Some(HotAction::Atlas) {
                         atlas_app::toggle_atlas_window(app);
+                    } else if let Some(HotAction::Play(label)) = action {
+                        play_app::toggle(app, label);
+                    } else if action == Some(HotAction::Wiki) {
+                        play_app::wiki_lookup(app.clone());
                     } else if action == Some(HotAction::Build) {
                         toggle_build_window(app);
                     } else if action == Some(HotAction::Batch) {
@@ -2549,6 +2576,7 @@ pub fn run() {
             }
             start_batch_watcher(app.handle().clone());
             start_whisper_watcher(app.handle().clone());
+            play_app::start_xp_watch(app.handle().clone());
             start_tree_watcher(app.handle().clone());
             start_live_searches(app.handle().clone());
             wealth_app::start_session_timer(app.handle().clone());
@@ -2646,6 +2674,10 @@ pub fn run() {
             hide_build_window,
             atlas_app::atlas_list, atlas_app::atlas_import, atlas_app::atlas_rename, atlas_app::atlas_delete, atlas_app::atlas_use,
             atlas_app::atlas_own_notes, atlas_app::atlas_official_link, atlas_app::hide_atlas_window,
+            play_app::level_view, play_app::level_move, play_app::level_jump_act, play_app::level_options, play_app::play_view,
+            play_app::maps_done, play_app::maps_history, play_app::maps_clear, play_app::watch_action, play_app::searches_get,
+            play_app::searches_save, play_app::search_type, play_app::stash_highlight, play_app::sheets_list, play_app::sheets_add,
+            play_app::sheets_remove, play_app::notes_get, play_app::notes_save, play_app::play_toggle, play_app::play_hide,
             open_rule,
             gear_picks,
             open_url,

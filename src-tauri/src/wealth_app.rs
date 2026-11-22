@@ -187,7 +187,7 @@ pub struct WealthView {
     missed: Vec<Valued>,
     last_items: Vec<Valued>,
     sessions: Vec<Session>,
-    current: Option<Session>,
+    pub current: Option<Session>,
     strategies: Vec<(String, usize, f64, f64)>,
     profiles: Vec<ScanProfile>,
     active: Option<String>,

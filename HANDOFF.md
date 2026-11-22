@@ -40,8 +40,42 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 - **F3** batch mode, **F4** reload filter in game, **F5** cycle filters (off by default), **F6** build window (PoB gems/gear/tree).
 - **F7** atlas strategy window (`atlas`; Endgame → Atlas picks which one).
 - **Ctrl+D** price check (new, own window `trade`). Changeable in Settings; skipped quietly if another app owns it.
+- **Play windows (22 Nov):** **F8** levelling route, **F9** map tracker + XP/h + stopwatch, **F10** saved searches,
+  **F11** cheat sheets (Syndicate + his pictures), notes (no key by default), **Alt+W** wiki page of the hovered item.
+  Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **Play tools (22 Nov, from the "what do players want" research: Exile UI, Exiled Exchange 2, PoE Overlay, Path of
+  Leveling, Reddit/forum asks).** Built on branch `ccr-26676017-7ecilq` while he was out, NOT merged/released yet.
+  Core `core/src/journey.rs` (tested), app `src-tauri/src/play_app.rs`, front end `src/Play.tsx` + `src/play.css`,
+  main-window page "Play tools" (Your character group), windows `level`, `tracker`, `searches`, `sheet`, `notes`.
+  - The Client.txt watcher (`start_whisper_watcher`) now always follows the log and hands every line to
+    `play_app::on_line`; trade pop-ups still only when the trade helper is on. On finding the log, `play_app::prime`
+    reads the last 4 MB for current zone + character. Live events are stamped with real time (the log's clock is local).
+  - **Levelling (F8):** route/zones/quest rewards from HeartofPhos/exile-leveling (MIT), rebuilt with
+    `node tools/build_levelling.mjs <exile-leveling clone>` → `core/data/levelling.json`. Step pointer per character
+    (play.json `level_pos`), moves on "Generating level N area <id>" (enter/waypoint to that zone, logout = act town;
+    looks 30 steps ahead, 12 behind). Options: league start, bandits, library, follow on/off, jump to act (Play tools
+    page). Shows quest gems your PoB build wants for your class ("Take X as your reward" / "Buy X from Nessa"), zone
+    level vs yours with PoE 1's XP penalty, and a vendor search of your build's gems (shortest unique bits, 250 chars).
+    PoE 1 only (the route is PoE 1's campaign).
+  - **Map tracker (F9):** `MapTracker` counts runs from zone loads (map areas start "Map", same seed = same map, portals
+    back in counted, hideout time not counted), deaths of your character, Done button. A Ctrl+D map check in the
+    10 minutes before attaches its mods. With an earnings session running, `made` = session value change over the run
+    (rough: sessions check every few minutes). History (500) in play.json; table on the Play tools page.
+    XP per hour: `trade_api::characters` (get-characters with his POESESSID, rate kind "stash") once a minute while
+    the tracker is open; time to next level from the game's XP table. Stopwatch with laps.
+  - **Searches (F10):** saved searches (play.json, editable on the page; defaults: movement speed, 3-links, RGB,
+    life/res, quality gems) plus "made for you" (build gems, Maps page regex). Click = focus game, Ctrl+F, Ctrl+A,
+    Ctrl+V (pasted, not typed, so stray letters never hit skill keys; clipboard restored). Wealth → Worth selling has
+    "Highlight in stash" (`stash_highlight`, item names, 250-char cap, most valuable first).
+  - **Cheat sheets (F11):** Syndicate table from Lailloken/Exile-UI Betrayal.json (MIT, data dated 12 Nov 2026),
+    rebuilt with `node tools/build_syndicate.mjs <Betrayal.json>` → `src/data/syndicate.json`; click cells to mark
+    picks (localStorage), find box dims the rest. Plus his own pictures: added on the page, copied to the data
+    folder's `cheatsheets`, shown as tabs.
+  - **Notes** window (notes.txt, saved as you type) and **wiki key** (Ctrl+C the hovered item → poewiki.net /
+    poe2wiki.net, uniques by name, else base).
+  - Checked here: cargo check of the app (Linux), all Rust tests, tsc, and screenshots of every window with sample data.
 - Filter editing: Find, Tiers (FilterBlade-style drag & drop, show/hide, restyle, copy/paste, stack sizes, item tiers 3.30),
   "Opened rule" view for any NeverSink rule that isn't a tier list, Presets (levelling like FilterBlade auto-adjust:
   build buttons, weapon types, armour types, vendor rares, rares-only after area 16), Themes, Prices (off by default),
@@ -620,6 +654,22 @@ Everything below was built since GROBBS last tested and has only been checked wi
 Confirmed in game so far: basic Ctrl+D price check (trade search returned listings); 20 Nov: weapon + armour
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
+**Play tools (22 Nov, branch `ccr-26676017-7ecilq`, not released yet):**
+- [ ] F8 levelling window: opens over the game without taking focus; moves to the next step when you enter a zone;
+  ‹ › arrows; quest reward lines name your build's gems; "Type it" puts the gem search in a vendor's search box.
+- [ ] Levelling options on the Play tools page (league start, bandits, jump to act) keep your place.
+- [ ] F9 map tracker: timer starts on entering a map, pauses in hideout, portals back in counted, deaths counted
+  (yours only), Done button; a Ctrl+D map check just before shows that map's mods; Play tools table fills up.
+- [ ] XP per hour shows after a couple of minutes with the tracker open (needs the Wealth page's account + POESESSID).
+- [ ] Stopwatch start / pause / lap / reset.
+- [ ] F10 searches: clicking one with the stash or a vendor open puts it in the search box (and nothing happens in
+  game when no search box is open). Your own searches can be added on the Play tools page.
+- [ ] Wealth → Worth selling → "Highlight in stash" lights up those items.
+- [ ] F11 cheat sheets: Syndicate table readable, marking cells sticks, added pictures show as tabs; resizes and remembers size.
+- [ ] Notes window (set a key first) saves as you type; Esc gives the game back its focus.
+- [ ] Alt+W opens the wiki page of the item under the mouse.
+- [ ] None of F8-F11 / Alt+W clash with his other tools (Settings → Hotkeys to change or clear).
+
 **Next test session (planned 21 Nov night, for 22 Nov).** Walk him through it a few at a time, between maps.
 Latest release is 0.2.38 (22 Nov): everything below is in it (0.2.38 added fixed base mods hidden, mod source badges, docked price window).
 **He plays on the installed release** (`%LOCALAPPDATA%\PoE Filter Editor\poe-filter-editor.exe`), not the dev
@@ -1038,6 +1088,9 @@ when the game window isn't found. Check in game: the window's spot, and that it 
       "Best strategies" ranks runs.
 
 ## Left to do (agreed order)
+0. **Play tools (22 Nov) are on branch `ccr-26676017-7ecilq`:** merge into main once he's had a look (Start editor.bat
+   only pulls main), then release. Ideas not built yet from the same research: live rank/race tracker (PoeRank-style),
+   bulk-selling helper (Bulky-style), lab layout of the day, levelling for PoE 2's campaign.
 1. **GROBBS to work through "Still to check in game" above**; fix what he reports.
 2. Wealth tracker follow-ups (real account tested and rares priced via the trade site, 21 Nov):
    "search every tab" done 21 Nov; guild stash built 21 Nov on branch `guild-stash` (awaiting approval); crafting planner done (0.2.32).

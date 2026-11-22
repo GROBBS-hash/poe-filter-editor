@@ -1,0 +1,788 @@
+{
+ "credit": "Syndicate rewards from Exile UI by Lailloken (MIT).",
+ "updated": "2026-11-12, 14:00 (utc)",
+ "members": [
+  {
+   "id": "aisling",
+   "name": "Aisling",
+   "jobs": {
+    "transportation": [
+     {
+      "kind": "",
+      "what": "double-veiled items"
+     },
+     {
+      "kind": "",
+      "what": "boots"
+     }
+    ],
+    "fortification": [
+     {
+      "kind": "crafting bench",
+      "what": "veiled exalt"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "boots"
+     }
+    ],
+    "research": [
+     {
+      "kind": "crafting bench",
+      "what": "veiled chaos"
+     },
+     {
+      "kind": "timed crafting",
+      "what": "boots"
+     }
+    ],
+    "intervention": [
+     {
+      "kind": "trapped chest",
+      "what": "unique gloves"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "gloves"
+     }
+    ]
+   }
+  },
+  {
+   "id": "cameria",
+   "name": "Cameria",
+   "jobs": {
+    "transportation": [
+     {
+      "kind": "allflame embers",
+      "what": "toads"
+     },
+     {
+      "kind": "",
+      "what": "ring"
+     }
+    ],
+    "fortification": [
+     {
+      "kind": "trapped chest",
+      "what": "jewels"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "rings"
+     }
+    ],
+    "research": [
+     {
+      "kind": "crafting bench",
+      "what": "jewels"
+     },
+     {
+      "kind": "timed crafting",
+      "what": "ring"
+     }
+    ],
+    "intervention": [
+     {
+      "kind": "trapped chest",
+      "what": "unique axes"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "axes"
+     }
+    ]
+   }
+  },
+  {
+   "id": "elreon",
+   "name": "Elreon",
+   "jobs": {
+    "transportation": [
+     {
+      "kind": "allflame embers",
+      "what": "divine"
+     },
+     {
+      "kind": "",
+      "what": "shield"
+     }
+    ],
+    "fortification": [
+     {
+      "kind": "trapped chest",
+      "what": "vaaled gear"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "shields"
+     }
+    ],
+    "research": [
+     {
+      "kind": "crafting bench",
+      "what": "tainted orbs"
+     },
+     {
+      "kind": "timed crafting",
+      "what": "shield"
+     }
+    ],
+    "intervention": [
+     {
+      "kind": "trapped chest",
+      "what": "unique staves"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "staves"
+     }
+    ]
+   }
+  },
+  {
+   "id": "gravicius",
+   "name": "Gravicius",
+   "jobs": {
+    "transportation": [
+     {
+      "kind": "",
+      "what": "div card stack"
+     },
+     {
+      "kind": "",
+      "what": "body armor"
+     }
+    ],
+    "fortification": [
+     {
+      "kind": "trapped chest",
+      "what": "div cards"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "body armors"
+     }
+    ],
+    "research": [
+     {
+      "kind": "trade 1 div card",
+      "what": "for a random one"
+     },
+     {
+      "kind": "timed crafting",
+      "what": "body armors"
+     }
+    ],
+    "intervention": [
+     {
+      "kind": "trapped chest",
+      "what": "unique sceptres/wands"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "sceptres/wands"
+     }
+    ]
+   }
+  },
+  {
+   "id": "guff",
+   "name": "Guff",
+   "jobs": {
+    "transportation": [
+     {
+      "kind": "",
+      "what": "random currency"
+     },
+     {
+      "kind": "",
+      "what": "gloves"
+     }
+    ],
+    "fortification": [
+     {
+      "kind": "trapped chest",
+      "what": "rare gear"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "gloves"
+     }
+    ],
+    "research": [
+     {
+      "kind": "crafting bench",
+      "what": "reflecting mist"
+     },
+     {
+      "kind": "timed crafting",
+      "what": "gloves"
+     }
+    ],
+    "intervention": [
+     {
+      "kind": "trapped chest",
+      "what": "unique shields"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "shields"
+     }
+    ]
+   }
+  },
+  {
+   "id": "haku",
+   "name": "Haku",
+   "jobs": {
+    "transportation": [
+     {
+      "kind": "",
+      "what": "unique strongbox"
+     },
+     {
+      "kind": "",
+      "what": "higher-rarity items"
+     }
+    ],
+    "fortification": [
+     {
+      "kind": "allflame embers",
+      "what": "flesh"
+     },
+     {
+      "kind": "",
+      "what": "mixed items"
+     }
+    ],
+    "research": [
+     {
+      "kind": "crafting bench",
+      "what": "influence exalts"
+     },
+     {
+      "kind": "",
+      "what": "allflame embers"
+     }
+    ],
+    "intervention": [
+     {
+      "kind": "trapped chest",
+      "what": "unique maces"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "maces"
+     }
+    ]
+   }
+  },
+  {
+   "id": "hillock",
+   "name": "Hillock",
+   "jobs": {
+    "transportation": [
+     {
+      "kind": "trapped chest",
+      "what": "influenced gear"
+     },
+     {
+      "kind": "",
+      "what": "belt"
+     }
+    ],
+    "fortification": [
+     {
+      "kind": "crafting bench",
+      "what": "influence exalts"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "belts"
+     }
+    ],
+    "research": [
+     {
+      "kind": "crafting bench",
+      "what": "eldritch implicit"
+     },
+     {
+      "kind": "timed crafting",
+      "what": "belts"
+     }
+    ],
+    "intervention": [
+     {
+      "kind": "trapped chest",
+      "what": "unique body armor"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "body armor"
+     }
+    ]
+   }
+  },
+  {
+   "id": "it",
+   "name": "It That Fled",
+   "jobs": {
+    "transportation": [
+     {
+      "kind": "trapped chest",
+      "what": "foulborn uniques"
+     },
+     {
+      "kind": "",
+      "what": "jewel"
+     }
+    ],
+    "fortification": [
+     {
+      "kind": "crafting bench",
+      "what": "breach ring"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "jewels"
+     }
+    ],
+    "research": [
+     {
+      "kind": "crafting bench",
+      "what": "tainted sockets"
+     },
+     {
+      "kind": "timed crafting",
+      "what": "jewels"
+     }
+    ],
+    "intervention": [
+     {
+      "kind": "trapped chest",
+      "what": "unique amulets"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "amulets"
+     }
+    ]
+   }
+  },
+  {
+   "id": "janus",
+   "name": "Janus",
+   "jobs": {
+    "transportation": [
+     {
+      "kind": "",
+      "what": "gold piles"
+     },
+     {
+      "kind": "",
+      "what": "basic currency"
+     }
+    ],
+    "fortification": [
+     {
+      "kind": "allflame embers",
+      "what": "gilded"
+     },
+     {
+      "kind": "",
+      "what": "quality currency"
+     }
+    ],
+    "research": [
+     {
+      "kind": "unique vendor",
+      "what": "(gold prices)"
+     },
+     {
+      "kind": "",
+      "what": "allflame embers"
+     }
+    ],
+    "intervention": [
+     {
+      "kind": "trapped chest",
+      "what": "unique rings"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "rings"
+     }
+    ]
+   }
+  },
+  {
+   "id": "jorgin",
+   "name": "Jorgin",
+   "jobs": {
+    "transportation": [
+     {
+      "kind": "allflame embers",
+      "what": "resplendence"
+     },
+     {
+      "kind": "",
+      "what": "amulet"
+     }
+    ],
+    "fortification": [
+     {
+      "kind": "trapped chest",
+      "what": "delve gear"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "amulets"
+     }
+    ],
+    "research": [
+     {
+      "kind": "crafting bench",
+      "what": "talisman"
+     },
+     {
+      "kind": "timed crafting",
+      "what": "amulet"
+     }
+    ],
+    "intervention": [
+     {
+      "kind": "trapped chest",
+      "what": "unique belts"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "belts"
+     }
+    ]
+   }
+  },
+  {
+   "id": "korell",
+   "name": "Korell",
+   "jobs": {
+    "transportation": [
+     {
+      "kind": "allflame embers",
+      "what": "cloister"
+     },
+     {
+      "kind": "",
+      "what": "helmet"
+     }
+    ],
+    "fortification": [
+     {
+      "kind": "trapped chest",
+      "what": "essence gear"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "helmets"
+     }
+    ],
+    "research": [
+     {
+      "kind": "crafting bench",
+      "what": "essences"
+     },
+     {
+      "kind": "timed crafting",
+      "what": "helmets"
+     }
+    ],
+    "intervention": [
+     {
+      "kind": "trapped chest",
+      "what": "unique boots"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "boots"
+     }
+    ]
+   }
+  },
+  {
+   "id": "leo",
+   "name": "Leo",
+   "jobs": {
+    "transportation": [
+     {
+      "kind": "allflame embers",
+      "what": "multitude"
+     },
+     {
+      "kind": "",
+      "what": "flask"
+     }
+    ],
+    "fortification": [
+     {
+      "kind": "trapped chest",
+      "what": "vaaled uniques"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "flasks"
+     }
+    ],
+    "research": [
+     {
+      "kind": "crafting bench",
+      "what": "djinn vaal orb"
+     },
+     {
+      "kind": "",
+      "what": "allflame embers"
+     }
+    ],
+    "intervention": [
+     {
+      "kind": "trapped chest",
+      "what": "unique helmets"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "helmets"
+     }
+    ]
+   }
+  },
+  {
+   "id": "riker",
+   "name": "Riker",
+   "jobs": {
+    "transportation": [
+     {
+      "kind": "",
+      "what": "unique items"
+     },
+     {
+      "kind": "",
+      "what": "quiver"
+     }
+    ],
+    "fortification": [
+     {
+      "kind": "",
+      "what": "ancient orbs"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "quivers"
+     }
+    ],
+    "research": [
+     {
+      "kind": "crafting bench",
+      "what": "ancient orb"
+     },
+     {
+      "kind": "",
+      "what": "fractured item"
+     }
+    ],
+    "intervention": [
+     {
+      "kind": "trapped chest",
+      "what": "unique items"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "items (random class)"
+     }
+    ]
+   }
+  },
+  {
+   "id": "rin",
+   "name": "Rin",
+   "jobs": {
+    "transportation": [
+     {
+      "kind": "",
+      "what": "originator maps"
+     },
+     {
+      "kind": "",
+      "what": "map"
+     }
+    ],
+    "fortification": [
+     {
+      "kind": "",
+      "what": "threads"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "maps"
+     }
+    ],
+    "research": [
+     {
+      "kind": "trapped chest",
+      "what": "threads"
+     },
+     {
+      "kind": "",
+      "what": "allflame embers"
+     }
+    ],
+    "intervention": [
+     {
+      "kind": "trapped chest",
+      "what": "unique maps"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "maps"
+     }
+    ]
+   }
+  },
+  {
+   "id": "tora",
+   "name": "Tora",
+   "jobs": {
+    "transportation": [
+     {
+      "kind": "qual. gems /",
+      "what": "facetor's lens"
+     },
+     {
+      "kind": "",
+      "what": "skill/support gems"
+     }
+    ],
+    "fortification": [
+     {
+      "kind": "trapped chest",
+      "what": "gems"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "gems"
+     }
+    ],
+    "research": [
+     {
+      "kind": "crafting bench",
+      "what": "gems"
+     },
+     {
+      "kind": "",
+      "what": "allflame embers"
+     }
+    ],
+    "intervention": [
+     {
+      "kind": "trapped chest",
+      "what": "unique bows"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "bows"
+     }
+    ]
+   }
+  },
+  {
+   "id": "vagan",
+   "name": "Vagan",
+   "jobs": {
+    "transportation": [
+     {
+      "kind": "allflame embers",
+      "what": "wildwood"
+     },
+     {
+      "kind": "",
+      "what": "allflame embers"
+     }
+    ],
+    "fortification": [
+     {
+      "kind": "trapped chest",
+      "what": "enshrouded uniques"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "weapons"
+     }
+    ],
+    "research": [
+     {
+      "kind": "crafting bench",
+      "what": "chaos orb + fracture"
+     },
+     {
+      "kind": "timed crafting",
+      "what": "weapon"
+     }
+    ],
+    "intervention": [
+     {
+      "kind": "trapped chest",
+      "what": "unique swords"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "swords"
+     }
+    ]
+   }
+  },
+  {
+   "id": "vorici",
+   "name": "Vorici",
+   "jobs": {
+    "transportation": [
+     {
+      "kind": "",
+      "what": "currency stacks"
+     },
+     {
+      "kind": "apply chromatics",
+      "what": "10 / 15 / 20 / 30"
+     }
+    ],
+    "fortification": [
+     {
+      "kind": "apply jeweller's / chromes /",
+      "what": "fusings to your item"
+     },
+     {
+      "kind": "apply jeweller's",
+      "what": "10 / 15 / 20 / 30"
+     }
+    ],
+    "research": [
+     {
+      "kind": "trapped chest",
+      "what": "soul core'd qual gems"
+     },
+     {
+      "kind": "apply fusings",
+      "what": "10 / 15 / 20 / 30"
+     }
+    ],
+    "intervention": [
+     {
+      "kind": "trapped chest",
+      "what": "unique daggers + claws"
+     },
+     {
+      "kind": "trapped chest",
+      "what": "daggers + claws"
+     }
+    ]
+   }
+  }
+ ]
+}

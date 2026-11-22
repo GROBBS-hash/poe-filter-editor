@@ -10,6 +10,7 @@ pub mod gear;
 pub mod history;
 pub mod ground;
 pub mod item;
+pub mod journey;
 pub mod maps;
 pub mod mapregex;
 pub mod neversink;

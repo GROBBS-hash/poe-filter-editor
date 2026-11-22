@@ -397,6 +397,7 @@ export default function Wealth() {
           <p className="muted small">Items from your last scan worth at least
             <input className="num w-min" type="number" min={0} value={v.min} onChange={(e) => prefs({ min: +e.target.value })} /> chaos
             that don't have a price note yet. Scan again after changing this.</p>
+          {v.missed.length > 0 && <HighlightInStash names={v.missed.map((m) => m.name)} />}
           {v.missed.length === 0 ? <p className="muted small">{last ? "Nothing unlisted above that value." : "Scan your stash first."}</p> : (
             <table className="w-table w-missed"><tbody>
               {v.missed.map((m, i) => (
@@ -482,5 +483,24 @@ export default function Wealth() {
         </div>
       )}
     </>
+  );
+}
+
+/** Lights these items up in the game's stash: types a search of their names into the stash search box (it's also
+ *  copied). The game's box holds 250 characters, so a long list starts with the most valuable ones. */
+function HighlightInStash({ names }: { names: string[] }) {
+  const [note, setNote] = useState("");
+  const go = (typeIt: boolean) => {
+    setNote("");
+    invoke<[string, number]>("stash_highlight", { names, typeIt })
+      .then(([, n]) => setNote(`${typeIt ? "Typed in game" : "Copied"}: ${n} of ${new Set(names).size} item names fit${n < new Set(names).size ? " (the game allows 250 characters)" : ""}.`))
+      .catch((e) => setNote(friendly(e)));
+  };
+  return (
+    <div className="row">
+      <button onClick={() => go(true)} title="Open your stash in game first. Puts the search in with Ctrl+F.">Highlight in stash</button>
+      <button className="link" onClick={() => go(false)}>Just copy the search</button>
+      {note && <span className="muted small">{note}</span>}
+    </div>
   );
 }
