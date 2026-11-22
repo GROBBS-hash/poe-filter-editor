@@ -2019,3 +2019,64 @@ body:not(.look-calm) .menu-group.has-g .menu-item::before { left: -20px; }
 .set-body { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
 .set-body > .card { margin: 0; }
 @media (max-width: 760px) { .set-layout { grid-template-columns: 1fr; } .set-nav { position: static; flex-direction: row; flex-wrap: wrap; } .set-nav button { width: auto; } }
+
+/* ── Price window: the three Awakened looks (22 Nov 2026). Awakened PoE Trade's layout made nicer: the item's own
+   picture, filter chips under it (nothing tucked away), stats, Search, price, listings, and every button in the bottom
+   bar with an icon. "Awakened + price" adds a price bar under the item; "Awakened tooltip" uses the game's frame. ── */
+[class*="tws-awakened"] .qm.tw { width: 410px; padding: 0; overflow: hidden; }
+[class*="tws-awakened"] .qm.tw > * { margin-left: 12px; margin-right: 12px; }
+[class*="tws-awakened"] .qm.tw > .qm-head { margin: 0; padding: 10px 12px; border-bottom: 1px solid var(--line); gap: 10px; align-items: center; }
+[class*="tws-awakened"] .qm-head .item-icon { width: 40px; height: 40px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,.6)); }
+[class*="tws-awakened"] .qm-name { font-family: var(--game-font); font-size: 18px; line-height: 1.1; }
+.tw-chips { display: flex; flex-wrap: wrap; gap: 5px; padding: 8px 0; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.tw-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; line-height: 1.2; padding: 3px 8px; border-radius: 6px;
+  border: 1px solid #3a3f49; background: #1f2227; color: var(--text-2); cursor: pointer; }
+button.tw-chip:hover { border-color: #59606b; color: var(--text); }
+.tw-chip.on { border-color: #7a6431; background: #2c2618; color: #f0d68a; }
+.tw-chip.fixed { cursor: default; color: var(--muted); }
+.tw-chip .item-icon, .tw-chip .cur-icon { width: 18px; height: 18px; object-fit: contain; margin: -2px 0; }
+.tw-online-dot { width: 7px; height: 7px; border-radius: 50%; background: #5fd38a; box-shadow: 0 0 0 2px rgba(95,211,138,.2); }
+[class*="tws-awakened"] .tw-stat { border-radius: 6px; }
+[class*="tws-awakened"] .tw-opts { justify-content: flex-end; margin: 6px 12px; }
+[class*="tws-awakened"] .tw-search { min-width: 120px; }
+.tw-awk-price .tw-hero { margin: 4px 0 8px; }
+[class*="tws-awakened"] .tw-res { margin-top: 2px; }
+[class*="tws-awakened"] .tw-tr .tw-price { font-size: 14px; font-weight: 600; color: #f3e6c4; }
+[class*="tws-awakened"] .cur-icon { width: 18px; height: 18px; vertical-align: -4px; }
+.tw-awk-foot { display: flex; flex-wrap: wrap; gap: 0; margin: 8px 0 0 !important; padding: 6px 8px; border-top: 1px solid var(--line); background: rgba(0,0,0,.18); }
+.tw-awk-foot .link { display: inline-flex; align-items: center; gap: 4px; padding: 4px 5px; border-radius: 6px; color: var(--text-2); font-size: 12px; }
+.tw-awk-foot .link:hover, .tw-awk-foot .link.on { background: var(--raised); color: var(--text); }
+.tw-awk-foot svg { color: var(--gold); flex: none; }
+[class*="tws-awakened"] .tw-save, [class*="tws-awakened"] .tw-report, [class*="tws-awakened"] .tw-saved { margin-bottom: 10px; }
+
+/* Awakened + price: the price bar right under the item, with cheapest / typical / listed beside it */
+.tws-awakened-price .qm.tw > .tw-hero { margin: 0 0 4px; border-radius: 0; margin-left: 0; margin-right: 0; padding: 10px 12px;
+  border-width: 0 0 1px; background: linear-gradient(180deg, #2a2418, #1b1d22); }
+.tws-awakened-price .tw-hero .tw-hero-price { font-size: 26px; }
+.tws-awakened-price .tw-hero .cur-icon { width: 30px; height: 30px; vertical-align: -7px; }
+.tws-awakened-price .tw-hero-side .cur-icon, .tws-awakened-price .tw-hero-foot .cur-icon { width: 16px; height: 16px; vertical-align: -3px; }
+.tws-awakened-price .qm.tw > .tw-mstats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin-top: 4px; margin-bottom: 6px; }
+.tws-awakened-price .tw-mstats > div { display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; background: var(--raised); font-size: 12px; }
+.tws-awakened-price .tw-mstats span { color: var(--muted); }
+.tws-awakened-price .tw-mstats .cur-icon { width: 16px; height: 16px; vertical-align: -3px; }
+
+/* Awakened tooltip: the game's item tooltip frame around the same layout */
+.tws-awakened-tooltip .qm.tw { background: #0d0b09; border-color: #5a4126; }
+.tws-awakened-tooltip .qm.tw > .qm-head { flex-direction: column; text-align: center; gap: 4px; background: linear-gradient(180deg, #3a2a16, #1e160d);
+  border-bottom: 1px solid #5a4126; }
+.tws-awakened-tooltip .qm-head .qm-sub { color: #c8a96a; }
+.tws-awakened-tooltip .tw-chips { justify-content: center; border-color: #3a2c1a; }
+.tws-awakened-tooltip .tw-chip { background: #16120d; border-color: #3d2f1c; }
+.tws-awakened-tooltip .tw-chip.on { background: #2b2113; border-color: #8a6a35; }
+.tws-awakened-tooltip .tw-group { justify-content: center; font-family: var(--game-font); color: #a3895c; border: none;
+  background: linear-gradient(90deg, transparent, #7a5a30, transparent) bottom / 70% 1px no-repeat; padding-bottom: 3px; }
+.tws-awakened-tooltip .tw-stat.on { background: #211a10; }
+.tws-awakened-tooltip .tw-label.mod-explicit, .tws-awakened-tooltip .tw-label.mod-pseudo { color: #8f99ff; }
+.tws-awakened-tooltip .tw-awk-price .tw-hero { text-align: center; background: transparent; border: none; border-top: 1px solid #3a2c1a; border-radius: 0; }
+.tws-awakened-tooltip .tw-awk-price .tw-hero-main { justify-content: center; }
+.tws-awakened-tooltip .tw-hero-price { font-family: var(--game-font); }
+.tws-awakened-tooltip .tw-awk-foot { background: #120f0b; border-color: #3a2c1a; }
+.tws-awakened-tooltip .tw-th { background: #0d0b09; }
+.tws-awakened-tooltip .tw-awk-price .tw-hero-price { font-size: 26px; }
+.tws-awakened-tooltip .tw-awk-price .tw-hero-price .cur-icon { width: 28px; height: 28px; vertical-align: -6px; }
+.tws-awakened-price .tw-mstats > div { white-space: nowrap; }

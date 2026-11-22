@@ -48,7 +48,7 @@ function money(c: number, divine: number | null) {
 /** A price with its orb picture, e.g. "180 [chaos]". */
 function Price({ n, cur }: { n: number; cur: string }) {
   const v = n < 1 ? +n.toFixed(3) : n < 10 ? +n.toFixed(2) : n < 100 ? +n.toFixed(1) : Math.round(n);
-  return <span className="tw-pr">{v}{["chaos", "divine"].includes(cur) ? <CurrencyIcon id={cur} /> : <> {UNIT[cur] ?? cur}</>}</span>;
+  return <span className="tw-pr">{v}{["chaos", "divine", "exalted"].includes(cur) ? <CurrencyIcon id={cur} /> : <> {UNIT[cur] ?? cur}</>}</span>;
 }
 
 /** A number that counts up to its value (a quarter second) when it first shows or changes: the big price arriving. */
@@ -456,7 +456,25 @@ export const TW_STYLES: [string, string, string][] = [
   ["split", "Split", "Your item on the left, the market beside it"],
   ["compare", "Compare", "Each listing's mods next to yours: green is better, red is worse"],
   ["price", "Price first", "The price big at the top, with how listings spread"],
+  // 22 Nov 2026: Awakened PoE Trade's layout made nicer (GROBBS: everything you need one click away, game icons).
+  ["awakened", "Awakened", "Awakened's layout: item, filter chips, stats, listings; every button on show"],
+  ["awakened-price", "Awakened + price", "Awakened's layout with a price bar under the item: cheapest, typical, how many listed"],
+  ["awakened-tooltip", "Awakened tooltip", "Awakened's layout inside the game's tooltip frame"],
 ];
+
+/** Small line pictures for the Awakened looks' bottom bar. */
+const FOOT_ICO: Record<string, string> = {
+  site: "M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5",
+  craft: "M14 4l6 6-3 3-6-6zM11 7L4 14l2 2 7-7",
+  saved: "M6 4h12v16l-6-4-6 4z",
+  save: "M12 5v14M5 12h14",
+  style: "M12 3a9 9 0 1 0 0 18c1 0 1.5-.8 1.2-1.6-.4-1 .3-2 1.4-2H17a4 4 0 0 0 4-4c0-5.5-4-10.4-9-10.4z",
+  layout: "M4 6h16M4 12h16M4 18h16",
+  report: "M5 21V4M5 4h11l-2 4 2 4H5",
+};
+function FootIco({ k }: { k: string }) {
+  return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d={FOOT_ICO[k]} /></svg>;
+}
 export const TW_STYLE_KEY = "tw.style";
 
 /** "+52 to Strength" -> ["+# to strength", 52]. */
@@ -511,11 +529,13 @@ function PriceSpread({ res, divine }: { res: Result | null; divine: number | nul
 /** The market at a glance, for the Split look's side panel. */
 function MarketStats({ res, divine }: { res: Result; divine: number | null }) {
   const ps = res.listings.map((l) => l.chaos).filter((x): x is number => x != null);
+  // With the orb pictures: divines once it's worth one, chaos below that.
+  const m = (c: number) => (divine && c >= divine ? <Price n={c / divine} cur="divine" /> : <Price n={c} cur="chaos" />);
   return (
     <div className="tw-mstats">
-      {res.summary && <div><span>Cheapest</span><b>{money(res.summary[0], divine)}</b></div>}
-      {res.summary && <div><span>Typical</span><b>{money(res.summary[1], divine)}</b></div>}
-      {ps.length > 0 && <div><span>Dearest shown</span><b>{money(Math.max(...ps), divine)}</b></div>}
+      {res.summary && <div><span>Cheapest</span><b>{m(res.summary[0])}</b></div>}
+      {res.summary && <div><span>Typical</span><b>{m(res.summary[1])}</b></div>}
+      {ps.length > 0 && <div><span>Dearest shown</span><b>{m(Math.max(...ps))}</b></div>}
       <div><span>Listed</span><b>{res.total.toLocaleString()}</b></div>
       <div><span>Online now</span><b>{res.listings.filter((l) => l.instant || l.whisper).length}</b></div>
     </div>
@@ -699,7 +719,11 @@ export default function TradeWindow() {
   );
   const trend = check.trend ? <TrendLine t={check.trend} /> : null;
   // Which look: where the price sits, and the extras each look adds.
-  const heroTop = style === "classic" || style === "compare";
+  const heroTop = style === "classic" || style === "compare" || style === "awakened-price";
+  // The Awakened looks: filter chips under the item, nothing tucked behind "More" or "Also searching for".
+  const awk = style.startsWith("awakened");
+  const saveBtn = <button className="link small" onClick={() => setSaving(saving == null ? itemTitle(it) : null)} title="Keep this search to run again or watch live">
+    {awk && <FootIco k="save" />}Save search</button>;
   return (
     <div className={`tw-wrap tws-${style}`} ref={box}>
     <div className="qm tw">
@@ -712,7 +736,27 @@ export default function TradeWindow() {
         </div>
       </div>
 
+      {awk && !check.bulk && (setup.category || hidden.length > 0 || it.rarity === "Unique") && (
+        <div className="tw-chips" title="What the search asks for besides the ticked stats. Gold ones are on; click to switch.">
+          {setup.category && it.rarity !== "Unique" && (
+            <button className={`tw-chip ${setup.base_only ? "on" : ""}`} onClick={() => setSetup({ ...setup, base_only: !setup.base_only })}>
+              <ItemIcon base={setup.base || it.base_type || null} size={18} />{setup.base || it.base_type} only</button>
+          )}
+          {it.item_level != null && it.rarity !== "Unique" && setup.category && (
+            <button className={`tw-chip ${setup.ilvl_min != null ? "on" : ""}`} title="Bases in the same item-level band: better mod tiers unlock at 75, 82, 84 and 86"
+              onClick={() => { const on = setup.ilvl_min == null; setSetup({ ...setup, ilvl_min: on ? it.item_level ?? null : null, ilvl_max: on && it.item_level ? ilvlBand(it.item_level)[1] : null }); }}>
+              ilvl {ilvlText(it.item_level)}</button>
+          )}
+          {it.rarity === "Unique" && (
+            <button className={`tw-chip ${setup.corrupted != null ? "on" : ""}`} title="A corrupted unique can't be changed any more, and its corruption implicit is part of its price"
+              onClick={() => setSetup({ ...setup, corrupted: setup.corrupted != null ? null : it.corrupted })}>
+              <CurrencyIcon id="vaal" size={18} />{it.corrupted ? "Corrupted only" : "Not corrupted only"}</button>
+          )}
+          {hidden.map((h) => <span key={h} className="tw-chip fixed">{/online/i.test(h) && <span className="tw-online-dot" />}{h}</span>)}
+        </div>
+      )}
       {heroTop && hero}
+      {style === "awakened-price" && res && <MarketStats res={res} divine={divine} />}
       {heroTop && trend}
       {check.sold != null && check.sold < 5 && (
         <div className="qm-warn tw-thin" title="poe.ninja's price comes from the few that sold. The filter's worth line counts cards like this under 50c as worthless.">
@@ -837,17 +881,17 @@ export default function TradeWindow() {
       )}
 
       {style === "tooltip" && <div className="tw-tt-price">{hero}{trend}</div>}
-      {!check.bulk && layout !== "flat" && setup.category && it.rarity !== "Unique" && <div className="tw-group tw-opts-head"><span>Base and item level</span></div>}
+      {!awk && !check.bulk && layout !== "flat" && setup.category && it.rarity !== "Unique" && <div className="tw-group tw-opts-head"><span>Base and item level</span></div>}
       {!check.bulk && <div className="tw-opts">
-        {setup.category && it.rarity !== "Unique" && (
+        {!awk && setup.category && it.rarity !== "Unique" && (
           <label><input type="checkbox" checked={setup.base_only} onChange={(e) => setSetup({ ...setup, base_only: e.target.checked })} /> {setup.base || it.base_type} only</label>
         )}
-        {it.item_level != null && it.rarity !== "Unique" && setup.category && (
+        {!awk && it.item_level != null && it.rarity !== "Unique" && setup.category && (
           <label title="Bases in the same item-level band: better mod tiers unlock at 75, 82, 84 and 86"><input type="checkbox" checked={setup.ilvl_min != null}
             onChange={(e) => setSetup({ ...setup, ilvl_min: e.target.checked ? it.item_level ?? null : null, ilvl_max: e.target.checked && it.item_level ? ilvlBand(it.item_level)[1] : null })} /> ilvl {ilvlText(it.item_level)}</label>
         )}
         <span className="tw-actions">
-        <button className="link small" onClick={() => setSaving(saving == null ? itemTitle(it) : null)} title="Keep this search to run again or watch live">Save search</button>
+        {!awk && saveBtn}
         <button className="tw-search" disabled={busy} onClick={() => run(setup)}
           title="Move your mouse onto this button to search (or click)"
           onMouseEnter={(e) => {
@@ -857,7 +901,7 @@ export default function TradeWindow() {
           }}>{busy ? <><Spinner /> Searching…</> : searched ? "Search again" : "Search trade"}</button>
         </span>
       </div>}
-      {!check.bulk && hidden.length > 0 && (
+      {!awk && !check.bulk && hidden.length > 0 && (
         <div className="tw-hidden">
           <button className="link small" onClick={toggleHidden} title="What the search also asks for, besides the ticked stats">
             {showHidden ? "▾" : "▸"} Also searching for ({hidden.length})</button>
@@ -882,6 +926,7 @@ export default function TradeWindow() {
         </form>
       )}
 
+      {awk && style !== "awakened-price" && <div className="tw-awk-price">{hero}{trend}</div>}
       {check.from_ground && it.rarity !== "Unique" && setup.filters.length === 0 && ["Rare", "Magic"].includes(it.rarity) && (
         <div className="muted small">Read off the ground, so no stats: pick it up and press Ctrl+D in your inventory for a proper price.</div>
       )}
@@ -953,6 +998,25 @@ export default function TradeWindow() {
           </div>
         </div>
       )}
+      {awk ? (
+      <div className="tw-foot tw-awk-foot">
+        {(res?.url || bulk?.url) && <button className="link small" onClick={() => invoke("open_url", { url: res?.url || bulk?.url })}><FootIco k="site" />Trade site</button>}
+        {check.setup?.raw && check.setup.item.rarity !== "Unique" && /^(armour|weapon|accessory)\./.test(check.setup.category ?? "") && (
+          <button className="link small" title="See what else can roll on it and the cheapest way to get a mod"
+            onClick={() => { try { localStorage.setItem(CRAFT_ITEM_KEY, check.setup?.raw ?? ""); } catch { /* not passed */ } invoke("open_editor", { tab: "craft" }); }}>
+            <FootIco k="craft" />Craft</button>)}
+        {!check.bulk && saveBtn}
+        {!check.bulk && <button className={`link small ${showSaved ? "on" : ""}`} onClick={() => setShowSaved(!showSaved)} title="Your saved searches">
+          <FootIco k="saved" />Saved ({saved.length}){saved.some((x) => x.live) ? " · live" : ""}</button>}
+        <button className="link small" onClick={nextStyle} title={"Switch the look of this window: " + TW_STYLES.map(([, n]) => n).join(", ")}>
+          <FootIco k="style" />{TW_STYLES.find(([k]) => k === style)?.[1]}</button>
+        <button className="link small" onClick={nextLayout} title="Grouped: headings. Flat: one list with a tag on each row, like Awakened.">
+          <FootIco k="layout" />{TW_LAYOUTS.find(([k]) => k === layout)?.[1]}</button>
+        {reporting == null && <button className="link small" onClick={() => { setReporting(""); setReported(""); }}
+          title="Something's wrong? Saves this price check with your note, so Claude can see exactly what went wrong">
+          <FootIco k="report" />{reported ? "✓ Saved" : "Report"}</button>}
+      </div>
+      ) : (
       <div className="tw-foot">
       {res && res.url && <button className="link small tw-open-site" onClick={() => invoke("open_url", { url: res.url })}>Open on the trade site</button>}
       {/* Gear you can craft on: open the Crafting page with this item (shared localStorage, see Craft.tsx). */}
@@ -974,6 +1038,7 @@ export default function TradeWindow() {
       )}
       </div>}
       </div>
+      )}
       {!check.bulk && savedPanel}
       {reporting != null && (
         <form className="tw-report" onSubmit={(e) => { e.preventDefault();

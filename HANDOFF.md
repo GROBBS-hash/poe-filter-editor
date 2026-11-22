@@ -632,8 +632,15 @@ plain explanation underneath). Flat layout confirmed. He picked menu mock-up A (
 "what's in here" line) with C's colours (blue = filter, amber = your changes, green = playing, purple = money and
 items) and Settings mock-up 1 (side menu: Hotkeys, Price check, Trading, Maps and area, Looks, AI). Both built
 22 Nov, not released yet. Group colours only show in the Colourful look; the calm looks keep gold/grey headings.
-Price window: he's still not sold on it; round 2 mock-ups shown 22 Nov (1 answer first, 2 stats as buttons, 3 tiny
-strip by the mouse, 4 what makes it valuable, 5 price ladder, 6 tick stats on the tooltip); waiting for his pick.
+Price window: he wants Awakened PoE Trade as the template, made nicer: everything needed one click away (nothing
+behind "More"), the item's own picture, currency icons, game icons everywhere. Round 2 mock-ups (answer first, chips,
+strip, ladder…) passed over. Built 22 Nov, not released yet: three new looks (Style button / Settings → Looks):
+**Awakened** (item picture + filter chips under it: base only, ilvl band, Vaal-orb corrupted toggle for uniques, and
+the "Also searching for" filters shown as chips; stats; Search; price; listings; bottom bar with icons: Trade site,
+Craft, Save search, Saved, Style, Layout, Report), **Awakened + price** (adds a price bar under the item with
+cheapest / typical / listed tiles) and **Awakened tooltip** (same inside the game's tooltip frame). Also: exalted
+orb picture on exalt prices, orb pictures in the market tiles (Split look too). Next: he tries them in game and
+picks one (then maybe make it the default and drop the looks he doesn't use).
 1. Price window (Ctrl+D on a rare): stats in groups (Minimum rolls, Prefixes "1 of 2 used", Suffixes...); More → Layout
    → Flat gives one list with a tag on each row. An item with under 5 listed shows amber "low confidence".
    Cogwork Ring (Dragon Turn): Intelligence reads +57 (not +46).

@@ -45,8 +45,10 @@ export function ItemIcon({ name, base, size = 32 }: { name?: string | null; base
 const CURRENCY_ART: Record<string, string> = {
   chaos: "https://web.poecdn.com/image/Art/2DItems/Currency/CurrencyRerollRare.png",
   divine: "https://web.poecdn.com/image/Art/2DItems/Currency/CurrencyModValues.png",
+  exalted: "https://web.poecdn.com/image/Art/2DItems/Currency/CurrencyAddModToRare.png",
+  vaal: "https://web.poecdn.com/image/Art/2DItems/Currency/CurrencyVaal.png",
 };
-const CURRENCY_NAME: Record<string, string> = { chaos: "Chaos Orb", divine: "Divine Orb", exalted: "Exalted Orb" };
+const CURRENCY_NAME: Record<string, string> = { chaos: "Chaos Orb", divine: "Divine Orb", exalted: "Exalted Orb", vaal: "Vaal Orb" };
 
 /** A small chaos / divine orb picture next to a price. */
 export function CurrencyIcon({ id, size = 16 }: { id: string; size?: number }) {
