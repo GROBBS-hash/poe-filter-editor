@@ -373,7 +373,9 @@ export default function App() {
     {searching && <Search pages={ALL} onClose={() => setSearching(false)}
       goPage={(id) => setTab(id as Tab)}
       goHelp={(i) => { setHelpStart(i); setTab("help"); }}
-      goItem={(f) => { setFindPick({ ...f }); setTab("find"); }} />}
+      goItem={(f) => { setFindPick({ ...f }); setTab("find"); }}
+      profileId={active?.id}
+      goTier={(h) => { setTab("tiers"); setFocus({ kind: "neversink", label: h.title, type_path: h.type_path, tier: h.tier, section: null, tier_name: null }); }} />}
     </>
   );
 }

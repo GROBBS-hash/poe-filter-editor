@@ -1,10 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { FAQ } from "./Help";
+import { ItemIcon } from "./icons";
+
+/** Words players type that NeverSink's names don't use ("quality gems" -> the gem sections). */
+const SYNONYMS: Record<string, string> = { qual: "quality", gem: "gems", "6l": "6-linked", "6link": "6-linked", "5l": "5-links", links: "linked",
+  clusters: "cluster", abyss: "abyss", ilvl: "item level", corrupt: "corrupted", div: "divination", cards: "divination" };
 
 export type Page = { id: string; name: string; hint: string };
 type Found = { base_type: string; item_class: string };
+/** A Tiers page section or one of its steps (searched by name, group and conditions). */
+export type TierHit = { type_path: string[]; tier: string | null; title: string; sub: string; text: string; icon: string | null };
+type TierSection = { type_path: string[]; title: string; group: string; tiers: { tier: string; name: string; bases: string[]; conds?: { words: string }[] }[] };
 type Hit =
+  | { kind: "tier"; hit: TierHit }
   | { kind: "page"; page: Page }
   | { kind: "help"; q: string; index: number }
   | { kind: "item"; item: Found };
@@ -14,9 +23,20 @@ const norm = (s: string) => s.toLowerCase();
 const matches = (text: string, q: string) => { const t = norm(text); return norm(q).split(/\s+/).filter(Boolean).every((w) => t.includes(w)); };
 
 /** Ctrl+K: one box that finds items, pages and help answers. Enter opens the highlighted one. */
-export default function Search({ pages, onClose, goPage, goHelp, goItem }: {
+export default function Search({ pages, onClose, goPage, goHelp, goItem, goTier, profileId }: {
   pages: Page[]; onClose: () => void; goPage: (id: string) => void; goHelp: (index: number) => void; goItem: (f: Found) => void;
+  goTier?: (h: TierHit) => void; profileId?: string;
 }) {
+  // The Tiers page's sections and steps, loaded once when the box opens.
+  const [tiers, setTiers] = useState<TierHit[]>([]);
+  useEffect(() => {
+    if (!profileId || !goTier) return;
+    invoke<TierSection[]>("get_tiers", { id: profileId }).then((secs) => setTiers(secs.flatMap((s) => [
+      { type_path: s.type_path, tier: null, title: s.title, sub: `Tiers · ${s.group}`, text: `${s.title} ${s.group}`, icon: s.tiers.find((t) => t.bases.length)?.bases[0] ?? null },
+      ...s.tiers.map((t) => ({ type_path: s.type_path, tier: t.tier, title: t.name, sub: `Tiers · ${s.title}`,
+        text: `${t.name} ${s.title} ${(t.conds ?? []).map((c) => c.words).join(" ")}`, icon: t.bases[0] ?? null })),
+    ]))).catch(() => setTiers([]));
+  }, [profileId]); // eslint-disable-line react-hooks/exhaustive-deps
   const [q, setQ] = useState("");
   const [items, setItems] = useState<Found[]>([]);
   const [sel, setSel] = useState(0);
@@ -36,8 +56,12 @@ export default function Search({ pages, onClose, goPage, goHelp, goItem }: {
     if (!s) return pageHits;
     const helpHits = FAQ.map((f, index) => ({ kind: "help" as const, q: f.q, index })).filter((h) => matches(h.q, s)).slice(0, 4);
     const itemHits = items.map((item) => ({ kind: "item" as const, item }));
-    return [...itemHits, ...pageHits.slice(0, 5), ...helpHits];
-  }, [q, items, pages]);
+    // Tiers: sections first, then steps; typed words also match their usual synonyms ("qual" -> "quality").
+    const words = norm(s).split(/\s+/).filter(Boolean);
+    const fits = (text: string) => { const t = norm(text); return words.every((w) => t.includes(w) || t.includes(w.replace(/s$/, "")) || (SYNONYMS[w] && t.includes(SYNONYMS[w]))); };
+    const tierHits = tiers.filter((t) => fits(t.text)).sort((a, b) => (a.tier ? 1 : 0) - (b.tier ? 1 : 0)).slice(0, 8).map((hit) => ({ kind: "tier" as const, hit }));
+    return [...tierHits, ...itemHits, ...pageHits.slice(0, 5), ...helpHits];
+  }, [q, items, pages, tiers]);
 
   useEffect(() => { setSel(0); }, [q, items.length]);
   useEffect(() => { list.current?.querySelector<HTMLElement>(".on")?.scrollIntoView({ block: "nearest" }); }, [sel]);
@@ -46,6 +70,7 @@ export default function Search({ pages, onClose, goPage, goHelp, goItem }: {
     onClose();
     if (h.kind === "page") goPage(h.page.id);
     else if (h.kind === "help") goHelp(h.index);
+    else if (h.kind === "tier") goTier?.(h.hit);
     else goItem(h.item);
   };
   const onKey = (e: React.KeyboardEvent) => {
@@ -56,7 +81,7 @@ export default function Search({ pages, onClose, goPage, goHelp, goItem }: {
   };
 
   let lastKind = "";
-  const heading: Record<Hit["kind"], string> = { item: "Items", page: "Pages", help: "Help" };
+  const heading: Record<Hit["kind"], string> = { tier: "Tiers page", item: "Items", page: "Pages", help: "Help" };
   return (
     <div className="srch-back" onMouseDown={onClose}>
       <div className="srch" role="dialog" aria-label="Search" onMouseDown={(e) => e.stopPropagation()} onKeyDown={onKey}>
@@ -70,11 +95,12 @@ export default function Search({ pages, onClose, goPage, goHelp, goItem }: {
           {hits.map((h, i) => {
             const head = h.kind !== lastKind ? <li key={`h-${h.kind}`} className="srch-head">{heading[h.kind]}</li> : null;
             lastKind = h.kind;
-            const label = h.kind === "page" ? h.page.name : h.kind === "help" ? h.q : h.item.base_type;
-            const sub = h.kind === "page" ? h.page.hint : h.kind === "help" ? "How do I…?" : `${h.item.item_class} · change how it drops`;
+            const label = h.kind === "tier" ? h.hit.title : h.kind === "page" ? h.page.name : h.kind === "help" ? h.q : h.item.base_type;
+            const sub = h.kind === "tier" ? h.hit.sub : h.kind === "page" ? h.page.hint : h.kind === "help" ? "How do I…?" : `${h.item.item_class} · change how it drops`;
+            const icon = h.kind === "tier" ? h.hit.icon : h.kind === "item" ? h.item.base_type : null;
             return [head,
               <li key={`${h.kind}-${i}`} className={i === sel ? "srch-hit on" : "srch-hit"} onMouseEnter={() => setSel(i)} onClick={() => open(h)}>
-                <span className="srch-label">{label}</span><span className="srch-sub muted small">{sub}</span>
+                <span className="srch-label with-icon">{icon && <ItemIcon base={icon} size={20} />}{label}</span><span className="srch-sub muted small">{sub}</span>
               </li>];
           })}
         </ul>

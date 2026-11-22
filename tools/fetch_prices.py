@@ -165,6 +165,34 @@ def base_type_icons(game, league):
         add_icon(game, line.get("baseType") or line.get("name"), line.get("icon"))
 
 
+def fetch_json(url):
+    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            return json.load(r)
+    except Exception as e:  # a missing extra source only means fewer pictures
+        print(f"  ! {url}: {e}", file=sys.stderr)
+        return None
+
+
+def extra_icons(game):
+    """Pictures poe.ninja doesn't price (Heist, flasks, cards, league items...), added only where none was found:
+    1. the trade site's own item list (currency, fragments, Heist, essences... with pictures),
+    2. the game's base item list (RePoE export): every base item's art file, served as PNG by GGG's image server."""
+    if game != "poe1":
+        return
+    static = fetch_json("https://www.pathofexile.com/api/trade/data/static")
+    for cat in (static or {}).get("result") or []:
+        for e in cat.get("entries") or []:
+            add_icon(game, e.get("text"), e.get("image"))
+    bases = fetch_json("https://repoe-fork.github.io/base_items.json") or {}
+    for b in bases.values():
+        dds = ((b.get("visual_identity") or {}).get("dds_file") or "")
+        if b.get("name") and dds.endswith(".dds") and b.get("release_state") != "unreleased":
+            add_icon(game, b["name"], f"{CDN}/image/{dds[:-4]}.png")
+    print(f"  pictures: {len(icons[game])}")
+
+
 def run(game, exchange_types, stash_types):
     leagues = get(f"/{game}/api/economy/leagues")
     if not leagues:
@@ -189,6 +217,7 @@ def run(game, exchange_types, stash_types):
         items += got
         print(f"  {t}: {len(got)}")
     base_type_icons(game, league_id)
+    extra_icons(game)
     if game == "poe1" and core_seen and core_seen.get("primary"):
         unit = str(core_seen["primary"])
     return {

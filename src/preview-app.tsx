@@ -132,7 +132,8 @@ mockIPC((cmd, args) => {
       { id: 2, text: "Players cannot Regenerate Life, Mana or Energy Shield", token: "t reg", scary: 800, nightmare: false, trade_id: null, danger: "No regen" }] };
   if (cmd === "map_tool_regex") return "\"!s def\"";
   // Real icons when the editor is running (vite serves the app's icon list), else none.
-  if (cmd === "get_icons") return fetch("/preview-data/icons").then((r) => r.json()).catch(() => ({}));
+  // public/_icons.json (git-ignored) when present: a picture list with the extra sources merged in, else his own.
+  if (cmd === "get_icons") return fetch("/_icons.json").then((r) => r.ok ? r.json() : Promise.reject()).catch(() => fetch("/preview-data/icons").then((r) => r.json())).catch(() => ({}));
   if (cmd === "get_settings") return { key_atlas: "F7" };
   // Price check page: saved searches (Live on/off and delete work in the preview).
   if (cmd === "saved_list") return savedSearches;

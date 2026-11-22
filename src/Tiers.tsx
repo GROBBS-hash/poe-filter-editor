@@ -166,7 +166,11 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
     const k = focus.type_path.join(">");
     const glow = () => {
       setSel(k); setQ(""); setEditing(null); setFocusTier(focus.tier);
-      window.setTimeout(() => document.querySelector(`[data-tier="${CSS.escape(focus.tier ?? "")}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
+      window.setTimeout(() => {
+        // The menu shows where you are, then the step (when one was asked for) glows in view.
+        document.querySelector(".tiers-sec.on")?.scrollIntoView({ block: "nearest" });
+        if (focus.tier) document.querySelector(`[data-tier="${CSS.escape(focus.tier)}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 80);
       window.setTimeout(() => setFocusTier(null), 3500);
     };
     if (sections.some((s) => s.type_path.join(">") === k)) { glow(); return; }

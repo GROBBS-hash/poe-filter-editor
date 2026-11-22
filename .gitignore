@@ -11,3 +11,4 @@ public/_craft_routes.json
 # impeccable design plugin: per-machine files
 .impeccable/config.local.json
 .impeccable/hook.cache.json
+public/_icons.json
