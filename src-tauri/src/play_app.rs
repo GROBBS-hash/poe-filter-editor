@@ -251,7 +251,14 @@ pub struct LevelView {
     pub options: RouteOptions,
     pub manual: bool,
     pub credit: String,
+    /// The Trials of Ascendancy on the route: (zone, which lab, done = the route is past it, here = you're in that zone).
+    pub trials: Vec<Trial>,
+    /// Resistance penalty from the acts you've finished (0, -30 after act 5, -60 after act 10).
+    pub res_penalty: i32,
 }
+
+#[derive(Serialize, Clone)]
+pub struct Trial { pub zone: String, pub lab: String, pub done: bool, pub here: bool }
 
 fn build_gems(app: &AppHandle) -> (Vec<String>, Option<String>) {
     let state = app.state::<AppState>();
@@ -304,7 +311,22 @@ pub fn level_view(app: AppHandle) -> LevelView {
     let zone_level = zone.as_ref().map(|z| z.1);
     let char_level = character.as_ref().map(|c| c.2);
     let zone_label = zone.as_ref().map(|z| if !zone_name.is_empty() { zone_name.clone() } else { r.areas.get(&z.0).map(|a| a.n.clone()).unwrap_or_else(|| journey::map_name(&z.0)) });
+    // Trials: the route's "Complete the trial" steps, done once the route is past them.
+    let zone_id = zone.as_ref().map(|z| z.0.clone()).unwrap_or_default();
+    let mut trials = vec![];
+    let mut last_zone = String::new();
+    for (p, &i) in vis.iter().enumerate() {
+        let st = &r.steps[i];
+        for (k, v) in &st.parts { if (k == "enter" || k == "waypoint") && !v.is_empty() { last_zone = v.clone(); } }
+        if st.parts.iter().any(|(k, _)| k == "trial") {
+            let lab = if st.act <= 3 { "Normal" } else if st.act <= 7 { "Cruel" } else { "Merciless" };
+            trials.push(Trial { zone: r.areas.get(&last_zone).map(|a| a.n.clone()).unwrap_or_default(), lab: lab.into(), done: p < pos, here: last_zone == zone_id && p >= pos });
+        }
+    }
+    let act_now = vis.get(pos).map(|&i| r.steps[i].act).unwrap_or(1);
+    let res_penalty = if pos + 1 >= vis.len() { -60 } else if act_now >= 6 { -30 } else { 0 };
     LevelView {
+        trials, res_penalty,
         pos, total: vis.len(), current: pos - from, steps,
         zone: zone_label, zone_level, char_level, class: (!class.is_empty()).then_some(class),
         xp_keep: match (char_level, zone_level) { (Some(c), Some(z)) => Some(journey::xp_multiplier(c, z)), _ => None },

@@ -14,6 +14,7 @@ export type LevelView = {
   pos: number; total: number; steps: StepView[]; current: number; zone: string | null; zone_level: number | null;
   char_level: number | null; class: string | null; xp_keep: number | null; gem_search: string; gems_left_out: string[];
   options: RouteOptions; manual: boolean; credit: string;
+  trials: { zone: string; lab: string; done: boolean; here: boolean }[]; res_penalty: number;
 };
 export type MapRun = {
   name: string; area: string; level: number; seed: number; start: number; last_enter: number; in_map: number; left: number;
@@ -128,6 +129,7 @@ export function LevelWindow() {
               you {v.char_level}{keep != null && keep < 0.99 ? ` · ${Math.round(keep * 100)}% XP` : ""}</span>}
           </span>
         </div>
+        <LevelChips v={v} />
         {v.steps.map((s, i) => <Step key={`${v.pos}-${i}`} s={s} cls={i < v.current ? "done" : i === v.current ? "now" : "next"} />)}
         {v.gem_search && <div className="lv-search">
           <div className="pw-row between"><span className="pw-small">Your build's gems at a vendor</span>
@@ -138,6 +140,25 @@ export function LevelWindow() {
           <code title={v.gem_search}>{v.gem_search}</code>
         </div>}
       </div>
+    </div>
+  );
+}
+
+/** Trials, lab and resistance reminders under the zone line. */
+function LevelChips({ v }: { v: LevelView }) {
+  const lab = (name: string) => v.trials.filter((t) => t.lab === name);
+  const normal = lab("Normal");
+  const here = v.trials.find((t) => t.here);
+  const nextLab = ["Normal", "Cruel", "Merciless"].find((n) => lab(n).some((t) => !t.done));
+  const labReady = (n: string) => lab(n).length > 0 && lab(n).every((t) => t.done);
+  return (
+    <div className="pw-row" style={{ flexWrap: "wrap", marginTop: 5, gap: 5 }}>
+      {here && <span className="pw-tag warn">Trial of Ascendancy in this zone</span>}
+      {nextLab && <span className="pw-tag" title={lab(nextLab).map((t) => `${t.done ? "✓" : "·"} ${t.zone}`).join("\n")}>
+        {nextLab} trials {lab(nextLab).filter((t) => t.done).length}/{lab(nextLab).length}</span>}
+      {["Normal", "Cruel", "Merciless"].some(labReady) && normal.length > 0 &&
+        <button className="pw-btn link" title="Today's lab layouts and where the treasure keys are (poelab.com)" onClick={() => invoke("open_url", { url: "https://www.poelab.com/" })}>Today's lab ↗</button>}
+      {v.res_penalty < 0 && <span className="pw-tag bad" title="Every resistance is lowered after Kitava: check your gear still reaches 75%">res {v.res_penalty}% since {v.res_penalty === -30 ? "act 5" : "act 10"}</span>}
     </div>
   );
 }
