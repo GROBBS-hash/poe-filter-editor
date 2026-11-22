@@ -50,6 +50,9 @@ fn default_rules(kind: &str) -> Vec<(u32, u64)> {
         "poeprices" => vec![(3, 10), (20, 300)],
         // Your stash on pathofexile.com: slow and steady.
         "stash" => vec![(8, 10), (30, 60)],
+        // Character lists and a character's items (checked live 22 Nov: 10/60s + 50/30min, and 30/60s + 100/30min).
+        "chars" => vec![(10, 60), (50, 1800)],
+        "items" => vec![(30, 60), (100, 1800)],
         _ => vec![(8, 4), (12, 10)],
     }
 }
@@ -245,12 +248,26 @@ pub fn guild_stash_tab(account: &str, sessid: &str, league: &str, poe2: bool, in
 }
 
 /// Your characters (name, league, class, level, experience) from pathofexile.com, signed in with your POESESSID.
-/// The map tracker reads experience from it for XP per hour.
+/// The map tracker reads your level from it (the site no longer sends experience, Nov 2026).
 pub fn characters(account: &str, sessid: &str, poe2: bool) -> Result<Value, String> {
     let url = format!("https://www.pathofexile.com/character-window/get-characters?accountName={}&realm={}",
         enc(account), if poe2 { "poe2" } else { "pc" });
     let req = ureq::get(&url).set("Cookie", &format!("POESESSID={}", sessid.trim()));
-    match call("stash", req, None) {
+    // The site counts character lists apart from stash tabs (its own limit: 10 a minute, 50 in 30 minutes).
+    match call("chars", req, None) {
+        Ok(v) if v.get("error").is_some() => Err(stash_error(&v["error"]["message"].as_str().unwrap_or("").to_string())),
+        Ok(v) => Ok(v),
+        Err(e) => Err(e),
+    }
+}
+
+/// One character's items (what it wears and its bags) plus `character` (name, level, lastLoginTime = its last zone
+/// change, when the site saved it). The map tracker reads it before and after each map visit.
+pub fn character_items(account: &str, sessid: &str, character: &str, poe2: bool) -> Result<Value, String> {
+    let url = format!("https://www.pathofexile.com/character-window/get-items?accountName={}&realm={}&character={}",
+        enc(account), if poe2 { "poe2" } else { "pc" }, enc(character));
+    let req = ureq::get(&url).set("Cookie", &format!("POESESSID={}", sessid.trim()));
+    match call("items", req, None) {
         Ok(v) if v.get("error").is_some() => Err(stash_error(&v["error"]["message"].as_str().unwrap_or("").to_string())),
         Ok(v) => Ok(v),
         Err(e) => Err(e),

@@ -54,10 +54,16 @@ fn read_tab(account: &str, sessid: &str, league: &str, poe2: bool, index: usize)
 
 /// Values items with the current poe.ninja prices.
 fn value(app: &AppHandle, items: &serde_json::Value, tab: &str) -> Vec<Valued> {
+    with_lookup(app, |look| wealth::value_tab(&items["items"], tab, look)).unwrap_or_default()
+}
+
+/// Runs `f` with the stash pricing (poe.ninja, as the Wealth page counts it); None before prices have loaded.
+pub(crate) fn with_lookup<T>(app: &AppHandle, f: impl FnOnce(wealth::Lookup) -> T) -> Option<T> {
     let state = app.state::<AppState>();
     let game = active_game(&state);
     let prices = state.prices.lock().unwrap();
-    let Some(f) = prices.get(&game) else { return vec![] };
+    let f_ = f;
+    let Some(f) = prices.get(&game) else { return None };
     let look = |name: Option<&str>, base: &str, kind: &str| -> Option<f64> {
         match kind {
             "unique" => price_of(f, name, base, "Unique"),
@@ -69,7 +75,7 @@ fn value(app: &AppHandle, items: &serde_json::Value, tab: &str) -> Vec<Valued> {
             _ => price_of(f, None, base, ""),
         }
     };
-    wealth::value_tab(&items["items"], tab, &look)
+    Some(f_(&look))
 }
 
 fn divine(app: &AppHandle) -> Option<f64> { currency_rates(app).get("divine").copied() }

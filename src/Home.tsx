@@ -61,7 +61,7 @@ export default function Home({ profile, keys, go, search }: {
     [keys.key_build ?? "F6", "Show or hide your build"],
     [keys.key_atlas ?? "F7", "Show or hide your atlas strategy"],
     [keys.key_level ?? "F8", "Levelling route over the game"],
-    [keys.key_tracker ?? "F9", "Map tracker, XP per hour, stopwatch"],
+    [keys.key_tracker ?? "F9", "Map tracker, loot per map, stopwatch"],
   ];
 
   return (

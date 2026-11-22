@@ -111,12 +111,19 @@ pub struct MapRun {
     /// Earnings session value when the run started (to work out `made`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub value_at_start: Option<f64>,
+    /// Seconds the timer stood still while the game was paused (Escape menu) or the skill tree was open.
+    #[serde(default)]
+    pub paused: i64,
+    /// What you picked up in it (from your inventory before and after each visit), priced.
+    #[serde(default)]
+    pub loot: Vec<crate::loot::LootLine>,
 }
 
 impl MapRun {
     /// PoE 1 map tier from the area level (68 = tier 1).
     pub fn tier(&self) -> Option<u32> { (self.level >= 68).then(|| self.level - 67) }
-    /// Time inside so far (counting the current visit if `inside` and `now` given).
+    /// Time inside so far (counting the current visit if `inside` and `now` given). Pass `inside` = false while
+    /// paused: the visit up to the pause is already counted in `in_map`.
     pub fn time_inside(&self, inside: bool, now: i64) -> i64 {
         self.in_map + if inside && now > self.last_enter { now - self.last_enter } else { 0 }
     }
@@ -132,6 +139,9 @@ pub struct MapTracker {
     pub history: Vec<MapRun>,
     /// Your character's name (from level-up lines), so a party member's death isn't counted as yours.
     pub character: Option<String>,
+    /// The timer is stopped (Escape menu or skill tree open) since then.
+    #[serde(default)]
+    pub paused_since: Option<i64>,
     #[serde(skip)]
     pending: Option<(String, u32, u64, i64)>,
 }
@@ -145,6 +155,8 @@ impl MapTracker {
         let mut out = vec![];
         match ev {
             PlayEvent::Area { time, level, id, seed } => {
+                // A zone loading means no menu is open any more.
+                self.set_paused(false, *time);
                 self.pending = Some((id.clone(), *level, *seed, *time));
                 // Leaving a map shows up as the next zone loading.
                 if self.inside && !is_map_area(id) {
@@ -190,6 +202,7 @@ impl MapTracker {
 
     /// Ends the current run (when the next map starts, or you press Done).
     pub fn finish(&mut self, now: i64) -> Option<MapRun> {
+        self.set_paused(false, now);
         let mut c = self.current.take()?;
         if self.inside { c.in_map += (now - c.last_enter).max(0); c.left = now; }
         self.inside = false;
@@ -197,6 +210,115 @@ impl MapTracker {
         if self.history.len() > 500 { let n = self.history.len() - 500; self.history.drain(..n); }
         Some(c)
     }
+
+    /// Stops or restarts the clock (the game paused / a menu covering the game). Only counts while you're inside a
+    /// map. Returns true when something changed.
+    pub fn set_paused(&mut self, paused: bool, now: i64) -> bool {
+        match (paused, self.paused_since) {
+            (true, None) if self.inside => {
+                let Some(c) = self.current.as_mut() else { return false };
+                let now = now.max(c.last_enter);
+                c.in_map += now - c.last_enter;
+                c.last_enter = now;
+                self.paused_since = Some(now);
+                true
+            }
+            (false, Some(since)) => {
+                self.paused_since = None;
+                if let Some(c) = self.current.as_mut() {
+                    let now = now.max(since);
+                    c.paused += now - since;
+                    // The visit goes on from now (the paused stretch is already banked out of in_map).
+                    if self.inside { c.last_enter = now; }
+                }
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// Seconds inside the current map right now (0 without one), standing still while paused.
+    pub fn current_inside(&self, now: i64) -> i64 {
+        self.current.as_ref().map(|c| c.time_inside(self.inside && self.paused_since.is_none(), now)).unwrap_or(0)
+    }
+}
+
+// ---------- is a menu covering the game? ----------
+
+/// Points to sample on the bottom of the game's screen (the life/mana bar, flasks and skill bar frame): the passive tree
+/// and the Escape menu cover or darken them. `rect` = the game's drawing area (x, y, width, height) on screen.
+pub fn hud_points(rect: (i32, i32, i32, i32)) -> Vec<(i32, i32)> {
+    let (x, y, w, h) = rect;
+    let mut out = vec![];
+    for row in 0..4 {
+        let fy = 0.955 + row as f64 * 0.012; // bottom 4.5% of the screen
+        for col in 0..28 {
+            let fx = 0.14 + col as f64 * (0.72 / 27.0);
+            out.push((x + (fx * w as f64) as i32, y + (fy * h as f64) as i32));
+        }
+    }
+    out
+}
+
+/// Points in the middle of the screen, where the Escape menu's panel sits.
+pub fn centre_points(rect: (i32, i32, i32, i32)) -> Vec<(i32, i32)> {
+    let (x, y, w, h) = rect;
+    let mut out = vec![];
+    for row in 0..10 {
+        for col in 0..8 {
+            let fx = 0.42 + col as f64 * (0.16 / 7.0);
+            let fy = 0.30 + row as f64 * (0.40 / 9.0);
+            out.push((x + (fx * w as f64) as i32, y + (fy * h as f64) as i32));
+        }
+    }
+    out
+}
+
+/// Share (0..1) of points whose colour changed clearly between two samples.
+pub fn changed_share(a: &[[u8; 3]], b: &[[u8; 3]]) -> f64 {
+    let n = a.len().min(b.len());
+    if n == 0 { return 0.0; }
+    let changed = a.iter().zip(b).filter(|(p, q)| (0..3).any(|i| (p[i] as i32 - q[i] as i32).abs() > 40)).count();
+    changed as f64 / n as f64
+}
+
+/// What the game looks like with nothing open (and, if set up, with the Escape menu open), saved by "Set up".
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct MenuLook {
+    /// The bottom bar with no menu open.
+    pub hud: Vec<[u8; 3]>,
+    /// The middle of the screen with the Escape menu open (when set up).
+    pub esc: Vec<[u8; 3]>,
+    /// The game's size when it was set up (a different size needs setting up again).
+    pub size: (i32, i32),
+}
+
+impl MenuLook {
+    /// Is a menu covering the game? `hud`/`centre` = the same points sampled now.
+    pub fn covered(&self, hud: &[[u8; 3]], centre: &[[u8; 3]]) -> bool {
+        // Most of the bottom bar looks different: the skill tree (or the Escape menu darkening everything) is up.
+        // Flask charges and skill cooldowns only ever change a few of the points.
+        let bar_gone = !self.hud.is_empty() && changed_share(&self.hud, hud) >= 0.55;
+        // The middle matches the Escape menu's panel.
+        let esc_up = !self.esc.is_empty() && !centre.is_empty() && changed_share(&self.esc, centre) <= 0.2;
+        bar_gone || esc_up
+    }
+}
+
+/// Smooths the once-a-second check: the clock only stops or starts after two readings in a row agree.
+#[derive(Debug, Clone, Default)]
+pub struct Steady { shown: bool, streak: u32 }
+
+impl Steady {
+    /// Feeds one reading; returns Some(new state) when it flips.
+    pub fn feed(&mut self, covered: bool) -> Option<bool> {
+        if covered == self.shown { self.streak = 0; return None; }
+        self.streak += 1;
+        if self.streak >= 2 { self.shown = covered; self.streak = 0; return Some(covered); }
+        None
+    }
+    pub fn reset(&mut self) { *self = Steady::default(); }
 }
 
 /// "MapWorldsStrand" -> "Strand", "MapWorldsArachnidTomb" -> "Arachnid Tomb" (until the game names it).
@@ -244,6 +366,23 @@ pub fn map_stats(runs: &[MapRun], since: i64) -> MapStats {
         deaths: rs.iter().map(|r| r.deaths).sum(),
         avg_made: (!made.is_empty()).then(|| made.iter().sum::<f64>() / made.len() as f64),
     }
+}
+
+/// Where the play session you're in began, when it began before `now` with maps already run: walks back through the
+/// runs while each one ended less than `gap` seconds before the next began (or before now). Returns (start, deaths in
+/// those runs). Used when the editor starts mid-session, so the session card counts the maps you'd already done.
+pub fn session_start(history: &[MapRun], current: Option<&MapRun>, now: i64, gap: i64) -> Option<(i64, u32)> {
+    let mut runs: Vec<&MapRun> = history.iter().collect();
+    if let Some(c) = current { if !history.iter().any(|h| h.start == c.start && h.area == c.area) { runs.push(c); } }
+    let mut next = now;
+    let mut found: Option<(i64, u32)> = None;
+    for r in runs.iter().rev() {
+        let end = r.left.max(r.start);
+        if next - end > gap { break; }
+        found = Some((r.start, found.map_or(0, |f| f.1) + r.deaths));
+        next = r.start;
+    }
+    found
 }
 
 // ---------- experience ----------
@@ -528,6 +667,77 @@ mod tests {
         let s = map_stats(&m.history, 0);
         assert_eq!(s.avg_cycle, 250);
         assert!((s.per_hour - 14.4).abs() < 0.01);
+    }
+
+    #[test]
+    fn session_carries_on() {
+        // His 22 Nov evening: Colonnade, Cursed Crypt, then the editor restarted, then Park. The session should
+        // still count both earlier maps (it said 1 while Today said 2).
+        let run = |start: i64, left: i64, deaths: u32| MapRun { start, left, in_map: left - start, deaths, ..Default::default() };
+        let hist = vec![run(0, 400, 0), run(10_000, 10_400, 3), run(10_620, 10_860, 0)];
+        let cur = run(11_570, 11_720, 0);
+        assert_eq!(session_start(&hist, Some(&cur), 11_800, 1800), Some((10_000, 3)));
+        // Long after the last map: no session to carry on.
+        assert_eq!(session_start(&hist, None, 20_000, 1800), None);
+    }
+
+    #[test]
+    fn pauses_in_menus() {
+        let mut m = MapTracker::default();
+        m.on_event(&area(0, "MapWorldsStrand", 5));
+        assert_eq!(m.current_inside(100), 100);
+        assert!(m.set_paused(true, 100)); // Escape menu at 1:40
+        assert!(!m.set_paused(true, 120)); // still open
+        assert_eq!(m.current_inside(160), 100); // clock stands still
+        assert!(m.set_paused(false, 160));
+        assert_eq!(m.current_inside(200), 140);
+        // Paused, then portal out: the hideout load ends the pause and the visit.
+        m.set_paused(true, 200);
+        m.on_event(&area(230, "HideoutFelled", 1));
+        assert!(!m.inside && m.paused_since.is_none());
+        assert_eq!(m.current.as_ref().unwrap().in_map, 140);
+        assert_eq!(m.current.as_ref().unwrap().paused, 90);
+        // Not in a map: nothing to pause.
+        assert!(!m.set_paused(true, 240));
+        m.on_event(&area(250, "MapWorldsStrand", 5));
+        m.set_paused(true, 300);
+        let done = m.finish(400).unwrap();
+        assert_eq!((done.in_map, done.paused), (190, 190));
+    }
+
+    #[test]
+    fn spots_menus() {
+        let rect = (0, 0, 1920, 1080);
+        let hp = hud_points(rect);
+        assert_eq!(hp.len(), 112);
+        assert!(hp.iter().all(|p| p.1 >= 1030 && p.1 < 1080 && p.0 > 260 && p.0 < 1660));
+        assert!(centre_points(rect).iter().all(|p| p.0 > 800 && p.0 < 1120));
+        let bar: Vec<[u8; 3]> = (0..112).map(|i| [(i * 2) as u8, 60, 90]).collect();
+        let look = MenuLook { hud: bar.clone(), esc: vec![], size: (1920, 1080) };
+        // A few flasks / cooldowns changed: still playing.
+        let mut busy = bar.clone();
+        for p in busy.iter_mut().take(20) { *p = [250, 250, 250]; }
+        assert!(!look.covered(&busy, &[]));
+        // Everything darkened (Escape menu) or replaced (skill tree): covered.
+        let dark: Vec<[u8; 3]> = bar.iter().map(|p| [p[0] / 3, p[1] / 3, p[2] / 3]).collect();
+        assert!(look.covered(&dark, &[]));
+        let tree: Vec<[u8; 3]> = (0..112).map(|_| [10, 10, 10]).collect();
+        assert!(look.covered(&tree, &[]));
+        // The Escape panel in the middle, set up: seen even if the bar didn't change.
+        let panel: Vec<[u8; 3]> = (0..80).map(|i| [40 + (i % 7) as u8 * 20, 30, 20]).collect();
+        let look = MenuLook { esc: panel.clone(), ..look };
+        assert!(look.covered(&bar, &panel));
+        let world: Vec<[u8; 3]> = (0..80).map(|i| [200, (i * 3) as u8, 100]).collect();
+        assert!(!look.covered(&bar, &world));
+        // Two readings in a row before the clock stops or starts.
+        let mut s = Steady::default();
+        assert_eq!(s.feed(true), None);
+        assert_eq!(s.feed(true), Some(true));
+        assert_eq!(s.feed(true), None);
+        assert_eq!(s.feed(false), None);
+        assert_eq!(s.feed(true), None); // a blip doesn't count
+        assert_eq!(s.feed(false), None);
+        assert_eq!(s.feed(false), Some(false));
     }
 
     #[test]

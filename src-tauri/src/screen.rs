@@ -66,6 +66,12 @@ pub fn read_ground(accept: &dyn Fn(&str) -> bool) -> Result<(ScreenRead, Tooltip
 }
 
 /// Every line of text in a w x h box around the mouse, top to bottom (the choice reader: altars, remnants, rewards).
+/// The colour at each of these screen points (the map tracker's "is a menu open?" check: a tiny capture, once a second).
+#[cfg(windows)]
+pub fn sample_points(points: &[(i32, i32)]) -> Result<Vec<[u8; 3]>, String> { imp::sample(points).map_err(|e| e.to_string()) }
+#[cfg(not(windows))]
+pub fn sample_points(_points: &[(i32, i32)]) -> Result<Vec<[u8; 3]>, String> { Err("Only on Windows".into()) }
+
 #[cfg(not(windows))]
 pub fn read_lines_near_mouse(_w: i32, _h: i32) -> Result<Vec<String>, String> {
     Err("Reading the screen only works on Windows".into())
@@ -409,6 +415,32 @@ mod imp {
             copied?;
             Ok((Pic { px: buf, w, h }, cx - x, cy - y))
         }
+    }
+
+    /// The colour at each screen point (averaged over 3x3 pixels), from one small capture around them all.
+    pub fn sample(points: &[(i32, i32)]) -> windows::core::Result<Vec<[u8; 3]>> {
+        if points.is_empty() { return Ok(vec![]); }
+        let (x0, x1) = (points.iter().map(|p| p.0).min().unwrap() - 1, points.iter().map(|p| p.0).max().unwrap() + 1);
+        let (y0, y1) = (points.iter().map(|p| p.1).min().unwrap() - 1, points.iter().map(|p| p.1).max().unwrap() + 1);
+        let (w, h) = (x1 - x0 + 1, y1 - y0 + 1);
+        let (cx, cy) = (x0 + w / 2, y0 + h / 2);
+        let (pic, mx, my) = capture(cx, cy, w, h)?;
+        let (ox, oy) = (cx - mx, cy - my);
+        Ok(points.iter().map(|&(x, y)| {
+            let mut sum = [0u32; 3];
+            let mut n = 0;
+            for dy in -1..=1 {
+                for dx in -1..=1 {
+                    let (px, py) = (x + dx - ox, y + dy - oy);
+                    if px < 0 || py < 0 || px >= pic.w || py >= pic.h { continue; }
+                    let i = ((py * pic.w + px) * 4) as usize;
+                    sum[0] += pic.px[i + 2] as u32; sum[1] += pic.px[i + 1] as u32; sum[2] += pic.px[i] as u32;
+                    n += 1;
+                }
+            }
+            let n = n.max(1);
+            [(sum[0] / n) as u8, (sum[1] / n) as u8, (sum[2] / n) as u8]
+        }).collect())
     }
 
     /// Cuts out a rectangle of a picture.

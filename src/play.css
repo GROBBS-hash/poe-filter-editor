@@ -120,3 +120,35 @@
 .pt-table td { padding: 4px 6px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
 .pt-search { display: grid; grid-template-columns: 1fr 2fr auto; gap: 6px; margin-bottom: 6px; }
 .pt-search .text { margin: 0; }
+
+/* Loot per map, look C (picked 22 Nov): one colour bar by kind, then the best drops; the biggest one glows. */
+.loot-label { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+.loot-total { font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.loot-bar { display: flex; height: 11px; border-radius: 6px; overflow: hidden; background: var(--input); margin: 5px 0 4px; }
+.loot-bar.thin { height: 8px; width: 130px; margin: 0; }
+.loot-bar > span { display: block; height: 100%; }
+.loot-legend { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 11.5px; color: var(--text-2); }
+.loot-legend > span { display: inline-flex; align-items: center; gap: 4px; }
+.loot-dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; flex: none; margin-right: 4px; vertical-align: -1px; }
+.loot-legend .loot-dot { margin-right: 0; }
+.loot-best { margin-top: 5px; }
+.loot-row { display: flex; align-items: center; gap: 7px; font-size: 12.5px; padding: 2px 0; }
+.loot-row img { width: 22px; height: 22px; object-fit: contain; flex: none; }
+.loot-ico { width: 22px; flex: none; display: flex; justify-content: center; }
+.loot-ico .loot-dot { margin: 0; width: 10px; height: 10px; }
+.loot-row.hero { background: linear-gradient(90deg, rgba(224,130,61,.24), transparent); border-radius: 7px; padding: 3px 6px; margin: 0 -6px; }
+.loot-row.hero .loot-name { color: #ffb27a; font-weight: 650; }
+.loot-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.loot-v { margin-left: auto; font-variant-numeric: tabular-nums; padding-left: 8px; }
+.loot-tier { font-size: 10px; font-weight: 700; border-radius: 4px; padding: 0 4px; margin-right: 5px; vertical-align: 1px; }
+.loot-tier.t1 { background: #e0823d; color: #1a1405; }
+.loot-tier.t2 { background: #6b4a2f; color: #ffd2ae; }
+.loot-tier.t3 { background: var(--input); color: var(--muted); border: 1px solid var(--line); }
+.loot-kinds { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 2px 14px; }
+.pt-table td.n, .pt-table th.n { text-align: right; }
+.pt-table tr.pt-click { cursor: pointer; }
+.pt-table tr.pt-click:hover td { background: rgba(255,255,255,.03); }
+.pt-table tr.pt-loot td { background: var(--input); padding: 8px 10px; }
+.loot-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px 18px; }
+.loot-kind-h { display: flex; align-items: center; font-size: 12.5px; font-weight: 650; margin-bottom: 2px; }
+.loot-kind-h > span:last-child { margin-left: auto; font-variant-numeric: tabular-nums; }

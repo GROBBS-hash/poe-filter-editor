@@ -3,6 +3,7 @@ import { PageLoading } from "./Loading";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { TW_LAYOUTS, TW_LAYOUT_KEY, TW_STYLES, TW_STYLE_KEY } from "./TradeWindow";
+import { TrackerSettings } from "./Play";
 
 type Settings = {
   key_quick_edit: string; key_batch: string; key_reload: string; key_cycle: string; key_build: string; key_price?: string; key_atlas?: string;
@@ -59,6 +60,7 @@ const SECTIONS: [string, string, string][] = [
   ["price", "Price check", "M12 3v18M16.5 7.5c0-1.7-2-3-4.5-3s-4.5 1.3-4.5 3 2 2.6 4.5 3 4.5 1.3 4.5 3-2 3-4.5 3-4.5-1.3-4.5-3"],
   ["trade", "Trading", "M4 8h13l-3-3M20 16H7l3 3"],
   ["maps", "Maps and area", "M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14"],
+  ["tracker", "Map tracker", "M12 7v5l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z"],
   ["looks", "Looks", "M12 3a9 9 0 1 0 0 18c1 0 1.5-.8 1.2-1.6-.4-1 .3-2 1.4-2H17a4 4 0 0 0 4-4c0-5.5-4-10.4-9-10.4zM7.5 11h.01M10 7h.01M15 7h.01"],
   ["ai", "AI (optional)", "M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"],
 ];
@@ -89,6 +91,7 @@ export default function SettingsPage() {
         ))}
       </nav>
       <div className="set-body">
+      {sec === "tracker" && <TrackerSettings />}
       {sec === "looks" && <><MainLook /><div className="card"><PriceLook /></div></>}
       {sec === "keys" && <div className="card">
         <h2>Hotkeys</h2>

@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ResizeGrips, WinBar } from "./WinFrame";
 import { CurrencyIcon, ItemIcon } from "./icons";
 import syndicate from "./data/syndicate.json";
@@ -20,25 +20,45 @@ export type LevelView = {
 };
 export type MapRun = {
   name: string; area: string; level: number; seed: number; start: number; last_enter: number; in_map: number; left: number;
-  deaths: number; portals: number; mods: string[]; made: number | null;
+  deaths: number; portals: number; mods: string[]; made: number | null; paused?: number; loot?: LootLine[];
 };
+/** One thing a map gave you (loot.rs). cat: currency, cards, uniques, maps, scarabs, fragments, gems, gear, other. */
+export type LootLine = { name: string; cat: string; stack: number; value: number; icon: string; tier?: number | null };
+export type LootPrefs = { on: boolean; hide: string[]; min_chaos: number };
+type PauseInfo = { on: boolean; ready: boolean; esc_ready: boolean; note: string };
 type MapStats = { runs: number; avg_inside: number; avg_cycle: number; per_hour: number; deaths: number; avg_made: number | null };
 type TrackerView = {
-  current: MapRun | null; inside: boolean; current_inside: number; recent: MapRun[]; today: MapStats; all: MapStats;
-  xp_per_hour: number | null; xp_left: number | null; xp_frac: number | null; xp_minutes: number | null; xp_char: string | null;
-  xp_level: number | null; xp_note: string; watch_ms: number; watch_running: boolean; laps: number[]; now: number;
-  session: SessionSummary | null;
+  current: MapRun | null; inside: boolean; current_inside: number; paused: boolean; recent: MapRun[]; today: MapStats; all: MapStats;
+  char_name: string | null; char_level: number | null; watch_ms: number; watch_running: boolean; laps: number[]; now: number;
+  session: SessionSummary | null; pause: PauseInfo; loot_prefs: LootPrefs; loot_note: string; divine: number | null;
 };
 type SessionSummary = { start: number; played: number; maps: number; map_time: number; per_hour: number; deaths: number; levels: number;
-  xp_gained: number | null; made: number | null; best: MapRun | null };
+  made: number | null; best: MapRun | null; loot: LootLine[]; loot_value: number; loot_maps: number; loot_secs: number };
+/** Loot per hour of the session: "1.4 div / hour" (or chaos before divine prices load); null under 5 minutes of counted maps. */
+export const lootPerHour = (s: SessionSummary, div: number | null) => {
+  if (s.loot_maps === 0 || s.loot_secs < 300) return null;
+  const h = (s.loot_value / s.loot_secs) * 3600;
+  return div ? `${(h / div).toFixed(h / div < 10 ? 1 : 0)} div / hour` : `${Math.round(h)}c / hour`;
+};
+
+/** The loot kinds in the order they're shown (loot.rs KINDS), with their colours. */
+export const LOOT_KINDS: [string, string, string][] = [
+  ["currency", "Currency", "#dcb25a"], ["cards", "Div cards", "#7fb8ff"], ["uniques", "Uniques", "#e0823d"], ["maps", "Maps", "#b9c0cc"],
+  ["scarabs", "Scarabs", "#6fd3a0"], ["fragments", "Fragments", "#b493ff"], ["gems", "Gems", "#4fc7c7"], ["gear", "Gear", "#8b92a1"], ["other", "Other", "#6b7280"],
+];
+export const lootTotal = (l: LootLine[]) => l.reduce((a, b) => a + b.value, 0);
+/** "412c" or, from a divine up, "2.1 div". */
+export const chaosOrDiv = (c: number, div: number | null) => div && c >= div ? `${(c / div).toLocaleString(undefined, { maximumFractionDigits: 1 })} div` : `${Math.round(c)}c`;
 
 /** The end-of-session card: what tonight added up to. */
-function SessionCard({ s, compact }: { s: SessionSummary; compact?: boolean }) {
+function SessionCard({ s, compact, divine }: { s: SessionSummary; compact?: boolean; divine?: number | null }) {
+  const ph = lootPerHour(s, divine ?? null);
   const items: [string, string][] = [
     ["Played", mmss(s.played)],
     ["Maps", s.maps ? `${s.maps}${s.per_hour ? ` · ${s.per_hour.toFixed(1)}/h` : ""}` : "none"],
     ...(s.made != null ? [["Made", `≈ ${Math.round(s.made)}c`] as [string, string]] : []),
-    ...(s.xp_gained != null ? [["XP gained", big(s.xp_gained)] as [string, string]] : []),
+    ...(s.loot_maps > 0 && !compact ? [["Loot", `${Math.round(s.loot_value).toLocaleString()}c`] as [string, string], ["A map", `${Math.round(s.loot_value / s.loot_maps)}c`] as [string, string]] : []),
+    ...(ph && !compact ? [["Per hour", ph] as [string, string]] : []),
     ...(s.levels ? [["Levels", `+${s.levels}`] as [string, string]] : []),
     ["Deaths", String(s.deaths)],
   ];
@@ -169,7 +189,7 @@ function LevelChips({ v }: { v: LevelView }) {
 
 // ---------- map tracker ----------
 
-/** The map tracker (F9): this map's time, maps per hour, deaths, XP per hour, a stopwatch. */
+/** The map tracker (F9): this map's time (stops in menus), maps per hour, deaths, loot per map, a stopwatch. */
 export function TrackerWindow() {
   const [v, setV] = useState<TrackerView | null>(null);
   const [now, setNow] = useState(Date.now());
@@ -185,7 +205,7 @@ export function TrackerWindow() {
   if (!v) return <div className="bo pw" />;
   // Tick the clocks locally between updates.
   const drift = Math.max(0, now / 1000 - v.now);
-  const inside = v.current_inside + (v.inside ? drift : 0);
+  const inside = v.current_inside + (v.inside && !v.paused ? drift : 0);
   const watch = v.watch_ms + (v.watch_running ? drift * 1000 : 0);
   const act = (a: string) => invoke<PlayView>("watch_action", { action: a }).then((p) => setV(p.tracker));
   const c = v.current;
@@ -195,7 +215,8 @@ export function TrackerWindow() {
       <div className="bo-body">
         {c ? <>
           <div className="pw-row between"><span className="trk-name">{c.name} <span className="pw-small">{tier(c)}</span></span>
-            <span className={`pw-tag ${v.inside ? "good" : ""}`}>{v.inside ? "in map" : "out"}</span></div>
+            <span className={`pw-tag ${v.paused ? "warn" : v.inside ? "good" : ""}`}
+              title={v.paused ? "The timer stops while the Escape menu or the skill tree is open" : undefined}>{v.paused ? "paused" : v.inside ? "in map" : "out"}</span></div>
           <div className="pw-row between">
             <span className="trk-big">{mmss(inside)}</span>
             <button className="pw-btn" title="Finished with this map (otherwise it ends when you open the next one)" onClick={() => invoke<PlayView>("maps_done").then((p) => setV(p.tracker))}>Done</button>
@@ -208,13 +229,9 @@ export function TrackerWindow() {
           <span>Avg <b>{mmss(v.today.avg_inside)}</b> in map</span>
           <span>{v.today.avg_made != null ? <>≈ <b>{Math.round(v.today.avg_made)}c</b> a map</> : <>{v.today.deaths} deaths</>}</span>
         </div>}
-        <div className="trk-sec">
-          {v.xp_per_hour != null ? <>
-            <div className="pw-row between"><span><b>{big(v.xp_per_hour)}</b> <span className="pw-small">XP / hour</span></span>
-              <span className="pw-small">{v.xp_minutes != null ? `level ${(v.xp_level ?? 0) + 1} in ${mmss(v.xp_minutes * 60)}` : ""}</span></div>
-            {v.xp_frac != null && <div className="trk-bar"><span style={{ width: `${Math.round(v.xp_frac * 100)}%` }} /></div>}
-          </> : <div className="pw-small">{v.xp_note || "XP per hour: measuring…"}</div>}
-        </div>
+        <TrackerLoot v={v} />
+        {v.char_level != null && <div className="trk-sec pw-small">{v.char_name} · level <b style={{ color: "var(--text)" }}>{v.char_level}</b>
+          {v.session && v.session.levels > 0 ? ` (+${v.session.levels} this session)` : ""}</div>}
         <div className="trk-sec pw-row between">
           <span className="trk-name" style={{ fontVariantNumeric: "tabular-nums" }}>{mmss(watch / 1000)}<span className="pw-small">.{Math.floor((watch % 1000) / 100)}</span></span>
           <span className="pw-row">
@@ -224,7 +241,7 @@ export function TrackerWindow() {
           </span>
         </div>
         {v.laps.length > 0 && <div className="pw-small">{v.laps.slice(0, 4).map((l) => mmss(l / 1000)).join(" · ")}</div>}
-        {v.session && v.session.played > 300 && <SessionCard s={v.session} compact />}
+        {v.session && v.session.played > 300 && <SessionCard s={v.session} compact divine={v.divine} />}
       </div>
     </div>
   );
@@ -504,6 +521,144 @@ function Tile({ title, k, children, label }: { title: string; k?: string; childr
   );
 }
 
+const kindOf = (k: string) => LOOT_KINDS.find((x) => x[0] === k) ?? LOOT_KINDS[LOOT_KINDS.length - 1];
+
+/** One bar split by where the value came from (look C, picked 22 Nov). */
+export function LootBar({ loot, thin }: { loot: LootLine[]; thin?: boolean }) {
+  const total = lootTotal(loot);
+  if (total <= 0) return <div className={`loot-bar ${thin ? "thin" : ""}`} />;
+  return (
+    <div className={`loot-bar ${thin ? "thin" : ""}`}>
+      {LOOT_KINDS.map(([k, name, col]) => {
+        const v = loot.filter((l) => l.cat === k).reduce((a, b) => a + b.value, 0);
+        return v > 0 ? <span key={k} style={{ width: `${(v / total) * 100}%`, background: col }} title={`${name} ${Math.round(v)}c`} /> : null;
+      })}
+    </div>
+  );
+}
+
+const TierTag = ({ t }: { t?: number | null }) => t ? <span className={`loot-tier t${t}`}>T{t}</span> : null;
+
+/** Everything a map dropped, by kind (the Play tools history, click a map). */
+function LootList({ loot, prefs, divine }: { loot: LootLine[]; prefs: LootPrefs | null; divine: number | null }) {
+  const min = prefs?.min_chaos ?? 0;
+  return (
+    <div className="loot-list">{LOOT_KINDS.map(([k, name, col]) => {
+      const ls = loot.filter((l) => l.cat === k);
+      if (!ls.length) return null;
+      const big = ls.filter((l) => l.value >= min), small = ls.filter((l) => l.value < min);
+      return (
+        <div key={k} className="loot-kind">
+          <div className="loot-kind-h"><span className="loot-dot" style={{ background: col }} />{name}<span>{chaosOrDiv(ls.reduce((a, b) => a + b.value, 0), divine)}</span></div>
+          {big.map((l) => <div key={l.name} className="loot-row">{l.icon ? <img src={l.icon} alt="" /> : <span className="loot-ico"><span className="loot-dot" style={{ background: col }} /></span>}
+            <span className="loot-name"><TierTag t={l.tier} />{l.stack > 1 && <span className="muted">{l.stack}× </span>}{l.name}</span>
+            <span className="loot-v">{l.value > 0 ? chaosOrDiv(l.value, divine) : "no price"}</span></div>)}
+          {small.length > 0 && <div className="muted small" style={{ paddingLeft: 26 }}>+ {small.length} under {min}c ({Math.round(small.reduce((a, b) => a + b.value, 0))}c)</div>}
+        </div>
+      );
+    })}</div>
+  );
+}
+
+/** The loot block in the tracker window: the total, the colour bar, and the best drops (look C). */
+function TrackerLoot({ v }: { v: TrackerView }) {
+  const p = v.loot_prefs;
+  if (!p.on) return null;
+  const cur = v.current?.loot ?? [];
+  const last = v.recent[0]?.loot ?? [];
+  const [label, loot] = cur.length > 0 ? ["This map", cur] : last.length > 0 ? ["Last map", last] : ["This map", [] as LootLine[]];
+  const total = lootTotal(loot);
+  const shown = loot.filter((l) => !p.hide.includes(l.cat));
+  const best = shown.filter((l) => l.value >= p.min_chaos).slice(0, 4);
+  const rest = loot.length - best.length;
+  const kinds = LOOT_KINDS.map(([k, name, col]) => ({ k, name, col, v: loot.filter((l) => l.cat === k).reduce((a, b) => a + b.value, 0) }))
+    .filter((x) => x.v > 0 && !p.hide.includes(x.k)).sort((a, b) => b.v - a.v);
+  const s = v.session;
+  return (
+    <div className="trk-sec">
+      {loot.length === 0 ? <div className="pw-small">{v.loot_note || (v.inside ? "Loot shows when you leave the map (your bags are read as you go in and out)." : "Loot per map: run a map and it shows here.")}</div> : <>
+        <div className="pw-row between"><span className="loot-label">{label}</span>
+          <span className="loot-total">{Math.round(total).toLocaleString()}c{v.divine ? <span className="pw-small"> ≈ {(total / v.divine).toFixed(1)} div</span> : null}</span></div>
+        <LootBar loot={loot.filter((l) => !p.hide.includes(l.cat))} />
+        <div className="loot-legend">{kinds.map((x) => <span key={x.k}><span className="loot-dot" style={{ background: x.col }} />{x.name} {Math.round(x.v)}c</span>)}</div>
+        <div className="loot-best">{best.map((l, i) => (
+          <div key={l.name + l.cat} className={`loot-row ${i === 0 && (l.tier === 1 || (v.divine != null && l.value >= v.divine * 0.5)) ? "hero" : ""}`}>
+            {l.icon ? <img src={l.icon} alt="" /> : <span className="loot-ico"><span className="loot-dot" style={{ background: kindOf(l.cat)[2] }} /></span>}
+            <span className="loot-name"><TierTag t={l.tier} />{l.stack > 1 && <span className="pw-small">{l.stack}× </span>}{l.name}</span>
+            <span className="loot-v">{chaosOrDiv(l.value, v.divine)}</span>
+          </div>
+        ))}</div>
+        {rest > 0 && <div className="pw-small">+ {rest} smaller drop{rest > 1 ? "s" : ""}</div>}
+      </>}
+      {s && s.loot_maps > 0 && <div className="pw-small" style={{ marginTop: 5 }}>This session: <b style={{ color: "var(--text)" }}>{s.loot_maps} map{s.loot_maps > 1 ? "s" : ""} · {Math.round(s.loot_value).toLocaleString()}c</b>
+        {v.divine ? ` (≈ ${(s.loot_value / v.divine).toFixed(1)} div)` : ""} · {Math.round(s.loot_value / s.loot_maps)}c a map
+        {lootPerHour(s, v.divine) && <> · <b style={{ color: "var(--gold)" }}>{lootPerHour(s, v.divine)}</b></>}</div>}
+    </div>
+  );
+}
+
+/** Settings → Map tracker: the timer stopping in menus (with its set-up) and the loot breakdown. */
+export function TrackerSettings() {
+  const [v, setV] = useState<TrackerView | null>(null);
+  const [busy, setBusy] = useState("");
+  const [msg, setMsg] = useState("");
+  useEffect(() => {
+    invoke<PlayView>("play_view").then((p) => setV(p.tracker)).catch(() => {});
+    const un = listen<PlayView>("play-update", (e) => setV(e.payload.tracker));
+    return () => { un.then((f) => f()); };
+  }, []);
+  if (!v) return null;
+  const p = v.pause, lp = v.loot_prefs;
+  const setup = (kind: string) => {
+    setBusy(kind); setMsg("Click into the game now" + (kind === "esc" ? " and press Escape" : " (nothing open)") + ": reading in 5 seconds…");
+    invoke<string>("pause_setup", { kind }).then(setMsg).catch((e) => setMsg(String(e))).finally(() => setBusy(""));
+  };
+  const pause = (on: boolean, forget = false) => invoke<PlayView>("pause_prefs", { on, forget }).then((x) => setV(x.tracker));
+  const loot = (patch: Partial<LootPrefs>) => invoke<PlayView>("loot_prefs_save", { prefs: { ...lp, ...patch } }).then((x) => setV(x.tracker));
+  return (
+    <>
+      <div className="card">
+        <h2>Stop the map timer in menus</h2>
+        <p className="muted small">The map timer (F9) stands still while the Escape menu or the passive skill tree is open. The game doesn't say when
+          they're open, so the editor looks at a few dots of the game's screen once a second (only while you're in a map and the game is in front).</p>
+        <label className="check"><input type="checkbox" checked={p.on} onChange={(e) => pause(e.target.checked)} /><span>Stop the timer in the Escape menu and the skill tree</span></label>
+        {p.on && <>
+          <p className="small" style={{ margin: "8px 0 4px" }}>{p.ready ? <span className="w-full">Set up{p.esc_ready ? ", Escape menu too" : ""}.</span> : <b>Needs setting up once:</b>}{" "}
+            {p.note && p.ready && <span className="muted">{p.note}</span>}</p>
+          <ol className="small muted" style={{ margin: "0 0 8px", paddingLeft: 18 }}>
+            <li>In a map or your hideout, with no panels open, click <b>Set up</b> and click back into the game within 5 seconds.</li>
+            <li>If the timer doesn't stop for the Escape menu: click <b>Escape menu</b>, click into the game and press Escape within 5 seconds.</li>
+          </ol>
+          <div className="row">
+            <button className="primary" disabled={!!busy} onClick={() => setup("hud")}>{busy === "hud" ? "Reading…" : p.ready ? "Set up again" : "Set up"}</button>
+            <button disabled={!!busy || !p.ready} onClick={() => setup("esc")}>{busy === "esc" ? "Reading…" : "Escape menu"}</button>
+            {p.ready && <button className="link" onClick={() => pause(true, true)}>Forget</button>}
+          </div>
+          {msg && <p className="note small">{msg}</p>}
+        </>}
+      </div>
+      <div className="card">
+        <h2>Loot per map</h2>
+        <p className="muted small">What each map brought in: your bags on pathofexile.com as you go in and come out, priced with poe.ninja. Needs your account and
+          POESESSID (Wealth page). The site saves your character when you change zone, so the count is up to the last time you left the map.</p>
+        <label className="check"><input type="checkbox" checked={lp.on} onChange={(e) => loot({ on: e.target.checked })} /><span>Count loot in maps</span></label>
+        {lp.on && <>
+          <p className="muted small" style={{ margin: "8px 0 2px" }}>Show these kinds (the rest still count in the total)</p>
+          <div className="loot-kinds">{LOOT_KINDS.map(([k, name, col]) => (
+            <label key={k} className="check" style={{ margin: 0 }}><input type="checkbox" checked={!lp.hide.includes(k)}
+              onChange={(e) => loot({ hide: e.target.checked ? lp.hide.filter((h) => h !== k) : [...lp.hide, k] })} />
+              <span><span className="loot-dot" style={{ background: col }} />{name}{k === "uniques" ? " (T1 = 1 div+, T2 = 10c+)" : ""}</span></label>
+          ))}</div>
+          <div className="row" style={{ marginTop: 8 }}><span className="small">List an item from</span>
+            <input className="num" type="number" min={0} step={1} style={{ width: 70 }} value={lp.min_chaos} onChange={(e) => loot({ min_chaos: Math.max(0, +e.target.value) })} />
+            <span className="small">chaos</span><span className="muted small">Cheaper drops are added up in one line.</span></div>
+        </>}
+        {v.loot_note && <p className="note small">{v.loot_note}</p>}
+      </div>
+    </>
+  );
+}
+
 /** Play tools page: what each play window does, levelling choices, your searches, cheat sheet pictures, map runs. */
 export default function PlayTools() {
   const keys = useKeys();
@@ -514,14 +669,17 @@ export default function PlayTools() {
   const [msg, setMsg] = useState("");
   const [session, setSession] = useState<SessionSummary | null>(null);
   const [keepInMaps, setKeepInMaps] = useState(false);
+  const [prefs, setPrefs] = useState<LootPrefs | null>(null);
+  const [divine, setDivine] = useState<number | null>(null);
+  const [openRun, setOpenRun] = useState<number | null>(null);
   useEffect(() => {
-    invoke<PlayView>("play_view").then((p) => setSession(p.tracker.session)).catch(() => {});
+    invoke<PlayView>("play_view").then((p) => { setSession(p.tracker.session); setPrefs(p.tracker.loot_prefs); setDivine(p.tracker.divine); }).catch(() => {});
     invoke<boolean>("play_prefs_get").then(setKeepInMaps).catch(() => {});
     invoke<LevelView>("level_view").then(setLv).catch(() => {});
     invoke<SearchView>("searches_get").then((v) => setSearches(v.saved)).catch(() => {});
     invoke<Sheet[]>("sheets_list").then(setSheets).catch(() => {});
     invoke<MapRun[]>("maps_history").then(setRuns).catch(() => {});
-    const un = listen<PlayView>("play-update", (e) => { setSession(e.payload.tracker.session); invoke<MapRun[]>("maps_history").then(setRuns); });
+    const un = listen<PlayView>("play-update", (e) => { setSession(e.payload.tracker.session); setPrefs(e.payload.tracker.loot_prefs); invoke<MapRun[]>("maps_history").then(setRuns); });
     return () => { un.then((f) => f()); };
   }, []);
   const setOpts = (o: Partial<RouteOptions>, manual?: boolean) => {
@@ -548,7 +706,7 @@ export default function PlayTools() {
           <Tile title="Levelling" k={k("key_level", "F8")} label="level">The campaign route step by step. It moves on by itself as you enter zones,
             says which quest gem rewards your PoB build wants, warns when you're too high or low for the zone, and has a vendor search for your build's gems.</Tile>
           <Tile title="Map tracker" k={k("key_tracker", "F9")} label="tracker">Time in each map, maps per hour, deaths, the mods from a Ctrl+D just
-            before you opened it, XP per hour, and a stopwatch. With an earnings session running (Wealth), roughly what each map made.</Tile>
+            before you opened it, what each map dropped (priced), and a stopwatch. The timer stops in the Escape menu and the skill tree. Settings → Map tracker.</Tile>
           <Tile title="Searches" k={k("key_searches", "F10")} label="searches">Click a saved search and it's typed into the stash or vendor search box.
             Your build's gems and your map regex are added for you.</Tile>
           <Tile title="Cheat sheets" k={k("key_sheet", "F11")} label="sheet">The Syndicate rewards table (click the ones you want), plus any pictures you add below:
@@ -565,7 +723,7 @@ export default function PlayTools() {
       {session && <div className="card">
         <h2>This session</h2>
         <p className="muted small">Started {new Date(session.start * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}. A new session starts after 30 minutes without playing.</p>
-        <SessionCard s={session} />
+        <SessionCard s={session} divine={divine} />
       </div>}
 
       {lv && <div className="card">
@@ -622,11 +780,25 @@ export default function PlayTools() {
         <div className="pw-row between"><h2>Map runs</h2>
           {runs.length > 0 && <button className="link" onClick={() => { if (confirm("Forget every map run?")) invoke("maps_clear").then(() => setRuns([])); }}>Clear</button>}</div>
         {recent.length === 0 ? <p className="muted small">None yet: open a map and the tracker counts it.</p> :
-          <table className="pt-table"><thead><tr><th>Map</th><th>Tier</th><th>In map</th><th>Deaths</th><th>Made</th><th>When</th></tr></thead>
-            <tbody>{recent.map((r, i) => (
-              <tr key={i} title={r.mods.join("\n")}><td>{r.name}</td><td>{tier(r)}</td><td>{mmss(r.in_map)}</td><td>{r.deaths || ""}</td>
-                <td>{r.made != null ? `≈ ${Math.round(r.made)}c` : ""}</td><td className="muted">{new Date(r.start * 1000).toISOString().slice(5, 16).replace("T", " ")}</td></tr>
-            ))}</tbody></table>}
+          <table className="pt-table"><thead><tr><th>Map</th><th>Tier</th><th>In map</th><th>Deaths</th><th>Where the loot came from</th><th className="n">Loot</th><th>Best drop</th><th>When</th></tr></thead>
+            <tbody>{recent.map((r, i) => {
+              const loot = r.loot ?? [];
+              const best = loot.find((l) => !(prefs?.hide ?? []).includes(l.cat)) ?? loot[0];
+              return (<Fragment key={i}>
+                <tr title={r.mods.join("\n")} className={loot.length ? "pt-click" : ""} onClick={() => loot.length && setOpenRun(openRun === i ? null : i)}>
+                  <td>{r.name}</td><td>{tier(r)}</td>
+                  <td>{mmss(r.in_map)}{r.paused ? <span className="muted small" title="Time with the Escape menu or skill tree open, not counted"> (+{mmss(r.paused)} paused)</span> : null}</td>
+                  <td>{r.deaths || ""}</td>
+                  <td>{loot.length ? <LootBar loot={loot} thin /> : r.made != null ? <span className="muted small">earnings ≈ {Math.round(r.made)}c</span> : ""}</td>
+                  <td className="n">{loot.length ? <b>{chaosOrDiv(lootTotal(loot), divine)}</b> : ""}</td>
+                  <td>{best ? <span className="loot-name"><TierTag t={best.tier} />{best.stack > 1 ? `${best.stack}× ` : ""}{best.name}</span> : ""}</td>
+                  <td className="muted">{new Date(r.start * 1000).toISOString().slice(5, 16).replace("T", " ")}</td></tr>
+                {openRun === i && <tr key={`${i}-loot`} className="pt-loot"><td colSpan={8}><LootList loot={loot} prefs={prefs} divine={divine} /></td></tr>}
+              </Fragment>);
+            })}</tbody></table>}
+        {recent.some((r) => (r.loot ?? []).length > 0) && <div className="loot-legend" style={{ marginTop: 8 }}>
+          {LOOT_KINDS.map(([k, name, col]) => <span key={k}><span className="loot-dot" style={{ background: col }} />{name}</span>)}
+          <span className="muted">· Click a map to see everything it dropped.</span></div>}
         {msg && <div className="error small">{msg}</div>}
       </div>
     </div>

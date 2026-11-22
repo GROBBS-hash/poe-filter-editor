@@ -46,6 +46,32 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **Map tracker: timer stops in menus, loot per map, div per hour (22 Nov, not released yet).** After his 0.2.41 test.
+  - **Pause:** the game doesn't log the Escape menu or skill tree, so (like Exile UI's "screen checks") the editor
+    samples ~110 dots of the game's bottom bar once a second (only inside a map, only with the game in front;
+    `screen::sample_points`, one tiny BitBlt) and compares them with a picture saved by **Settings → Map tracker →
+    Set up**. 55%+ of the dots changed = covered (skill tree, or the Escape menu darkening the screen); optional
+    second picture of the Escape menu's middle (`centre_points`, matched within 20%). Two readings in a row before it
+    flips (`journey::Steady`). `MapTracker::set_paused` banks the visit up to the pause; `MapRun.paused` = seconds
+    stood still (shown as "+m:ss paused" in the history). A zone load ends a pause. On/off in Settings
+    (`PlayStore.pause_off`, `menu: MenuLook`); a new game window size needs Set up again. Tests `pauses_in_menus`, `spots_menus`.
+  - **Loot:** `core/src/loot.rs`. The app reads the character's items (`trade_api::character_items`,
+    get-items, own rate kind "items": 30/60s, 100/30min; get-characters now kind "chars": 10/60s, 50/30min) ~4 s
+    after each map entry and exit, checking `character.lastLoginTime` (= the site's save at the zone change) and
+    retrying. `loot::gained` diffs the bags (stackables by count, the rest by item id; used-up things ignored),
+    `kind` sorts (currency, cards, uniques, maps, scarabs, fragments, gems, gear, other), priced with the Wealth
+    page's lookup (`wealth_app::with_lookup`), unique tier by worth (T1 ≥ 1 div, T2 ≥ 10c). Stored per run
+    (`MapRun.loot`, merged across portal visits, max 60 lines). One worker thread runs the reads in order. Settings:
+    on/off, kinds shown, list-from N chaos (`LootPrefs`). Done pressed inside a map counts the bags as of the last
+    zone change. Tests `finds_what_you_picked_up`, `kinds_and_tiers`; checked against his live bags.
+  - **Look C** (he picked it from three mock-ups): tracker shows the total (chaos + div), one colour bar by kind, the
+    top 4 drops with pictures (the biggest glows), "+ N smaller drops", and a session line with **div per hour**
+    (his ask: session loot / time from the first counted map's start to the last one's end, or now mid-map;
+    `SessionSummary.loot_secs`). Play tools history: mini bar, loot, best drop; click a map for everything by kind.
+  - **Fixes from his screenshot:** XP per hour always showed 0: pathofexile.com no longer sends experience
+    (checked live), so it's gone; the tracker shows "name · level N" (get-characters every 10 min while open, picks
+    the log's character or the latest `lastLoginTime`). The session said 1 map while Today said 2: an editor restart
+    started a new session; `journey::session_start` now carries on through runs less than 30 min apart (test `session_carries_on`).
 - **Crafting jewels and cluster jewels (22 Nov, not released yet).** After his 0.2.39 test ("crafting is important for
   clusters especially"). `tools/build_craft_data.mjs` now keeps normal jewels (Cobalt, Crimson, Viridian), abyss jewels
   (Murderous / Searching / Hypnotic / Ghastly Eye) and cluster jewels: one crafting base per enchant
@@ -94,8 +120,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
     back in counted, hideout time not counted), deaths of your character, Done button. A Ctrl+D map check in the
     10 minutes before attaches its mods. With an earnings session running, `made` = session value change over the run
     (rough: sessions check every few minutes). History (500) in play.json; table on the Play tools page.
-    XP per hour: `trade_api::characters` (get-characters with his POESESSID, rate kind "stash") once a minute while
-    the tracker is open; time to next level from the game's XP table. Stopwatch with laps.
+    ~~XP per hour~~ (removed 22 Nov: the site stopped sending experience; see the newer entry above). Stopwatch with laps.
   - **Searches (F10):** saved searches (play.json, editable on the page; defaults: movement speed, 3-links, RGB,
     life/res, quality gems) plus "made for you" (build gems, Maps page regex). Click = focus game, Ctrl+F, Ctrl+A,
     Ctrl+V (pasted, not typed, so stray letters never hit skill keys; clipboard restored). Wealth → Worth selling has
@@ -718,14 +743,29 @@ Everything below was built since GROBBS last tested and has only been checked wi
 Confirmed in game so far: basic Ctrl+D price check (trade search returned listings); 20 Nov: weapon + armour
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
+**Map tracker: menus, loot, div per hour (22 Nov, not released yet):**
+- [ ] Settings → Map tracker → **Set up**: click it, click into the game within 5 s with nothing open. Then in a map,
+  open the passive tree: within ~2 s the tracker tag says "paused" and the clock stops; close it and it goes on.
+- [ ] Same with the Escape menu. If it doesn't stop: press **Escape menu**, click into the game and press Escape
+  within 5 s, then try again.
+- [ ] Nothing pauses by mistake while playing normally (flasks, skills on cooldown, big fights, inventory open).
+- [ ] Loot: run a map and portal out; within ~10 s the tracker shows "Last map" / "This map" with a total, the colour
+  bar and the best drops. Portal back in and out again: the second visit adds to it. Totals look right?
+- [ ] Session line shows maps · chaos · a map · **div / hour** after a few maps; Play tools → Map runs shows the
+  bar, loot and best drop; clicking a map lists everything by kind.
+- [ ] Settings: unticking a kind hides it from the list (still in the total); "List an item from N chaos" works.
+- [ ] Tracker shows "NerfDis · level 91" instead of the old XP line; This session counts the same maps as Today.
+
 **Crafting jewels and cluster jewels (22 Nov, not released yet):**
 - [ ] Build window → Jewels tab: every non-unique jewel (clusters, Cobalt etc., abyss jewels) has a Craft button.
 - [ ] Craft on his Large lightning cluster: the Crafting page opens on "Large Cluster Jewel: Lightning Damage" with
   Overshock, Thunderstruck, Widespread Destruction and the life regen planned; the "Start from…" box names the
   enchant, 8 passives and item level 50+; "How to make it" lists routes cheapest first (no bench / essence steps).
-- [ ] (0.2.40 fix) Cobalt Jewel, lightning cast speed + energy shield in the plan: the Plan box now lists Harvest
+- [x] (0.2.40 fix) Cobalt Jewel, lightning cast speed + energy shield in the plan: the Plan box now lists Harvest
   reforge Defence first, then "Alteration + Regal Orb + Exalted Orb" and "Alteration + Regal Orb", all cheaper than
-  Chaos Orbs. Does that match what he'd do?
+  Chaos Orbs. **Confirmed in game 22 Nov** (Harvest reforge Defence cheapest, then Alteration + Regal, Chaos near the
+  bottom). Small mismatch for later: the Plan list says Harvest Defence 1 in 149 / ~198c while the "How to make it"
+  panel says 1 in 174 / ~230c for the same step.
 - [ ] Do the odds feel right next to Craft of Exile for a cluster he actually crafts? (Weights and mod counts were
   matched against Craft of Exile on 22 Nov.)
 
@@ -733,9 +773,11 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] F8 levelling window: opens over the game without taking focus; moves to the next step when you enter a zone;
   ‹ › arrows; quest reward lines name your build's gems; "Type it" puts the gem search in a vendor's search box.
 - [ ] Levelling options on the Play tools page (league start, bandits, jump to act) keep your place.
-- [ ] F9 map tracker: timer starts on entering a map, pauses in hideout, portals back in counted, deaths counted
-  (yours only), Done button; a Ctrl+D map check just before shows that map's mods; Play tools table fills up.
-- [ ] XP per hour shows after a couple of minutes with the tracker open (needs the Wealth page's account + POESESSID).
+- [x] F9 map tracker: timer, maps per hour, deaths, Done button (**confirmed in game 22 Nov**, Park T16). Still unchecked:
+  a Ctrl+D map check just before shows that map's mods; portals back in counted.
+- [x] ~~XP per hour~~: showed 0 in his test. pathofexile.com no longer sends a character's experience (checked live
+  22 Nov: get-characters and get-items only give name, class, league, level, lastLoginTime), so XP per hour was removed;
+  the tracker shows "name · level N" instead.
 - [ ] Stopwatch start / pause / lap / reset.
 - [ ] F10 searches: clicking one with the stash or a vendor open puts it in the search box (and nothing happens in
   game when no search box is open). Your own searches can be added on the Play tools page.

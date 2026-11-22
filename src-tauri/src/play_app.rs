@@ -2,8 +2,8 @@
 //! - Levelling overlay ("level" window): the route step you're on, following the zones you enter (exile-leveling's
 //!   route), quest gems from your PoB build, zone level vs yours, and a vendor search for your build's gems.
 //! - Map tracker ("tracker" window): time in each map, maps per hour, deaths, mods from a Ctrl+D map check just
-//!   before, roughly what an earnings session made per map; XP per hour (from your character on pathofexile.com
-//!   when the Wealth page has your POESESSID); a stopwatch.
+//!   before, what each map dropped (your bags on pathofexile.com before and after, priced), the timer stopping in the
+//!   Escape menu / skill tree (a few pixels of the screen); your level; a stopwatch.
 //! - Search strings ("searches" window): saved stash/vendor searches typed into the game's search box with one click.
 //! - Cheat sheets ("sheet" window): the Syndicate table and your own pictures.
 //! - Notes ("notes" window), and a wiki key (opens the wiki page of the item under the mouse).
@@ -12,7 +12,8 @@
 //! game's memory.
 
 use super::*;
-use filter_core::journey::{self, MapChange, MapRun, MapTracker, PlayEvent, RouteOptions};
+use filter_core::journey::{self, MapChange, MapRun, MapTracker, MenuLook, PlayEvent, RouteOptions, Steady};
+use filter_core::loot::{self, LootLine, LootPrefs};
 use std::collections::HashMap;
 
 /// A saved search: a name and what to type into the game's search box.
@@ -34,6 +35,12 @@ struct PlayStore {
     alerts: Vec<Alert>,
     /// Hide the levelling, searches, cheat sheet and notes windows while you're in a map (back in town they return).
     keep_in_maps: bool,
+    /// Don't stop the map timer while the Escape menu or skill tree is open.
+    pause_off: bool,
+    /// How the game looks with no menu open (and with the Escape menu), from "Set up" on the Play tools page.
+    menu: MenuLook,
+    /// The loot breakdown per map (Settings).
+    loot: LootPrefs,
 }
 
 /// "Tell me when Mageblood is under 150 divines".
@@ -59,10 +66,15 @@ struct Live {
     zone_name: String,
     /// (name, class, level) from the log.
     character: Option<(String, String, u32)>,
-    /// (unix time, total experience) samples for XP per hour.
-    xp: Vec<(i64, u64)>,
-    xp_note: String,
-    xp_char: Option<(String, u32, u64)>,
+    /// Your character on pathofexile.com: (name, level). (The site stopped sending experience in Nov 2026, so there's
+    /// no XP per hour any more.)
+    site_char: Option<(String, u32)>,
+    /// The menu check: smoothing, and a note for the Play tools page.
+    steady: Steady,
+    pause_note: String,
+    /// Your bags when you last went into the current map: (run, items).
+    loot_base: Option<(RunKey, Vec<serde_json::Value>)>,
+    loot_note: String,
     /// Stopwatch: running since (unix ms), time banked (ms), laps (ms).
     watch_since: Option<i64>,
     watch_acc: i64,
@@ -75,8 +87,11 @@ struct Live {
     sess_last: i64,
     sess_deaths: u32,
     sess_levels: u32,
-    sess_xp_start: Option<u64>,
 }
+
+/// Which run: (area id, seed, start).
+type RunKey = (String, u64, i64);
+fn run_key(r: &MapRun) -> RunKey { (r.area.clone(), r.seed, r.start) }
 
 static STORE: Mutex<Option<PlayStore>> = Mutex::new(None);
 static LIVE: Mutex<Option<Live>> = Mutex::new(None);
@@ -153,8 +168,15 @@ pub fn on_line(app: &AppHandle, line: &str) {
     }
     let changes = with_store(app, |s| s.maps.on_event(&ev));
     map_visibility(app, &changes);
+    let now_run = with_store(app, |s| s.maps.current.as_ref().map(run_key));
     let mut save = false;
     for c in &changes {
+        // Loot: your bags as you go into the map, and again as you come out.
+        match c {
+            MapChange::Started | MapChange::Resumed => if let Some(k) = &now_run { queue_loot(app, LootJob::Enter(k.clone(), unix())); },
+            MapChange::Left => if let Some(k) = &now_run { queue_loot(app, LootJob::Leave(k.clone(), unix())); },
+            _ => {}
+        }
         match c {
             MapChange::Started => {
                 // A Ctrl+D map check in the last 10 minutes: that's the map you just opened.
@@ -178,11 +200,15 @@ pub fn on_line(app: &AppHandle, line: &str) {
             MapChange::None => {}
         }
     }
-    // The session: a new one after 30 quiet minutes.
+    // The session: a new one after 30 quiet minutes. When the editor starts mid-session (a restart or an update),
+    // it carries on from the maps you'd already run.
+    let fresh = with_live(|l| l.sess_start == 0 || unix() - l.sess_last > 30 * 60);
+    let carried = if fresh { with_store(app, |s| journey::session_start(&s.maps.history, s.maps.current.as_ref(), unix(), 30 * 60)) } else { None };
     with_live(|l| {
         let now = unix();
-        if l.sess_start == 0 || now - l.sess_last > 30 * 60 {
-            l.sess_start = now; l.sess_deaths = 0; l.sess_levels = 0; l.sess_xp_start = l.xp.last().map(|x| x.1);
+        if fresh {
+            let (start, deaths) = carried.unwrap_or((now, 0));
+            l.sess_start = start; l.sess_deaths = deaths; l.sess_levels = 0;
         }
         l.sess_last = now;
         match &ev {
@@ -406,32 +432,45 @@ pub fn level_options(app: AppHandle, options: RouteOptions, manual: bool) -> Lev
     level_view(app)
 }
 
-// ---------- map tracker, XP, stopwatch ----------
+// ---------- map tracker, loot, stopwatch ----------
 
 #[derive(Serialize, Clone)]
 pub struct TrackerView {
     pub current: Option<MapRun>,
     pub inside: bool,
-    /// Seconds inside the current map so far.
+    /// Seconds inside the current map so far (standing still while paused).
     pub current_inside: i64,
+    /// The timer is stopped: the Escape menu or the skill tree is open.
+    pub paused: bool,
     pub recent: Vec<MapRun>,
     /// Today's runs (last 12 hours) and all runs.
     pub today: journey::MapStats,
     pub all: journey::MapStats,
-    /// XP per hour, experience left to the next level, how far through it (0..1), minutes to level.
-    pub xp_per_hour: Option<f64>,
-    pub xp_left: Option<u64>,
-    pub xp_frac: Option<f64>,
-    pub xp_minutes: Option<f64>,
-    pub xp_char: Option<String>,
-    pub xp_level: Option<u32>,
-    pub xp_note: String,
+    /// Your character on pathofexile.com (name, level), when the Wealth page has your account.
+    pub char_name: Option<String>,
+    pub char_level: Option<u32>,
     /// Stopwatch in milliseconds; running?
     pub watch_ms: i64,
     pub watch_running: bool,
     pub laps: Vec<i64>,
     pub now: i64,
     pub session: Option<SessionSummary>,
+    pub pause: PauseInfo,
+    pub loot_prefs: LootPrefs,
+    /// Why loot isn't showing ("" when it is).
+    pub loot_note: String,
+    /// The divine's price (chaos), to show totals in divines.
+    pub divine: Option<f64>,
+}
+
+/// The menu check, for the Play tools page.
+#[derive(Serialize, Clone)]
+pub struct PauseInfo {
+    pub on: bool,
+    /// The bottom bar is set up (needed); the Escape menu is set up too (optional).
+    pub ready: bool,
+    pub esc_ready: bool,
+    pub note: String,
 }
 
 /// End of session card: what this play session added up to.
@@ -445,11 +484,18 @@ pub struct SessionSummary {
     pub per_hour: f64,
     pub deaths: u32,
     pub levels: u32,
-    pub xp_gained: Option<u64>,
     /// Sum of "about made" over the session's maps (when an earnings session ran).
     pub made: Option<f64>,
     /// The map that made the most, or else the quickest.
     pub best: Option<MapRun>,
+    /// Loot over the session's maps (the current one too): everything added up, chaos.
+    pub loot: Vec<LootLine>,
+    pub loot_value: f64,
+    /// Maps that have loot counted (for "a map" averages).
+    pub loot_maps: usize,
+    /// Seconds from the first counted map's start to the end of the last (or now, while a map is going): what
+    /// "divines per hour" divides by.
+    pub loot_secs: i64,
 }
 
 #[derive(Serialize, Clone)]
@@ -460,16 +506,15 @@ pub fn play_view(app: AppHandle) -> PlayView { PlayView { tracker: tracker_view(
 
 fn tracker_view(app: &AppHandle) -> TrackerView {
     let now = unix();
-    let (current, inside, recent, today, all, all_runs) = with_store(app, |s| {
+    let (current, inside, paused, current_inside, recent, today, all, all_runs, prefs, menu, pause_off) = with_store(app, |s| {
         let h = &s.maps.history;
-        (s.maps.current.clone(), s.maps.inside, h.iter().rev().take(8).cloned().collect::<Vec<_>>(),
-            journey::map_stats(h, now - 12 * 3600), journey::map_stats(h, 0), h.iter().rev().take(200).rev().cloned().collect::<Vec<_>>())
+        (s.maps.current.clone(), s.maps.inside, s.maps.paused_since.is_some(), s.maps.current_inside(now),
+            h.iter().rev().take(8).cloned().collect::<Vec<_>>(),
+            journey::map_stats(h, now - 12 * 3600), journey::map_stats(h, 0), h.iter().rev().take(200).rev().cloned().collect::<Vec<_>>(),
+            s.loot.clone(), s.menu.clone(), s.pause_off)
     });
-    let current_inside = current.as_ref().map(|c| c.time_inside(inside, now)).unwrap_or(0);
+    let divine = currency_rates(app).get("divine").copied();
     with_live(|l| {
-        let rate = journey::xp_per_hour(&l.xp, 30 * 60);
-        let last = l.xp.last().map(|x| x.1);
-        let next = last.and_then(journey::to_next);
         let watch_ms = l.watch_acc + l.watch_since.map(|t| unix_ms() - t).unwrap_or(0);
         let session = (l.sess_start > 0).then(|| {
             let runs: Vec<MapRun> = all_runs.iter().filter(|r| r.start >= l.sess_start).cloned().collect();
@@ -477,20 +522,33 @@ fn tracker_view(app: &AppHandle) -> TrackerView {
             let made: Vec<f64> = runs.iter().filter_map(|r| r.made).collect();
             let best = runs.iter().filter(|r| r.made.is_some()).max_by(|a, b| a.made.unwrap_or(0.0).total_cmp(&b.made.unwrap_or(0.0)))
                 .or_else(|| runs.iter().filter(|r| r.in_map > 60).min_by_key(|r| r.in_map)).cloned();
+            let mut sess_loot: Vec<LootLine> = vec![];
+            let mut loot_maps = 0;
+            let looted: Vec<&MapRun> = runs.iter().chain(current.iter().filter(|c| c.start >= l.sess_start)).filter(|r| !r.loot.is_empty()).collect();
+            for r in &looted { loot_maps += 1; loot::merge(&mut sess_loot, r.loot.clone()); }
+            let loot_secs = match (looted.first(), looted.last()) {
+                (Some(a), Some(b)) => {
+                    let still_going = current.as_ref().is_some_and(|c| c.start == b.start && c.area == b.area);
+                    (if still_going { now } else { b.left.max(b.start + b.in_map) }) - a.start
+                }
+                _ => 0,
+            }.max(0);
             SessionSummary {
                 start: l.sess_start, played: (l.sess_last - l.sess_start).max(now - l.sess_start).max(0), maps: runs.len(),
                 map_time: runs.iter().map(|r| r.in_map).sum(), per_hour: st.per_hour, deaths: l.sess_deaths, levels: l.sess_levels,
-                xp_gained: match (l.sess_xp_start, l.xp.last()) { (Some(a), Some(b)) if b.1 >= a => Some(b.1 - a), _ => None },
                 made: (!made.is_empty()).then(|| made.iter().sum()), best,
+                loot_value: loot::total(&sess_loot), loot: sess_loot, loot_maps, loot_secs,
             }
         });
+        let pause = PauseInfo {
+            on: !pause_off, ready: !menu.hud.is_empty(), esc_ready: !menu.esc.is_empty(),
+            note: if menu.hud.is_empty() { "Not set up yet".into() } else { l.pause_note.clone() },
+        };
         TrackerView {
-            current, inside, current_inside, recent, today, all,
-            xp_per_hour: rate, xp_left: next.map(|n| n.0), xp_frac: next.map(|n| n.1),
-            xp_minutes: match (rate, next) { (Some(r), Some((left, _))) if r > 0.0 => Some(left as f64 / r * 60.0), _ => None },
-            xp_char: l.xp_char.as_ref().map(|c| c.0.clone()), xp_level: l.xp_char.as_ref().map(|c| c.1),
-            xp_note: l.xp_note.clone(),
+            current, inside, current_inside, paused, recent, today, all,
+            char_name: l.site_char.as_ref().map(|c| c.0.clone()), char_level: l.site_char.as_ref().map(|c| c.1),
             watch_ms, watch_running: l.watch_since.is_some(), laps: l.laps.clone(), now, session,
+            pause, loot_prefs: prefs, loot_note: l.loot_note.clone(), divine,
         }
     })
 }
@@ -498,7 +556,10 @@ fn tracker_view(app: &AppHandle) -> TrackerView {
 /// Done with this map (it otherwise ends when you open the next one).
 #[tauri::command]
 pub fn maps_done(app: AppHandle) -> PlayView {
+    let (was_inside, key) = with_store(&app, |s| (s.maps.inside, s.maps.current.as_ref().map(run_key)));
     with_store(&app, |s| { s.maps.finish(unix()); });
+    // Pressed inside the map: what's in your bags now counts as its loot (as of your last zone change).
+    if let (true, Some(k)) = (was_inside, key) { queue_loot(&app, LootJob::Leave(k, unix())); }
     save_store(&app);
     emit_all(&app);
     play_view(app)
@@ -510,7 +571,7 @@ pub fn maps_history(app: AppHandle) -> Vec<MapRun> { with_store(&app, |s| s.maps
 
 #[tauri::command]
 pub fn maps_clear(app: AppHandle) -> PlayView {
-    with_store(&app, |s| { s.maps.history.clear(); s.maps.current = None; s.maps.inside = false; });
+    with_store(&app, |s| { s.maps.history.clear(); s.maps.current = None; s.maps.inside = false; s.maps.paused_since = None; });
     save_store(&app);
     emit_all(&app);
     play_view(app)
@@ -528,53 +589,226 @@ pub fn watch_action(app: AppHandle, action: String) -> PlayView {
     play_view(app)
 }
 
-/// Asks pathofexile.com for your character's experience every minute while the tracker window is open
-/// (needs the account and POESESSID from the Wealth page). Without them, XP per hour shows a note instead.
-pub fn start_xp_watch(app: AppHandle) {
+/// Starts the tracker's background helpers: your level from pathofexile.com, the menu check, and the loot reader.
+pub fn start_watchers(app: AppHandle) {
+    start_level_watch(app.clone());
+    start_pause_watch(app.clone());
+    start_loot_worker(app);
+}
+
+/// Your account name and POESESSID from the Wealth page (None when either is missing), and PoE 2 or not.
+fn account(app: &AppHandle) -> Option<(String, String, bool)> {
+    let st = app.state::<AppState>();
+    let s = st.store.lock().unwrap().settings.clone();
+    let (acc, sess) = (s.poe_account.trim().to_string(), s.poesessid.trim().to_string());
+    (!acc.is_empty() && !sess.is_empty()).then(|| (acc, sess, active_game(&st) == Game::Poe2))
+}
+
+/// Your level from pathofexile.com every 10 minutes while the tracker is open (the loot reader updates it too).
+fn start_level_watch(app: AppHandle) {
     thread::spawn(move || {
         let mut last_ask = 0i64;
         loop {
-            thread::sleep(Duration::from_secs(5));
+            thread::sleep(Duration::from_secs(10));
             let open = app.get_webview_window("tracker").map(|w| w.is_visible().unwrap_or(false)).unwrap_or(false);
-            if !open || unix() - last_ask < 60 { continue; }
+            if !open || unix() - last_ask < 600 { continue; }
             last_ask = unix();
-            let (acc, sess) = {
-                let st = app.state::<AppState>();
-                let s = st.store.lock().unwrap().settings.clone();
-                (s.poe_account.trim().to_string(), s.poesessid.trim().to_string())
-            };
-            if acc.is_empty() || sess.is_empty() {
-                with_live(|l| l.xp_note = "XP per hour needs your account and POESESSID (Wealth page)".into());
-                emit_all(&app);
-                continue;
-            }
-            let poe2 = active_game(&app.state::<AppState>()) == Game::Poe2;
-            let want = with_live(|l| l.character.as_ref().map(|c| c.0.clone()));
-            match trade_api::characters(&acc, &sess, poe2) {
-                Ok(v) => {
-                    let list = v.as_array().cloned().unwrap_or_default();
-                    // The character the log says you're playing, else the last one played.
-                    let pick = list.iter().find(|c| want.as_deref().is_some_and(|w| c["name"].as_str() == Some(w)))
-                        .or_else(|| list.iter().find(|c| c["lastActive"].as_bool() == Some(true)))
-                        .or_else(|| list.first());
-                    if let Some(c) = pick {
-                        let name = c["name"].as_str().unwrap_or("").to_string();
-                        let xp = c["experience"].as_u64().unwrap_or(0);
-                        let level = c["level"].as_u64().unwrap_or(0) as u32;
-                        with_live(|l| {
-                            if l.xp_char.as_ref().map(|x| &x.0) != Some(&name) { l.xp.clear(); }
-                            l.xp_char = Some((name, level, xp));
-                            l.xp.push((unix(), xp));
-                            if l.xp.len() > 240 { l.xp.remove(0); }
-                            l.xp_note = if l.xp.len() < 2 { "Measuring… (a minute or two)".into() } else { String::new() };
-                        });
-                    }
+            let Some((acc, sess, poe2)) = account(&app) else { continue };
+            if let Ok(v) = trade_api::characters(&acc, &sess, poe2) {
+                if let Some(c) = pick_character(&app, &v) {
+                    with_live(|l| l.site_char = Some((c["name"].as_str().unwrap_or("").to_string(), c["level"].as_u64().unwrap_or(0) as u32)));
+                    emit_all(&app);
                 }
-                Err(e) => with_live(|l| l.xp_note = format!("Couldn't read your character: {e}")),
+            }
+        }
+    });
+}
+
+/// The character the log says you're playing, else the one you played last.
+fn pick_character(app: &AppHandle, list: &serde_json::Value) -> Option<serde_json::Value> {
+    let want = with_live(|l| l.character.as_ref().map(|c| c.0.clone())).or_else(|| with_store(app, |s| s.maps.character.clone()));
+    let list = list.as_array()?;
+    list.iter().find(|c| want.as_deref().is_some_and(|w| c["name"].as_str() == Some(w)))
+        .or_else(|| list.iter().max_by_key(|c| c["lastLoginTime"].as_i64().unwrap_or(0)))
+        .cloned()
+}
+
+// ---------- the menu check (timer stops in the Escape menu and the skill tree) ----------
+
+/// Once a second while you're inside a map: a few pixels of the game's bottom bar (and the middle, if the Escape menu
+/// is set up) compared with how they looked when you set it up. Only while the game is the window in front.
+fn start_pause_watch(app: AppHandle) {
+    thread::spawn(move || loop {
+        thread::sleep(Duration::from_secs(1));
+        let (on, look, inside) = with_store(&app, |s| (!s.pause_off, s.menu.clone(), s.maps.inside));
+        if !on || look.hud.is_empty() || !inside {
+            // Switched off mid-pause: let the clock go on.
+            let changed = with_store(&app, |s| s.maps.set_paused(false, unix()));
+            with_live(|l| l.steady.reset());
+            if changed { save_store(&app); emit_all(&app); }
+            continue;
+        }
+        let Some(rect) = game_client_rect() else { continue };
+        if (rect.2, rect.3) != look.size {
+            with_live(|l| l.pause_note = "The game window changed size: press Set up again".into());
+            continue;
+        }
+        // Alt-tabbed or clicking one of our windows: leave the clock as it is.
+        if !game_in_front() { continue; }
+        let Ok(hud) = screen::sample_points(&journey::hud_points(rect)) else { continue };
+        let centre = if look.esc.is_empty() { vec![] } else { screen::sample_points(&journey::centre_points(rect)).unwrap_or_default() };
+        let covered = look.covered(&hud, &centre);
+        if let Some(state) = with_live(|l| { l.pause_note.clear(); l.steady.feed(covered) }) {
+            // Two readings a second apart agreed: it changed about a second ago.
+            if with_store(&app, |s| s.maps.set_paused(state, unix() - 1)) { save_store(&app); emit_all(&app); }
+        }
+    });
+}
+
+/// "Set up" (bottom bar, with nothing open) or "Escape menu" (with it open): waits 5 seconds so you can click into the
+/// game (and press Escape), then remembers how it looks.
+#[tauri::command]
+pub async fn pause_setup(app: AppHandle, kind: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        thread::sleep(Duration::from_secs(5));
+        let rect = game_client_rect().ok_or("Can't find the game window")?;
+        if !game_in_front() { return Err("Path of Exile wasn't in front: click into the game within 5 seconds".to_string()); }
+        let msg = if kind == "esc" {
+            let centre = screen::sample_points(&journey::centre_points(rect))?;
+            let hud = screen::sample_points(&journey::hud_points(rect))?;
+            let already = with_store(&app, |s| {
+                let seen = s.menu.covered(&hud, &[]);
+                s.menu.esc = centre;
+                seen
+            });
+            if already { "Escape menu saved (the bottom bar check already spots it too)".into() } else { "Escape menu saved".into() }
+        } else {
+            let hud = screen::sample_points(&journey::hud_points(rect))?;
+            with_store(&app, |s| {
+                // A new size: the old Escape picture no longer lines up.
+                if s.menu.size != (rect.2, rect.3) { s.menu.esc.clear(); }
+                s.menu.hud = hud;
+                s.menu.size = (rect.2, rect.3);
+            });
+            "Saved. Now open the skill tree in a map: the tracker should say Paused".into()
+        };
+        with_live(|l| { l.pause_note.clear(); l.steady.reset(); });
+        save_store(&app);
+        emit_all(&app);
+        Ok(msg)
+    }).await.map_err(err)?
+}
+
+#[tauri::command]
+pub fn pause_prefs(app: AppHandle, on: bool, forget: bool) -> PlayView {
+    with_store(&app, |s| { s.pause_off = !on; if forget { s.menu = MenuLook::default(); } });
+    save_store(&app);
+    emit_all(&app);
+    play_view(app)
+}
+
+// ---------- loot per map ----------
+
+enum LootJob {
+    /// You went into the map (at this time): remember your bags.
+    Enter(RunKey, i64),
+    /// You came out (or pressed Done inside): what's new in your bags is the map's loot.
+    Leave(RunKey, i64),
+}
+
+static LOOT_TX: Mutex<Option<std::sync::mpsc::Sender<LootJob>>> = Mutex::new(None);
+
+fn queue_loot(app: &AppHandle, job: LootJob) {
+    if !with_store(app, |s| s.loot.on) { return; }
+    if account(app).is_none() {
+        with_live(|l| l.loot_note = "Loot per map needs your account and POESESSID (Wealth page)".into());
+        return;
+    }
+    if let Some(tx) = LOOT_TX.lock().unwrap().as_ref() { let _ = tx.send(job); }
+}
+
+/// Reads your bags from pathofexile.com, one job at a time in order.
+fn start_loot_worker(app: AppHandle) {
+    let (tx, rx) = std::sync::mpsc::channel::<LootJob>();
+    *LOOT_TX.lock().unwrap() = Some(tx);
+    thread::spawn(move || {
+        for job in rx {
+            let (key, at) = match &job { LootJob::Enter(k, t) | LootJob::Leave(k, t) => (k.clone(), *t) };
+            let bags = match read_bags(&app, at) {
+                Ok(b) => b,
+                Err(e) => { with_live(|l| l.loot_note = format!("Couldn't read your bags: {e}")); emit_all(&app); continue; }
+            };
+            match job {
+                LootJob::Enter(..) => with_live(|l| { l.loot_base = Some((key, bags)); l.loot_note.clear(); }),
+                LootJob::Leave(..) => {
+                    let base = with_live(|l| match &l.loot_base { Some((k, b)) if *k == key => { let b = b.clone(); l.loot_base = None; Some(b) } _ => None });
+                    let Some(before) = base else { continue };
+                    let new = loot::gained(&before, &bags);
+                    let divine = currency_rates(&app).get("divine").copied().unwrap_or(0.0);
+                    let Some(lines) = wealth_app::with_lookup(&app, |look| loot::lines(&new, look, divine)) else {
+                        with_live(|l| l.loot_note = "Prices haven't loaded yet: loot not counted for that visit".into());
+                        continue;
+                    };
+                    with_store(&app, |s| {
+                        let run = match s.maps.current.as_mut() {
+                            Some(c) if run_key(c) == key => Some(c),
+                            _ => s.maps.history.iter_mut().rev().take(5).find(|r| run_key(r) == key),
+                        };
+                        if let Some(r) = run {
+                            loot::merge(&mut r.loot, lines);
+                            r.loot.truncate(60);
+                        }
+                    });
+                    with_live(|l| l.loot_note.clear());
+                    save_store(&app);
+                }
             }
             emit_all(&app);
         }
     });
+}
+
+/// Your bags as the site saved them at your zone change at `at`. The site saves your character when you change
+/// zone; waits a moment and checks it has (its lastLoginTime), trying a few times.
+fn read_bags(app: &AppHandle, at: i64) -> Result<Vec<serde_json::Value>, String> {
+    let (acc, sess, poe2) = account(app).ok_or("no account")?;
+    let name = match with_live(|l| l.character.as_ref().map(|c| c.0.clone())).or_else(|| with_store(app, |s| s.maps.character.clone())) {
+        Some(n) => n,
+        None => {
+            let v = trade_api::characters(&acc, &sess, poe2)?;
+            let c = pick_character(app, &v).ok_or("no characters on this account")?;
+            let n = c["name"].as_str().unwrap_or("").to_string();
+            with_store(app, |s| s.maps.character = Some(n.clone()));
+            n
+        }
+    };
+    let wait = (at + 4 - unix()).clamp(0, 10);
+    thread::sleep(Duration::from_secs(wait as u64));
+    let mut last = Err("not read".to_string());
+    for attempt in 0..4 {
+        if attempt > 0 { thread::sleep(Duration::from_secs(6)); }
+        match trade_api::character_items(&acc, &sess, &name, poe2) {
+            Ok(v) => {
+                let c = &v["character"];
+                with_live(|l| l.site_char = Some((c["name"].as_str().unwrap_or(&name).to_string(), c["level"].as_u64().unwrap_or(0) as u32)));
+                let saved = c["lastLoginTime"].as_i64().unwrap_or(0);
+                let bags = loot::bag_items(&v["items"]);
+                // Saved at (or after) this zone change, allowing for clocks a little apart.
+                if saved >= at - 15 || attempt == 3 { return Ok(bags); }
+                last = Ok(bags);
+            }
+            Err(e) => last = Err(e),
+        }
+    }
+    last
+}
+
+#[tauri::command]
+pub fn loot_prefs_save(app: AppHandle, prefs: LootPrefs) -> PlayView {
+    with_store(&app, |s| s.loot = prefs);
+    save_store(&app);
+    emit_all(&app);
+    play_view(app)
 }
 
 // ---------- search strings ----------
