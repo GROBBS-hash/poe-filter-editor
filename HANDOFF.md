@@ -48,7 +48,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
-- **Clearer sidebar, hotkeys explained, Price check page (22 Nov, not released yet).** He said the sidebar's subheadings
+- **Clearer sidebar, hotkeys explained, Price check page (22 Nov, released in 0.2.44).** He said the sidebar's subheadings
   didn't make sense ("Maps/Atlas too vague", "Your character" isn't only levelling) and the Home hotkey card would confuse
   new players (what does F2 change?). He picked sidebar mock-up **B "Sorted by what you're doing"** and hotkey card **C
   "Grouped by what they're for"**, and asked for the price check to have its own entry.
@@ -782,7 +782,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Clicking it again later logs in at once (the window may flash and close).
 - [ ] Settings → Map tracker → Loot per map shows "Logged in to pathofexile.com".
 
-**Clearer sidebar, hotkeys explained, Price check page (22 Nov, not released yet):**
+**Clearer sidebar, hotkeys explained, Price check page (22 Nov, released in 0.2.44):**
 - [ ] Sidebar reads well: Your loot filter · How items look · Your changes · Build and gear · While you play · Money,
   each with a line saying what's in it. New names: Price tiers, Unique finder, Game windows, Map mods, Atlas tree,
   Price check, Stash worth. Hover a page: the hint makes sense. Anything still confusing?
