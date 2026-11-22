@@ -48,6 +48,14 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **F2 one button, tracker fits its content, fairer "sells for about" (23 Nov, not released yet).** After his 0.2.48 test.
+  - F2: "Change this look" moved into the Shown by box, bottom right (the box itself is no longer a button; it went to the
+    same place, he wanted one).
+  - Map tracker: he meant "big enough to show everything", not zoom. The A−/A+ buttons are gone from it; `useFitHeight`
+    (WinFrame.tsx) sizes the window to its content (width 280, never taller than the screen), so no scrolling.
+    `useWinScale` / `SizeButtons` stay in WinFrame for later, unused.
+  - Price window: "sells for about" / Typical = the 3rd cheapest seller (each seller once) when there are 5+, else the
+    middle one (was the middle of the cheapest ten: 90c on his Xirgil's Crank with 60, 60, 70, 74c instant listings; now 70c).
 - **Price window: tier badges on totals, exact unique rolls, buyout switch (23 Nov, released in 0.2.48).** From his screenshots.
   - Total rows (+94% total Elemental Resistance, total Life…) had no T1/T2 badge: `trade_rules::totals` now gives them the
     best tier among the mods adding up to them, and a lone mod's roll bar / range / affix (tooltip says "best tier among the mods").
@@ -898,6 +906,9 @@ Confirmed in game so far: basic Ctrl+D price check (trade search returned listin
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
 **Tiers: step conditions, jewels first (23 Nov, released in 0.2.46):**
+- [ ] (not released yet) F2: one gold "Change this look" button inside the Shown by box.
+- [ ] (not released yet) Map tracker shows everything without scrolling (grows and shrinks with what it shows).
+- [ ] (not released yet) Ctrl+D "sells for about" sits near the 3rd cheapest listing.
 - [ ] (0.2.48) Ctrl+D: resist / life total rows show a T badge; a unique opens with its own numbers; "Instant buyout
   only" can be clicked off ("Any seller") and back on, then Search again.
 - [ ] (0.2.48) F2 on any item: a "Shown by" box names the Tiers section and step (with its conditions); click opens it.

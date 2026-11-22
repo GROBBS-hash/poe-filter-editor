@@ -912,7 +912,10 @@ pub fn listings(fetched: &Value, rates: &HashMap<String, f64>) -> Vec<Listing> {
 /// What the cheapest listings say it's worth: (lowest, typical) in chaos.
 pub fn summary(ls: &[Listing]) -> Option<(f64, f64)> {
     // Price fixers list a few very cheap copies (often the same seller many times) to drag the price down.
-    // Count each seller once, at their cheapest, then take the middle of the cheapest ten sellers.
+    // Count each seller once, at their cheapest. Then "sells for about" is the 3rd cheapest seller: near enough the bottom
+    // to be what it really sells for, while one or two suspiciously cheap listings don't decide it. (23 Nov: it was the
+    // middle of the cheapest ten, 90c on his Xirgil's Crank with instant 60c, 60c, 70c and 74c ones listed.)
+    // With fewer than five sellers, the middle one.
     let mut by_seller: Vec<(&str, f64)> = Vec::new();
     for l in ls {
         let Some(c) = l.chaos else { continue };
@@ -924,8 +927,8 @@ pub fn summary(ls: &[Listing]) -> Option<(f64, f64)> {
     let mut v: Vec<f64> = by_seller.into_iter().map(|(_, c)| c).collect();
     if v.is_empty() { return None; }
     v.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    let first = &v[..v.len().min(10)];
-    Some((v[0], first[first.len() / 2]))
+    let typical = if v.len() >= 5 { v[2] } else { v[v.len() / 2] };
+    Some((v[0], typical))
 }
 
 /// Trade site currency ids -> names poe.ninja uses.
@@ -1499,6 +1502,9 @@ Item Level: 75
         let mut fixed: Vec<Listing> = (0..6).map(|_| l("fixer", 0.1)).collect();
         fixed.extend([l("a", 3.0), l("b", 3.0), l("c", 4.0), l("d", 5.0)]);
         assert_eq!(summary(&fixed), Some((0.1, 3.0)));
+        // His Xirgil's Crank (23 Nov): instant 60, 60, 70, 74, 75, 90… sells for about 70, not the middle (90).
+        let crank: Vec<Listing> = [60.0, 60.0, 70.0, 74.0, 75.0, 90.0, 100.0, 145.0, 150.0].iter().enumerate().map(|(i, c)| l(&format!("s{i}"), *c)).collect();
+        assert_eq!(summary(&crank), Some((60.0, 70.0)));
     }
 }
 

@@ -111,3 +111,33 @@ export function SizeButtons({ s }: { s: ReturnType<typeof useWinScale> }) {
     </span>
   );
 }
+
+/**
+ * A window over the game that grows (or shrinks) to fit everything it shows, so nothing needs scrolling (23 Nov: "make
+ * the window a little bigger to fit the whole picture" of the map tracker). Keeps its width; never taller than the screen.
+ */
+export function useFitHeight(width: number, min = 200) {
+  useEffect(() => {
+    let last = 0;
+    const fit = () => {
+      const bar = document.querySelector<HTMLElement>(".bo-bar");
+      const body = document.querySelector<HTMLElement>(".bo-body");
+      if (!body) return;
+      // The content itself (not the box, which is as tall as the window): the bottom of its last child, plus padding.
+      const last2 = body.lastElementChild as HTMLElement | null;
+      const pad = parseFloat(getComputedStyle(body).paddingBottom) || 0;
+      const content = last2 ? last2.getBoundingClientRect().bottom - body.getBoundingClientRect().top + body.scrollTop + pad : body.scrollHeight;
+      const want = Math.max(min, Math.min(window.screen.availHeight - 40, Math.ceil((bar?.offsetHeight ?? 0) + content + 4)));
+      if (Math.abs(want - last) < 3) return;
+      last = want;
+      import("@tauri-apps/api/dpi").then(({ LogicalSize }) => getCurrentWindow().setSize(new LogicalSize(width, want))).catch(() => {});
+    };
+    const ro = new ResizeObserver(fit);
+    const body = document.querySelector<HTMLElement>(".bo-body");
+    if (body) { ro.observe(body); Array.from(body.children).forEach((c) => ro.observe(c)); }
+    const mo = new MutationObserver(() => { fit(); const b = document.querySelector<HTMLElement>(".bo-body"); if (b) Array.from(b.children).forEach((c) => ro.observe(c)); });
+    mo.observe(document.body, { childList: true, subtree: true });
+    fit();
+    return () => { ro.disconnect(); mo.disconnect(); };
+  }, [width, min]);
+}

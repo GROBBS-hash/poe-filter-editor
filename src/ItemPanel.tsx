@@ -36,7 +36,7 @@ const plain = (p: string) => PLAIN[p] ?? p.replace(/([a-z])([A-Z])/g, "$1 $2");
 
 /** Which rule decides it, in the Tiers page's words (23 Nov: "a way to see what rule is showing this item"):
  *  "Shown by Crafting bases › Tier 1 bases, item level 86+", that rule's conditions as small chips; click to open it. */
-function RuleLine({ src, hidden, onOpen }: { src?: Source; hidden: boolean; onOpen?: () => void }) {
+function RuleLine({ src, hidden, onOpen, action }: { src?: Source; hidden: boolean; onOpen?: () => void; action: string }) {
   if (!src) return null;
   const verb = hidden ? "Hidden by" : "Shown by";
   const name = src.label.replace(/^(Preset|Hide|Highlight|Louder|Quieter|Style): /, "");
@@ -51,9 +51,12 @@ function RuleLine({ src, hidden, onOpen }: { src?: Source; hidden: boolean; onOp
       {(src.conds?.length ?? 0) > 0 && <span className="qm-rule-conds">{src.conds!.map((c) => <span key={c}>{c}</span>)}</span>}
     </>
   );
-  return onOpen
-    ? <button className="qm-rule" onClick={onOpen} title="Open this rule in the editor">{body}<span className="qm-rule-go">Open ›</span></button>
-    : <div className="qm-rule">{body}</div>;
+  return (
+    <div className="qm-rule">
+      {body}
+      {onOpen && <button className="qm-change qm-rule-btn" onClick={onOpen} title="Opens this rule in the editor">{action}</button>}
+    </div>
+  );
 }
 
 /** A clear "why": who decided it, in plain words, which rule, and a button to open that rule in the app. */
@@ -455,8 +458,8 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
             return (
               <>
                 <div className="qm-chips">{chips.filter(Boolean).map((c) => <span key={c} className="qm-chip">{c}</span>)}</div>
-                <RuleLine src={src} hidden={!shown(v.visibility)} onOpen={canOpen ? change : undefined} />
-                {canOpen && <button className="qm-change" onClick={change}>{shown(v.visibility) ? "Change this look" : "Change this rule"}</button>}
+                <RuleLine src={src} hidden={!shown(v.visibility)} onOpen={canOpen ? change : undefined}
+                  action={shown(v.visibility) ? "Change this look" : "Change this rule"} />
               </>
             );
           })()}

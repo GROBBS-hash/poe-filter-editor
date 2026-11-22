@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ResizeGrips, SizeButtons, WinBar, useWinScale } from "./WinFrame";
+import { ResizeGrips, WinBar, useFitHeight } from "./WinFrame";
 import { CurrencyIcon, ItemIcon } from "./icons";
 import { PoeLogin } from "./Wealth";
 import syndicate from "./data/syndicate.json";
@@ -195,7 +195,8 @@ function LevelChips({ v }: { v: LevelView }) {
 /** The map tracker (F9): this map's time (stops in menus), maps per hour, deaths, loot per map, a stopwatch. */
 export function TrackerWindow() {
   const [v, setV] = useState<TrackerView | null>(null);
-  const size = useWinScale("tracker", [280, 360]);
+  // Tall enough for everything it shows (no scrolling).
+  useFitHeight(280);
   const [now, setNow] = useState(Date.now());
   const keys = useKeys();
   useEsc("tracker");
@@ -215,7 +216,7 @@ export function TrackerWindow() {
   const c = v.current;
   return (
     <div className="bo pw">
-      <WinBar title="Map tracker" hint={`Esc / ${keys.key_tracker || "F9"}`} onClose={() => invoke("play_hide", { label: "tracker" })}><SizeButtons s={size} /></WinBar>
+      <WinBar title="Map tracker" hint={`Esc / ${keys.key_tracker || "F9"}`} onClose={() => invoke("play_hide", { label: "tracker" })} />
       <div className="bo-body">
         {c ? <>
           <div className="pw-row between"><span className="trk-name">{c.name} <span className="pw-small">{tier(c)}</span></span>
