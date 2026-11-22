@@ -46,7 +46,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
-- **"Log in with pathofexile.com" button (22 Nov, not released yet).** He asked for one-click login like other tools.
+- **"Log in with pathofexile.com" button (22 Nov, released in 0.2.43).** He asked for one-click login like other tools.
   GGG's OAuth is closed to new apps (see Left to do), so: `wealth_app::poe_login` opens the site's own login page in
   a small editor window (label `poelogin`, deliberately not in `capabilities/default.json`, so the page has no access
   to the app). A thread reads that window's POESESSID cookie (`Webview::cookies_for_url`) every 1.2 s; since the site
@@ -755,7 +755,7 @@ Everything below was built since GROBBS last tested and has only been checked wi
 Confirmed in game so far: basic Ctrl+D price check (trade search returned listings); 20 Nov: weapon + armour
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
-**Log in with pathofexile.com (22 Nov, not released yet):**
+**Log in with pathofexile.com (22 Nov, released in 0.2.43):**
 - [ ] Wealth page → click your account name (top right of the stash card) → **Log in with pathofexile.com**: a window
   with the website's login opens; log in; it closes by itself and the page says "Logged in as Name#1234" and loads tabs.
 - [ ] Clicking it again later logs in at once (the window may flash and close).
