@@ -621,7 +621,7 @@ Confirmed in game so far: basic Ctrl+D price check (trade search returned listin
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
 **Next test session (planned 21 Nov night, for 22 Nov).** Walk him through it a few at a time, between maps.
-Latest release is 0.2.37 (22 Nov): everything below up to the Awakened looks is in it, so he can test it all in the installed editor.
+Latest release is 0.2.38 (22 Nov): everything below is in it (0.2.38 added fixed base mods hidden, mod source badges, docked price window).
 **He plays on the installed release** (`%LOCALAPPDATA%\PoE Filter Editor\poe-filter-editor.exe`), not the dev
 editor, so unreleased things (e.g. Settings → Main window look) only reach him after a release.
 **22 Nov results:** 1. Grouped layout, low confidence and Dragon Turn +57 seen working; he wanted low confidence more
@@ -643,13 +643,13 @@ orb picture on exalt prices, orb pictures in the market tiles (Split look too). 
 picks one (then maybe make it the default and drop the looks he doesn't use). 22 Nov after 0.2.37: **Awakened +
 price is his favourite so far** (not final). Base mods with no roll range (same on every item of that base, e.g.
 Cogwork's four) are now hidden behind "4 base mods the same on every Cogwork Ring · show", like Awakened's "Show
-hidden" (`hide_const_roll`); only when the copy had ranges (advanced copy), never ticked ones or maps. Not released.
-**Mod source badges** (22 Nov, not released): like Awakened's tags, a coloured badge (with the game's little icon from
+hidden" (`hide_const_roll`); only when the copy had ranges (advanced copy), never ticked ones or maps. In 0.2.38.
+**Mod source badges** (22 Nov, in 0.2.38): like Awakened's tags, a coloured badge (with the game's little icon from
 `public/mod-icons/`, copied from Awakened's repo) after any mod that needs something special: Exarch / Eater (eldritch),
 Essence, Delve, Veiled, Incursion, the six influences, Infamous, Rare only, Synthesised, Corrupted. Read from the
 advanced copy's "{ … Modifier "name" }" heading (`mod_source` in core/src/trade.rs, Awakened's name lists);
 `StatFilter.source`. Crafted / fractured / foulborn tags now coloured too. Eldritch implicits are never hidden as
-"fixed base mods". **Docked price window** (22 Nov, not released): like Awakened, the Ctrl+D window opens at the top
+"fixed base mods". **Docked price window** (22 Nov, in 0.2.38): like Awakened, the Ctrl+D window opens at the top
 of the game beside its side panel, every time: just left of the inventory when you price check on the right half of
 the game, just right of the stash on the left half (panel = game height × 370/600, Awakened's figure;
 `place_beside_panel` + `TRADE_DOCK` in lib.rs keep that edge when the window grows). Falls back to beside the mouse
