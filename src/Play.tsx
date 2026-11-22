@@ -268,7 +268,7 @@ export function SearchesWindow() {
   );
   return (
     <div className="bo pw">
-      <WinBar title="Searches" hint={`Esc / ${keys.key_searches || "F10"}`} onClose={() => invoke("play_hide", { label: "searches" })} />
+      <WinBar title="Stash searches" hint={`Esc / ${keys.key_searches || "F10"}`} onClose={() => invoke("play_hide", { label: "searches" })} />
       <div className="bo-body">
         <div className="pw-small">Open your stash or a vendor, then click one: it's typed into the search box.</div>
         {err && <div className="error small">{err}</div>}
@@ -619,15 +619,15 @@ export function TrackerSettings() {
   return (
     <>
       <div className="card">
-        <h2>Stop the map timer in menus</h2>
-        <p className="muted small">The map timer (F9) stands still while the Escape menu or the passive skill tree is open. The game doesn't say when
-          they're open, so the editor looks at a few dots of the game's screen once a second (only while you're in a map and the game is in front).</p>
-        <label className="check"><input type="checkbox" checked={p.on} onChange={(e) => pause(e.target.checked)} /><span>Stop the timer in the Escape menu and the skill tree</span></label>
+        <h2>Stop the map timer when you're not playing</h2>
+        <p className="muted small">The map timer (F9) stands still while you're in another program (alt-tab), and while the Escape menu or the
+          passive skill tree is open. The game doesn't say when they're open, so the editor looks at a few dots of the game's screen once a second.</p>
+        <label className="check"><input type="checkbox" checked={p.on} onChange={(e) => pause(e.target.checked)} /><span>Stop the timer when you alt-tab, open the Escape menu or the skill tree</span></label>
         {p.on && <>
-          <p className="small" style={{ margin: "8px 0 4px" }}>{p.ready ? <span className="w-full">Set up{p.esc_ready ? ", Escape menu too" : ""}.</span> : <b>Needs setting up once:</b>}{" "}
+          <p className="small" style={{ margin: "8px 0 4px" }}>{p.ready ? <span className="w-full">Ready{p.esc_ready ? ", Escape menu too" : ""}.</span> : <b>Gets ready by itself a few seconds into your next map.</b>}{" "}
             {p.note && p.ready && <span className="muted">{p.note}</span>}</p>
           <ol className="small muted" style={{ margin: "0 0 8px", paddingLeft: 18 }}>
-            <li>In a map or your hideout, with no panels open, click <b>Set up</b> and click back into the game within 5 seconds.</li>
+            <li>If the timer stops when nothing is open: in a map, with no panels open, click <b>Set up again</b> and click back into the game within 5 seconds.</li>
             <li>If the timer doesn't stop for the Escape menu: click <b>Escape menu</b>, click into the game and press Escape within 5 seconds.</li>
           </ol>
           <div className="row">
@@ -709,14 +709,14 @@ export default function PlayTools() {
           <Tile title="Levelling" k={k("key_level", "F8")} label="level">The campaign route step by step. It moves on by itself as you enter zones,
             says which quest gem rewards your PoB build wants, warns when you're too high or low for the zone, and has a vendor search for your build's gems.</Tile>
           <Tile title="Map tracker" k={k("key_tracker", "F9")} label="tracker">Time in each map, maps per hour, deaths, the mods from a Ctrl+D just
-            before you opened it, what each map dropped (priced), and a stopwatch. The timer stops in the Escape menu and the skill tree. Settings → Map tracker.</Tile>
-          <Tile title="Searches" k={k("key_searches", "F10")} label="searches">Click a saved search and it's typed into the stash or vendor search box.
+            before you opened it, what each map dropped (priced), and a stopwatch. The timer stops while you alt-tab, and in the Escape menu and the skill tree. Settings → Map tracker.</Tile>
+          <Tile title="Stash searches" k={k("key_searches", "F10")} label="searches">Click a saved search and it's typed into the stash or vendor search box.
             Your build's gems and your map regex are added for you.</Tile>
           <Tile title="Cheat sheets" k={k("key_sheet", "F11")} label="sheet">The Syndicate rewards table (click the ones you want), plus any pictures you add below:
             Heist, lab layouts, Delve, anything.</Tile>
           <Tile title="Notes" k={k("key_notes", "") || undefined} label="notes">A notepad over the game, saved as you type.</Tile>
-          <Tile title="Wiki" k={k("key_wiki", "Alt+W")}>Hover an item and press the key: its wiki page opens in your browser (uniques by name, the rest by base).</Tile>
-          <Tile title="Read a choice" k={k("key_read", "Alt+R")}>Hover an Eldritch altar, an Expedition remnant or a reward screen and press the key:
+          <Tile title="Open on the wiki" k={k("key_wiki", "Alt+W")}>Hover an item and press the key: its wiki page opens in your browser (uniques by name, the rest by base).</Tile>
+          <Tile title="Which one should I pick?" k={k("key_read", "Alt+R")}>Hover an Eldritch altar, an Expedition remnant or a reward screen and press the key:
             it reads the text, says which altar choice to take, flags mods on your can't-run list, and prices the rewards. Windows only.</Tile>
         </div>
         <label className="check" style={{ marginTop: 10 }}><input type="checkbox" checked={!keepInMaps} onChange={(e) => { setKeepInMaps(!e.target.checked); invoke("play_prefs", { keepInMaps: !e.target.checked }); }} />

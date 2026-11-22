@@ -545,7 +545,7 @@ fn tracker_view(app: &AppHandle) -> TrackerView {
         });
         let pause = PauseInfo {
             on: !pause_off, ready: !menu.hud.is_empty(), esc_ready: !menu.esc.is_empty(),
-            note: if menu.hud.is_empty() { "Not set up yet".into() } else { l.pause_note.clone() },
+            note: if menu.hud.is_empty() { "Gets ready by itself in your next map".into() } else { l.pause_note.clone() },
         };
         TrackerView {
             current, inside, current_inside, paused, recent, today, all,
@@ -638,32 +638,72 @@ fn pick_character(app: &AppHandle, list: &serde_json::Value) -> Option<serde_jso
 
 // ---------- the menu check (timer stops in the Escape menu and the skill tree) ----------
 
-/// Once a second while you're inside a map: a few pixels of the game's bottom bar (and the middle, if the Escape menu
-/// is set up) compared with how they looked when you set it up. Only while the game is the window in front.
+/// Once a second while you're inside a map: the clock stops when you alt-tab away from the game (clicking one of our
+/// own windows doesn't count), and when a few pixels of the game's bottom bar (and the middle, if the Escape menu is
+/// set up) look different from normal: the Escape menu darkens them, the skill tree covers them.
+/// The normal look is learnt by itself (23 Nov 2026: he never pressed Set up, so the clock never stopped): a few
+/// seconds into a map, once the bar has looked the same for 3 seconds in a row with the game in front.
 fn start_pause_watch(app: AppHandle) {
+    let mut learn: Vec<Vec<[u8; 3]>> = vec![];
+    let mut away_streak = 0u32;
     thread::spawn(move || loop {
         thread::sleep(Duration::from_secs(1));
-        let (on, look, inside) = with_store(&app, |s| (!s.pause_off, s.menu.clone(), s.maps.inside));
-        if !on || look.hud.is_empty() || !inside {
+        let (on, look, inside, in_for) = with_store(&app, |s| {
+            let in_for = s.maps.current.as_ref().filter(|_| s.maps.inside).map(|c| unix() - c.last_enter).unwrap_or(0);
+            (!s.pause_off, s.menu.clone(), s.maps.inside, in_for)
+        });
+        let set = |paused: bool, at: i64| {
+            if with_store(&app, |s| s.maps.set_paused(paused, at)) { save_store(&app); emit_all(&app); }
+        };
+        if !on || !inside {
             // Switched off mid-pause: let the clock go on.
-            let changed = with_store(&app, |s| s.maps.set_paused(false, unix()));
+            set(false, unix());
             with_live(|l| l.steady.reset());
-            if changed { save_store(&app); emit_all(&app); }
+            learn.clear();
+            away_streak = 0;
             continue;
         }
+        // Alt-tabbed to another program: stop the clock (after 2 seconds, so a quick look doesn't count).
+        // One of our own windows in front (the tracker, the price window): leave the clock as it is.
+        if !game_in_front() {
+            learn.clear();
+            if ours_in_front() { away_streak = 0; continue; }
+            away_streak += 1;
+            if away_streak == 2 { set(true, unix() - 1); with_live(|l| l.steady.reset()); }
+            continue;
+        }
+        if away_streak >= 2 {
+            // Back in the game: the menu check below decides from here (a menu still open stops it again).
+            set(false, unix());
+        }
+        away_streak = 0;
         let Some(rect) = game_client_rect() else { continue };
-        if (rect.2, rect.3) != look.size {
-            with_live(|l| l.pause_note = "The game window changed size: press Set up again".into());
+        let Ok(hud) = screen::sample_points(&journey::hud_points(rect)) else { continue };
+        // No normal look yet, or the game changed size: learn it now.
+        if look.hud.is_empty() || (rect.2, rect.3) != look.size {
+            if in_for < 4 { continue; }
+            learn.push(hud);
+            if learn.len() > 3 { learn.remove(0); }
+            let steady = learn.len() == 3 && learn.windows(2).all(|w| journey::changed_share(&w[0], &w[1]) < 0.1);
+            if steady {
+                let bar = learn.pop().unwrap_or_default();
+                with_store(&app, |s| {
+                    if s.menu.size != (rect.2, rect.3) { s.menu.esc.clear(); }
+                    s.menu.hud = bar;
+                    s.menu.size = (rect.2, rect.3);
+                });
+                learn.clear();
+                with_live(|l| { l.pause_note.clear(); l.steady.reset(); });
+                save_store(&app);
+                emit_all(&app);
+            }
             continue;
         }
-        // Alt-tabbed or clicking one of our windows: leave the clock as it is.
-        if !game_in_front() { continue; }
-        let Ok(hud) = screen::sample_points(&journey::hud_points(rect)) else { continue };
         let centre = if look.esc.is_empty() { vec![] } else { screen::sample_points(&journey::centre_points(rect)).unwrap_or_default() };
         let covered = look.covered(&hud, &centre);
         if let Some(state) = with_live(|l| { l.pause_note.clear(); l.steady.feed(covered) }) {
             // Two readings a second apart agreed: it changed about a second ago.
-            if with_store(&app, |s| s.maps.set_paused(state, unix() - 1)) { save_store(&app); emit_all(&app); }
+            set(state, unix() - 1);
         }
     });
 }

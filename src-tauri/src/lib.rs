@@ -1159,6 +1159,19 @@ fn game_in_front() -> bool {
 #[cfg(not(windows))]
 fn game_in_front() -> bool { false }
 
+/// Is one of our own windows in front (the editor, the map tracker, the price window)?
+#[cfg(windows)]
+fn ours_in_front() -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
+    unsafe {
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(GetForegroundWindow(), Some(&mut pid));
+        pid == std::process::id()
+    }
+}
+#[cfg(not(windows))]
+fn ours_in_front() -> bool { false }
+
 /// The filter name the game knows ("League Start" for "League Start.filter").
 fn active_filter_name(app: &AppHandle) -> Option<String> {
     let state = app.state::<AppState>();

@@ -79,6 +79,14 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Settings → Map tracker → Loot per map (`PoeLogin` in Wealth.tsx). Expired-login messages point to the button.
   Tested live: his saved login gives his account name, a made-up session gives none (test `account_name_from_profile_page`).
   Not tried: the window itself (only his installed editor was running; a second copy would clash).
+- **Map tracker pauses by itself, clearer key wording (23 Nov, not released yet).** He reported the timer kept running
+  when he alt-tabbed or pressed Escape. Cause: Set up was never pressed (his `play.json` had an empty `menu.hud`), and
+  alt-tab was deliberately ignored. Now (`play_app::start_pause_watch`): the normal bottom bar is learnt by itself 4 s+
+  into a map, once 3 readings a second apart agree (<10% changed), and again when the game window changes size; another
+  program in front for 2 s stops the clock (our own windows don't count: `ours_in_front`, same process id); back in the
+  game the menu check takes over. Set up / Escape menu buttons stay as fixes. Key wording in `src/hotkeys.ts` rewritten so
+  each says what it changes (F2 "Change how an item drops": your loot filter, from now on). Game windows tiles renamed
+  to match (Stash searches, Which one should I pick?, Open on the wiki).
 - **Map tracker: timer stops in menus, loot per map, div per hour (22 Nov, released in 0.2.42).** After his 0.2.41 test.
   - **Pause:** the game doesn't log the Escape menu or skill tree, so (like Exile UI's "screen checks") the editor
     samples ~110 dots of the game's bottom bar once a second (only inside a map, only with the game in front;
@@ -790,6 +798,13 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Price check page: steps make sense; your saved searches show; **Go live** / ✕ work; the four Settings buttons
   open the right part of Settings (and Map mods).
 - [ ] Settings → Hotkeys and Help → "What each key does in game" use the same words as Home.
+
+**Map tracker pauses by itself, clearer key wording (23 Nov, not released yet):**
+- [ ] Enter a map and play normally for 10 s (nothing open). Then press Escape: within ~2 s the tracker says paused
+  and the clock stops; close it and it goes on. Same with the passive tree.
+- [ ] Alt-tab to another program for a few seconds: the clock stops; back in the game it goes on. Clicking the
+  tracker window itself doesn't stop it.
+- [ ] Home → "In game" card and Settings → Hotkeys: does each key now say plainly what it does (F2 especially)?
 
 **Map tracker: menus, loot, div per hour (22 Nov, released in 0.2.42):**
 - [ ] Settings → Map tracker → **Set up**: click it, click into the game within 5 s with nothing open. Then in a map,
