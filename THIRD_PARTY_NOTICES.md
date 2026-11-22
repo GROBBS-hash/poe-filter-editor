@@ -27,7 +27,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## Exile UI (Syndicate rewards: src/data/syndicate.json)
+## Exile UI (Syndicate rewards: src/data/syndicate.json; anoint recipes: src/data/anoints.json)
 https://github.com/Lailloken/Exile-UI
 
 ```

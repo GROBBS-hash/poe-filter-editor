@@ -276,6 +276,8 @@ pub struct LevelView {
     pub trials: Vec<Trial>,
     /// Resistance penalty from the acts you've finished (0, -30 after act 5, -60 after act 10).
     pub res_penalty: i32,
+    /// Your filter is for PoE 2: the route is PoE 1's campaign.
+    pub poe2: bool,
 }
 
 #[derive(Serialize, Clone)]
@@ -347,7 +349,7 @@ pub fn level_view(app: AppHandle) -> LevelView {
     let act_now = vis.get(pos).map(|&i| r.steps[i].act).unwrap_or(1);
     let res_penalty = if pos + 1 >= vis.len() { -60 } else if act_now >= 6 { -30 } else { 0 };
     LevelView {
-        trials, res_penalty,
+        trials, res_penalty, poe2: active_game(&app.state::<AppState>()) == Game::Poe2,
         pos, total: vis.len(), current: pos - from, steps,
         zone: zone_label, zone_level, char_level, class: (!class.is_empty()).then_some(class),
         xp_keep: match (char_level, zone_level) { (Some(c), Some(z)) => Some(journey::xp_multiplier(c, z)), _ => None },
@@ -986,3 +988,19 @@ pub fn play_prefs(app: AppHandle, keep_in_maps: bool) {
 
 #[tauri::command]
 pub fn play_prefs_get(app: AppHandle) -> bool { with_store(&app, |s| s.keep_in_maps) }
+
+// ---------- prices for the small lookups (oils, the exchange check) ----------
+
+/// poe.ninja's chaos price for each of these names (oils, currencies), when it has one.
+#[tauri::command]
+pub fn price_names(app: AppHandle, names: Vec<String>) -> HashMap<String, f64> {
+    let state = app.state::<AppState>();
+    let game = active_game(&state);
+    let prices = state.prices.lock().unwrap();
+    let Some(f) = prices.get(&game) else { return HashMap::new() };
+    names.into_iter().filter_map(|n| {
+        if n == "Chaos Orb" { return Some((n, 1.0)); }
+        let v = f.items.iter().filter(|i| i.name.eq_ignore_ascii_case(&n) && i.cat != "SkillGem").map(|i| i.value).reduce(f64::max)?;
+        Some((n, v))
+    }).collect()
+}

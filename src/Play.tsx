@@ -4,6 +4,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ResizeGrips, WinBar } from "./WinFrame";
 import syndicate from "./data/syndicate.json";
+import anoints from "./data/anoints.json";
 import "./play.css";
 
 // ---------- shared types (mirror play_app.rs / journey.rs) ----------
@@ -14,7 +15,7 @@ export type LevelView = {
   pos: number; total: number; steps: StepView[]; current: number; zone: string | null; zone_level: number | null;
   char_level: number | null; class: string | null; xp_keep: number | null; gem_search: string; gems_left_out: string[];
   options: RouteOptions; manual: boolean; credit: string;
-  trials: { zone: string; lab: string; done: boolean; here: boolean }[]; res_penalty: number;
+  trials: { zone: string; lab: string; done: boolean; here: boolean }[]; res_penalty: number; poe2: boolean;
 };
 export type MapRun = {
   name: string; area: string; level: number; seed: number; start: number; last_enter: number; in_map: number; left: number;
@@ -129,6 +130,7 @@ export function LevelWindow() {
               you {v.char_level}{keep != null && keep < 0.99 ? ` · ${Math.round(keep * 100)}% XP` : ""}</span>}
           </span>
         </div>
+        {v.poe2 && <div className="pw-tag warn" style={{ marginTop: 5 }}>This route is PoE 1's campaign (PoE 2's isn't in yet)</div>}
         <LevelChips v={v} />
         {v.steps.map((s, i) => <Step key={`${v.pos}-${i}`} s={s} cls={i < v.current ? "done" : i === v.current ? "now" : "next"} />)}
         {v.gem_search && <div className="lv-search">
@@ -146,9 +148,10 @@ export function LevelWindow() {
 
 /** Trials, lab and resistance reminders under the zone line. */
 function LevelChips({ v }: { v: LevelView }) {
-  const lab = (name: string) => v.trials.filter((t) => t.lab === name);
+  const trials = v.trials ?? [];
+  const lab = (name: string) => trials.filter((t) => t.lab === name);
   const normal = lab("Normal");
-  const here = v.trials.find((t) => t.here);
+  const here = trials.find((t) => t.here);
   const nextLab = ["Normal", "Cruel", "Merciless"].find((n) => lab(n).some((t) => !t.done));
   const labReady = (n: string) => lab(n).length > 0 && lab(n).every((t) => t.done);
   return (
@@ -322,12 +325,57 @@ export function SheetWindow() {
       <WinBar title="Cheat sheets" hint={`Esc / ${keys.key_sheet || "F11"} hides`} onClose={() => invoke("play_hide", { label: "sheet" })} />
       <div className="bo-body">
         <div className="cs-tabs">
-          <button className={tab === "syndicate" || !shown ? "on" : ""} onClick={() => pick("syndicate")}>Syndicate</button>
+          <button className={tab === "syndicate" || (!shown && tab !== "anoints") ? "on" : ""} onClick={() => pick("syndicate")}>Syndicate</button>
+          <button className={tab === "anoints" ? "on" : ""} onClick={() => pick("anoints")}>Blight oils</button>
           {sheets.map((s) => <button key={s.name} className={tab === s.name ? "on" : ""} onClick={() => pick(s.name)}>{s.name}</button>)}
         </div>
-        {shown ? <img className="cs-img" src={shown.data} alt={shown.name} /> : <SyndicateTable />}
+        {shown ? <img className="cs-img" src={shown.data} alt={shown.name} /> : tab === "anoints" ? <AnointLookup /> : <SyndicateTable />}
       </div>
       <ResizeGrips />
+    </div>
+  );
+}
+
+// ---------- blight oils ----------
+
+type Anoint = { name: string; oils: string[]; stats: string[] };
+const ANOINTS = anoints as { credit: string; updated: string; oils: string[]; amulets: Anoint[] };
+
+/** Blight oils: find a notable (or a stat word) and see its three oils and what they cost; or pick the oils you have. */
+export function AnointLookup() {
+  const [q, setQ] = useState("");
+  const [have, setHave] = useState<string[]>([]);
+  const [prices, setPrices] = useState<Record<string, number>>({});
+  useEffect(() => { invoke<Record<string, number>>("price_names", { names: ANOINTS.oils.map((o) => `${o} Oil`) }).then(setPrices).catch(() => {}); }, []);
+  const cost = (oils: string[]) => {
+    const each = oils.map((o) => prices[`${o} Oil`]);
+    return each.every((x) => x != null) ? each.reduce((a, b) => a + b, 0) : null;
+  };
+  const words = q.trim().toLowerCase();
+  const canMake = (a: Anoint) => {
+    const left = [...have];
+    return a.oils.every((o) => { const i = left.indexOf(o); if (i < 0) return false; left.splice(i, 1); return true; });
+  };
+  const list = ANOINTS.amulets.filter((a) => (words === "" || a.name.toLowerCase().includes(words) || a.stats.some((s) => s.toLowerCase().includes(words)))
+    && (have.length === 0 || canMake(a))).slice(0, 60);
+  const toggle = (o: string) => setHave(have.includes(o) ? have.filter((x) => x !== o) : [...have, o]);
+  return (
+    <div>
+      <div className="pw-row" style={{ flexWrap: "wrap" }}>
+        <input className="text" style={{ margin: 0, maxWidth: 280 }} placeholder="A notable or a stat (e.g. Whispers of Doom, curse)" value={q} onChange={(e) => setQ(e.target.value)} />
+        <span className="pw-small">{ANOINTS.credit}</span>
+      </div>
+      <div className="pw-row" style={{ flexWrap: "wrap", margin: "6px 0", gap: 4 }}>
+        <span className="pw-small">Oils I have:</span>
+        {ANOINTS.oils.map((o) => <button key={o} className={`pw-btn ${have.includes(o) ? "primary" : ""}`} onClick={() => toggle(o)}
+          title={prices[`${o} Oil`] != null ? `${Math.round(prices[`${o} Oil`])}c on poe.ninja` : undefined}>{o}</button>)}
+        {have.length > 0 && <button className="link pw-btn" onClick={() => setHave([])}>clear</button>}
+      </div>
+      <table className="syn"><thead><tr><th>Notable</th><th>Oils</th><th>Does</th><th>Cost</th></tr></thead>
+        <tbody>{list.map((a) => { const c = cost(a.oils); return (
+          <tr key={a.name}><td className="who">{a.name}</td><td>{a.oils.join(" + ")}</td><td className="w2">{a.stats.join(" · ")}</td><td>{c != null ? `${Math.round(c)}c` : ""}</td></tr>
+        ); })}</tbody></table>
+      {list.length === 0 && <p className="pw-small">Nothing matches.</p>}
     </div>
   );
 }
@@ -505,6 +553,14 @@ export default function PlayTools() {
         </div>
       </div>}
 
+      <ExchangeCheck />
+
+      <div className="card">
+        <h2>Blight oils</h2>
+        <p className="muted small">Which three oils make a notable, and what they cost. Also in the cheat sheets window (F11).</p>
+        <AnointLookup />
+      </div>
+
       <div className="card">
         <h2>Searches</h2>
         <p className="muted small">Up to 250 characters, as the game allows. Quotes and | work like in the game ("nt sp|life").</p>
@@ -538,6 +594,37 @@ export default function PlayTools() {
             ))}</tbody></table>}
         {msg && <div className="error small">{msg}</div>}
       </div>
+    </div>
+  );
+}
+
+const CURRENCIES = ["Chaos Orb", "Divine Orb", "Exalted Orb", "Orb of Alchemy", "Orb of Fusing", "Orb of Alteration", "Chromatic Orb", "Jeweller's Orb",
+  "Regal Orb", "Vaal Orb", "Orb of Scouring", "Gemcutter's Prism", "Orb of Annulment", "Blessed Orb", "Orb of Regret", "Mirror of Kalandra"];
+
+/** Is the rate in the game's currency exchange good? "I give 1 Divine Orb, I get 175 Chaos Orb" against poe.ninja. */
+function ExchangeCheck() {
+  const [give, setGive] = useState({ n: 1, c: "Divine Orb" });
+  const [get, setGet] = useState({ n: 170, c: "Chaos Orb" });
+  const [p, setP] = useState<Record<string, number>>({});
+  useEffect(() => { invoke<Record<string, number>>("price_names", { names: CURRENCIES }).then(setP).catch(() => {}); }, []);
+  const a = p[give.c], b = p[get.c];
+  const ratio = a && b && give.n > 0 && get.n > 0 ? (get.n * b) / (give.n * a) : null;
+  const pick = (v: { n: number; c: string }, set: (x: { n: number; c: string }) => void) => (
+    <span className="row" style={{ margin: 0 }}>
+      <input className="num" type="number" min={0} style={{ width: 80 }} value={v.n || ""} onChange={(e) => set({ ...v, n: +e.target.value })} />
+      <select value={v.c} onChange={(e) => set({ ...v, c: e.target.value })}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</select>
+    </span>
+  );
+  return (
+    <div className="card">
+      <h2>Currency exchange check</h2>
+      <p className="muted small">Is the rate you're offered (at Faustus or in a whisper) good? Compared with poe.ninja right now.</p>
+      <div className="row"><span className="muted small">I give</span>{pick(give, setGive)}<span className="muted small">I get</span>{pick(get, setGet)}</div>
+      {ratio != null ? <p className={ratio >= 0.97 ? "w-full" : "w-low"} style={{ margin: 0 }}>
+        {ratio >= 1.03 ? `Good deal: ${Math.round((ratio - 1) * 100)}% better than poe.ninja` : ratio >= 0.97 ? "About poe.ninja's rate: fair"
+          : `${Math.round((1 - ratio) * 100)}% worse than poe.ninja`}
+        <span className="muted small"> (poe.ninja: 1 {give.c} ≈ {+(a / b).toFixed(a / b < 10 ? 2 : 0)} {get.c})</span></p>
+        : <p className="muted small">No poe.ninja price for one of those yet.</p>}
     </div>
   );
 }

@@ -41,7 +41,8 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 - **F7** atlas strategy window (`atlas`; Endgame → Atlas picks which one).
 - **Ctrl+D** price check (new, own window `trade`). Changeable in Settings; skipped quietly if another app owns it.
 - **Play windows (22 Nov):** **F8** levelling route, **F9** map tracker + XP/h + stopwatch, **F10** saved searches,
-  **F11** cheat sheets (Syndicate + his pictures), notes (no key by default), **Alt+W** wiki page of the hovered item.
+  **F11** cheat sheets (Syndicate, blight oils + his pictures), notes (no key by default), **Alt+W** wiki page of the hovered
+  item, **Alt+R** read the altar / remnant / reward screen under the mouse.
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
@@ -76,6 +77,34 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   - **Notes** window (notes.txt, saved as you type) and **wiki key** (Ctrl+C the hovered item → poewiki.net /
     poe2wiki.net, uniques by name, else base).
   - Checked here: cargo check of the app (Linux), all Rust tests, tsc, and screenshots of every window with sample data.
+- **QoL wave 2 (22 Nov, same branch, from "be the player" review; his picks):**
+  - **Crafting search** (`core/src/craft/search.rs`, command `craft_search`, `CraftSearchBox` in the Plan card): planned
+    mods -> stash regex, "this tier or better" = at least that tier's lowest roll (`at_least`, up to 4 digits), words cut to
+    the shortest start no other mod on the base shares; any / all; Copy / Put it in game / Add to my searches (F10).
+    Limit stated in the UI: searches read numbers, not tiers.
+  - **Crafting verdict** (`Verdict` in RouteSummary: Easy / Worth a try / Pricey / Usually not worth, from the cheapest
+    route's cost in divines and risk) and **buy price for planned items** with no copied item (`craft_buy_plan`: a
+    made-up copy from `plan_item_text`, every non-junk stat ticked at its value).
+  - **Trades pop-up:** "Underpriced? / Fair / Good sale" vs poe.ninja (`whispers::check_price`, `trade_price_check`);
+    **Show in stash** draws a pulsing box on the whisper's cell (`stashbox` window, click-through, 20s; `stash_cell`:
+    grid starts 16/1080 x 161/1080 of the game height, cell 52.8/1080, quad = half; past 12 = quad; "(quad)" button).
+    The geometry is a best guess: CHECK IN GAME.
+  - **Map check verdict:** big "Safe to run / Don't run" + how to reroll (Chaos on rare, Alteration on magic, corrupted = put aside).
+  - **Session summary** (`SessionSummary` in tracker view: new session after 30 quiet minutes; maps, made, XP gained,
+    levels, deaths, best map) in the tracker window and on Play tools.
+  - **Levelling:** trials count per lab ("Normal trials 4/6", from the route's trial steps vs your position), "Trial of
+    Ascendancy in this zone", Today's lab link (poelab.com) once a lab's trials are done, res -30/-60 reminder, a note
+    on PoE 2 that the route is PoE 1's.
+  - **Wealth:** "Check your prices" (listed items under 70% / over 150% of poe.ninja; `Valued.note` now kept),
+    "Divination cards" (sets from `Valued.max_stack`, all tabs), **price alerts** (play.json `alerts`, checked after each
+    hourly price fetch by `check_alerts`, shown once per crossing in the trades pop-up).
+  - **Read a choice (Alt+R):** `screen::read_lines_near_mouse` (Windows OCR of a 1500x1000 box, NOT testable here) ->
+    `core/src/choices.rs` (altar headings split top/bottom, rewards scored by words, dangers = MAP_DANGER filtered by his
+    can't-run list and outweigh rewards; remnants; reward screens priced by exact poe.ninja names) -> `choice` window.
+  - **Play windows hide in maps** (level, searches, sheet, notes; back on leaving; play.json `keep_in_maps` = off switch on Play tools).
+  - **Blight oils** (`src/data/anoints.json` from Exile UI, MIT, `node tools/build_anoints.mjs`): search by notable or
+    stat, tick oils you have, recipe cost from poe.ninja. Tab in F11 and a card on Play tools.
+  - **Currency exchange check** on Play tools (`price_names`): your rate vs poe.ninja.
 - Filter editing: Find, Tiers (FilterBlade-style drag & drop, show/hide, restyle, copy/paste, stack sizes, item tiers 3.30),
   "Opened rule" view for any NeverSink rule that isn't a tier list, Presets (levelling like FilterBlade auto-adjust:
   build buttons, weapon types, armour types, vendor rares, rares-only after area 16), Themes, Prices (off by default),
@@ -668,7 +697,17 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] F11 cheat sheets: Syndicate table readable, marking cells sticks, added pictures show as tabs; resizes and remembers size.
 - [ ] Notes window (set a key first) saves as you type; Esc gives the game back its focus.
 - [ ] Alt+W opens the wiki page of the item under the mouse.
-- [ ] None of F8-F11 / Alt+W clash with his other tools (Settings → Hotkeys to change or clear).
+- [ ] None of F8-F11 / Alt+W / Alt+R clash with his other tools (Settings → Hotkeys to change or clear).
+- [ ] Crafting: plan 2+ mods → "Crafting search" lights the item up in the stash when one rolls (any / all); "Add to my
+  searches" puts it in F10. Verdict line under "How to make it"; "Or just buy one" works without a copied item.
+- [ ] Trades: price line on a whisper looks sensible; **Show in stash** box lands on the right square (normal and quad tab).
+- [ ] Ctrl+D on a map: "Safe to run" / "Don't run" with the reroll hint.
+- [ ] Session summary in the tracker after a few maps; levelling trials count, "Trial in this zone", lab link, res reminder.
+- [ ] Wealth: Check your prices, Divination cards, price alert pops up over the game when it crosses.
+- [ ] Alt+R on an Eldritch altar picks top/bottom sensibly; on a remnant flags your can't-run mods; on a Ritual/reward
+  screen lists prices. (Reads the screen: tell me what it got wrong.)
+- [ ] Play windows hide while in a map and come back in town.
+- [ ] Blight oils tab (F11) and the exchange check on Play tools.
 
 **Next test session (planned 21 Nov night, for 22 Nov).** Walk him through it a few at a time, between maps.
 Latest release is 0.2.38 (22 Nov): everything below is in it (0.2.38 added fixed base mods hidden, mod source badges, docked price window).
@@ -1089,8 +1128,9 @@ when the game window isn't found. Check in game: the window's spot, and that it 
 
 ## Left to do (agreed order)
 0. **Play tools (22 Nov) are on branch `ccr-26676017-7ecilq`:** merge into main once he's had a look (Start editor.bat
-   only pulls main), then release. Ideas not built yet from the same research: live rank/race tracker (PoeRank-style),
-   bulk-selling helper (Bulky-style), lab layout of the day, levelling for PoE 2's campaign.
+   only pulls main), then release. Not built yet: live rank/race tracker (PoeRank-style), bulk-selling helper
+   (Bulky-style), PoE 2's campaign route, crafting methods still unmodelled (veiled, conqueror exalts, awakener,
+   recombinators, beastcraft), PoE 2 crafting.
 1. **GROBBS to work through "Still to check in game" above**; fix what he reports.
 2. Wealth tracker follow-ups (real account tested and rares priced via the trade site, 21 Nov):
    "search every tab" done 21 Nov; guild stash built 21 Nov on branch `guild-stash` (awaiting approval); crafting planner done (0.2.32).
