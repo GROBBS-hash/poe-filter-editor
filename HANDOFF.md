@@ -90,7 +90,15 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   - **Login window froze the whole app (found 23 Nov in 0.2.44):** `poe_login` was a plain (sync) command, which runs
     on the main thread; building a window there deadlocks on Windows. Symptoms he saw: grey login window, an invisible
     window in the middle of the screen eating game clicks, Set up stuck on "Reading…", the price window cut off (it
-    couldn't resize). Now `async`. Rule: any command that builds a window must be `async`.
+    couldn't resize). Now `async`. Rule: any command that builds a window must be `async`. Tested 23 Nov with a test
+    copy: the window loads the real sign-in page, both editors keep responding.
+  - **Login window saves the password** (WebView2 `SetIsPasswordAutosaveEnabled`, via `webview2-com`), so it's typed
+    once; "Remember me" keeps him logged in. He asked for Chrome's saved logins: not possible (Chrome locks them from
+    other programs). The proper route is GGG's OAuth ("Sign in with pathofexile.com" opens his own browser, like
+    poe.ninja), which needs GGG to approve an app; he said "not now" (23 Nov) to drafting the application.
+  - **Test copy beside his installed editor (dev builds only):** `LODESTONE_DATA_DIR=<folder>` gives it its own
+    settings folder (put `<unix time> shown` in `alive.txt` there so it starts minimised); `LODESTONE_TEST_LOGIN=1`
+    opens the login window by itself and prints its address. Run with `npm run tauri dev`.
 - **Map tracker: timer stops in menus, loot per map, div per hour (22 Nov, released in 0.2.42).** After his 0.2.41 test.
   - **Pause:** the game doesn't log the Escape menu or skill tree, so (like Exile UI's "screen checks") the editor
     samples ~110 dots of the game's bottom bar once a second (only inside a map, only with the game in front;
@@ -810,6 +818,7 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
   tracker window itself doesn't stop it.
 - [ ] Home → "In game" card and Settings → Hotkeys: does each key now say plainly what it does (F2 especially)?
 - [ ] Log in with pathofexile.com: the window shows the website's login page (no grey box, nothing frozen after).
+  Tick Remember me; it should offer to save the password, and next time fill it in.
 - [ ] Ctrl+D price window isn't cut off on the right (it was while the app was frozen).
 
 **Map tracker: menus, loot, div per hour (22 Nov, released in 0.2.42):**

@@ -2517,8 +2517,16 @@ fn batch_forget(app: AppHandle, keys: Option<Vec<String>>) {
 
 /// Everything the app keeps, loaded before any window opens (so a window can never
 /// ask for it too early). Same folder Tauri uses: <AppData>/com.grobbs.poefiltereditor.
+#[cfg(debug_assertions)]
+async fn tokio_sleep(secs: u64) {
+    let _ = tauri::async_runtime::spawn_blocking(move || std::thread::sleep(Duration::from_secs(secs))).await;
+}
+
 fn load_state() -> AppState {
     let data = dirs::data_dir().unwrap_or_else(|| PathBuf::from(".")).join("com.grobbs.poefiltereditor");
+    // Development builds only: a test copy can run beside his installed editor with its own settings folder.
+    #[cfg(debug_assertions)]
+    let data = std::env::var_os("LODESTONE_DATA_DIR").map(PathBuf::from).unwrap_or(data);
     let _ = std::fs::create_dir_all(&data);
     let store_path = data.join("profiles.json");
     // Start from the last downloaded prices, then keep them fresh.
@@ -2623,6 +2631,21 @@ pub fn run() {
             wealth_app::start_session_timer(app.handle().clone());
             win_place::start_main(app.handle());
             updates::start(app.handle().clone());
+            // Development builds only: open "Log in with pathofexile.com" by itself, the way the button does (an async
+            // command, off the main thread), to check the window loads and the app stays responsive.
+            #[cfg(debug_assertions)]
+            if std::env::var_os("LODESTONE_TEST_LOGIN").is_some() {
+                let h = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio_sleep(3).await;
+                    eprintln!("[login-test] poe_login -> {:?}", wealth_app::poe_login(h.clone()).await);
+                    for _ in 0..6 {
+                        tokio_sleep(3).await;
+                        let url = h.get_webview_window("poelogin").and_then(|w| w.url().ok()).map(|u| u.to_string());
+                        eprintln!("[login-test] login window url: {url:?}");
+                    }
+                });
+            }
 
             // Tray icon: the app lives here so hotkeys work while you play.
             use tauri::menu::{Menu, MenuItem};

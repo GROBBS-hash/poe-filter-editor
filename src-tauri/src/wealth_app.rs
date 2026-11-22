@@ -279,8 +279,21 @@ pub async fn poe_login(app: AppHandle) -> Result<(), String> {
         .focused(true)
         .build()
         .map_err(err)?;
+    // Let the window save the password like a browser (off by default in Edge's WebView2), so it's typed once.
+    // Chrome's own saved logins can't be used: Chrome locks them away from other programs (23 Nov 2026, he asked).
+    #[cfg(windows)]
+    let _ = w.with_webview(|wv| unsafe {
+        use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Settings4;
+        use windows_core::Interface;
+        if let Ok(s) = wv.controller().CoreWebView2().and_then(|c| c.Settings()) {
+            if let Ok(s4) = s.cast::<ICoreWebView2Settings4>() {
+                let _ = s4.SetIsPasswordAutosaveEnabled(true);
+                let _ = s4.SetIsGeneralAutofillEnabled(true);
+            }
+        }
+    });
     thread::spawn(move || {
-        let tell = |ok: bool, account: Option<String>, error: Option<String>| {
+        let tell =|ok: bool, account: Option<String>, error: Option<String>| {
             let _ = app.emit("poe-login", serde_json::json!({ "ok": ok, "account": account, "error": error }));
         };
         let started = std::time::Instant::now();
