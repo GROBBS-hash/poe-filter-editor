@@ -32,6 +32,8 @@ struct PlayStore {
     level_manual: bool,
     /// Price alerts, checked against poe.ninja each hourly price update.
     alerts: Vec<Alert>,
+    /// Hide the levelling, searches, cheat sheet and notes windows while you're in a map (back in town they return).
+    keep_in_maps: bool,
 }
 
 /// "Tell me when Mageblood is under 150 divines".
@@ -150,6 +152,7 @@ pub fn on_line(app: &AppHandle, line: &str) {
         PlayEvent::Area { time, .. } | PlayEvent::Entered { time, .. } | PlayEvent::Level { time, .. } | PlayEvent::Slain { time, .. } => *time = unix(),
     }
     let changes = with_store(app, |s| s.maps.on_event(&ev));
+    map_visibility(app, &changes);
     let mut save = false;
     for c in &changes {
         match c {
@@ -911,3 +914,75 @@ pub fn check_alerts(app: &AppHandle) {
         if !w.is_visible().unwrap_or(false) { win_place::show_over_game(app, &w); }
     }
 }
+
+// ---------- reading league mechanic choices off the screen ----------
+
+/// The choice reader's key: reads the text around the mouse (an Eldritch altar, an Expedition remnant, a reward screen)
+/// and says which to pick, what's dangerous for you, and what the items are worth.
+pub fn read_choice(app: AppHandle) {
+    thread::spawn(move || {
+        let lines = match screen::read_lines_near_mouse(1500, 1000) {
+            Ok(l) => l,
+            Err(e) => { show_choice(&app, None, Some(e)); return; }
+        };
+        let (avoid, game) = {
+            let st = app.state::<AppState>();
+            let s = st.store.lock().unwrap().settings.clone();
+            (s.map_avoid.unwrap_or_default(), active_game(&st))
+        };
+        let file = app.state::<AppState>().prices.lock().unwrap().get(&game).cloned();
+        let price = |n: &str| file.as_ref().and_then(|f| f.items.iter().filter(|i| i.name.eq_ignore_ascii_case(n) && i.cat != "SkillGem").map(|i| i.value).reduce(f64::max));
+        let read = filter_core::choices::read(&lines, &avoid, &price);
+        if read.lines.is_empty() { show_choice(&app, None, Some("Couldn't read any text there: hover the altar or remnant and try again".into())); return; }
+        show_choice(&app, Some(read), None);
+    });
+}
+
+#[derive(Serialize, Clone)]
+struct ChoiceView { read: Option<filter_core::choices::ChoiceRead>, error: Option<String>, divine: Option<f64> }
+
+fn show_choice(app: &AppHandle, read: Option<filter_core::choices::ChoiceRead>, error: Option<String>) {
+    let divine = currency_rates(app).get("divine").copied();
+    if let Some(w) = app.get_webview_window("choice") {
+        place_near_cursor(&w, 24);
+        let _ = w.emit("choice-read", ChoiceView { read, error, divine });
+        let front = game_in_front();
+        let _ = w.show();
+        if front { focus_game(); }
+    }
+}
+
+// ---------- out of the way while you map ----------
+
+static HIDDEN_FOR_MAP: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+/// Entering a map hides the play windows that aren't for mapping; leaving it brings back the ones it hid.
+fn map_visibility(app: &AppHandle, changes: &[MapChange]) {
+    if with_store(app, |s| s.keep_in_maps) { return; }
+    for c in changes {
+        match c {
+            MapChange::Started | MapChange::Resumed => {
+                let mut hidden = HIDDEN_FOR_MAP.lock().unwrap();
+                for label in ["level", "searches", "sheet", "notes"] {
+                    if let Some(w) = app.get_webview_window(label) {
+                        if w.is_visible().unwrap_or(false) { let _ = w.hide(); if !hidden.iter().any(|h| h == label) { hidden.push(label.into()); } }
+                    }
+                }
+            }
+            MapChange::Left => {
+                let labels: Vec<String> = std::mem::take(&mut *HIDDEN_FOR_MAP.lock().unwrap());
+                for label in labels { if let Some(w) = app.get_webview_window(&label) { win_place::show_over_game(app, &w); } }
+            }
+            _ => {}
+        }
+    }
+}
+
+#[tauri::command]
+pub fn play_prefs(app: AppHandle, keep_in_maps: bool) {
+    with_store(&app, |s| s.keep_in_maps = keep_in_maps);
+    save_store(&app);
+}
+
+#[tauri::command]
+pub fn play_prefs_get(app: AppHandle) -> bool { with_store(&app, |s| s.keep_in_maps) }

@@ -1,6 +1,7 @@
 pub mod area;
 pub mod atlas;
 pub mod compare;
+pub mod choices;
 pub mod craft;
 pub mod ask;
 pub mod evaluate;

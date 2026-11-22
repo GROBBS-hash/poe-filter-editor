@@ -57,7 +57,7 @@ struct AppState {
 }
 
 #[derive(Clone, Copy, PartialEq)]
-enum HotAction { QuickEdit, Batch, Reload, Cycle, Build, Price, Atlas, Chat(usize), Play(&'static str), Wiki }
+enum HotAction { QuickEdit, Batch, Reload, Cycle, Build, Price, Atlas, Chat(usize), Play(&'static str), Wiki, Read }
 
 /// (Re)registers hotkeys from settings. Errors name the key that failed.
 fn register_hotkeys(app: &AppHandle, s: &Settings) -> Result<(), String> {
@@ -75,9 +75,10 @@ fn register_hotkeys(app: &AppHandle, s: &Settings) -> Result<(), String> {
         if !key.trim().is_empty() { wanted.push((key.as_str(), HotAction::Play(label))); }
     }
     if !s.key_wiki.trim().is_empty() { wanted.push((s.key_wiki.as_str(), HotAction::Wiki)); }
+    if !s.key_read.trim().is_empty() { wanted.push((s.key_read.as_str(), HotAction::Read)); }
     let mut parsed = Vec::new();
     for (key, action) in wanted {
-        let soft = matches!(action, HotAction::Atlas | HotAction::Play(_) | HotAction::Wiki);
+        let soft = matches!(action, HotAction::Atlas | HotAction::Play(_) | HotAction::Wiki | HotAction::Read);
         let sc: Shortcut = match key.parse() {
             Ok(sc) => sc,
             Err(_) if soft => { let _ = app.emit("hotkey-warning", format!("“{key}” isn't a key the app understands: pick another in Settings")); continue; }
@@ -108,7 +109,7 @@ fn register_hotkeys(app: &AppHandle, s: &Settings) -> Result<(), String> {
             Err(e) if action == HotAction::Atlas => {
                 let _ = app.emit("hotkey-warning", format!("Atlas strategy key unavailable (another program may own it): {e}"));
             }
-            Err(e) if matches!(action, HotAction::Play(_) | HotAction::Wiki) => {
+            Err(e) if matches!(action, HotAction::Play(_) | HotAction::Wiki | HotAction::Read) => {
                 let _ = app.emit("hotkey-warning", format!("A play window key is unavailable (another program may own it): {e}"));
             }
             Err(e) if matches!(action, HotAction::Chat(_)) => {
@@ -2541,7 +2542,7 @@ pub fn run() {
         .plugin(tauri_plugin_window_state::Builder::default()
             .with_state_flags(tauri_plugin_window_state::StateFlags::SIZE | tauri_plugin_window_state::StateFlags::POSITION
                 | tauri_plugin_window_state::StateFlags::MAXIMIZED)
-            .with_denylist(&["overlay", "build", "trade", "trades", "earnings", "atlas", "batch", "level", "tracker", "searches", "sheet", "notes", "stashbox"]).build())
+            .with_denylist(&["overlay", "build", "trade", "trades", "earnings", "atlas", "batch", "level", "tracker", "searches", "sheet", "notes", "stashbox", "choice"]).build())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(move |app, sc, ev| {
@@ -2579,6 +2580,8 @@ pub fn run() {
                         play_app::toggle(app, label);
                     } else if action == Some(HotAction::Wiki) {
                         play_app::wiki_lookup(app.clone());
+                    } else if action == Some(HotAction::Read) {
+                        play_app::read_choice(app.clone());
                     } else if action == Some(HotAction::Build) {
                         toggle_build_window(app);
                     } else if action == Some(HotAction::Batch) {
@@ -2703,7 +2706,7 @@ pub fn run() {
             play_app::maps_done, play_app::maps_history, play_app::maps_clear, play_app::watch_action, play_app::searches_get,
             play_app::searches_save, play_app::search_type, play_app::stash_highlight, play_app::sheets_list, play_app::sheets_add,
             play_app::sheets_remove, play_app::notes_get, play_app::notes_save, play_app::play_toggle, play_app::play_hide,
-            play_app::trade_price_check, play_app::show_stash_spot, play_app::hide_stash_spot, play_app::alerts_get, play_app::alerts_save,
+            play_app::trade_price_check, play_app::show_stash_spot, play_app::hide_stash_spot, play_app::alerts_get, play_app::alerts_save, play_app::play_prefs, play_app::play_prefs_get,
             open_rule,
             gear_picks,
             open_url,

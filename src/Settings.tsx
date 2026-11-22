@@ -9,7 +9,7 @@ type Settings = {
   cycle_enabled: boolean; fallback_area_level: number; claude_api_key: string; map_avoid?: string[] | null;
   trade_helper?: boolean; thanks_message?: string; chat_keys?: { key: string; command: string }[];
   price_compare?: boolean; price_rolls?: boolean; price_instant_all?: boolean; price_buyout_only?: boolean; build_with_tree?: boolean; key_tree?: string;
-  key_level?: string; key_tracker?: string; key_searches?: string; key_sheet?: string; key_notes?: string; key_wiki?: string;
+  key_level?: string; key_tracker?: string; key_searches?: string; key_sheet?: string; key_notes?: string; key_wiki?: string; key_read?: string;
 };
 const CHAT_IDEAS = ["/hideout", "/kingsmarch", "/menagerie", "/delve", "/exit", "/invite", "/kick", "/afk"];
 
@@ -106,6 +106,7 @@ export default function SettingsPage() {
           <span>Show/hide cheat sheets (Syndicate and your pictures)</span><ClearableKey value={s.key_sheet ?? "F11"} onChange={(k) => set({ key_sheet: k })} />
           <span>Show/hide your notes</span><ClearableKey value={s.key_notes ?? ""} onChange={(k) => set({ key_notes: k })} />
           <span>Open the wiki page of the item under your mouse</span><ClearableKey value={s.key_wiki ?? "Alt+W"} onChange={(k) => set({ key_wiki: k })} />
+          <span>Read the altar, remnant or reward screen under your mouse</span><ClearableKey value={s.key_read ?? "Alt+R"} onChange={(k) => set({ key_read: k })} />
           <label className="check"><input type="checkbox" checked={s.cycle_enabled} onChange={(e) => set({ cycle_enabled: e.target.checked })} />
             <span>Switch to your next filter (e.g. League Start → Strict 1 → Strict 2) and load it</span></label>
           <KeyBox value={s.key_cycle} disabled={!s.cycle_enabled} onChange={(k) => set({ key_cycle: k })} />

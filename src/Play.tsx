@@ -361,6 +361,54 @@ export function NotesWindow() {
   );
 }
 
+// ---------- reading league mechanic choices ----------
+
+type ChoiceLine = { text: string; kind: string; note: string | null };
+type Choice = { heading: string; lines: ChoiceLine[]; score: number; danger: boolean };
+type ChoiceRead = { kind: string; choices: Choice[]; pick: number | null; priced: [string, number][]; lines: string[] };
+type ChoiceView = { read: ChoiceRead | null; error: string | null; divine: number | null };
+
+/** Alt+R over an Eldritch altar, an Expedition remnant or a reward screen: which to pick, what's dangerous, what's worth what. */
+export function ChoiceWindow() {
+  const [v, setV] = useState<ChoiceView | null>(null);
+  useEsc("choice");
+  useEffect(() => {
+    const un = listen<ChoiceView>("choice-read", (e) => setV(e.payload));
+    return () => { un.then((f) => f()); };
+  }, []);
+  const r = v?.read;
+  const worth = (c: number) => v?.divine && c >= v.divine ? `${(c / v.divine).toFixed(1)} div` : `${c < 10 ? c.toFixed(1) : Math.round(c)}c`;
+  const title = r?.kind === "altar" ? "Eldritch altar" : r?.kind === "remnant" ? "Remnant" : r?.kind === "rewards" ? "Rewards" : "What's on screen";
+  return (
+    <div className="bo pw">
+      <WinBar title={title} hint="Esc hides" onClose={() => invoke("play_hide", { label: "choice" })} />
+      <div className="bo-body">
+        {v?.error && <div className="error small">{v.error}</div>}
+        {r && r.kind === "altar" && r.pick != null && <div className={`tw-map-verdict ${r.choices[r.pick].danger ? "bad" : "ok"}`}>
+          <b>Take the {r.pick === 0 ? "top" : "bottom"} one</b>{r.choices[r.pick].danger && <span className="small"> · both have a danger for you: be careful</span>}</div>}
+        {r && r.kind === "remnant" && <div className={`tw-map-verdict ${r.choices.some((c) => c.danger) ? "bad" : "ok"}`}>
+          <b>{r.choices.some((c) => c.danger) ? "Has a mod you can't run" : "Nothing on your can't-run list"}</b></div>}
+        {r && r.choices.filter((c) => r.kind !== "rewards" && r.kind !== "unknown").map((c, i) => (
+          <div key={i} className={`lv-step ${r.pick === i ? "now" : "next"}`}>
+            {c.heading && <div className="pw-small" style={{ fontWeight: 650 }}>{r.kind === "altar" ? (i === 0 ? "Top: " : "Bottom: ") : ""}{c.heading}</div>}
+            {c.lines.map((l, j) => (
+              <div key={j} className="small" style={{ color: l.kind === "danger" ? "var(--red)" : l.kind === "reward" ? "var(--green)" : undefined }}>
+                {l.text}{l.note && <span className="pw-tag bad" style={{ marginLeft: 6 }}>{l.note}</span>}</div>
+            ))}
+          </div>
+        ))}
+        {r && r.priced.length > 0 && <div className="trk-sec">
+          <div className="pw-small">Worth on poe.ninja</div>
+          {r.priced.slice(0, 12).map(([n, c]) => <div key={n} className="pw-row between small"><span>{n}</span><b>{worth(c)}</b></div>)}
+        </div>}
+        {r && r.kind === "unknown" && r.priced.length === 0 && <div className="pw-small">Read this, but didn't recognise it as an altar, remnant or reward screen:
+          <div className="small" style={{ marginTop: 4 }}>{r.lines.slice(0, 12).join(" · ")}</div></div>}
+        {r && r.kind !== "unknown" && <div className="pw-small" style={{ marginTop: 8 }}>A rough guide from the words on screen. Dangers come from your can't-run list (Maps page).</div>}
+      </div>
+    </div>
+  );
+}
+
 // ---------- the main window's page ----------
 
 function Tile({ title, k, children, label }: { title: string; k?: string; children: ReactNode; label?: string }) {
@@ -382,8 +430,10 @@ export default function PlayTools() {
   const [runs, setRuns] = useState<MapRun[]>([]);
   const [msg, setMsg] = useState("");
   const [session, setSession] = useState<SessionSummary | null>(null);
+  const [keepInMaps, setKeepInMaps] = useState(false);
   useEffect(() => {
     invoke<PlayView>("play_view").then((p) => setSession(p.tracker.session)).catch(() => {});
+    invoke<boolean>("play_prefs_get").then(setKeepInMaps).catch(() => {});
     invoke<LevelView>("level_view").then(setLv).catch(() => {});
     invoke<SearchView>("searches_get").then((v) => setSearches(v.saved)).catch(() => {});
     invoke<Sheet[]>("sheets_list").then(setSheets).catch(() => {});
@@ -422,7 +472,11 @@ export default function PlayTools() {
             Heist, lab layouts, Delve, anything.</Tile>
           <Tile title="Notes" k={k("key_notes", "") || undefined} label="notes">A notepad over the game, saved as you type.</Tile>
           <Tile title="Wiki" k={k("key_wiki", "Alt+W")}>Hover an item and press the key: its wiki page opens in your browser (uniques by name, the rest by base).</Tile>
+          <Tile title="Read a choice" k={k("key_read", "Alt+R")}>Hover an Eldritch altar, an Expedition remnant or a reward screen and press the key:
+            it reads the text, says which altar choice to take, flags mods on your can't-run list, and prices the rewards. Windows only.</Tile>
         </div>
+        <label className="check" style={{ marginTop: 10 }}><input type="checkbox" checked={!keepInMaps} onChange={(e) => { setKeepInMaps(!e.target.checked); invoke("play_prefs", { keepInMaps: !e.target.checked }); }} />
+          <span>Hide the levelling, searches, cheat sheet and notes windows while I'm in a map (they come back in town)</span></label>
       </div>
 
       {session && <div className="card">

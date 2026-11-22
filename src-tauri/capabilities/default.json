@@ -15,7 +15,8 @@
     "searches",
     "sheet",
     "notes",
-    "stashbox"
+    "stashbox",
+    "choice"
   ],
   "permissions": [
     "core:default",

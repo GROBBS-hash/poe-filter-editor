@@ -65,6 +65,16 @@ pub fn read_ground(accept: &dyn Fn(&str) -> bool) -> Result<(ScreenRead, Tooltip
     imp::read(accept).map_err(|e| e.to_string())
 }
 
+/// Every line of text in a w x h box around the mouse, top to bottom (the choice reader: altars, remnants, rewards).
+#[cfg(not(windows))]
+pub fn read_lines_near_mouse(_w: i32, _h: i32) -> Result<Vec<String>, String> {
+    Err("Reading the screen only works on Windows".into())
+}
+#[cfg(windows)]
+pub fn read_lines_near_mouse(w: i32, h: i32) -> Result<Vec<String>, String> {
+    imp::read_lines(w, h).map_err(|e| e.to_string())
+}
+
 #[cfg_attr(not(windows), allow(dead_code))]
 /// (text colour, background colour): background is the most common colour,
 /// text the most common one that clearly stands out from it.
@@ -426,6 +436,28 @@ mod imp {
             }
         }
         out
+    }
+
+    /// Every line of text in a w x h box around the mouse (kept within the engine's size limit).
+    pub fn read_lines(w: i32, h: i32) -> windows::core::Result<Vec<String>> {
+        let mut p = POINT::default();
+        unsafe { GetCursorPos(&mut p)? };
+        let max = OcrEngine::MaxImageDimension().unwrap_or(2600) as i32;
+        let engine = OcrEngine::TryCreateFromUserProfileLanguages()?;
+        let (pic, _, _) = capture(p.x, p.y, w.min(max), h.min(max))?;
+        // Small game text reads better enlarged, when it still fits the engine's limit.
+        let scale = if pic.w * 2 <= max && pic.h * 2 <= max { 2 } else { 1 };
+        let enlarged = upscale(&pic, 0, pic.w, scale);
+        let buffer = CryptographicBuffer::CreateFromByteArray(&enlarged)?;
+        let bitmap = SoftwareBitmap::CreateCopyWithAlphaFromBuffer(
+            &buffer, BitmapPixelFormat::Bgra8, pic.w * scale, pic.h * scale, BitmapAlphaMode::Ignore)?;
+        let result = engine.RecognizeAsync(&bitmap)?.get()?;
+        let mut out = Vec::new();
+        for line in result.Lines()? {
+            let t = line.Text()?.to_string();
+            if !t.trim().is_empty() { out.push(t); }
+        }
+        Ok(out)
     }
 
     pub fn read(accept: &dyn Fn(&str) -> bool) -> windows::core::Result<(ScreenRead, TooltipLines)> {

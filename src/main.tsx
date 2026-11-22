@@ -9,12 +9,12 @@ import TradesWindow from "./TradesWindow";
 import EarningsWindow from "./EarningsWindow";
 import AtlasOverlay from "./AtlasOverlay";
 import { BatchWindow } from "./Batch";
-import { LevelWindow, NotesWindow, SearchesWindow, SheetWindow, TrackerWindow } from "./Play";
+import { ChoiceWindow, LevelWindow, NotesWindow, SearchesWindow, SheetWindow, TrackerWindow } from "./Play";
 import "./styles.css";
 
 const label = getCurrentWindow().label;
 const StashBox = () => <div className="stashbox" />;
-const PLAY: Record<string, () => React.ReactElement> = { stashbox: StashBox, level: LevelWindow, tracker: TrackerWindow, searches: SearchesWindow, sheet: SheetWindow, notes: NotesWindow };
+const PLAY: Record<string, () => React.ReactElement> = { stashbox: StashBox, choice: ChoiceWindow, level: LevelWindow, tracker: TrackerWindow, searches: SearchesWindow, sheet: SheetWindow, notes: NotesWindow };
 document.body.classList.add(label === "overlay" || label === "build" || label === "trade" || label === "trades" || label === "earnings" || label === "atlas" || label === "batch" || label in PLAY ? "overlay" : "main");
 if (label === "trade") document.body.classList.add("scroll");
 
@@ -28,7 +28,7 @@ if (label !== "main") {
     r.classList.add("pop-in");
   };
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") pop(); });
-  for (const ev of ["price-check", "item-picked", "build-shown", "play-shown"]) listen(ev, pop);
+  for (const ev of ["price-check", "item-picked", "build-shown", "play-shown", "choice-read"]) listen(ev, pop);
   pop();
 }
 const Play = PLAY[label];

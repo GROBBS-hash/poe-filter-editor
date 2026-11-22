@@ -219,6 +219,20 @@
         "visible": false,
         "shadow": false,
         "focus": false
+      },
+      {
+        "label": "choice",
+        "title": "Choice",
+        "width": 380,
+        "height": 480,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "visible": false,
+        "shadow": false,
+        "focus": false
       }
     ],
     "security": {
