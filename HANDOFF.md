@@ -48,7 +48,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
-- **Tiers: every NeverSink rule on the page (23 Nov, not released yet).** He said "do them all" after gear. Every known
+- **Tiers: every NeverSink rule on the page (23 Nov, released in 0.2.46).** He said "do them all" after gear. Every known
   section now lists all its steps (`sections` uses `section_at` for every KNOWN entry, so steps that pick by item
   class, links or mods show too: Uniques 20 -> 30 steps, Divination cards 8 -> 10). New sections:
   - **Flasks and gems** (new group): Flasks, Tinctures (maps), Exceptional gems, Quality and level gems, Other gems.
@@ -69,7 +69,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   - New condition words: Fated, Imbued, Vestigial, Zana memory, Crucible tree…; "no corruption mod"; "any influence";
     named-mod lists no longer show the count as a name. Section pictures fall back to the first item when the chosen one
     has none (poe.ninja has no Heist / league item art, so those menu rows stay blank).
-- **Tiers: every gear rule of NeverSink's (23 Nov, not released yet).** Second group after jewels (see next entry).
+- **Tiers: every gear rule of NeverSink's (23 Nov, released in 0.2.46).** Second group after jewels (see next entry).
   Gear now lists, in NeverSink's order: Rare gear by item tier, 6-linked items, Influenced gear, Searing Exarch / Eater of
   Worlds implicits, Special mods (veiled, Incursion, Delve, beasts, mercenary…), High-quality bases, Crafting bases
   (by item level), Corrupted gear (twice-corrupted, corrupted rings/quivers), Enchanted and anointed, Sockets and links
@@ -81,7 +81,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   identified, quality, links, sockets, fractured, mirrored, area level. New condition words: Exarch / Eater implicit
   level, socket colours ("linked R-G-B sockets", "an abyss socket", not editable). Test `gear_step_conditions`
   (crafting bases lowered from 86 to 84 catch an item level 84 Crystal Belt). Next group: flasks, gems, currency, maps.
-- **Tiers: change NeverSink's step conditions, jewels first (23 Nov, not released yet).** He said the jewel section "isn't good
+- **Tiers: change NeverSink's step conditions, jewels first (23 Nov, released in 0.2.46).** He said the jewel section "isn't good
   enough, we can't set ilvl … how many mods … corrupted, NeverSink does this really well", then "revise EVERY section".
   He picked mock-up **C "NeverSink's own steps, click any condition to change it"** (and: "remember icons for items").
   - Every step on the Tiers page now shows its conditions as chips (`core/src/conds.rs`: `conds_of` reads them, plain
@@ -849,7 +849,7 @@ Everything below was built since GROBBS last tested and has only been checked wi
 Confirmed in game so far: basic Ctrl+D price check (trade search returned listings); 20 Nov: weapon + armour
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
-**Tiers: step conditions, jewels first (23 Nov, not released yet):**
+**Tiers: step conditions, jewels first (23 Nov, released in 0.2.46):**
 - [ ] Tiers menu: new groups Flasks and gems, Heist, League items; Uniques shows 6-link / corrupted / 6-socket steps.
   Quality and level gems → "Level 20, 20% quality" → click "quality 20+", set 18: 18% level 20 gems show after F4.
 - [ ] Currency step → + Add a condition → Stack size 5: only stacks of 5+ get that step's look.
