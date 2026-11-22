@@ -5,47 +5,45 @@ export type Cond = { key: string; value: string; words: string; kind: "number" |
 
 /** What "+ Add a condition" offers: keyword, plain name, kind, the value it starts with. */
 type Addable = { key: string; label: string; kind: Cond["kind"]; start: string; also?: Record<string, string>; hint?: string };
-const ADD_ANY: Addable[] = [
-  { key: "ItemLevel", label: "Item level", kind: "number", start: ">= 75" },
-  { key: "Corrupted", label: "Corrupted or not", kind: "yesno", start: "True" },
-  { key: "Rarity", label: "Rarity", kind: "rarity", start: "Rare" },
-  { key: "Identified", label: "Identified or not", kind: "yesno", start: "True" },
-  { key: "Quality", label: "Quality", kind: "number", start: ">= 20" },
-  { key: "AreaLevel", label: "Area level (where it drops)", kind: "number", start: ">= 68" },
-  { key: "StackSize", label: "Stack size", kind: "number", start: ">= 2" },
-  { key: "LinkedSockets", label: "Links", kind: "number", start: ">= 5" },
-  { key: "Sockets", label: "Sockets", kind: "number", start: ">= 6" },
-  { key: "Mirrored", label: "Mirrored or not", kind: "yesno", start: "False" },
-  { key: "FracturedItem", label: "Fractured or not", kind: "yesno", start: "True" },
-];
-const ADD_JEWEL: Addable[] = [
-  { key: "ItemLevel", label: "Item level", kind: "number", start: ">= 84" },
-  { key: "Corrupted", label: "Corrupted or not", kind: "yesno", start: "True" },
-  { key: "CorruptedMods", label: "Has a corruption mod", kind: "number", start: ">= 1", hint: "The extra mod a Vaal Orb can add" },
-  { key: "ModCount", label: "Number of mods (identified jewels)", kind: "number", start: ">= 3", also: { Identified: "True" },
-    hint: "Only works once a jewel is identified, so this also adds “identified”" },
-  { key: "EnchantmentPassiveNum", label: "Cluster passives", kind: "number", start: ">= 8", hint: "“Adds N Passive Skills” on cluster jewels" },
-  { key: "Rarity", label: "Rarity", kind: "rarity", start: "Rare" },
-  { key: "Identified", label: "Identified or not", kind: "yesno", start: "True" },
-  { key: "Mirrored", label: "Mirrored or not", kind: "yesno", start: "False" },
-];
-
-const ADD_GEAR: Addable[] = [
-  { key: "ItemLevel", label: "Item level", kind: "number", start: ">= 84", hint: "Higher item level can roll better mods" },
-  { key: "UnidentifiedItemTier", label: "Item tier", kind: "number", start: ">= 4", hint: "The tier shown on unidentified rare labels" },
-  { key: "Rarity", label: "Rarity", kind: "rarity", start: "Rare" },
-  { key: "Corrupted", label: "Corrupted or not", kind: "yesno", start: "False" },
-  { key: "CorruptedMods", label: "Has a corruption mod", kind: "number", start: ">= 1", hint: "The extra mod a Vaal Orb can add" },
-  { key: "ModCount", label: "Number of mods (identified items)", kind: "number", start: ">= 5", also: { Identified: "True" },
+/** Every condition "+ Add a condition" can offer, once. */
+const POOL: Record<string, Addable> = {
+  ItemLevel: { key: "ItemLevel", label: "Item level", kind: "number", start: ">= 84", hint: "Higher item level can roll better mods" },
+  UnidentifiedItemTier: { key: "UnidentifiedItemTier", label: "Item tier", kind: "number", start: ">= 4", hint: "The tier shown on unidentified rare labels" },
+  Rarity: { key: "Rarity", label: "Rarity", kind: "rarity", start: "Rare" },
+  Corrupted: { key: "Corrupted", label: "Corrupted or not", kind: "yesno", start: "False" },
+  CorruptedMods: { key: "CorruptedMods", label: "Has a corruption mod", kind: "number", start: ">= 1", hint: "The extra mod a Vaal Orb can add" },
+  ModCount: { key: "ModCount", label: "Number of mods (identified only)", kind: "number", start: ">= 4", also: { Identified: "True" },
     hint: "Only works once an item is identified, so this also adds “identified”" },
-  { key: "Identified", label: "Identified or not", kind: "yesno", start: "True" },
-  { key: "Quality", label: "Quality", kind: "number", start: ">= 20" },
-  { key: "LinkedSockets", label: "Links", kind: "number", start: ">= 5" },
-  { key: "Sockets", label: "Sockets", kind: "number", start: ">= 6" },
-  { key: "FracturedItem", label: "Fractured or not", kind: "yesno", start: "True" },
-  { key: "Mirrored", label: "Mirrored or not", kind: "yesno", start: "False" },
-  { key: "AreaLevel", label: "Area level (where it drops)", kind: "number", start: ">= 68", hint: "68+ = maps, below = the campaign" },
-];
+  EnchantmentPassiveNum: { key: "EnchantmentPassiveNum", label: "Cluster passives", kind: "number", start: ">= 8", hint: "“Adds N Passive Skills” on cluster jewels" },
+  Identified: { key: "Identified", label: "Identified or not", kind: "yesno", start: "True" },
+  Quality: { key: "Quality", label: "Quality", kind: "number", start: ">= 20" },
+  LinkedSockets: { key: "LinkedSockets", label: "Links", kind: "number", start: ">= 5" },
+  Sockets: { key: "Sockets", label: "Sockets", kind: "number", start: ">= 6" },
+  FracturedItem: { key: "FracturedItem", label: "Fractured or not", kind: "yesno", start: "True" },
+  Mirrored: { key: "Mirrored", label: "Mirrored or not", kind: "yesno", start: "False" },
+  AreaLevel: { key: "AreaLevel", label: "Area level (where it drops)", kind: "number", start: ">= 68", hint: "68+ = maps, below = the campaign" },
+  StackSize: { key: "StackSize", label: "Stack size", kind: "number", start: ">= 3", hint: "Only stacks of at least this many" },
+  GemLevel: { key: "GemLevel", label: "Gem level", kind: "number", start: ">= 20" },
+  TransfiguredGem: { key: "TransfiguredGem", label: "Transfigured or not", kind: "yesno", start: "True" },
+  DropLevel: { key: "DropLevel", label: "Base level (drop level)", kind: "number", start: ">= 30", hint: "How late in the game the base first drops" },
+  Replica: { key: "Replica", label: "Replica or not", kind: "yesno", start: "True" },
+  Foulborn: { key: "Foulborn", label: "Foulborn or not", kind: "yesno", start: "True" },
+};
+/** Which conditions each kind of section offers, most useful first. */
+export type Menu = "jewels" | "cluster" | "gear" | "flasks" | "gems" | "currency" | "uniques" | "levelling" | "league" | "any";
+const MENUS: Record<Menu, string[]> = {
+  jewels: ["ItemLevel", "Corrupted", "CorruptedMods", "ModCount", "Rarity", "Identified", "Mirrored"],
+  cluster: ["ItemLevel", "EnchantmentPassiveNum", "Corrupted", "ModCount", "Rarity", "Identified", "Mirrored"],
+  gear: ["ItemLevel", "UnidentifiedItemTier", "Rarity", "Corrupted", "CorruptedMods", "ModCount", "Identified", "Quality", "LinkedSockets", "Sockets",
+    "FracturedItem", "Mirrored", "AreaLevel"],
+  flasks: ["ItemLevel", "Quality", "Rarity", "Corrupted", "Identified", "ModCount", "AreaLevel", "Mirrored"],
+  gems: ["GemLevel", "Quality", "Corrupted", "TransfiguredGem", "AreaLevel", "Mirrored"],
+  currency: ["StackSize", "AreaLevel"],
+  uniques: ["LinkedSockets", "Sockets", "Corrupted", "CorruptedMods", "Quality", "ItemLevel", "Identified", "Mirrored", "Replica", "Foulborn", "AreaLevel"],
+  levelling: ["AreaLevel", "ItemLevel", "DropLevel", "Rarity", "LinkedSockets", "Sockets", "Quality", "Identified", "Corrupted"],
+  league: ["ItemLevel", "Rarity", "Corrupted", "Identified", "StackSize", "AreaLevel", "Quality"],
+  any: ["ItemLevel", "Corrupted", "Rarity", "Identified", "Quality", "AreaLevel", "StackSize", "LinkedSockets", "Sockets", "Mirrored", "FracturedItem"],
+};
 
 const RARITIES: [string, string][] =[["Normal", "white"], ["Magic", "magic"], ["Rare", "rare"], ["Unique", "unique"]];
 const YES_WORDS: Record<string, [string, string]> = {
@@ -147,7 +145,7 @@ function Editor({ cond, changed, onSave, onRemove, onUndo, onClose }: {
 
 /** A step's conditions as chips: click one to change it, "+ Add a condition" for more. Changed ones are gold. */
 export default function StepConds({ conds, changed, menu, onSet }: {
-  conds: Cond[]; changed: string[]; menu: "jewels" | "cluster" | "gear" | "any";
+  conds: Cond[]; changed: string[]; menu: Menu;
   onSet: (set: Record<string, string>, undo: string[], msg: string) => void;
 }) {
   const [open, setOpen] = useState<string | null>(null);
@@ -155,8 +153,7 @@ export default function StepConds({ conds, changed, menu, onSet }: {
   // Conditions you removed aren't in the step any more: show them crossed out so they can come back.
   const removed = changed.filter((k) => !conds.some((c) => c.key === k));
   const jewels = menu === "jewels" || menu === "cluster";
-  const offer = (jewels ? ADD_JEWEL : menu === "gear" ? ADD_GEAR : ADD_ANY)
-    .filter((a) => !conds.some((c) => c.key === a.key) && (menu === "cluster" || a.key !== "EnchantmentPassiveNum"));
+  const offer = MENUS[menu].map((k) => POOL[k]).filter((a) => !conds.some((c) => c.key === a.key));
   const shown = conds.filter((c) => c.key !== "Class" || !jewels);
   return (
     <div className="conds">

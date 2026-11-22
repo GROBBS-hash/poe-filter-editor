@@ -4,9 +4,23 @@ import { Tip } from "./Help";
 import { useEffect, useMemo, useState } from "react";
 import { ProfileInfo } from "./types";
 import StyleEditor, { CurrentStyle, CustomStyle, LookButton, Preview, fromCurrent } from "./StyleEditor";
-import { ItemIcon } from "./icons";
+import { ItemIcon, useIcons } from "./icons";
 import MapTiers, { MapSection } from "./MapTiers";
-import StepConds, { Cond } from "./StepConds";
+import StepConds, { Cond, Menu } from "./StepConds";
+
+/** Which "+ Add a condition" choices a section gets. */
+function menuFor(s: { group: string; title: string }): Menu {
+  switch (s.group) {
+    case "Jewels": return s.title.startsWith("Cluster") ? "cluster" : "jewels";
+    case "Gear": return "gear";
+    case "Flasks and gems": return /gem/i.test(s.title) ? "gems" : "flasks";
+    case "Currency": case "League currency": case "Fragments": case "Divination cards": return "currency";
+    case "Uniques": return "uniques";
+    case "Before maps": return "levelling";
+    case "Heist": case "League items": return "league";
+    default: return "any";
+  }
+}
 
 const CDN = "https://web.poecdn.com/image/Art/2DItems/";
 /** The picture next to each section in the menu: an item from the game ("×3" etc. for stacks). Sections not listed
@@ -32,7 +46,23 @@ const SECTION_ICON: Record<string, { item?: string; url?: string; badge?: string
   "Eater of Worlds implicits": { item: "Exceptional Eldritch Ichor" }, "Special mods (veiled, Incursion…)": { item: "Veiled Exalted Orb" },
   "High-quality bases": { item: "Blacksmith's Whetstone" }, "Crafting bases": { item: "Exalted Orb" }, "Corrupted gear": { item: "Vaal Orb" },
   "Enchanted and anointed": { item: "Golden Oil" }, "Sockets and links": { item: "Jeweller's Orb" }, "Rare gear by base": { item: "Regal Orb" },
-  "Rare rings and amulets": { item: "Amethyst Ring" }, "Rare belts": { item: "Stygian Vise" }, "Fractured bases": { item: "Fractured Fossil" }, "Veiled items": { item: "Veiled Chaos Orb" },
+  "Rare rings and amulets": { item: "Amethyst Ring" }, "Rare belts": { item: "Stygian Vise" },
+  "Identified rares with good mods": { item: "Scroll of Wisdom" }, "Identified rares by base": { item: "Scroll of Wisdom" },
+  "Identified corrupted gear": { item: "Vaal Orb" }, "Identified magic items with good mods": { item: "Orb of Alteration" },
+  "Memory strand gear": { item: "Hubris Circlet" }, "Rare gear by size": { item: "Regal Orb" }, "Crucible gear": { item: "Orb of Alchemy" },
+  "Abyss socket gear": { item: "Stygian Vise" }, "Unique maps": { item: "Map (Tier 16)" }, "Timeless splinters": { item: "Timeless Karui Splinter" },
+  "Ducats": { item: "Brinehook's Ducat" }, "Wombgifts": { item: "Ancient Wombgift" }, "Allflame embers": { item: "Allflame Ember of Kulemak" },
+  "Other currency": { item: "Scrying Orb" }, "League-only currency": { item: "Silver Coin" },
+  "Flasks": { url: CDN + "Flasks/quicksilver.png" }, "Tinctures": { item: "Prismatic Tincture" },
+  "Exceptional gems": { item: "Awakened Empower Support" }, "Quality and level gems": { item: "Gemcutter's Prism" }, "Other gems": { item: "Vaal Orb" },
+  "Contracts": { item: "Contract: Bunker" }, "Blueprints": { item: "Blueprint: Bunker" }, "Cloaks": { item: "Whisper-woven Cloak" },
+  "Brooches": { item: "Foliate Brooch" }, "Heist gear": { item: "Precise Arrowhead" }, "Tools": { item: "Master Lockpick" },
+  "Rogue's Markers": { item: "Rogue's Marker" }, "Idols": { item: "Kamasan Idol" }, "Expedition logbooks": { item: "Expedition Logbook" },
+  "Voidstones, trinkets and other": { item: "Ceremonial Voidstone" }, "Sanctum relics": { item: "Censer Relic" }, "Sanctum research": { item: "Forbidden Tome" },
+  "Reliquary keys and league items": { item: "Ancient Reliquary Key" }, "Invitations and Labyrinth items": { item: "Maven's Invitation: The Feared" },
+  "3-linked items": { item: "Orb of Fusing" }, "Rare bows": { item: "Imperial Bow" }, "Rare one-hand weapons": { item: "Jewelled Foil" },
+  "Rare two-hand weapons": { item: "Reaver Axe" }, "Rare caster weapons": { item: "Convoking Wand" }, "Rare armour": { item: "Astral Plate" },
+  "Rare jewellery": { item: "Two-Stone Ring" }, "Rare minion gear": { item: "Bone Ring" }, "Rare 4-links": { item: "Orb of Fusing" }, "Fractured bases": { item: "Fractured Fossil" }, "Veiled items": { item: "Veiled Chaos Orb" },
   "Jewels": { item: "Cobalt Jewel" }, "Abyss jewels": { item: "Searching Eye Jewel" }, "Cluster jewels": { item: "Large Cluster Jewel" },
   "Cluster jewels (cheap)": { item: "Small Cluster Jewel" }, "Special jewels": { item: "Timeless Jewel" }, "Jewels while levelling": { item: "Crimson Jewel" },
 };
@@ -41,10 +71,13 @@ const SECTION_ICON: Record<string, { item?: string; url?: string; badge?: string
 function SectionIcon({ title, first }: { title: string; first?: string }) {
   const pick = SECTION_ICON[title];
   const [broken, setBroken] = useState(false);
+  const icons = useIcons();
+  // The chosen item has no picture (league items poe.ninja leaves out): the section's first item instead.
+  const base = pick?.item && (icons[pick.item] || /Jewel$/.test(pick.item)) ? pick.item : first ?? pick?.item ?? null;
   return (
     <span className="tiers-ico">
       {pick?.url && !broken ? <img src={pick.url} alt="" width={22} height={22} onError={() => setBroken(true)} />
-        : <ItemIcon base={pick?.item ?? first ?? null} size={22} />}
+        : <ItemIcon base={base} size={22} />}
       {pick?.badge && <span className="tiers-ico-badge">{pick.badge}</span>}
     </span>
   );
@@ -325,7 +358,7 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
                         onSave={(s) => { setEditing(null); setTier(t, { style: s }); }} />
                     </div>
                   )}
-                  {t.conds && <StepConds conds={t.conds.filter((c) => !(c.key === "StackSize" && t.min_stack != null) && !(c.key === "UnidentifiedItemTier" && t.min_item_tier != null))} changed={t.changed ?? []} menu={section.group === "Jewels" ? (section.title.startsWith("Cluster") ? "cluster" : "jewels") : section.group === "Gear" ? "gear" : "any"}
+                  {t.conds && <StepConds conds={t.conds.filter((c) => !(c.key === "StackSize" && t.min_stack != null) && !(c.key === "UnidentifiedItemTier" && t.min_item_tier != null))} changed={t.changed ?? []} menu={menuFor(section)}
                     onSet={(set, undo, m) => setConds(t, set, undo, m)} />}
                   <div className="tier-items">
                     {items.map((b) => (

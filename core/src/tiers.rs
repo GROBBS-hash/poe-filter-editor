@@ -73,9 +73,19 @@ fn levelling_tier_name(t: &str) -> Option<String> {
         "essences" => "Essences", "t2chance" => "Orb of Alteration", "t3transearly" => "Transmutation (early acts)",
         "t3trans" => "Transmutation", "t4misc" => "Scraps and whetstones", "t5aug" => "Augmentation", "portal" => "Portal scrolls",
         "wisdom" => "Wisdom scrolls",
+        // More levelling rules (23 Nov).
+        "earlylevels" => "First levels", "bootsfocus" => "Boots first", "bodyarmours" => "Body armours",
+        "shields" => "Shields", "movementbootshigh" => "Movement speed boots", "movementbootslow" => "Movement speed boots (early)",
+        "anyveiled" => "Anything with a veiled mod", "4linkrares" => "Rares with 4 links", "earlythreelinks" => "3-links (early)",
+        "miniongear" => "Minion gear", "highphysquivers" => "Physical damage quivers", "fireresistgear" => "Fire resistance rings",
+        "generalcrafting" => "Bases to craft", "max" => "20% quality", "largerares" => "Big rares", "mediumrares1" | "mediumrares2" => "Medium rares",
+        "tinyrares" => "Small rares", "fatedgear" => "Fated gear", "medium1" | "medium2" => "Medium magic items", "tiny" => "Small magic items",
+        "noticeearly" => "Magic items in the first areas", "underlevel68" => "Rares, item level up to 68",
+        "underlevel42" => "Rares, item level up to 44", "underlevel24" => "Rares, item level up to 26", "underlevel16" => "Rares, item level up to 18",
         _ => return None,
     }.to_string())
 }
+
 
 /// Known sections: (type path, group, title). Order here is the order shown.
 const KNOWN: &[(&str, &str, &str)] = &[
@@ -98,12 +108,33 @@ const KNOWN: &[(&str, &str, &str)] = &[
     ("leveling->normalmagic->rgb", LEVELLING, "R-G-B linked items"),
     ("leveling->normalmagic->4l", LEVELLING, "4-linked items"),
     ("leveling->magic->remaining", LEVELLING, "Other magic items"),
+    ("leveling->normalmagic->3l", LEVELLING, "3-linked items"),
+    ("leveling->normalmagic->act2", LEVELLING, "Act 2 gear"),
+    ("leveling->normalmagic->otheracts", LEVELLING, "Later acts gear"),
+    ("leveling->normalmagic->minion", LEVELLING, "Minion gear"),
+    ("leveling->flasks->quality", LEVELLING, "Quality flasks"),
+    ("leveling->tincture", LEVELLING, "Tinctures while levelling"),
+    ("leveling->rare->socketslinks", LEVELLING, "Rare 4-links"),
+    ("leveling->rare->exotics", LEVELLING, "Movement boots and veiled"),
+    ("leveling->rare->universal", LEVELLING, "Rare jewellery"),
+    ("leveling->rare->armours", LEVELLING, "Rare armour"),
+    ("leveling->rare->minion", LEVELLING, "Rare minion gear"),
+    ("leveling->rare->caster", LEVELLING, "Rare caster weapons"),
+    ("leveling->rare->archer", LEVELLING, "Rare bows"),
+    ("leveling->rare->melee1h", LEVELLING, "Rare one-hand weapons"),
+    ("leveling->rare->melee2h", LEVELLING, "Rare two-hand weapons"),
+    ("leveling->rare->remaining", LEVELLING, "Other rares"),
+    ("decorators->leveling->rare", LEVELLING, "Rares by size"),
+    ("decorators->leveling->magic", LEVELLING, "Magic items by size"),
+    ("animatedweapons", LEVELLING, "Animate Weapon bases"),
     ("divination", "Divination cards", "Divination cards"),
     ("uniques", "Uniques", "Uniques"),
     ("uniques->replicas", "Uniques", "Replica uniques"),
     ("uniques->foulborn", "Uniques", "Foulborn uniques"),
+    ("uniques->maps", "Uniques", "Unique maps"),
     ("fragments", "Fragments", "Fragments"),
     ("currency->splinter->simulacrum", "Fragments", "Simulacrum splinters"),
+    ("currency->splinter", "Fragments", "Timeless splinters"),
     ("currency->stackedsplintershigh", "Fragments", "Splinter stacks (high)"),
     ("currency->stackedsplinterslow", "Fragments", "Splinter stacks (low)"),
     ("currency->essence", "League currency", "Essences"),
@@ -117,6 +148,37 @@ const KNOWN: &[(&str, &str, &str)] = &[
     ("runesgrafts", "League currency", "Runegrafts"),
     ("corpses", "League currency", "Corpses"),
     ("viscera", "League currency", "Viscera"),
+    ("currency->ducats", "League currency", "Ducats"),
+    ("exotic->wombgifts", "League currency", "Wombgifts"),
+    ("mapenchantments", "League currency", "Allflame embers"),
+    ("currency->others", "League currency", "Other currency"),
+    ("currency->leagueexclusive", "League currency", "League-only currency"),
+    // Flasks and gems in maps (23 Nov: every NeverSink rule on the page).
+    ("endgameflasks", "Flasks and gems", "Flasks"),
+    ("endgametinctures", "Flasks and gems", "Tinctures"),
+    ("gems->exceptional", "Flasks and gems", "Exceptional gems"),
+    ("gems->special", "Flasks and gems", "Quality and level gems"),
+    ("gems->generic", "Flasks and gems", "Other gems"),
+    // Heist.
+    ("heist->contract", "Heist", "Contracts"),
+    ("heist->blueprint", "Heist", "Blueprints"),
+    ("heist->cloak", "Heist", "Cloaks"),
+    ("heist->brooch", "Heist", "Brooches"),
+    ("heist->gear", "Heist", "Heist gear"),
+    ("heist->tool", "Heist", "Tools"),
+    ("currency->heist", "Heist", "Rogue's Markers"),
+    ("heisttarget", "Heist", "Heist targets"),
+    ("uniques->heist", "Heist", "Unique contracts and blueprints"),
+    // Other league items.
+    ("event->idols", "League items", "Idols"),
+    ("expedition->logbook", "League items", "Expedition logbooks"),
+    ("artefact->misc", "League items", "Voidstones, trinkets and other"),
+    ("artefact->sanctifiedrelics", "League items", "Sanctum relics"),
+    ("exoticmap->sanctum", "League items", "Sanctum research"),
+    ("charts", "League items", "Charts"),
+    ("miscmapitemsextra", "League items", "Reliquary keys and league items"),
+    ("questlike", "League items", "Invitations and Labyrinth items"),
+    ("enshrouded", "League items", "Enshrouded gear"),
     ("gold", "Currency", "Gold"),
     ("gear->tiered", "Gear", "Rare gear by item tier"),
     // The rest of NeverSink's gear rules (23 Nov: "revise every section, his is very thorough"), in his order.
@@ -136,6 +198,17 @@ const KNOWN: &[(&str, &str, &str)] = &[
     ("rr", "Gear", "Rare gear by base"),
     ("rr->amuring", "Gear", "Rare rings and amulets"),
     ("rr->belts", "Gear", "Rare belts"),
+    ("rareid", "Gear", "Identified rares with good mods"),
+    ("rareblendid", "Gear", "Identified rares by base"),
+    ("corruptedid", "Gear", "Identified corrupted gear"),
+    ("magicid", "Gear", "Identified magic items with good mods"),
+    ("gear->memorystrand", "Gear", "Memory strand gear"),
+    ("decorators->rareeg", "Gear", "Rare gear by size"),
+    ("exotic->crucible", "Gear", "Crucible gear"),
+    ("exotic->sockets", "Gear", "Abyss socket gear"),
+    ("chancing", "Gear", "Bases to chance"),
+    ("normalcraft->extra", "Gear", "White bases to craft"),
+    ("endgamergb", "Gear", "R-G-B items in maps"),
     // Jewels (21 Nov: he looked for the jewel rules here and couldn't find them).
     ("jewels->generic", "Jewels", "Jewels"),
     ("jewels->abyss", "Jewels", "Abyss jewels"),
@@ -279,7 +352,66 @@ fn gear_tier_name(key: &str, t: &str) -> Option<String> {
             "bestiaryvaluable" => "Beast mods (valuable)", "bestiaryother" => "Beast mods (other)", "delvefractured" => "Delve mods, fractured",
             "delve" => "Delve mods", "mercenaryothers" => "Mercenary mods", "mercenaryweapons" => "Mercenary weapons", "warband" => "Warband mods",
             "essence" => "Essence-only mods", "crafting" => "Crafted mods", _ => return None },
-        "exotic->fractured" => match t { "fractt3" => "Lower fractured bases", _ => return None },
+        "exotic->fractured" => match t { "fractt3" => "Lower fractured bases", "fractspecial" => "Fractured, special item types",
+            "fractothers" => "Any other fractured", _ => return None },
+        "rareid" | "corruptedid" | "magicid" => return Some(mods_step_name(t)),
+        "rareblendid" => match t {
+            "wcastermin" => "Caster weapons, 3+ good mods", "wsmallarmorsblend" => "Boots, gloves and helmets, 3+ good mods",
+            "wringsblend" => "Rings, 3+ good mods", "wamuletsblend" => "Amulets, 3+ good mods", "wbeltsblend" => "Belts, 3+ good mods",
+            "weleattackblend" => "Elemental attack weapons, 3+ good mods",
+            _ => { let n: u32 = t.strip_prefix('t')?.parse().ok()?; return Some(format!("Tier {n} bases")); } },
+        "uniques" => match t { "6s" => "6-socket uniques", "corrupteduniques" => "Corrupted uniques with a corruption mod", _ => return None },
+        "divination" => match t { "exstack" => "Special: stacks of cheap cards", _ => return None },
+        "gear->tiered" => match t { "any5" | "any4" => "Any item type, high item tier", "specialclasses" => "Special item types", _ => return None },
+        "rr" if t.starts_with("fated") => match t { "fatedspecial" => "Fated, special item types", _ => "Fated gear" },
+        "gear->memorystrand" => match t {
+            "t1high" => "Tier 1 bases, many memory strands", "t1" => "Tier 1 bases", "t2high" => "Tier 2 bases, many memory strands", "t2" => "Tier 2 bases",
+            "t3high" => "Tier 3 bases, many memory strands", "t3" => "Tier 3 bases", "anyhigh" => "Any base, many memory strands", "any" => "Any other", _ => return None },
+        "decorators->rareeg" => match t {
+            "largerares" => "Big rares", "mediumrares1" | "mediumrares2" => "Medium rares", "tinyrares" => "Small rares (rings, amulets…)",
+            "fourlinkedrares" => "Rares with 4+ links", "topilvl83" | "topilvl84" | "topilvl85" | "topilvl86" => "Top item level for the item type",
+            "corruptedrares" => "Corrupted rares", "corruptedraresimplicit" => "Corrupted rares with a corruption mod", "fatedgear" => "Fated gear", _ => return None },
+        "exotic->crucible" => "Gear with a Crucible tree",
+        "exotic->sockets" => "Gear with an abyss socket",
+        "endgameflasks" => match t {
+            "overqualcorrupted" => "Corrupted, 30% quality", "overqualutil1" => "Utility, very high quality", "overqualutil2" => "Utility, high quality",
+            "overquallife1" => "Life/mana, very high quality", "overquallife2" => "Life/mana, high quality", "utility85" | "utility84" | "utility82" => "Utility, high item level",
+            "lifemana82" => "Life/mana, high item level", "any20qualflask" => "Any white flask with 20% quality", "earlymappingflasks" => "Utility flasks (early maps)",
+            "anyutility" => "Any utility flask", "earlymappinglifemana" => "Life/mana flasks (early maps)", _ => return None },
+        "endgametinctures" => match t {
+            "overqual1" => "Very high quality", "overqual2" => "High quality", "tinc85" | "tinc82" => "High item level", "any" => "Any other", _ => return None },
+        "gems->exceptional" => match t {
+            "highexceptionalbadcorrupt" => "Corrupted, low quality", "t1" => "Tier 1", "t2" => "Tier 2", "t3" => "Tier 3", "t4" => "Tier 4",
+            "anyexceptionallvl" => "Any exceptional, high level", "anyexceptionalqual" => "Any exceptional, with quality", _ => return None },
+        "gems->special" => match t {
+            "altany" => "Any transfigured gem", "2020z" => "Level 20, 20% quality", "xx20z" => "Valuable, 20% quality", "2120" => "Level 21, 20% quality",
+            "2023" => "Level 20, 23% quality", "2123any" => "Level 21, 23% quality", "xx23" => "Valuable, 23% quality", "21xx" => "Level 21",
+            "vaal20" => "Vaal, 20% quality", _ => return None },
+        "gems->generic" => match t {
+            "lt1" => "Level tier 1", "lt2" => "Level tier 2", "lt3" => "Level tier 3", "qt1" => "Quality tier 1", "qt2" => "Quality tier 2",
+            "qt3" => "Quality tier 3", "qt4" => "Some quality", "qt4lvl" => "Some quality (levelling)", "ex6lvlgems" => "Special gems",
+            "decogemsvaalbgdrop" => "Vaal gems", "firstzone" => "First area gems", "levelingvaal" => "Vaal gems (levelling)", "leveling" => "Gems while levelling",
+            "corruptedvaalany" => "Corrupted Vaal gems", "any" => "Any other", _ => return None },
+        "heist->cloak" | "heist->brooch" | "heist->gear" | "heist->tool" => match t {
+            "t1highlevel" => "Tier 1, high item level", "t1" => "Tier 1", "t2" => "Tier 2", "t3any" => "Any other", _ => return None },
+        "heist->contract" | "heist->blueprint" => match t { "enchanted" => "Enchanted", "handpicked" => "Hand-picked targets", "any" => "Any other", _ => return None },
+        "currency->heist" => match t { "highstack" => "Big stacks", _ => return None },
+        "currency->others" => match t { "mischigh" => "Valuable", "misclow" => "Cheap", _ => return None },
+        "currency->leagueexclusive" => match t { "silvercoin" => "Silver Coins", _ => return None },
+        "uniques->maps" => match t { "multispecialcorrupted" => "Corrupted unique maps", _ => return None },
+        "event->idols" => {
+            let (kind, rar) = if let Some(k) = t.strip_suffix("rare") { (k, "rare") } else if let Some(k) = t.strip_suffix("magic") { (k, "magic") }
+                else { return Some(if t == "normalidols" { "White idols".into() } else { tier_name(t) }) };
+            return Some(format!("{} idol, {rar}", inf(kind)));
+        }
+        "artefact->misc" => match t { "anyimbued" => "Imbued items", "anysynth" => "Synthesised items", "voidstones" => "Voidstones", "anytrinket" => "Trinkets",
+            "fishingrods" => "Fishing rods", "pieces" => "Unique pieces", _ => return None },
+        "artefact->sanctifiedrelics" => match t { "selectedrelics" => "Good relics", "anyrelic" => "Any relic", _ => return None },
+        "exoticmap->sanctum" => match t { "ilvl83" => "High item level", _ => return None },
+        "miscmapitemsextra" => match t { "relickeys" => "Reliquary keys", "relickeyssafe" => "Vault keys", "itemizedleaguesincursion" => "Chronicle of Atzoatl",
+            "itemizedleaguesultimatum" => "Inscribed Ultimatum", "itemizedleaguesmercenary" => "Mercenary Warrant", _ => return None },
+        "questlike" => match t { "invitations" => "Invitations", "labyrinthconsumable" => "Labyrinth items", "incursionconsumable" => "Incursion items", _ => return None },
+        "enshrouded" => "Enshrouded gear",
         // NeverSink ranks the bases in these: tier 1 = the most wanted ones.
         "rr" | "rr->amuring" | "rr->belts" | "rare->exotic->veiled" | "exoticbases" => {
             let n: u32 = t.strip_prefix('t')?.parse().ok()?;
@@ -287,6 +419,49 @@ fn gear_tier_name(key: &str, t: &str) -> Option<String> {
         }
         _ => return None,
     }.to_string())
+}
+
+/// NeverSink's "identified with good mods" steps ("helmet_life_based", "amu_2corecaster", "idaj_mixer") in plain words.
+fn mods_step_name(t: &str) -> String {
+    let whole = match t {
+        "minionwand" => "Minion wands", "t1veil" => "Best veiled mods", "bleedlifeflask" => "Life flasks against bleeding",
+        "doublemodutilflask" => "Utility flasks, two good mods", "singlemodutilflask" => "Utility flasks, one good mod",
+        "doublemodtincture" => "Tinctures, two good mods", "singlemodtincture" => "Tinctures, one good mod", "bladeblast_2core" => "Blade Blast weapons",
+        "gem_bow" => "Bows with + gem levels", "gem_caster" => "Caster weapons with + gem levels", "gem_staves" => "Staves with + gem levels",
+        "amu_exalter" => "Amulets worth exalting", _ => "",
+    };
+    if !whole.is_empty() { return whole.into(); }
+    // "t1phys", "t2suppress": tier, then the kind.
+    if let Some(rest) = t.strip_prefix('t') {
+        let n: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+        if !n.is_empty() && !rest[n.len()..].is_empty() && !rest.contains('_') {
+            let kind = match &rest[n.len()..] { "phys" => "physical weapons", "caster" => "caster weapons", "proj" => "bows and wands (projectiles)",
+                "amu" => "amulets", "minionhelm" => "minion helmets", "quiver" => "quivers", "suppress" => "spell suppression", o => o };
+            return format!("Tier {n}: {kind}");
+        }
+    }
+    let word = |w: &str| -> String { match w {
+        "weapon" => "Weapons", "helmet" => "Helmets", "boots" => "Boots", "gloves" => "Gloves", "shield" => "Shields", "amu" => "Amulets",
+        "ring" => "Rings", "quiv" => "Quivers", "body" => "Body armours", "belt" => "Belts", "idjewel" => "Jewels", "idaj" => "Abyss jewels",
+        "caster" => "Caster weapons", "phys" => "physical", "physpure" => "pure physical", "ele" => "elemental", "elepure" => "pure elemental",
+        "life" => "life", "es" => "energy shield", "based" | "general" => "", "esfocus" => "energy shield", "defensefocus" => "defences",
+        "casterfocus" => "caster", "lifefocus" => "life", "attack" => "attack", "light" => "lightning", "minion" => "minion", "hit" => "hit damage",
+        "dot" => "damage over time", "defense" => "defences", "lifedefense" => "life and defences", "critattack" => "attack crits",
+        "critspell" => "spell crits", "mixer" => "mixed", "1corecaster" => "caster (1 key mod)", "2corecaster" => "caster (2 key mods)",
+        "1coredot" => "damage over time (1 key mod)", "2coredot" => "damage over time (2 key mods)", "1coreattack" => "attack (1 key mod)",
+        "2coreattack" => "attack (2 key mods)", "proj" => "projectile", "amulet" => "amulets", "minionhelm" => "minion helmets",
+        "quiver" => "quivers", "suppress" => "spell suppression",
+        other => {
+            // "fireweapont2" -> "fire", "slingert2" -> "spell slinger", "t1" -> "Tier 1".
+            if let Some(n) = other.strip_prefix('t').and_then(|n| n.parse::<u32>().ok()) { return format!("Tier {n}"); }
+            let o = other.trim_end_matches("t2").trim_end_matches("weapon");
+            return match o { "light" => "lightning".into(), "phys" => "physical".into(), "slinger" => "spell slinger".into(), _ => o.to_string() };
+        }
+    }.to_string() };
+    let parts: Vec<String> = t.split('_').map(word).filter(|w| !w.is_empty()).collect();
+    let out = match parts.as_slice() { [a, rest @ ..] if !rest.is_empty() => format!("{a}: {}", rest.join(" ")), _ => parts.join(" ") };
+    let mut c = out.chars();
+    c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default()
 }
 
 /// A step's name in its section: gear sections have their own words, the rest `tier_name`.
@@ -364,7 +539,7 @@ pub fn sections(segs: &[Segment]) -> Vec<Section> {
     // Jewels too (abyss steps pick by item class, not by item, so they'd be missing), and any known section that
     // has steps but no item list.
     let whole: Vec<&(&str, &str, &str)> = KNOWN.iter()
-        .filter(|k| k.1 == LEVELLING || k.1 == "Jewels" || k.1 == "Gear" || !found.iter().any(|s| s.type_path.join("->") == k.0)).collect();
+        .collect();
     for (key, group, title) in whole {
         let path: Vec<String> = key.split("->").map(String::from).collect();
         let Some(mut sec) = section_at(segs, &path) else { continue };

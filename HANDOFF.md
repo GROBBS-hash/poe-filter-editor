@@ -48,6 +48,27 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **Tiers: every NeverSink rule on the page (23 Nov, not released yet).** He said "do them all" after gear. Every known
+  section now lists all its steps (`sections` uses `section_at` for every KNOWN entry, so steps that pick by item
+  class, links or mods show too: Uniques 20 -> 30 steps, Divination cards 8 -> 10). New sections:
+  - **Flasks and gems** (new group): Flasks, Tinctures (maps), Exceptional gems, Quality and level gems, Other gems.
+  - **Heist** (new group): Contracts, Blueprints, Cloaks, Brooches, Heist gear, Tools, Rogue's Markers, Heist targets, unique contracts.
+  - **League items** (new group): Idols, Expedition logbooks, Voidstones/trinkets, Sanctum relics and research, Charts,
+    Reliquary keys and league items, Invitations and Labyrinth items, Enshrouded gear.
+  - Gear: identified rares with good mods (52 steps, `mods_step_name` words "amu_2corecaster" as "Amulets: caster (2 key
+    mods)"), identified rares by base, identified corrupted, identified magic items, memory strand gear, rare gear by
+    size, Crucible gear, abyss socket gear (+ chancing / white crafting bases / R-G-B in maps when the strictness has them).
+  - League currency: Ducats, Wombgifts, Allflame embers, Other currency, League-only currency. Fragments: Timeless
+    splinters. Uniques: Unique maps. Before maps: 3-links, Act 2 / later acts gear, minion gear, quality flasks,
+    tinctures, the rare weapon/armour/jewellery steps by act, rares and magic items by size, Animate Weapon bases.
+  - Left out on purpose: transmutation / augmentation stacks (he didn't want them), NeverSink's hide layers, quest items,
+    the plain map rules (the Map tiers panel covers those).
+  - "+ Add a condition" per kind of section (`MENUS` in StepConds.tsx, chosen by `menuFor` in Tiers.tsx): gems get gem
+    level / quality / transfigured, currency / cards / fragments get stack size / area level, uniques get links / sockets
+    / corrupted / replica / foulborn, levelling gets area level / drop level / links, flasks get quality / item level.
+  - New condition words: Fated, Imbued, Vestigial, Zana memory, Crucible tree…; "no corruption mod"; "any influence";
+    named-mod lists no longer show the count as a name. Section pictures fall back to the first item when the chosen one
+    has none (poe.ninja has no Heist / league item art, so those menu rows stay blank).
 - **Tiers: every gear rule of NeverSink's (23 Nov, not released yet).** Second group after jewels (see next entry).
   Gear now lists, in NeverSink's order: Rare gear by item tier, 6-linked items, Influenced gear, Searing Exarch / Eater of
   Worlds implicits, Special mods (veiled, Incursion, Delve, beasts, mercenary…), High-quality bases, Crafting bases
@@ -829,6 +850,9 @@ Confirmed in game so far: basic Ctrl+D price check (trade search returned listin
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
 **Tiers: step conditions, jewels first (23 Nov, not released yet):**
+- [ ] Tiers menu: new groups Flasks and gems, Heist, League items; Uniques shows 6-link / corrupted / 6-socket steps.
+  Quality and level gems → "Level 20, 20% quality" → click "quality 20+", set 18: 18% level 20 gems show after F4.
+- [ ] Currency step → + Add a condition → Stack size 5: only stacks of 5+ get that step's look.
 - [ ] Tiers → Gear: the menu lists 17 gear sections (Influenced gear, Crafting bases, Sockets and links…), each with a
   picture, and every step has a plain name. Crafting bases → "Tier 1 bases, item level 86+" → click "item level 86+",
   set 84: item level 84 Crystal Belts / Conquest Lamellars now show with that look after F4.

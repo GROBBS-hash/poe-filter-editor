@@ -33,6 +33,10 @@ pub const YESNO: &[(&str, &str, &str)] = &[
     ("SynthesisedItem", "synthesised", "not synthesised"), ("Replica", "replica", "not replica"),
     ("AnyEnchantment", "enchanted", "not enchanted"), ("BlightedMap", "blighted", "not blighted"),
     ("TransfiguredGem", "transfigured", "not transfigured"), ("Foulborn", "foulborn", "not foulborn"),
+    ("Fated", "fated", "not fated"), ("Imbued", "imbued", "not imbued"), ("Vestigial", "vestigial", "not vestigial"),
+    ("UberBlightedMap", "blight-ravaged", "not blight-ravaged"), ("ZanaMemory", "Zana memory", "not a Zana memory"),
+    ("HasCruciblePassiveTree", "has a Crucible tree", "no Crucible tree"), ("ElderMap", "Elder map", "not an Elder map"),
+    ("ShapedMap", "shaped", "not shaped"),
 ];
 /// Never shown as chips: the items themselves are shown as pictures, the look lines are the look.
 const SKIP: &[&str] = &["BaseType", "Continue"];
@@ -62,6 +66,10 @@ pub fn number_words(name: &str, value: &str) -> String {
             return format!("{} {na}–{nb}", if name == "stack of" { "stacks of" } else { name });
         }
     }
+    if name == "corruption mods" {
+        let (op, n) = split_op(value);
+        if n.trim() == "0" && matches!(op, "" | "==" | "=" | "<=") { return "no corruption mod".into(); }
+    }
     let parts: Vec<String> = value.split('\n').map(|line| {
         let (op, n) = split_op(line);
         let n = n.split_whitespace().next().unwrap_or("");
@@ -85,7 +93,8 @@ pub fn number_words(name: &str, value: &str) -> String {
 }
 
 fn plain_list(v: &str) -> Vec<String> {
-    v.split('"').map(str::trim).filter(|x| !x.is_empty() && !["==", "=", "!="].contains(x)).map(String::from).collect()
+    // Quoted names only (">=3 "Runic" …": the count isn't a name).
+    v.split('"').enumerate().filter(|(i, _)| i % 2 == 1).map(|(_, x)| x.trim()).filter(|x| !x.is_empty()).map(String::from).collect()
 }
 
 /// The conditions of one step, in filter order (same keyword twice is merged, e.g. two AreaLevel lines).
@@ -147,7 +156,11 @@ pub fn words(key: &str, value: &str) -> (String, &'static str) {
             let few = if mods.len() <= 3 { mods.join(", ") } else { format!("{}, {} or another of {} mods", mods[0], mods[1], mods.len()) };
             (if n.is_empty() || op.is_empty() { format!("has a mod: {few}") } else { format!("{n}+ of these mods: {few}") }, "fixed")
         }
-        "HasInfluence" => (format!("influence: {}", plain_list(value).join(", ").to_lowercase()), "fixed"),
+        "HasInfluence" => {
+            let names: Vec<String> = value.split(|c: char| c.is_whitespace() || c == '"').filter(|w| !w.is_empty() && !w.starts_with(['=', '<', '>']))
+                .map(str::to_lowercase).collect();
+            (if names.len() >= 6 { "any influence".into() } else { format!("influence: {}", names.join(", ")) }, "fixed")
+        }
         "SocketGroup" => (format!("socket colours {}", value.trim_start_matches(['=', '>', ' '])), "fixed"),
         "EnchantmentPassiveNode" => {
             let n = plain_list(value);
