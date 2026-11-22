@@ -14,7 +14,11 @@ const reply = {
   stackable: true, area_level: 83, game_filter: null,
   status: { assumptions: [], by_stack: [],
     verdict: { visibility: state === "hide" ? "Hide" : "Show", style, decided_by: "Orb of Unmaking", by_user_edit: state !== "show", reason: "", uncertain: [],
-      source: { kind: "edit", label: "Orb of Unmaking", type_path: [], tier: null, section: null, tier_name: null } } },
+      // ?state=show: decided by a NeverSink step, as the Tiers page names it.
+      source: state === "show"
+        ? { kind: "neversink", label: "", type_path: ["crafting", "generalgear"], tier: "t1_86", section: "Crafting bases", tier_name: "Tier 1 bases, item level 86+",
+            conds: ["not mirrored", "not corrupted", "item level 86+", "white, magic, rare"] }
+        : { kind: "edit", label: "Orb of Unmaking", type_path: [], tier: null, section: null, tier_name: null } } },
 };
 mockWindows("overlay");
 mockIPC((cmd) => {

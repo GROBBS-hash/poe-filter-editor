@@ -25,7 +25,7 @@ export function itemFromRule(d: RuleDetail): Item {
     corrupted: false, mirrored: false, unidentified: false,
   };
 }
-export type Source = { kind: string; label: string; type_path: string[]; tier: string | null; section: string | null; tier_name: string | null };
+export type Source = { kind: string; label: string; type_path: string[]; tier: string | null; section: string | null; tier_name: string | null; conds?: string[] };
 const WHO: Record<string, string> = { neversink: "NeverSink", edit: "Your edit", preset: "Preset", price: "Price tier", none: "No rule" };
 
 /** NeverSink's internal section names in plain words ("normalmagic" -> "white & blue"). */
@@ -33,6 +33,28 @@ const PLAIN: Record<string, string> = { leveling: "levelling", normalmagic: "whi
   "6l": "6-links", "5l": "5-links", rare: "rares", rgb: "R-G-B sockets", exotic: "special", exoticbases: "special bases",
   general: "general", gear: "gear", tiered: "by item tier", uniques: "uniques", currency: "currency", divination: "divination cards" };
 const plain = (p: string) => PLAIN[p] ?? p.replace(/([a-z])([A-Z])/g, "$1 $2");
+
+/** Which rule decides it, in the Tiers page's words (23 Nov: "a way to see what rule is showing this item"):
+ *  "Shown by Crafting bases › Tier 1 bases, item level 86+", that rule's conditions as small chips; click to open it. */
+function RuleLine({ src, hidden, onOpen }: { src?: Source; hidden: boolean; onOpen?: () => void }) {
+  if (!src) return null;
+  const verb = hidden ? "Hidden by" : "Shown by";
+  const name = src.label.replace(/^(Preset|Hide|Highlight|Louder|Quieter|Style): /, "");
+  const what = src.kind === "neversink"
+    ? <>{src.section ? <b>{src.section}</b> : <b>NeverSink › {src.type_path.map(plain).join(" › ")}</b>}{(src.tier_name ?? src.tier) && <> › {src.tier_name ?? src.tier}</>}</>
+    : src.kind === "edit" ? <>your edit <b>{name}</b></> : src.kind === "preset" ? <>preset <b>{name}</b></>
+    : src.kind === "price" ? <><b>{src.label}</b></> : <>no rule: the game shows it plainly</>;
+  const body = (
+    <>
+      <span className="qm-rule-h">{src.kind === "none" ? "Rule" : verb}</span>
+      <span className="qm-rule-name">{what}</span>
+      {(src.conds?.length ?? 0) > 0 && <span className="qm-rule-conds">{src.conds!.map((c) => <span key={c}>{c}</span>)}</span>}
+    </>
+  );
+  return onOpen
+    ? <button className="qm-rule" onClick={onOpen} title="Open this rule in the editor">{body}<span className="qm-rule-go">Open ›</span></button>
+    : <div className="qm-rule">{body}</div>;
+}
 
 /** A clear "why": who decided it, in plain words, which rule, and a button to open that rule in the app. */
 function Why({ v, onEditHere }: { v: Status["verdict"]; onEditHere?: () => void }) {
@@ -433,6 +455,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
             return (
               <>
                 <div className="qm-chips">{chips.filter(Boolean).map((c) => <span key={c} className="qm-chip">{c}</span>)}</div>
+                <RuleLine src={src} hidden={!shown(v.visibility)} onOpen={canOpen ? change : undefined} />
                 {canOpen && <button className="qm-change" onClick={change}>{shown(v.visibility) ? "Change this look" : "Change this rule"}</button>}
               </>
             );

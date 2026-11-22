@@ -59,6 +59,9 @@ pub struct Source {
     /// The same in the app's words, e.g. "Stacks of 3+" / "Tier 5", when it's in the Tiers tab.
     pub section: Option<String>,
     pub tier_name: Option<String>,
+    /// That rule's conditions in plain words ("item level 86+", "not corrupted"), as the Tiers page shows them.
+    #[serde(default)]
+    pub conds: Vec<String>,
 }
 
 fn source_of(b: &Block) -> Source {
@@ -73,7 +76,8 @@ fn source_of(b: &Block) -> Source {
     Source {
         kind: "neversink".into(),
         section: crate::tiers::section_title(&b.type_path),
-        tier_name: b.tier.as_deref().map(|t| if b.type_path.first().map(String::as_str) == Some("gold") { crate::tiers::gold_name(t) } else { crate::tiers::tier_name(t) }),
+        tier_name: b.tier.as_deref().map(|t| crate::tiers::step_name(&b.type_path.join("->"), t)),
+        conds: crate::conds::conds_of(&b.lines).into_iter().filter(|c| c.key != "Class" && c.key != "HasExplicitMod").map(|c| c.words).collect(),
         type_path: b.type_path.clone(),
         tier: b.tier.clone(),
         label: String::new(),

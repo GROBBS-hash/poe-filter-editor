@@ -2185,3 +2185,13 @@ button.tw-chip:hover { border-color: #59606b; color: var(--text); }
 .win-bar .bo-title { white-space: nowrap; }
 .win-bar .win-hint { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .loot-v { white-space: nowrap; }
+/* F2 panel: which rule decides the item, in the Tiers page's words (23 Nov). */
+.qm-rule { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px; width: 100%; text-align: left; margin: 8px 0 2px; padding: 7px 9px;
+  border: 1px solid var(--line); border-radius: 8px; background: color-mix(in srgb, var(--raised) 70%, transparent); color: var(--text-2); font-size: 12.5px; }
+button.qm-rule { cursor: pointer; }
+button.qm-rule:hover { border-color: var(--gold); }
+.qm-rule-h { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; width: 100%; }
+.qm-rule-name b { color: var(--text); font-weight: 600; }
+.qm-rule-conds { display: flex; flex-wrap: wrap; gap: 4px; width: 100%; }
+.qm-rule-conds span { border: 1px solid color-mix(in srgb, var(--gold) 45%, var(--line)); border-radius: 999px; padding: 0 7px; font-size: 11.5px; color: var(--text); }
+.qm-rule-go { margin-left: auto; color: var(--gold); font-size: 12px; }

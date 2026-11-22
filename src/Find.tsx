@@ -1,4 +1,5 @@
 import { usePersist } from "./usePersist";
+import { matchTiers, useTierHits, type TierHit } from "./Search";
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import ItemPanel from "./ItemPanel";
@@ -63,8 +64,11 @@ function Chips({ value, onPick }: { value: string; onPick: (c: string) => void }
   );
 }
 
-export default function Find({ onChange, view = "find", pick }: { onChange: () => void; view?: "find" | "presets"; pick?: Found | null }) {
+export default function Find({ onChange, view = "find", pick, profileId, goTier }: { onChange: () => void; view?: "find" | "presets"; pick?: Found | null;
+  profileId?: string; goTier?: (h: TierHit) => void }) {
   const [q, setQ] = usePersist("find.q", "");
+  const tiers = useTierHits(view === "find" ? profileId : undefined);
+  const tierHits = q.trim().length >= 2 ? matchTiers(tiers, q, 6) : [];
   const [results, setResults] = useState<Found[]>([]);
   const [chosen, setChosen] = useState<Found | null>(null);
   const [presets, setPresets] = useState<Preset[]>([]);
@@ -123,7 +127,43 @@ export default function Find({ onChange, view = "find", pick }: { onChange: () =
     <>
       {view === "find" && <>
       <div className="card">
-        <h2>Just say what you want</h2>
+        <h2>Find an item, item type or Tiers rule</h2>
+        <input className="text" autoFocus placeholder="Try “2h mace”, “chaos orb”, “quality gems”, “corpses”…" value={q}
+          onChange={(e) => { setQ(e.target.value); setChosen(null); }} />
+        {results.length > 0 && !chosen && (
+          <ul className="results">
+            {results.map((r) => (
+              <li key={r.item_class + r.base_type} onClick={() => setChosen(r)}>
+                {r.base_type ? <><span className="with-icon"><ItemIcon base={r.base_type} size={24} />{r.base_type}</span><span className="muted small">{r.item_class}</span></>
+                  : <><span><b>Every {r.item_class}</b></span><span className="muted small">whole item type</span></>}
+              </li>
+            ))}
+          </ul>
+        )}
+        {!chosen && tierHits.length > 0 && (
+          <>
+            <div className="muted small find-sub">On the Tiers page</div>
+            <ul className="results">
+              {tierHits.map((h) => (
+                <li key={h.type_path.join(">") + (h.tier ?? "")} onClick={() => goTier?.(h)}>
+                  <span className="with-icon">{h.icon && <ItemIcon base={h.icon} size={24} />}{h.title}</span><span className="muted small">{h.sub}</span>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        {q.trim() && results.length === 0 && tierHits.length === 0 && <div className="muted small">No matches.</div>}
+        {chosen && (
+          <div className="find-panel qm">
+            <ItemPanel key={chosen.item_class + chosen.base_type} inGame={false}
+              start={{ item: toItem(chosen), from_screen: false, screen_text: null, confidence: 1 }}
+              onClose={() => setChosen(null)} onChanged={onChange} />
+          </div>
+        )}
+      </div>
+      <div className="card">
+        <h2>Or describe a change in your own words</h2>
+        <div className="muted small" style={{ marginBottom: 6 }}>Type what you want and the editor makes the change for you (it asks before doing anything).</div>
         <div className="row">
           <input className="text grow" placeholder="e.g. show gold over 500 in a purple highlight · hide normal 2h swords · icon only for wisdom scrolls"
             value={askText} onChange={(e) => setAskText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && askNow()} />
@@ -149,29 +189,6 @@ export default function Find({ onChange, view = "find", pick }: { onChange: () =
         ) : <div className="note">Couldn't work out which item you mean. Try the item's name, like “Chaos Orb” or “two hand maces”.</div>)}
       </div>
 
-      <div className="card">
-        <h2>Find an item or item type</h2>
-        <input className="text" autoFocus placeholder="Try “2h mace”, “ammy”, “chaos orb”, “div card”…" value={q}
-          onChange={(e) => { setQ(e.target.value); setChosen(null); }} />
-        {results.length > 0 && !chosen && (
-          <ul className="results">
-            {results.map((r) => (
-              <li key={r.item_class + r.base_type} onClick={() => setChosen(r)}>
-                {r.base_type ? <><span className="with-icon"><ItemIcon base={r.base_type} size={24} />{r.base_type}</span><span className="muted small">{r.item_class}</span></>
-                  : <><span><b>Every {r.item_class}</b></span><span className="muted small">whole item type</span></>}
-              </li>
-            ))}
-          </ul>
-        )}
-        {q.trim() && results.length === 0 && <div className="muted small">No matches.</div>}
-        {chosen && (
-          <div className="find-panel qm">
-            <ItemPanel key={chosen.item_class + chosen.base_type} inGame={false}
-              start={{ item: toItem(chosen), from_screen: false, screen_text: null, confidence: 1 }}
-              onClose={() => setChosen(null)} onChanged={onChange} />
-          </div>
-        )}
-      </div>
 
       </>}
       {view === "presets" && <>

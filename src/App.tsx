@@ -351,7 +351,8 @@ export default function App() {
       {tab === "themes" && <Themes profile={active} onChange={refresh} />}
       {tab === "settings" && <SettingsPage />}
       {tab === "home" && <Home profile={active} keys={keys} go={(t) => setTab(t as Tab)} search={() => setSearching(true)} />}
-      {tab === "find" && <Find onChange={refresh} pick={findPick} />}
+      {tab === "find" && <Find onChange={refresh} pick={findPick} profileId={active?.id}
+        goTier={(h) => { setTab("tiers"); setFocus({ kind: "neversink", label: h.title, type_path: h.type_path, tier: h.tier, section: null, tier_name: null }); }} />}
       {tab === "help" && <Help key={helpStart} start={helpStart} keys={keys} go={(t) => setTab(t as Tab)} />}
       {tab === "gear" && <Gear />}
       {tab === "build" && <MyBuild />}

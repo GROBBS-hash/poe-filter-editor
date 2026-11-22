@@ -22,21 +22,34 @@ const norm = (s: string) => s.toLowerCase();
 /** Every word typed appears somewhere in the text. */
 const matches = (text: string, q: string) => { const t = norm(text); return norm(q).split(/\s+/).filter(Boolean).every((w) => t.includes(w)); };
 
-/** Ctrl+K: one box that finds items, pages and help answers. Enter opens the highlighted one. */
-export default function Search({ pages, onClose, goPage, goHelp, goItem, goTier, profileId }: {
-  pages: Page[]; onClose: () => void; goPage: (id: string) => void; goHelp: (index: number) => void; goItem: (f: Found) => void;
-  goTier?: (h: TierHit) => void; profileId?: string;
-}) {
-  // The Tiers page's sections and steps, loaded once when the box opens.
+/** The Tiers page's sections and steps for searching (loaded once per filter). */
+export function useTierHits(profileId?: string): TierHit[] {
   const [tiers, setTiers] = useState<TierHit[]>([]);
   useEffect(() => {
-    if (!profileId || !goTier) return;
+    if (!profileId) return;
     invoke<TierSection[]>("get_tiers", { id: profileId }).then((secs) => setTiers(secs.flatMap((s) => [
       { type_path: s.type_path, tier: null, title: s.title, sub: `Tiers · ${s.group}`, text: `${s.title} ${s.group}`, icon: s.tiers.find((t) => t.bases.length)?.bases[0] ?? null },
       ...s.tiers.map((t) => ({ type_path: s.type_path, tier: t.tier, title: t.name, sub: `Tiers · ${s.title}`,
         text: `${t.name} ${s.title} ${(t.conds ?? []).map((c) => c.words).join(" ")}`, icon: t.bases[0] ?? null })),
     ]))).catch(() => setTiers([]));
-  }, [profileId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [profileId]);
+  return tiers;
+}
+
+/** Tiers sections first, then steps; typed words also match their usual synonyms ("qual" -> "quality"), plurals too. */
+export function matchTiers(tiers: TierHit[], q: string, max = 8): TierHit[] {
+  const words = norm(q).split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const fits = (text: string) => { const t = norm(text); return words.every((w) => t.includes(w) || t.includes(w.replace(/s$/, "")) || (SYNONYMS[w] && t.includes(SYNONYMS[w]))); };
+  return tiers.filter((t) => fits(t.text)).sort((a, b) => (a.tier ? 1 : 0) - (b.tier ? 1 : 0)).slice(0, max);
+}
+
+/** Ctrl+K: one box that finds items, pages and help answers. Enter opens the highlighted one. */
+export default function Search({ pages, onClose, goPage, goHelp, goItem, goTier, profileId }: {
+  pages: Page[]; onClose: () => void; goPage: (id: string) => void; goHelp: (index: number) => void; goItem: (f: Found) => void;
+  goTier?: (h: TierHit) => void; profileId?: string;
+}) {
+  const tiers = useTierHits(goTier ? profileId : undefined);
   const [q, setQ] = useState("");
   const [items, setItems] = useState<Found[]>([]);
   const [sel, setSel] = useState(0);
@@ -56,10 +69,7 @@ export default function Search({ pages, onClose, goPage, goHelp, goItem, goTier,
     if (!s) return pageHits;
     const helpHits = FAQ.map((f, index) => ({ kind: "help" as const, q: f.q, index })).filter((h) => matches(h.q, s)).slice(0, 4);
     const itemHits = items.map((item) => ({ kind: "item" as const, item }));
-    // Tiers: sections first, then steps; typed words also match their usual synonyms ("qual" -> "quality").
-    const words = norm(s).split(/\s+/).filter(Boolean);
-    const fits = (text: string) => { const t = norm(text); return words.every((w) => t.includes(w) || t.includes(w.replace(/s$/, "")) || (SYNONYMS[w] && t.includes(SYNONYMS[w]))); };
-    const tierHits = tiers.filter((t) => fits(t.text)).sort((a, b) => (a.tier ? 1 : 0) - (b.tier ? 1 : 0)).slice(0, 8).map((hit) => ({ kind: "tier" as const, hit }));
+    const tierHits = matchTiers(tiers, s).map((hit) => ({ kind: "tier" as const, hit }));
     return [...tierHits, ...itemHits, ...pageHits.slice(0, 5), ...helpHits];
   }, [q, items, pages, tiers]);
 
