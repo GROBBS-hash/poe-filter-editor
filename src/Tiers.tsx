@@ -1,4 +1,4 @@
-import WorthLine from "./WorthLine";
+import WorthLine, { SectionWorth, worthText } from "./WorthLine";
 import { invoke } from "@tauri-apps/api/core";
 import { Tip } from "./Help";
 import { useEffect, useMemo, useState } from "react";
@@ -62,7 +62,15 @@ const SECTION_ICON: Record<string, { item?: string; url?: string; badge?: string
   "Reliquary keys and league items": { item: "Ancient Reliquary Key" }, "Invitations and Labyrinth items": { item: "Maven's Invitation: The Feared" },
   "3-linked items": { item: "Orb of Fusing" }, "Rare bows": { item: "Imperial Bow" }, "Rare one-hand weapons": { item: "Jewelled Foil" },
   "Rare two-hand weapons": { item: "Reaver Axe" }, "Rare caster weapons": { item: "Convoking Wand" }, "Rare armour": { item: "Astral Plate" },
-  "Rare jewellery": { item: "Two-Stone Ring" }, "Rare minion gear": { item: "Bone Ring" }, "Rare 4-links": { item: "Orb of Fusing" }, "Fractured bases": { item: "Fractured Fossil" }, "Veiled items": { item: "Veiled Chaos Orb" },
+  "Rare jewellery": { item: "Two-Stone Ring" },
+  "Act 2 gear": { item: "Rustic Sash" }, "Later acts gear": { item: "Leather Belt" }, "Minion gear": { item: "Convoking Wand" },
+  "Quality flasks": { item: "Glassblower's Bauble" }, "Tinctures while levelling": { item: "Prismatic Tincture" },
+  "Movement boots and veiled": { item: "Two-Toned Boots" }, "Other rares": { item: "Regal Orb" }, "Rares by size": { item: "Regal Orb" },
+  "Magic items by size": { item: "Orb of Alteration" }, "Animate Weapon bases": { item: "Driftwood Club" },
+  "Splinter stacks (high)": { item: "Splinter of Chayula" }, "Splinter stacks (low)": { item: "Splinter of Xoph" },
+  "Sulphur": { item: "Sulphur Flask" }, "Corpses": { item: "Perfect Fiend" }, "Viscera": { item: "Ichor-Coated Viscera" },
+  "Heist targets": { item: "Rogue's Marker" }, "Unique contracts and blueprints": { item: "Blueprint: Bunker" }, "Charts": { item: "Kalguuran Delving Chart" },
+  "Enshrouded gear": { item: "Enshrouded Body Armour" }, "Exotic bases": { item: "Simplex Amulet" }, "Rare minion gear": { item: "Bone Ring" }, "Rare 4-links": { item: "Orb of Fusing" }, "Fractured bases": { item: "Fractured Fossil" }, "Veiled items": { item: "Veiled Chaos Orb" },
   "Jewels": { item: "Cobalt Jewel" }, "Abyss jewels": { item: "Searching Eye Jewel" }, "Cluster jewels": { item: "Large Cluster Jewel" },
   "Cluster jewels (cheap)": { item: "Small Cluster Jewel" }, "Special jewels": { item: "Timeless Jewel" }, "Jewels while levelling": { item: "Crimson Jewel" },
 };
@@ -131,7 +139,8 @@ function StackBox({ value, onSave, label = "stacks of", title = "Smallest stack 
     </span>
   );
 }
-type Section = { type_path: string[]; title: string; group: string; tiers: TierRow[]; shared_bases?: boolean };
+type Section = { type_path: string[]; title: string; group: string; tiers: TierRow[]; shared_bases?: boolean;
+  prices?: Record<string, number>; hide_below?: number | null };
 
 const SHOW_ITEMS = 24;
 
@@ -215,6 +224,9 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
     return () => { window.clearTimeout(id); window.clearTimeout(off); };
   }, [found, sel]);
 
+  // Prices are in chaos on PoE 1; big ones read better in Divine Orbs.
+  const divine = sections.find((s) => s.prices?.["Divine Orb"])?.prices?.["Divine Orb"] ?? null;
+  const unit = profile.game === "Poe2" ? "exalted" : "chaos";
   const section = sections.find((s) => s.type_path.join(">") === sel) ?? (extra && extraKey === sel ? extra : undefined);
   const isExtra = !!extra && section === extra;
   const done = async (p: Promise<unknown>, m: string) => {
@@ -323,6 +335,10 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
             {!isExtra && (section.title === "Divination cards" || section.title === "Uniques") && (
               <WorthLine profileId={profile.id} group={section.title === "Uniques" ? "Uniques" : "DivinationCards"} onChange={onChange} />
             )}
+            {!isExtra && section.group !== "Uniques" && section.title !== "Divination cards" && section.prices && (
+              <SectionWorth profileId={profile.id} sectionKey={section.type_path.join("->")} prices={section.prices}
+                limit={section.hide_below ?? null} onChange={() => { onChange(); load(); }} />
+            )}
             {section.tiers.map((t) => {
               const key = t.tier;
               const shown = t.visibility !== "Hide";
@@ -372,6 +388,9 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
                         onDragEnd={() => { setDrag(null); setOver(null); }}
                         title={`Drag to another tier`}>
                         <ItemIcon base={b} size={20} />{b}
+                        {section.prices?.[b] != null && <span className={`chip-price ${section.hide_below != null && section.prices[b] < section.hide_below ? "below" : ""}`}
+                          title={section.group === "Uniques" ? "poe.ninja: the most a unique on this base is worth" : "poe.ninja price"}>
+                          {section.group === "Uniques" ? "up to " : ""}{worthText(section.prices[b], unit, divine)}</span>}
                       </span>
                     ))}
                     {t.bases.length > SHOW_ITEMS && (

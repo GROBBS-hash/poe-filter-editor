@@ -231,7 +231,7 @@ pub fn render_profile(store: &Store, id: &str, filter_dir: &Path, prices: Option
         apply_theme(&mut segs, &theme);
     }
     let extra = match (&p.prices, prices) {
-        (Some(settings), Some(file)) => price_blocks(settings, file, nl),
+        (Some(settings), Some(file)) => price_blocks(settings, file, nl) + &crate::prices::section_hide_blocks(&segs, &settings.section_hide, file, nl),
         _ => String::new(),
     };
     let warnings = apply_with_extra(&mut segs, &store.resolved_rules(id), &extra, nl);

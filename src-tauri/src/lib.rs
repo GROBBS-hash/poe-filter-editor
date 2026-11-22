@@ -1408,6 +1408,11 @@ fn get_tiers(state: State<AppState>, id: String) -> Result<Vec<filter_core::tier
     let (text, _) = render_profile(&store, &id, &filter_dir(game), prices.get(&game), None).map_err(err)?;
     let mut s = filter_core::tiers::sections(&parse_filter(&text));
     filter_core::tiers::mark_changed(&mut s, &store.resolved_rules(&id));
+    // poe.ninja worth beside each item, and each section's "hide if worth under" line.
+    if let Some(file) = prices.get(&game) {
+        let hides = store.profiles.get(&id).and_then(|p| p.prices.as_ref()).map(|p| p.section_hide.clone()).unwrap_or_default();
+        filter_core::tiers::attach_prices(&mut s, file, &hides);
+    }
     Ok(s)
 }
 

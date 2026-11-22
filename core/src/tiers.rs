@@ -52,6 +52,28 @@ pub struct Section {
     /// dragging would pull it out of the others, so the app doesn't offer it.
     #[serde(default)]
     pub shared_bases: bool,
+    /// poe.ninja worth of the items listed here (in the price file's unit), for the page to show and filter by.
+    #[serde(default)]
+    pub prices: std::collections::BTreeMap<String, f64>,
+    /// "Hide if worth under N" for this section (your price settings), when set.
+    #[serde(default)]
+    pub hide_below: Option<f64>,
+}
+
+/// Adds worth to each section's items and its "hide if worth under" line. Unique sections show the most a unique on
+/// that base is worth; everything else is priced by name.
+pub fn attach_prices(sections: &mut [Section], file: &crate::prices::PriceFile, hides: &std::collections::BTreeMap<String, f64>) {
+    let uniques = crate::prices::values_by_base(file, crate::prices::Group::Uniques);
+    for s in sections.iter_mut() {
+        let unique = s.group == "Uniques";
+        for t in &s.tiers {
+            for b in &t.bases {
+                let v = if unique { uniques.get(b).copied() } else { crate::prices::price_of(file, None, b, "Normal") };
+                if let Some(v) = v.filter(|v| *v > 0.0) { s.prices.insert(b.clone(), v); }
+            }
+        }
+        s.hide_below = hides.get(&s.type_path.join("->")).copied();
+    }
 }
 
 /// The group of levelling rules (the campaign, before maps): flasks, weapon upgrades, links, magic items…
@@ -516,7 +538,7 @@ pub fn sections(segs: &[Segment]) -> Vec<Section> {
             None => {
                 let (group, title) = KNOWN.iter().find(|k| k.0 == key).map(|k| (k.1.to_string(), k.2.to_string()))
                     .unwrap_or_else(|| ("Other".into(), b.type_path.iter().map(|p| tier_name(p)).collect::<Vec<_>>().join(" › ")));
-                found.push(Section { type_path: b.type_path.clone(), title, group, tiers: vec![], shared_bases: false });
+                found.push(Section { type_path: b.type_path.clone(), title, group, tiers: vec![], shared_bases: false, prices: Default::default(), hide_below: None });
                 found.len() - 1
             }
         };
@@ -588,7 +610,7 @@ pub fn section_at(segs: &[Segment], type_path: &[String]) -> Option<Section> {
     }
     if tiers.is_empty() { return None; }
     let title = section_title(type_path).unwrap_or_else(|| type_path.iter().map(|p| plain_part(p)).collect::<Vec<_>>().join(" › "));
-    Some(Section { type_path: type_path.to_vec(), title, group: "Opened rule".into(), tiers, shared_bases: true })
+    Some(Section { type_path: type_path.to_vec(), title, group: "Opened rule".into(), tiers, shared_bases: true, prices: Default::default(), hide_below: None })
 }
 
 /// NeverSink's short section names in plain words.

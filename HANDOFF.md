@@ -48,6 +48,24 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **Tiers: prices on items, "hide if worth under" anywhere, search, pictures, clearer menu (23 Nov, not released yet).**
+  After his 0.2.46 look ("we need pictures for everything", group names "too blended in", search found nothing for
+  "quality", "only show corpses worth x chaos").
+  - Every item chip shows its poe.ninja worth ("3c", "20 div"; uniques "up to …" = best unique on that base).
+    `tiers::attach_prices` fills `Section.prices` in `get_tiers`.
+  - "Hide items here worth under N" on every section with prices (not Uniques / Divination cards, which keep their own
+    WorthLine): `SectionWorth` in WorthLine.tsx saves `PriceSettings.section_hide` ("corpses" -> 5.0);
+    `prices::section_hide_blocks` (called from `render_profile`) hides that section's priced items under the line,
+    a stack at its total worth (`StackSize < ceil(line / price)`). Unpriced items stay with NeverSink. Hidden ones are
+    struck through on the page. Test `section_worth_line`.
+  - Ctrl+K search lists Tiers sections and steps (by name, section and condition words, with simple synonyms like
+    "qual", "6l", "ilvl"); Enter opens the Tiers page on it and the menu scrolls there.
+  - Pictures: the hourly price job (`tools/fetch_prices.py` `extra_icons`) adds the trade site's static item list and
+    every base item's art from the RePoE export (dds path -> web.poecdn.com/image/….png), only where poe.ninja has none:
+    6248 pictures (was 3837), every Tiers item but NeverSink's partial names, which use the first matching item
+    (`partialIcon` in icons.tsx). Checked on GitHub Actions. Dev preview: public/_icons.json (git-ignored) = merged list.
+  - Tiers menu group names: look A, gold capitals with a line (he picked it from four mock-ups). Missing menu
+    pictures filled in (`SECTION_ICON`), falling back to the section's first item.
 - **Tiers: every NeverSink rule on the page (23 Nov, released in 0.2.46).** He said "do them all" after gear. Every known
   section now lists all its steps (`sections` uses `section_at` for every KNOWN entry, so steps that pick by item
   class, links or mods show too: Uniques 20 -> 30 steps, Divination cards 8 -> 10). New sections:
@@ -850,6 +868,11 @@ Confirmed in game so far: basic Ctrl+D price check (trade search returned listin
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
 **Tiers: step conditions, jewels first (23 Nov, released in 0.2.46):**
+- [ ] (not released yet) Tiers → Corpses: every corpse shows its price. Tick "Hide items here worth under", type 5:
+  cheap corpses get struck through; after F4 a single 1c corpse is hidden but a stack worth 5c+ still shows.
+- [ ] (not released yet) Ctrl+K → "quality gems" → Enter opens Quality and level gems.
+- [ ] Pictures on Heist items, flasks, cards and league items (arrive with the next price download, no release needed).
+- [ ] (not released yet) Tiers menu: group names in gold capitals with a line.
 - [ ] Tiers menu: new groups Flasks and gems, Heist, League items; Uniques shows 6-link / corrupted / 6-socket steps.
   Quality and level gems → "Level 20, 20% quality" → click "quality 20+", set 18: 18% level 20 gems show after F4.
 - [ ] Currency step → + Add a condition → Stack size 5: only stacks of 5+ get that step's look.

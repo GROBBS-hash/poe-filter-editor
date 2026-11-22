@@ -2168,3 +2168,12 @@ button.tw-chip:hover { border-color: #59606b; color: var(--text); }
 .cond-menu-item { display: flex; flex-direction: column; align-items: flex-start; text-align: left; background: transparent; border: 0; padding: 6px 8px; border-radius: 6px; }
 .cond-menu-item:hover { background: var(--gold-bg); }
 .tier-name img, .tier-name .item-icon { flex: none; }
+
+/* Tiers menu group headings, look A (he picked it 23 Nov: they blended in): gold capitals with a line after. */
+.tiers-gname { display: flex; align-items: center; gap: 8px; color: var(--gold); font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .09em; margin: 16px 0 4px; }
+.tiers-gname::after { content: ""; flex: 1; height: 1px; background: color-mix(in srgb, var(--gold) 35%, transparent); }
+.tiers-group:first-of-type .tiers-gname { margin-top: 6px; }
+/* poe.ninja worth on each item of a Tiers step; struck through when "hide if worth under" hides it. */
+.chip-price { margin-left: 4px; padding: 0 6px; border-radius: 999px; font-size: 11px; background: color-mix(in srgb, var(--gold) 16%, transparent); color: var(--gold); white-space: nowrap; }
+.chip-price.below { background: transparent; color: var(--muted); text-decoration: line-through; }

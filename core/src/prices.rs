@@ -117,6 +117,10 @@ pub struct GroupSettings {
 pub struct PriceSettings {
     pub enabled: bool,
     pub groups: Vec<GroupSettings>,
+    /// "Hide if worth under N" per Tiers page section (key "currency->corpses" style type path), 23 Nov:
+    /// "only show corpses worth x chaos". Works with price tiers off, like the groups' hide_below.
+    #[serde(default)]
+    pub section_hide: BTreeMap<String, f64>,
 }
 
 fn look(size: u32, text: [u8; 4], border: [u8; 4], bg: [u8; 4], beam: &str, icon: (u8, &str, &str), sound: Sound) -> CustomStyle {
@@ -149,7 +153,37 @@ pub fn default_settings(unit: &str) -> PriceSettings {
             tiers: tiers("6"),
             hide_below: None,
         }).collect(),
+        section_hide: BTreeMap::new(),
     }
+}
+
+/// Hide rules for the Tiers page's "hide if worth under" lines: every item listed in that NeverSink section that
+/// poe.ninja prices under the line. A stack counts at its total worth (5 x 1c corpses stay when the line is 4c).
+/// Items poe.ninja doesn't price are left to NeverSink.
+pub fn section_hide_blocks(segs: &[crate::filter::Segment], hides: &BTreeMap<String, f64>, file: &PriceFile, nl: &str) -> String {
+    let u = unit_short(&file.unit);
+    let mut out = String::new();
+    for (key, limit) in hides {
+        let path: Vec<String> = key.split("->").map(String::from).collect();
+        let Some(sec) = crate::tiers::section_at(segs, &path) else { continue };
+        let title = crate::tiers::section_title(&path).unwrap_or_else(|| key.clone());
+        let mut by_stack: BTreeMap<u32, Vec<String>> = BTreeMap::new();
+        let mut seen = std::collections::BTreeSet::new();
+        for b in sec.tiers.iter().flat_map(|t| t.bases.iter()) {
+            if !seen.insert(b.clone()) { continue; }
+            let Some(v) = price_of(file, None, b, "Normal").filter(|v| *v > 0.0) else { continue };
+            if v >= *limit { continue; }
+            by_stack.entry((limit / v).ceil().min(5000.0) as u32).or_default().push(b.clone());
+        }
+        for (need, names) in by_stack {
+            let refs: Vec<&String> = names.iter().collect();
+            out.push_str(&format!("Hide # Price: {title} worth under {limit}{u}{nl}"));
+            if need > 1 { out.push_str(&format!("    StackSize < {need}{nl}")); }
+            out.push_str(&format!("    BaseType == {}{nl}", base_list(&refs)));
+            out.push_str(&format!("    DisableDropSound True{nl}{nl}"));
+        }
+    }
+    out
 }
 
 /// Replica uniques only come from Heist, and Foulborn ones from their league mechanic: neither drops as a
@@ -311,6 +345,31 @@ mod tests {
         assert_eq!(price_of(&file(), Some("Wurm's Molt"), "Leather Belt", "Unique"), Some(1.0));
         assert_eq!(price_of(&file(), None, "Leather Belt", "Unique"), Some(29584.0));
         assert_eq!(price_of(&file(), None, "Divine Orb", "Currency"), Some(176.0));
+    }
+
+    /// Tiers page "hide items here worth under 4c" on corpses: 1c ones hide unless dropped as a stack of 4+.
+    #[test]
+    fn section_worth_line() {
+        let mut f = file();
+        let it = |name: &str, value: f64| PriceItem { name: name.into(), base: name.into(), cat: "Corpse".into(), value, variant: None,
+            listings: Some(10), trend: None, change: None, volume: None };
+        f.items.push(it("Perfect Forest Tiger", 40.0));
+        f.items.push(it("Blood Demon", 1.0));
+        let mut segs = parse_filter("Show # $type->corpses $tier->t1\n\tClass == \"Corpses\"\n\tBaseType == \"Perfect Forest Tiger\" \"Unpriced Corpse\"\n\tSetFontSize 45\n\nShow # $type->corpses $tier->t3\n\tClass == \"Corpses\"\n\tBaseType == \"Blood Demon\"\n\tSetFontSize 40\n");
+        let mut hides = BTreeMap::new();
+        hides.insert("corpses".to_string(), 4.0);
+        let blocks = section_hide_blocks(&segs, &hides, &f, "\n");
+        assert!(blocks.contains("StackSize < 4") && blocks.contains("\"Blood Demon\"") && !blocks.contains("Tiger") && !blocks.contains("Unpriced"), "{blocks}");
+        apply_with_extra_test(&mut segs, &blocks);
+        let corpse = |name: &str, stack: u32| { let mut i = parse_item(&format!("Item Class: Corpses\nRarity: Normal\n{name}\n--------\nStack Size: {stack}/10\n")).unwrap(); i.item_class = "Corpses".into(); i };
+        let v = status(&segs, &corpse("Blood Demon", 1), Some(83), false).verdict; println!("{} {} {:?}", v.visibility, v.decided_by, v.uncertain);
+        assert_eq!(v.visibility, "Hide");
+        assert_eq!(status(&segs, &corpse("Blood Demon", 5), Some(83), false).verdict.visibility, "Show");
+        assert_eq!(status(&segs, &corpse("Perfect Forest Tiger", 1), Some(83), false).verdict.visibility, "Show");
+    }
+    fn apply_with_extra_test(segs: &mut Vec<crate::filter::Segment>, extra: &str) {
+        crate::rules::apply_with_extra(segs, &[], extra, "\n");
+        *segs = parse_filter(&crate::filter::render_filter(segs));
     }
 
     #[test]

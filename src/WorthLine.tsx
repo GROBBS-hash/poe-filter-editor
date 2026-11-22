@@ -68,3 +68,57 @@ export default function WorthLine({ profileId, group, onChange }: { profileId: s
     </div>
   );
 }
+
+/** A worth in plain short form: "12c", "0.5c", "2.3 div" (when a Divine Orb's price is known), "40 ex" on PoE 2. */
+export function worthText(v: number, unit: string, divine?: number | null): string {
+  if (unit === "chaos" && divine && v >= divine) return `${(v / divine).toFixed(v >= divine * 10 ? 0 : 1)} div`;
+  const n = v >= 10 ? Math.round(v).toString() : v >= 1 ? v.toFixed(1).replace(/\.0$/, "") : v.toFixed(2).replace(/0$/, "");
+  return unit === "chaos" ? `${n}c` : `${n} ${unit === "exalted" ? "ex" : unit}`;
+}
+
+/**
+ * "Hide items here worth under N" for any Tiers section with poe.ninja prices (corpses, essences, fossils…; 23 Nov:
+ * "only show corpses worth x chaos"). Saved as the price settings' section_hide for this section; the filter hides the
+ * items listed here that poe.ninja prices under the line, counting a stack at its total worth. Unpriced items stay.
+ */
+export function SectionWorth({ profileId, sectionKey, prices, limit: start, onChange }: {
+  profileId: string; sectionKey: string; prices: Record<string, number>; limit: number | null; onChange: () => void;
+}) {
+  const [limit, setLimit] = useState<number | null>(start);
+  const [err, setErr] = useState("");
+  const [unit, setUnit] = useState("chaos");
+  const timer = useRef(0);
+  useEffect(() => setLimit(start), [start, sectionKey]);
+  useEffect(() => { invoke<Page>("get_price_settings", { id: profileId }).then((p) => setUnit(p.info?.unit ?? "chaos")).catch(() => {}); }, [profileId]);
+  const values = Object.values(prices);
+  const save = (next: number | null) => {
+    setLimit(next);
+    clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => {
+      invoke<Page & { settings: Settings & { section_hide?: Record<string, number> } }>("get_price_settings", { id: profileId }).then((p) => {
+        const hides = { ...(p.settings.section_hide ?? {}) };
+        if (next == null) delete hides[sectionKey]; else hides[sectionKey] = next;
+        return invoke("set_price_settings", { id: profileId, settings: { ...p.settings, section_hide: hides } });
+      }).then(() => { setErr(""); onChange(); }).catch((e) => setErr(friendly(e)));
+    }, 600);
+  };
+  if (values.length === 0) return null;
+  const on = limit != null;
+  const below = on ? values.filter((v) => v < (limit ?? 0)).length : 0;
+  return (
+    <div className={`worth-line ${on ? "on" : ""}`}>
+      <label>
+        <input type="checkbox" checked={on} onChange={(e) => save(e.target.checked ? (unit === "chaos" ? 5 : 20) : null)} />
+        Hide items here worth under
+      </label>
+      <input className="num" type="number" min={0} step="any" disabled={!on} value={limit ?? ""}
+        onChange={(e) => save(Math.max(0, +e.target.value || 0))} />
+      {unit === "chaos" ? <CurrencyIcon id="chaos" /> : <span className="muted small">{unit}</span>}
+      <span className="muted small">
+        {on ? <>hides <b>{below}</b> of the {values.length} priced items here right now · a stack counts at its total worth · prices from poe.ninja</>
+          : `Each item shows its poe.ninja price. ${values.length} of the items here have one; the rest stay as NeverSink has them.`}
+      </span>
+      {err && <span className="danger-text small">{err}</span>}
+    </div>
+  );
+}
