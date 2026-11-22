@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ResizeGrips, WinBar } from "./WinFrame";
+import { CurrencyIcon, ItemIcon } from "./icons";
 import syndicate from "./data/syndicate.json";
 import anoints from "./data/anoints.json";
 import "./play.css";
@@ -267,6 +268,31 @@ type Job = { kind: string; what: string };
 type Member = { id: string; name: string; jobs: Record<string, Job[]> };
 const JOBS = ["transportation", "fortification", "research", "intervention"];
 const SYN_KEY = "syndicate.picks";
+const cap = (t: string) => t ? t[0].toUpperCase() + t.slice(1) : t;
+
+/** The game picture for a Syndicate reward (names as poe.ninja lists them; missing ones just show no picture). */
+const REWARD_ART: Record<string, string> = {
+  "double-veiled items": "Veiled Chaos Orb", "veiled chaos": "Veiled Chaos Orb", "veiled exalt": "Veiled Exalted Orb",
+  jewels: "Cobalt Jewel", "tainted orbs": "Tainted Chaos Orb", "tainted sockets": "Tainted Jeweller's Orb",
+  "div card stack": "Stacked Deck", "div cards": "Stacked Deck", "for a random one": "Stacked Deck",
+  "random currency": "Chaos Orb", "currency stacks": "Chaos Orb", "reflecting mist": "Reflecting Mist",
+  "influence exalts": "Hunter's Exalted Orb", "eldritch implicit": "Grand Eldritch Ember",
+  "vaaled gear": "Vaal Orb", "vaaled uniques": "Vaal Orb", "djinn vaal orb": "Vaal Orb",
+  "ancient orbs": "Ancient Orb", "ancient orb": "Ancient Orb", threads: "Betrayal Thread",
+  "chaos orb + fracture": "Fracturing Orb", "fusings to your item": "Orb of Fusing", gems: "Gemcutter's Prism",
+  "soul core'd qual gems": "Gemcutter's Prism", essences: "Deafening Essence of Greed", "essence gear": "Deafening Essence of Greed",
+  "unique gloves": "Iron Gauntlets", "unique helmets": "Iron Hat", "unique boots": "Iron Greaves", "unique belts": "Headhunter",
+  "unique rings": "Coral Ring", "unique amulets": "Coral Amulet", "unique axes": "Rusted Hatchet", "unique bows": "Crude Bow",
+  "unique sceptres/wands": "Driftwood Wand", "unique shields": "Splintered Tower Shield", "unique body armor": "Kaom's Heart",
+  "unique items": "Tabula Rasa", "rare gear": "Vaal Regalia", "influenced gear": "Hunter's Exalted Orb", "unique strongbox": "Valdo's Puzzle Box",
+};
+function rewardArt(j: Job): string | null {
+  if (j.kind === "allflame embers") {
+    const w = j.what.replace(/\b\w/g, (c) => c.toUpperCase());
+    return ["Toads", "Flesh", "Resplendence"].includes(w) ? `Allflame Ember of ${w}` : `Allflame Ember of the ${w}`;
+  }
+  return REWARD_ART[j.what] ?? null;
+}
 
 /** The Syndicate table: click cells to mark the rewards you want (kept on this PC). */
 export function SyndicateTable() {
@@ -283,10 +309,10 @@ export function SyndicateTable() {
     <div>
       <div className="pw-row">
         <input className="text" style={{ margin: 0, maxWidth: 260 }} placeholder="Find a reward (e.g. veiled, jewel)" value={find} onChange={(e) => setFind(e.target.value)} />
-        <span className="pw-small">Click a reward to mark it (green). Data from Exile UI, updated {(syndicate as { updated: string }).updated.split(",")[0]}.</span>
+        <span className="pw-small">Click a reward to mark it. Data from Exile UI, updated {(syndicate as { updated: string }).updated.split(",")[0]}.</span>
       </div>
-      <table className="syn">
-        <thead><tr><th>Member</th>{JOBS.map((j) => <th key={j}>{j[0].toUpperCase() + j.slice(1)}</th>)}</tr></thead>
+      <table className="syn syn-board">
+        <thead><tr><th>Member</th>{JOBS.map((j) => <th key={j} className={`syn-div ${j}`}>{j}</th>)}</tr></thead>
         <tbody>{members.map((m) => (
           <tr key={m.id}><td className="who">{m.name}</td>{JOBS.map((j) => {
             const list = m.jobs[j] ?? [];
@@ -294,9 +320,12 @@ export function SyndicateTable() {
             const text = list.map((x) => `${x.kind} ${x.what}`).join(" ").toLowerCase();
             const dim = q !== "" && !text.includes(q);
             return (
-              <td key={j} className={`${picks.includes(k) ? "pick" : ""} ${dim ? "dim" : ""}`} onClick={() => toggle(k)}>
-                {list[0] && <>{list[0].kind && <span className="k">{list[0].kind}</span>}<span className="w">{list[0].what}</span></>}
-                {list[1] && <div className="w2">{list[1].kind ? `${list[1].kind}: ` : ""}{list[1].what}</div>}
+              <td key={j} className={dim ? "dim" : ""}>
+                <button className={`syn-cell ${picks.includes(k) ? "pick" : ""}`} onClick={() => toggle(k)} aria-pressed={picks.includes(k)}
+                  title={picks.includes(k) ? "Marked: click to unmark" : "Click to mark this reward"}>
+                  {list[0] && <b>{rewardArt(list[0]) && <ItemIcon name={rewardArt(list[0])} size={22} />}<span>{cap(list[0].what)}</span></b>}
+                  <small>{[list[0]?.kind, list[1] ? (list[1].kind ? `${list[1].kind}: ${list[1].what}` : list[1].what) : ""].filter(Boolean).join(" · ")}</small>
+                </button>
               </td>
             );
           })}</tr>
@@ -346,18 +375,17 @@ export function AnointLookup() {
   const [q, setQ] = useState("");
   const [have, setHave] = useState<string[]>([]);
   const [prices, setPrices] = useState<Record<string, number>>({});
-  useEffect(() => { invoke<Record<string, number>>("price_names", { names: ANOINTS.oils.map((o) => `${o} Oil`) }).then(setPrices).catch(() => {}); }, []);
+  useEffect(() => { invoke<Record<string, number>>("price_names", { names: [...ANOINTS.oils.map((o) => `${o} Oil`), "Divine Orb"] }).then(setPrices).catch(() => {}); }, []);
   const cost = (oils: string[]) => {
     const each = oils.map((o) => prices[`${o} Oil`]);
     return each.every((x) => x != null) ? each.reduce((a, b) => a + b, 0) : null;
   };
   const words = q.trim().toLowerCase();
-  const canMake = (a: Anoint) => {
-    const left = [...have];
-    return a.oils.every((o) => { const i = left.indexOf(o); if (i < 0) return false; left.splice(i, 1); return true; });
-  };
+  // How many of a recipe's three oils you've ticked (each ticked colour counts for every copy the recipe needs).
+  const got = (a: Anoint) => a.oils.filter((o) => have.includes(o)).length;
   const list = ANOINTS.amulets.filter((a) => (words === "" || a.name.toLowerCase().includes(words) || a.stats.some((s) => s.toLowerCase().includes(words)))
-    && (have.length === 0 || canMake(a))).slice(0, 60);
+    && (have.length === 0 || got(a) > 0))
+    .sort((a, b) => have.length ? got(b) - got(a) : 0).slice(0, 60);
   const toggle = (o: string) => setHave(have.includes(o) ? have.filter((x) => x !== o) : [...have, o]);
   return (
     <div>
@@ -365,15 +393,20 @@ export function AnointLookup() {
         <input className="text" style={{ margin: 0, maxWidth: 280 }} placeholder="A notable or a stat (e.g. Whispers of Doom, curse)" value={q} onChange={(e) => setQ(e.target.value)} />
         <span className="pw-small">{ANOINTS.credit}</span>
       </div>
-      <div className="pw-row" style={{ flexWrap: "wrap", margin: "6px 0", gap: 4 }}>
+      <div className="oil-chips">
         <span className="pw-small">Oils I have:</span>
-        {ANOINTS.oils.map((o) => <button key={o} className={`pw-btn ${have.includes(o) ? "primary" : ""}`} onClick={() => toggle(o)}
-          title={prices[`${o} Oil`] != null ? `${Math.round(prices[`${o} Oil`])}c on poe.ninja` : undefined}>{o}</button>)}
+        {ANOINTS.oils.map((o) => <button key={o} className={`oil-chip ${have.includes(o) ? "on" : ""}`} onClick={() => toggle(o)} aria-pressed={have.includes(o)}
+          title={`${o} Oil${prices[`${o} Oil`] != null ? ` · ${Math.round(prices[`${o} Oil`])}c on poe.ninja` : ""}`}><ItemIcon name={`${o} Oil`} size={28} /><span>{o}</span></button>)}
         {have.length > 0 && <button className="link pw-btn" onClick={() => setHave([])}>clear</button>}
       </div>
-      <table className="syn"><thead><tr><th>Notable</th><th>Oils</th><th>Does</th><th>Cost</th></tr></thead>
-        <tbody>{list.map((a) => { const c = cost(a.oils); return (
-          <tr key={a.name}><td className="who">{a.name}</td><td>{a.oils.join(" + ")}</td><td className="w2">{a.stats.join(" · ")}</td><td>{c != null ? `${Math.round(c)}c` : ""}</td></tr>
+      <table className="syn oil-table"><thead><tr><th>Notable</th><th>Oils</th><th>Does</th><th className="num">Cost</th></tr></thead>
+        <tbody>{list.map((a) => { const c = cost(a.oils); const div = prices["Divine Orb"]; return (
+          <tr key={a.name}>
+            <td className="who">{a.name}{have.length > 0 && (got(a) === 3 ? <span className="oil-can">✓ you have all three</span> : <span className="oil-can part">you have {got(a)} of 3</span>)}</td>
+            <td className="oil-pics" title={a.oils.join(" + ")}>{a.oils.map((o, i) => <span key={i} className={have.length && !have.includes(o) ? "oil-miss" : ""}><ItemIcon name={`${o} Oil`} size={22} /></span>)}<span className="sr">{a.oils.join(" + ")}</span></td>
+            <td className="oil-does">{a.stats.map((st, i) => <span key={i}>{st}</span>)}</td>
+            <td className="num">{c == null ? "" : div && c >= div ? <span className="oil-cost">{(c / div).toFixed(1)}<CurrencyIcon id="divine" /></span> : <span className="oil-cost">{Math.round(c)}<CurrencyIcon id="chaos" /></span>}</td>
+          </tr>
         ); })}</tbody></table>
       {list.length === 0 && <p className="pw-small">Nothing matches.</p>}
     </div>

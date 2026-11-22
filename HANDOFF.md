@@ -77,6 +77,11 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   - **Notes** window (notes.txt, saved as you type) and **wiki key** (Ctrl+C the hovered item → poewiki.net /
     poe2wiki.net, uniques by name, else base).
   - Checked here: cargo check of the app (Linux), all Rust tests, tsc, and screenshots of every window with sample data.
+- **Play windows design pass (22 Nov, after 0.2.39):** impeccable polish of all play windows; cheat sheets in look A
+  ( in Play.tsx maps Syndicate rewards to poe.ninja icon names); blight oils list recipes using any ticked
+  oil, best match first; play windows scroll instead of clipping (). Browser preview of every play
+  window with sample data: [Y,N]? ().
+  Jewel / cluster crafting is being built in a separate session (he asked for a Craft button on jewels, clusters most).
 - **QoL wave 2 (22 Nov, same branch, from "be the player" review; his picks):**
   - **Crafting search** (`core/src/craft/search.rs`, command `craft_search`, `CraftSearchBox` in the Plan card): planned
     mods -> stash regex, "this tier or better" = at least that tier's lowest roll (`at_least`, up to 4 digits), words cut to
@@ -694,7 +699,11 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] F10 searches: clicking one with the stash or a vendor open puts it in the search box (and nothing happens in
   game when no search box is open). Your own searches can be added on the Play tools page.
 - [ ] Wealth → Worth selling → "Highlight in stash" lights up those items.
-- [ ] F11 cheat sheets: Syndicate table readable, marking cells sticks, added pictures show as tabs; resizes and remembers size.
+- [x] F11 opens and both tabs work (22 Nov). He asked for game pictures and a better layout: done as look A (he picked it
+  from three mock-ups): oil pictures, coloured Syndicate divisions, reward cards with pictures, cost in chaos/divine.
+- [ ] F11 look A: pictures show for oils and most Syndicate rewards; ticking oils lists recipes that use them
+  ("you have 2 of 3", missing oils faded); marking cells sticks; added pictures show as tabs.
+- [ ] Map tracker window scrolls when its content is taller than the window (the session summary used to be cut off).
 - [ ] Notes window (set a key first) saves as you type; Esc gives the game back its focus.
 - [ ] Alt+W opens the wiki page of the item under the mouse.
 - [ ] None of F8-F11 / Alt+W / Alt+R clash with his other tools (Settings → Hotkeys to change or clear).

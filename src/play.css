@@ -1,5 +1,8 @@
 /* Play windows (22 Nov 2026): levelling, map tracker, searches, cheat sheets, notes. Built on the .bo overlay box. */
 .pw .bo-body { padding: 10px 12px 12px; }
+/* The shared .bo > .bo-body rule clips overflow (for the build window); play windows scroll instead, so nothing gets cut off. */
+.bo.pw > .bo-body { display: block; overflow-y: auto; }
+.bo.pw > .bo-body.nt-body { display: flex; }
 .pw .bo-bar { padding: 7px 10px 7px 12px; }
 .pw .bo-bar .bo-title { font-size: 14px; }
 .pw-row { display: flex; align-items: center; gap: 8px; }
@@ -59,6 +62,42 @@
 .syn .k { display: block; font-size: 10.5px; color: var(--muted); }
 .syn .w { color: var(--text); }
 .syn .w2 { color: var(--muted); font-size: 11px; }
+
+/* Cheat sheets, look A (22 Nov): game pictures, coloured Syndicate divisions, reward cards */
+.syn-board { border-collapse: separate; border-spacing: 4px; margin-top: 6px; }
+.syn-board td { padding: 0; border: none; cursor: default; height: 1px; }
+.syn-board td.who { font-size: 13.5px; padding: 0 6px 0 2px; vertical-align: middle; }
+.syn-board th { border: none; padding: 6px 8px 4px; font-size: 11.5px; }
+.syn-board th.syn-div { text-transform: uppercase; letter-spacing: .06em; font-weight: 700; border-bottom: 2px solid currentColor; }
+.syn-div.transportation { color: #6fb7ff; }
+.syn-div.fortification { color: #e5b45a; }
+.syn-div.research { color: #7fd28a; }
+.syn-div.intervention { color: #ff8a7a; }
+.syn-cell { display: flex; flex-direction: column; gap: 2px; width: 100%; height: 100%; text-align: left; padding: 6px 8px; border-radius: 8px;
+  background: var(--input); border: 1px solid var(--line); color: var(--text); font: inherit; cursor: pointer; }
+.syn-cell:hover { border-color: var(--line-2); background: rgba(255,255,255,.05); }
+.syn-cell b { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 13px; line-height: 1.25; }
+.syn-cell b img { flex: none; }
+.syn-cell small { color: var(--muted); font-size: 11.5px; line-height: 1.3; }
+.syn-cell.pick { border-color: rgba(98,207,128,.6); background: rgba(98,207,128,.13); }
+.syn-cell.pick b::after { content: "✓"; margin-left: auto; color: var(--green); }
+.oil-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin: 8px 0; }
+.oil-chip { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 56px; padding: 4px 4px 3px; border-radius: 8px;
+  background: var(--input); border: 1px solid var(--line); color: var(--muted); font-size: 11.5px; }
+.oil-chip:hover { border-color: var(--line-2); color: var(--text); }
+.oil-chip.on { border-color: var(--gold); background: var(--gold-bg); color: var(--text); }
+.oil-table td { cursor: default; vertical-align: middle; padding: 6px; }
+.oil-table td.who { font-size: 13.5px; }
+.oil-table .num { text-align: right; white-space: nowrap; }
+.oil-pics { white-space: nowrap; }
+.oil-pics img { margin-right: 1px; }
+.oil-does { color: var(--text-2); font-size: 12.5px; }
+.oil-does span { display: block; }
+.oil-can { display: block; font-size: 11px; font-weight: 500; color: var(--green); }
+.oil-can.part { color: var(--muted); }
+.oil-miss { opacity: .3; }
+.oil-cost { display: inline-flex; align-items: center; gap: 3px; font-variant-numeric: tabular-nums; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
 /* Notes */
 .nt-area { flex: 1; width: 100%; resize: none; background: var(--input); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; font: inherit; font-size: 13.5px; line-height: 1.45; }

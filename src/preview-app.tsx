@@ -9,6 +9,9 @@ import maxrollSample from "../core/data/test_maxroll_vg1ga30g.json";
 import atlasData from "../public/atlas_poe1.json";
 import BuildOverlay from "./BuildOverlay";
 import "./styles.css";
+import { ChoiceWindow, LevelWindow, NotesWindow, SearchesWindow, SheetWindow, TrackerWindow } from "./Play";
+import { choiceView, playMock } from "./preview-play";
+import { emit } from "@tauri-apps/api/event";
 
 const now = Math.floor(Date.now() / 1000);
 const snap = (t: number, total: number) => ({ time: t, league: "Covens", total, divine: 217, tabs: [["Frags", total * 0.6], ["GEM", total * 0.2]], profile: "Dump tabs" });
@@ -97,7 +100,10 @@ let atlas = { active: 1, variant: 0, list: [
     variants: [{ name: "Atlas tree", nodes: [29045, ...mxVariant.history.slice(0, 40)], steps: atlasSteps(mxVariant.history.slice(0, 40)), choices: [], notes: [] }] },
 ] };
 const atlasWindow = location.search.includes("atlas-window");
-mockWindows(atlasWindow ? "atlas" : buildWin ? "build" : "main");
+// ?play=level (tracker, searches, sheet, notes, choice) shows that play window with sample data (preview-play.ts).
+const playWin = new URLSearchParams(location.search).get("play") ?? (location.search.includes("sheet") ? "sheet" : null);
+const sheetWin = playWin != null;
+mockWindows(playWin ? playWin : atlasWindow ? "atlas" : buildWin ? "build" : "main");
 mockIPC((cmd, args) => {
   if (cmd === "overview") return { profiles: [{ id: "mid", name: "Mid-Game", game: "Poe1", base_file: "", output_file: "", rules: [] }], active: "mid", poe1_dir: "", poe2_dir: "", batch_on: false };
   if (cmd === "wealth_get") return wealth;
@@ -123,6 +129,8 @@ mockIPC((cmd, args) => {
   // Real icons when the editor is running (vite serves the app's icon list), else none.
   if (cmd === "get_icons") return fetch("/preview-data/icons").then((r) => r.json()).catch(() => ({}));
   if (cmd === "get_settings") return { key_atlas: "F7" };
+  { const p = playMock(cmd); if (p !== undefined) return p; }
+  if (cmd === "price_names") return Object.fromEntries((args as { names: string[] }).names.map((n, i) => [n, n === "Divine Orb" ? 260 : [1, 1, 1, 1, 2, 2, 3, 4, 6, 9, 14, 30, 90, 600][i % 14]]));
   if (cmd === "atlas_list") return atlas;
   if (cmd === "atlas_use") { const a = args as { id: number; variant: number }; atlas = { ...atlas, active: a.id, variant: a.variant }; return atlas; }
   if (cmd === "atlas_rename") { const a = args as { id: number; name: string }; atlas = { ...atlas, list: atlas.list.map((s) => s.id === a.id ? { ...s, name: a.name } : s) }; return atlas; }
@@ -202,7 +210,8 @@ mockIPC((cmd, args) => {
 }, { shouldMockEvents: true });
 
 try { if (!localStorage.getItem("tab")) localStorage.setItem("tab", "wealth"); } catch { /* fine */ }
-if (!buildWin && !atlasWindow) document.body.classList.add("main");
+if (!buildWin && !atlasWindow && !sheetWin) document.body.classList.add("main");
+if (sheetWin) document.body.classList.add("overlay");
 // For checking pages from the browser console: await __go("Themes") opens that sidebar page.
 (window as unknown as { __go: (n: string) => Promise<boolean> }).__go = async (name: string) => {
   const el = Array.from(document.querySelectorAll<HTMLButtonElement>(".side button")).find((b) => b.textContent?.trim().startsWith(name));
@@ -210,4 +219,6 @@ if (!buildWin && !atlasWindow) document.body.classList.add("main");
 };
 if (buildWin) document.body.classList.add("overlay");
 if (atlasWindow) document.body.classList.add("overlay");
-createRoot(document.getElementById("root")!).render(atlasWindow ? <AtlasOverlay /> : buildWin ? <BuildOverlay /> : <App />);
+const PLAY_WINS: Record<string, () => React.ReactElement> = { level: LevelWindow, tracker: TrackerWindow, searches: SearchesWindow, sheet: SheetWindow, notes: NotesWindow, choice: ChoiceWindow };
+function PlayPreview() { const W = PLAY_WINS[playWin ?? ""] ?? SheetWindow; if (playWin === "choice") setTimeout(() => emit("choice-read", choiceView), 300); const [w, h] = ({ level: [380, 440], tracker: [280, 360], searches: [320, 380], sheet: [900, 600], notes: [360, 420], choice: [380, 480] } as Record<string, number[]>)[playWin ?? ""] ?? [900, 600]; return <div style={{ width: w, height: h, position: "relative", transform: "translateZ(0)" }}><style>{`.bo{height:${h}px !important}`}</style><W /></div>; }
+createRoot(document.getElementById("root")!).render(playWin ? <PlayPreview /> : atlasWindow ? <AtlasOverlay /> : buildWin ? <BuildOverlay /> : <App />);
