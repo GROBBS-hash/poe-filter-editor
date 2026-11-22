@@ -1233,7 +1233,7 @@ when the game window isn't found. Check in game: the window's spot, and that it 
    fixed at registration), scopes account:characters + account:stashes, 10 h access / 7 day refresh tokens, User-Agent
    "OAuth {clientId}/{version} (contact: …)"; its character endpoint still returns experience, so XP per hour could come
    back. Doable now without GGG: a "Log in" button opening pathofexile.com's own login page in a small app window and
-   reading the POESESSID cookie when he's logged in (Tauri 2.12 has ). Waiting on his go-ahead.
+   reading the POESESSID cookie when he's logged in (Tauri 2.12 has `Webview::cookies_for_url`). Waiting on his go-ahead.
 5. Deferred earlier: PoE 2 coverage. Batch mode tidy-up done 21 Nov (see "Batch mode"). (Installer + auto-update done 21 Nov: see "Installer and updates".)
 
 ## Known caveats
