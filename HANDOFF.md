@@ -87,6 +87,10 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   game the menu check takes over. Set up / Escape menu buttons stay as fixes. Key wording in `src/hotkeys.ts` rewritten so
   each says what it changes (F2 "Change how an item drops": your loot filter, from now on). Game windows tiles renamed
   to match (Stash searches, Which one should I pick?, Open on the wiki).
+  - **Login window froze the whole app (found 23 Nov in 0.2.44):** `poe_login` was a plain (sync) command, which runs
+    on the main thread; building a window there deadlocks on Windows. Symptoms he saw: grey login window, an invisible
+    window in the middle of the screen eating game clicks, Set up stuck on "Reading…", the price window cut off (it
+    couldn't resize). Now `async`. Rule: any command that builds a window must be `async`.
 - **Map tracker: timer stops in menus, loot per map, div per hour (22 Nov, released in 0.2.42).** After his 0.2.41 test.
   - **Pause:** the game doesn't log the Escape menu or skill tree, so (like Exile UI's "screen checks") the editor
     samples ~110 dots of the game's bottom bar once a second (only inside a map, only with the game in front;
@@ -805,6 +809,8 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 - [ ] Alt-tab to another program for a few seconds: the clock stops; back in the game it goes on. Clicking the
   tracker window itself doesn't stop it.
 - [ ] Home → "In game" card and Settings → Hotkeys: does each key now say plainly what it does (F2 especially)?
+- [ ] Log in with pathofexile.com: the window shows the website's login page (no grey box, nothing frozen after).
+- [ ] Ctrl+D price window isn't cut off on the right (it was while the app was frozen).
 
 **Map tracker: menus, loot, div per hour (22 Nov, released in 0.2.42):**
 - [ ] Settings → Map tracker → **Set up**: click it, click into the game within 5 s with nothing open. Then in a map,

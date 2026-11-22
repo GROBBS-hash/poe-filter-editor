@@ -260,8 +260,10 @@ pub async fn wealth_setup(app: AppHandle, account: String, sessid: Option<String
 /// in there, your website login (POESESSID) and account name are saved for you and the window closes. The window is
 /// just the website: it has no access to the editor (it isn't in the app's capabilities). Your login stays in the
 /// editor's own browser storage, so next time it's one click. The result arrives as a "poe-login" event.
+/// Must stay `async`: on Windows, building a window inside a plain (main-thread) command deadlocks the whole app
+/// (23 Nov 2026: the login window stayed grey, Map tracker → Set up never finished, the price window couldn't resize).
 #[tauri::command]
-pub fn poe_login(app: AppHandle) -> Result<(), String> {
+pub async fn poe_login(app: AppHandle) -> Result<(), String> {
     if let Some(w) = app.get_webview_window("poelogin") {
         let _ = w.unminimize();
         let _ = w.show();
