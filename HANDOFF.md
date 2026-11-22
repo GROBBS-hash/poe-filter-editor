@@ -1127,8 +1127,7 @@ when the game window isn't found. Check in game: the window's spot, and that it 
       "Best strategies" ranks runs.
 
 ## Left to do (agreed order)
-0. **Play tools (22 Nov) are on branch `ccr-26676017-7ecilq`:** merge into main once he's had a look (Start editor.bat
-   only pulls main), then release. Not built yet: live rank/race tracker (PoeRank-style), bulk-selling helper
+0. **Play tools (22 Nov) released in 0.2.39.** Not built yet: live rank/race tracker (PoeRank-style), bulk-selling helper
    (Bulky-style), PoE 2's campaign route, crafting methods still unmodelled (veiled, conqueror exalts, awakener,
    recombinators, beastcraft), PoE 2 crafting.
 1. **GROBBS to work through "Still to check in game" above**; fix what he reports.
