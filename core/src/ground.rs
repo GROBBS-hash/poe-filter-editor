@@ -391,11 +391,20 @@ pub fn label_distance(segs: &[Segment], item: &Item, seen: LabelColours, area_le
         c.map(|c| { let a = c[3] as u32; [(c[0] as u32 * a / 255) as u8, (c[1] as u32 * a / 255) as u8, (c[2] as u32 * a / 255) as u8] })
             .unwrap_or([0, 0, 0])
     };
+    let one = |it: &Item| -> i32 {
+        let v = evaluate(segs, &Ctx { item: it, area_level: Some(area_level), stack: None, from_screen: true });
+        let text = v.style.text.map(|t| [t[0], t[1], t[2]]).unwrap_or(def);
+        let hidden_penalty = if v.visibility == "Hide" { 200_000 } else { 0 };
+        dist(text, seen.text) + dist(bg_of(v.style.background), seen.background) + hidden_penalty
+    };
     let it = Item { rarity: rarity.into(), sockets: sockets.map(String::from), ..item.clone() };
-    let v = evaluate(segs, &Ctx { item: &it, area_level: Some(area_level), stack: None, from_screen: true });
-    let text = v.style.text.map(|t| [t[0], t[1], t[2]]).unwrap_or(def);
-    let hidden_penalty = if v.visibility == "Hide" { 200_000 } else { 0 };
-    dist(text, seen.text) + dist(bg_of(v.style.background), seen.background) + hidden_penalty
+    // A ground label doesn't say the item level, and filters show or hide gear by it (NeverSink hides most rares in
+    // maps unless the item level is high): try a few likely ones and keep the closest, so a visible rare isn't
+    // counted as "hidden" just because its item level isn't known yet.
+    if it.item_level.is_none() && crate::item::is_gear(&it) && it.rarity != "Unique" {
+        return [None, Some(75), Some(84), Some(86)].into_iter().map(|l| one(&Item { item_level: l, ..it.clone() })).min().unwrap_or(0);
+    }
+    one(&it)
 }
 
 /// Uses the hover box, but not its rarity when the label on screen clearly
@@ -410,8 +419,11 @@ pub fn apply_tooltip_checked(segs: &[Segment], item: &mut Item, t: &TooltipRead,
     }
     if let (Some(r), Some(seen)) = (t.rarity.clone(), label) {
         if t.found.unique.is_none() && r != item.rarity {
-            let theirs = label_distance(segs, item, seen, area_level, &r, None);
-            let ours = label_distance(segs, item, seen, area_level, &item.rarity, item.sockets.as_deref());
+            // Compare with the box's item level: without one, the filter hides most rares in maps, so "rare" would look
+            // unlikely and a unique guess would win (his Twilight Regalia, 23 Nov: a rare read as Mantle of Dreams).
+            let known = Item { item_level: t.item_level.or(item.item_level), ..item.clone() };
+            let theirs = label_distance(segs, &known, seen, area_level, &r, None);
+            let ours = label_distance(segs, &known, seen, area_level, &item.rarity, item.sockets.as_deref());
             if theirs > ours + 25_000 { t.rarity = None; }
         }
     }

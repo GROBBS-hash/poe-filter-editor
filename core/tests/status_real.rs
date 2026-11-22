@@ -183,3 +183,26 @@ fn gear_step_conditions() {
     println!("before {} by {}; after {} by {}", before.visibility, before.decided_by, after.visibility, after.decided_by);
     assert!(after.decided_by.contains("t1_86"), "{}", after.decided_by);
 }
+
+/// F2 on a rare Twilight Regalia label (23 Nov): the label has no item level, and without one NeverSink hides rares in
+/// maps, so "rare" used to look unlikely and the reader picked the base's unique (Mantle of Dreams). Now it's rare,
+/// and the hover box's "rare" isn't overruled either.
+#[test]
+fn ground_rare_isnt_read_as_its_unique() {
+    use filter_core::ground::{apply_tooltip_checked, ground_item, GroundMatch, LabelColours, TooltipRead};
+    use filter_core::item::Item;
+    let segs = parse_filter(&std::fs::read_to_string(SRC).unwrap());
+    // How the filter draws an item level 86 rare Twilight Regalia (what he saw on the ground).
+    let mut drawn = Item { item_class: "Body Armours".into(), base_type: "Twilight Regalia".into(), rarity: "Rare".into(), item_level: Some(86), unidentified: true, ..Default::default() };
+    fill_class(&mut drawn);
+    let v = status(&segs, &drawn, Some(83), true).verdict;
+    let rgb = |c: Option<[u8; 4]>, d: [u8; 3]| c.map(|c| [c[0], c[1], c[2]]).unwrap_or(d);
+    let bg = v.style.background.map(|c| { let a = c[3] as u32; [(c[0] as u32 * a / 255) as u8, (c[1] as u32 * a / 255) as u8, (c[2] as u32 * a / 255) as u8] }).unwrap_or([0, 0, 0]);
+    let seen = LabelColours { text: rgb(v.style.text, [255, 255, 119]), background: bg };
+    let m = GroundMatch { base: "Twilight Regalia".into(), stack: None, tier: None, superior: false, confidence: 1.0, unique: None };
+    let mut it = ground_item(&segs, &m, Some(seen), 83);
+    assert_ne!(it.rarity, "Unique", "label {seen:?} drawn by {}", v.decided_by);
+    let t = TooltipRead { found: m.clone(), item_level: Some(86), unidentified: true, rarity: Some("Rare".into()), header: "Twilight Regalia".into() };
+    apply_tooltip_checked(&segs, &mut it, &t, Some(seen), 83);
+    assert_eq!((it.rarity.as_str(), it.item_level), ("Rare", Some(86)));
+}
