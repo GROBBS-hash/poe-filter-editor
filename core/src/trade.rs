@@ -27,6 +27,37 @@ pub struct ModLine {
     /// How wide its roll range is (averaged over its numbers that vary), from the advanced copy: "(80-100)" -> 20.
     #[serde(skip)]
     pub width: Option<f64>,
+    /// Where it came from when special (eldritch, essence, delve, influence…): see `StatFilter::source`.
+    pub source: Option<String>,
+}
+
+/// A mod's special source from its advanced-copy heading, e.g. { Prefix Modifier "Subterranean" (Tier: 1) } -> delve.
+/// The mod names are the game's (the same lists Awakened PoE Trade uses).
+fn mod_source(head: &str) -> Option<String> {
+    let s = |x: &str| Some(x.to_string());
+    if head.contains("Eater of Worlds Implicit") { return s("eater"); }
+    if head.contains("Searing Exarch Implicit") { return s("exarch"); }
+    if head.contains("Corrupted Implicit") { return s("corrupted"); }
+    if head.contains("Rare-only") { return s("rareonly"); }
+    if head.contains("Synthesised") { return s("synthesised"); }
+    let name = head.split('"').nth(1)?;
+    const LISTS: [(&str, &[&str]); 11] = [
+        ("shaper", &["of Shaping", "The Shaper's", "Elevated Shaper's", "of Elevated Shaping"]),
+        ("elder", &["of the Elder", "The Elder's", "Elevated Elder's", "of the Elevated Elder"]),
+        ("crusader", &["Crusader's", "of the Crusade", "Elevated Crusader's", "of the Elevated Crusade"]),
+        ("hunter", &["Hunter's", "of the Hunt", "Elevated Hunter's", "of the Elevated Hunt"]),
+        ("redeemer", &["of Redemption", "Redeemer's", "Elevated Redeemer's", "of Elevated Redemption"]),
+        ("warlord", &["Warlord's", "of the Conquest", "Elevated Warlord's", "of the Elevated Conquest"]),
+        ("delve", &["Subterranean", "of the Underground"]),
+        ("veiled", &["Chosen", "of the Order", "Leo's", "Catarina's", "Elreon's", "Vorici's", "Haku's", "Tora's", "Vagan's", "Brinerot",
+            "of Janus", "It's", "of Hillock", "Gravicius'", "Jorgin's", "Korell's", "Rin's", "of Cameria", "of Aisling", "of Riker",
+            "of Catarina", "Zorath's", "of Zorath"]),
+        ("incursion", &["Guatelitzi's", "Xopec's", "Topotante's", "Tacati's", "Matatl's", "of Matatl", "Citaqualotl's", "of Citaqualotl",
+            "of Tacati", "of Guatelitzi", "of Puhuarte"]),
+        ("essence", &["of the Essence", "Essences"]),
+        ("infamous", &["of Infamy", "Infamous"]),
+    ];
+    LISTS.iter().find(|(_, names)| names.contains(&name)).map(|(k, _)| k.to_string())
 }
 
 /// One stat to search on, with a tick box and a minimum.
@@ -54,6 +85,11 @@ pub struct StatFilter {
     /// An upper limit too (a cluster jewel's passive count is searched exactly: more passives is a worse jewel).
     #[serde(default)]
     pub max: Option<f64>,
+    /// Where the mod came from when it needs something special, from the advanced copy's heading (like Awakened's
+    /// tags): "exarch", "eater", "essence", "delve", "veiled", "incursion", "shaper", "elder", "crusader", "hunter",
+    /// "redeemer", "warlord", "infamous", "rareonly", "synthesised", "corrupted".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
 }
 
 /// Mods that almost never change what an item sells for.
@@ -359,6 +395,7 @@ pub fn mods(text: &str) -> Vec<ModLine> {
         let mut header_affix: Option<String> = None;
         // "{ Suffix Modifier … — 25% Increased }": the item boosts this mod (Cogwork Ring); its numbers need the boost.
         let mut header_boost: Option<f64> = None;
+        let mut header_source: Option<String> = None;
         // A mod written over two lines: the second starts in lower case ("…in Radius" / "also grant…").
         let mut joined: Vec<String> = Vec::new();
         for l in sec {
@@ -379,6 +416,7 @@ pub fn mods(text: &str) -> Vec<ModLine> {
                 header_kind = Some(if low.contains("implicit") { "implicit" } else if low.contains("crafted") { "crafted" }
                     else if low.contains("enchant") { "enchant" } else if low.contains("fractured") { "fractured" }
                     else if low.contains("foulborn") || low.contains("mutated") { "mutated" } else { "explicit" }.to_string());
+                header_source = mod_source(l);
                 header_affix = if low.contains("prefix") { Some("prefix".into()) } else if low.contains("suffix") { Some("suffix".into()) } else { None };
                 header_boost = low.rfind("% increased").and_then(|i| {
                     let digits: String = low[..i].chars().rev().take_while(|c| c.is_ascii_digit()).collect::<Vec<_>>().into_iter().rev().collect();
@@ -402,7 +440,7 @@ pub fn mods(text: &str) -> Vec<ModLine> {
             if t.is_empty() || !t.chars().any(|c| c.is_ascii_digit()) && !numberless_ok { continue; }
             let (_, values) = template(&t);
             let (roll, range) = (roll_of(l, &values), range_text(l));
-            out.push(ModLine { text: t, kind, tier: header_tier, values, roll, range, affix: header_affix.clone(), width: width_of(l) });
+            out.push(ModLine { text: t, kind, tier: header_tier, values, roll, range, affix: header_affix.clone(), width: width_of(l), source: header_source.clone() });
         }
     }
     out
@@ -538,7 +576,7 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
             if t.starts_with("Adds # Passive Skills") { enabled = true; max = min; }
             if t.starts_with("Added Small Passive Skills grant") { enabled = true; }
         }
-        filters.push(StatFilter { id, label: m.text.clone(), value, min, max, enabled, kind, tier: m.tier, junk, roll: m.roll, range: m.range.clone(), affix: m.affix.clone() });
+        filters.push(StatFilter { id, label: m.text.clone(), value, min, max, enabled, kind, tier: m.tier, junk, roll: m.roll, range: m.range.clone(), affix: m.affix.clone(), source: m.source.clone() });
     }
     if is_map(&item) { filters.splice(0..0, crate::trade_rules::map_props(text, &item)); }
     // Heist contracts and blueprints: area level, wings, the job they need.
@@ -1217,7 +1255,7 @@ Item Level: 75
     fn reads_advanced_copy() {
         let m = mods(BOOTS);
         assert_eq!(m.len(), 5);
-        assert_eq!(m[0], ModLine { text: "+8% to Cold Resistance".into(), kind: "implicit".into(), tier: None, values: vec![8.0], roll: None, range: None, affix: None, width: None });
+        assert_eq!(m[0], ModLine { text: "+8% to Cold Resistance".into(), kind: "implicit".into(), tier: None, values: vec![8.0], roll: None, range: None, affix: None, width: None, source: None });
         assert_eq!((m[1].text.as_str(), m[1].tier, m[1].values[0]), ("+28 to maximum Life", Some(7), 28.0));
         assert_eq!(m[3].tier, Some(1));
         assert!(m[1].roll.is_some(), "life has a range: {:?}", m[1]);
@@ -1455,5 +1493,24 @@ Item Level: 75
         let mut fixed: Vec<Listing> = (0..6).map(|_| l("fixer", 0.1)).collect();
         fixed.extend([l("a", 3.0), l("b", 3.0), l("c", 4.0), l("d", 5.0)]);
         assert_eq!(summary(&fixed), Some((0.1, 3.0)));
+    }
+}
+
+#[cfg(test)]
+mod source_tests {
+    use super::*;
+    #[test]
+    fn eldritch_essence_and_delve_sources() {
+        let item = "Item Class: Boots\nRarity: Rare\nFoe Urge\nCrusader Boots\n--------\nItem Level: 85\n--------\n\
+{ Searing Exarch Implicit Modifier (Lesser) }\n5% chance to Block Attack Damage\n--------\n\
+{ Prefix Modifier \"Subterranean\" (Tier: 1) }\n+86(80-89) to maximum Life\n\
+{ Suffix Modifier \"of the Essence\" (Tier: 1) }\n16(14-16)% increased Stun and Block Recovery\n\
+{ Suffix Modifier \"of the Lightning\" (Tier: 2) }\n+42(36-41)% to Lightning Resistance\n";
+        let m = mods(item);
+        let src = |t: &str| m.iter().find(|x| x.text.contains(t)).and_then(|x| x.source.clone());
+        assert_eq!(src("Block Attack").as_deref(), Some("exarch"));
+        assert_eq!(src("maximum Life").as_deref(), Some("delve"));
+        assert_eq!(src("Stun and Block").as_deref(), Some("essence"));
+        assert_eq!(src("Lightning Resistance"), None);
     }
 }

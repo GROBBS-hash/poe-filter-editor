@@ -644,6 +644,16 @@ picks one (then maybe make it the default and drop the looks he doesn't use). 22
 price is his favourite so far** (not final). Base mods with no roll range (same on every item of that base, e.g.
 Cogwork's four) are now hidden behind "4 base mods the same on every Cogwork Ring · show", like Awakened's "Show
 hidden" (`hide_const_roll`); only when the copy had ranges (advanced copy), never ticked ones or maps. Not released.
+**Mod source badges** (22 Nov, not released): like Awakened's tags, a coloured badge (with the game's little icon from
+`public/mod-icons/`, copied from Awakened's repo) after any mod that needs something special: Exarch / Eater (eldritch),
+Essence, Delve, Veiled, Incursion, the six influences, Infamous, Rare only, Synthesised, Corrupted. Read from the
+advanced copy's "{ … Modifier "name" }" heading (`mod_source` in core/src/trade.rs, Awakened's name lists);
+`StatFilter.source`. Crafted / fractured / foulborn tags now coloured too. Eldritch implicits are never hidden as
+"fixed base mods". **Docked price window** (22 Nov, not released): like Awakened, the Ctrl+D window opens at the top
+of the game beside its side panel, every time: just left of the inventory when you price check on the right half of
+the game, just right of the stash on the left half (panel = game height × 370/600, Awakened's figure;
+`place_beside_panel` + `TRADE_DOCK` in lib.rs keep that edge when the window grows). Falls back to beside the mouse
+when the game window isn't found. Check in game: the window's spot, and that it doesn't cover the inventory.
 1. Price window (Ctrl+D on a rare): stats in groups (Minimum rolls, Prefixes "1 of 2 used", Suffixes...); More → Layout
    → Flat gives one list with a tag on each row. An item with under 5 listed shows amber "low confidence".
    Cogwork Ring (Dragon Turn): Intelligence reads +57 (not +46).

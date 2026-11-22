@@ -11,7 +11,34 @@ import { CRAFT_ITEM_KEY } from "./Craft";
 
 type StatFilter = { id: string; label: string; value: number; min: number | null; enabled: boolean; kind: string; tier: number | null; junk?: boolean; roll?: number | null; range?: string | null; affix?: string | null;
   /** An upper limit too: a cluster jewel's passive count is searched exactly. */
-  max?: number | null };
+  max?: number | null;
+  /** Where the mod came from when special: eldritch, essence, delve, influence… (from the advanced copy). */
+  source?: string | null };
+
+/** The coloured badge for a mod that needs something special (like Awakened's tags): [label, picture, what it means]. */
+const SOURCE: Record<string, [string, string | null, string]> = {
+  exarch: ["Exarch", null, "Searing Exarch implicit (eldritch altar)"],
+  eater: ["Eater", null, "Eater of Worlds implicit (eldritch altar)"],
+  essence: ["Essence", "essence", "Only from an essence"],
+  delve: ["Delve", "delve", "Only from a fossil (Delve)"],
+  veiled: ["Veiled", "veiled", "Unveiled with Jun (Betrayal)"],
+  incursion: ["Incursion", "incursion", "Only from the Temple of Atzoatl (Incursion)"],
+  shaper: ["Shaper", "influence-Shaper", "Shaper influence"],
+  elder: ["Elder", "influence-Elder", "Elder influence"],
+  crusader: ["Crusader", "influence-Crusader", "Crusader influence"],
+  hunter: ["Hunter", "influence-Hunter", "Hunter influence"],
+  redeemer: ["Redeemer", "influence-Redeemer", "Redeemer influence"],
+  warlord: ["Warlord", "influence-Warlord", "Warlord influence"],
+  infamous: ["Infamous", "mercenary", "From a mercenary (Infamous)"],
+  rareonly: ["Rare only", "rareonly", "Can only roll on rare items"],
+  synthesised: ["Synthesised", null, "Synthesised implicit"],
+  corrupted: ["Corrupted", null, "Corruption implicit (Vaal Orb)"],
+};
+function SourceTag({ s }: { s: string }) {
+  const x = SOURCE[s];
+  if (!x) return null;
+  return <span className={`tw-src tw-src-${s}`} title={x[2]}>{x[1] && <img src={`/mod-icons/${x[1]}.png`} alt="" width={16} height={16} />}{x[0]}</span>;
+}
 type Setup = { item: Item; filters: StatFilter[]; unknown_kinds?: string[]; base_only: boolean; ilvl_min: number | null; ilvl_max?: number | null; links_min: number | null;
   gem_level: number | null; unknown: string[]; category: string | null; raw?: string; misc?: string[]; base?: string; affix_max?: [number, number] | null;
   /** Awakened-style "search as a base": why it's a crafting base, which mods to keep, item level, influences. */
@@ -837,7 +864,7 @@ export default function TradeWindow() {
         // "-1 Prefix Modifier allowed") never changes the search, so it's hidden until asked for. Only when the copy
         // showed ranges at all (the advanced copy), and never a ticked one or a map's.
         const advanced = setup.filters.some((f) => f.range != null);
-        const fixed = advanced && !check.map ? order.filter((i) => { const f = setup.filters[i]; return f.kind === "implicit" && f.range == null && !f.enabled; }) : [];
+        const fixed = advanced && !check.map ? order.filter((i) => { const f = setup.filters[i]; return f.kind === "implicit" && f.range == null && !f.enabled && !f.source; }) : [];
         const rows = order.filter((i) => !(flat && !showInTotals && tucked.includes(i)) && (showFixed || !fixed.includes(i)));
         return (
         <div className={`tw-stats ${flat ? "flat" : ""}`}>
@@ -858,7 +885,8 @@ export default function TradeWindow() {
                 <label className={`tw-stat ${f.enabled ? "on" : ""} ${f.junk ? "junk" : ""} ${open ? "open" : ""}`} title={f.junk ? "Rarely changes the price" : undefined}>
                   <input type="checkbox" checked={f.enabled} onChange={(e) => patch(i, { enabled: e.target.checked })} />
                   <span className={`tw-label mod-${f.kind}`}>{label}{open && <span className="tw-room"> room to craft</span>}
-                    {!flat && KIND[f.kind] && f.kind !== "pseudo" && f.kind !== "implicit" && <span className="tw-kind">{KIND[f.kind]}</span>}
+                    {f.source && <SourceTag s={f.source} />}
+                    {!flat && KIND[f.kind] && f.kind !== "pseudo" && f.kind !== "implicit" && <span className={`tw-kind tw-kind-${f.kind}`}>{KIND[f.kind]}</span>}
                     {f.tier != null && <span className={`tw-tier ${tierClass(f.tier)}`} title="Tier 1 is the best this mod can roll">T{f.tier}</span>}
                     {f.roll != null && <Roll r={f.roll} range={f.range} tier={f.tier} />}</span>
                   {flat && <span className={`tw-tag ${tag.split(" ").pop()} ${tag.includes("crafted") ? "crafted" : ""}`}>{tag}</span>}

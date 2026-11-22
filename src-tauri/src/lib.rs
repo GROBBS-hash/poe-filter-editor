@@ -411,10 +411,58 @@ fn place_near_cursor(w: &tauri::WebviewWindow, gap: i32) {
     let _ = w.set_position(PhysicalPosition::new(x, y));
 }
 
+/// The game's drawing area on screen (x, y, width, height), in physical pixels.
+#[cfg(windows)]
+fn game_client_rect() -> Option<(i32, i32, i32, i32)> {
+    use windows::core::{w, PCWSTR};
+    use windows::Win32::Foundation::{POINT, RECT};
+    use windows::Win32::Graphics::Gdi::ClientToScreen;
+    use windows::Win32::UI::WindowsAndMessaging::{FindWindowW, GetClientRect};
+    unsafe {
+        let h = FindWindowW(w!("POEWindowClass"), PCWSTR::null())
+            .or_else(|_| FindWindowW(PCWSTR::null(), w!("Path of Exile")))
+            .or_else(|_| FindWindowW(PCWSTR::null(), w!("Path of Exile 2"))).ok()?;
+        if h.is_invalid() { return None; }
+        let mut r = RECT::default();
+        GetClientRect(h, &mut r).ok()?;
+        let mut p = POINT { x: 0, y: 0 };
+        if !ClientToScreen(h, &mut p).as_bool() { return None; }
+        let (w, ht) = (r.right - r.left, r.bottom - r.top);
+        (w > 200 && ht > 200).then_some((p.x, p.y, w, ht))
+    }
+}
+#[cfg(not(windows))]
+fn game_client_rect() -> Option<(i32, i32, i32, i32)> { None }
+
+/// The price window's docked edge: (true = its right edge stays put, x). Set when it opens beside a game panel, so it
+/// grows away from the inventory (or stash) instead of over it.
+static TRADE_DOCK: Mutex<Option<(bool, i32)>> = Mutex::new(None);
+
+/// Like Awakened PoE Trade: the price window opens in the same place every time, beside the game's side panel. Price
+/// check in your inventory (right half of the game) and it sits just left of the inventory; in the stash (left half),
+/// just right of the stash. The panel is 370 px wide at 600 px tall, so it scales with the game's height.
+fn place_beside_panel(w: &tauri::WebviewWindow) {
+    let Some((gx, gy, gw, gh)) = game_client_rect() else { *TRADE_DOCK.lock().unwrap() = None; place_near_cursor(w, 24); return };
+    let Ok(pos) = w.cursor_position() else { return };
+    let panel = (gh as f64 * 370.0 / 600.0).round() as i32;
+    let width = w.outer_size().map(|s| s.width as i32).unwrap_or(400);
+    let inventory = pos.x as i32 > gx + gw / 2;
+    let x = if inventory { gx + gw - panel - width } else { gx + panel };
+    *TRADE_DOCK.lock().unwrap() = Some(if inventory { (true, gx + gw - panel) } else { (false, gx + panel) });
+    let _ = w.set_position(PhysicalPosition::new(x, gy));
+}
+
 /// Called by a pop-up after it changes size: pulls it back fully onto its screen.
 #[tauri::command]
 fn keep_on_screen(window: tauri::WebviewWindow) {
-    let (Ok(p), Ok(s)) = (window.outer_position(), window.outer_size()) else { return };
+    let (Ok(mut p), Ok(s)) = (window.outer_position(), window.outer_size()) else { return };
+    // The docked price window keeps its edge beside the game panel when it grows or shrinks.
+    if window.label() == "trade" {
+        if let Some((right, edge)) = *TRADE_DOCK.lock().unwrap() {
+            let x = if right { edge - s.width as i32 } else { edge };
+            if x != p.x { let _ = window.set_position(PhysicalPosition::new(x, p.y)); p.x = x; }
+        }
+    }
     let Some((mx, my, mw, mh)) = monitor_at(&window, p.x as f64 + 1.0, p.y as f64 + 1.0) else { return };
     let (w, h) = (s.width as i32, s.height as i32);
     let x = p.x.clamp(mx, (mx + mw - w).max(mx));
@@ -703,7 +751,7 @@ fn show_price(app: &AppHandle, payload: PriceCheck, text: &str, compare: bool) {
         }
     }
     if let Some(w) = app.get_webview_window("trade") {
-        place_near_cursor(&w, 24);
+        place_beside_panel(&w);
         if let Some(s) = payload.setup.as_ref() { save_sample(&state.data_dir, &s.item, "", &payload); }
         let _ = w.emit("price-check", payload);
         let _ = w.show();

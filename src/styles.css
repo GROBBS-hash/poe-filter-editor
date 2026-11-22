@@ -2080,3 +2080,22 @@ button.tw-chip:hover { border-color: #59606b; color: var(--text); }
 .tws-awakened-tooltip .tw-awk-price .tw-hero-price { font-size: 26px; }
 .tws-awakened-tooltip .tw-awk-price .tw-hero-price .cur-icon { width: 28px; height: 28px; vertical-align: -6px; }
 .tws-awakened-price .tw-mstats > div { white-space: nowrap; }
+
+/* ── Mod source badges (22 Nov 2026), like Awakened's: eldritch, essence, delve, influence… with the game's icons ── */
+.tw-src { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; padding: 0 5px; border-radius: 4px; font-size: 11px; font-weight: 600;
+  line-height: 16px; vertical-align: 1px; white-space: nowrap; color: #e9e3d4; background: #2a2d34; border: 1px solid #3a3f49; }
+.tw-src img { width: 16px; height: 16px; margin: -2px 0 -2px -3px; object-fit: contain; }
+.tw-src-exarch { background: linear-gradient(90deg, #b3261e, #7a1a3a); border-color: #d0453b; color: #fff; }
+.tw-src-eater { background: linear-gradient(90deg, #1d4f9c, #4b2a8a); border-color: #3f73c9; color: #fff; }
+.tw-src-essence { background: #3a2147; border-color: #7a4a92; color: #e6c8f3; }
+.tw-src-delve { background: #2f2a1c; border-color: #6d5c33; color: #e8d6a6; }
+.tw-src-veiled { background: #3a1f1f; border-color: #8a4a4a; color: #f0c8c8; }
+.tw-src-incursion { background: #213326; border-color: #4f7a58; color: #c9ecd0; }
+.tw-src-shaper, .tw-src-elder, .tw-src-crusader, .tw-src-hunter, .tw-src-redeemer, .tw-src-warlord { background: #26293a; border-color: #4c5378; color: #d4d9f5; }
+.tw-src-infamous { background: #33291c; border-color: #6e5836; color: #ecd9b6; }
+.tw-src-rareonly { background: #34331c; border-color: #6e6a33; color: #f2ecb0; }
+.tw-src-synthesised { background: #1f3550; border-color: #3f6ea3; color: #cfe2fa; }
+.tw-src-corrupted { background: #5a1a1a; border-color: #a33a3a; color: #ffd6d6; }
+.tw-kind.tw-kind-crafted, .tw-tag.crafted { background: #1f3f78; border-color: #3e6fc4; color: #d7e6ff; }
+.tw-kind.tw-kind-fractured { background: #6b4a22; border-color: #b07a35; color: #ffe4c0; }
+.tw-kind.tw-kind-mutated { background: #6a1f45; border-color: #b0407a; color: #ffd6ea; }
