@@ -78,9 +78,9 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
     poe2wiki.net, uniques by name, else base).
   - Checked here: cargo check of the app (Linux), all Rust tests, tsc, and screenshots of every window with sample data.
 - **Play windows design pass (22 Nov, after 0.2.39):** impeccable polish of all play windows; cheat sheets in look A
-  ( in Play.tsx maps Syndicate rewards to poe.ninja icon names); blight oils list recipes using any ticked
-  oil, best match first; play windows scroll instead of clipping (). Browser preview of every play
-  window with sample data: [Y,N]? ().
+  (`REWARD_ART` in Play.tsx maps Syndicate rewards to poe.ninja icon names); blight oils list recipes using any ticked
+  oil, best match first; play windows scroll instead of clipping (`.bo.pw > .bo-body`). Browser preview of every play
+  window with sample data: `preview-app.html?play=level|tracker|searches|sheet|notes|choice` (`src/preview-play.ts`).
   Jewel / cluster crafting is being built in a separate session (he asked for a Craft button on jewels, clusters most).
 - **QoL wave 2 (22 Nov, same branch, from "be the player" review; his picks):**
   - **Crafting search** (`core/src/craft/search.rs`, command `craft_search`, `CraftSearchBox` in the Plan card): planned
