@@ -48,6 +48,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **Price window: "Which stat to untick?" fits (23 Nov, not released yet).** It was width 100% plus the window's 12px side margin, so it ran off the right edge; now it fills between the margins like the rest (`.tw-untick-ask`, `.tw-untick` use margin-block).
 - **No false "that tier is gone" lines (23 Nov, not released yet).** Saving a look showed 11 "Couldn't change … that tier
   is gone" lines: Red-Maps (Uber Strict) inherits Mid-Game's (Very Strict) tier edits, and NeverSink switches those tiers
   off at Uber Strict ("#Show # $type->… $tier->…"). He chose to just hide the message (not switch them on for Show
