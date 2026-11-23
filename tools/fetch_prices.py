@@ -13,8 +13,10 @@ the app never talks to poe.ninja directly; it reads these files instead.
 Standard library only.
 """
 
+import base64
 import json
 import os
+import re
 import sys
 import time
 import urllib.parse
@@ -39,9 +41,29 @@ icons = {"poe1": {}, "poe2": {}}
 CDN = "https://web.poecdn.com"
 
 
+def tinted(url):
+    """A generated picture with a conqueror's mark baked in ("mc": e.g. Veritania's on 'Map (Tier 16)'), or another
+    influence mark. poe.ninja lists each map tier several times (plain + one per conqueror); the plain one is the
+    item's real look (he spotted the Veritania mark on Originator maps, 23 Nov)."""
+    m = re.search(r"/gen/image/([^/]+)/", url or "")
+    if not m:
+        return False
+    try:
+        raw = base64.urlsafe_b64decode(m.group(1) + "=" * (-len(m.group(1)) % 4)).decode("utf-8", "ignore")
+        opts = json.loads(raw)[2]
+    except Exception:
+        return False
+    return isinstance(opts, dict) and any(k in opts for k in ("mc", "mo", "ms"))
+
+
 def add_icon(game, name, url):
-    if name and url and name not in icons[game]:
-        icons[game][name] = url if url.startswith("http") else CDN + url
+    if not (name and url):
+        return
+    url = url if url.startswith("http") else CDN + url
+    have = icons[game].get(name)
+    # First one wins, except a plain picture replaces one with a conqueror's mark.
+    if have is None or (tinted(have) and not tinted(url)):
+        icons[game][name] = url
 poe2_exalted_per_divine = 1.0  # set from the exchange data before uniques are read
 
 
