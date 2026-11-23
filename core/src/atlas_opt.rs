@@ -52,6 +52,7 @@ pub const MECHANICS: &[(&str, &[&str], &[&str])] = &[
     ("gold", &[], &["Gold"]),
 ];
 
+#[allow(dead_code)] // name / text: read by the tests and the dev printout
 struct Node {
     kind: u8,
     name: String,

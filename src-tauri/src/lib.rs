@@ -60,8 +60,50 @@ struct AppState {
 #[derive(Clone, Copy, PartialEq)]
 enum HotAction { QuickEdit, Batch, Reload, Cycle, Build, Price, Atlas, Chat(usize), Play(&'static str), Wiki, Read }
 
-/// (Re)registers hotkeys from settings. Errors name the key that failed.
+/// The in-game keys are only held while Path of Exile (or one of our windows over it) is in front, like Awakened
+/// PoE Trade: elsewhere F5 refreshes the browser again (he asked 23 Nov). `KEYS_ON` = they're registered now.
+static KEYS_ON: AtomicBool = AtomicBool::new(false);
+/// Set while the focus watcher puts the keys back, so a key another program owns doesn't warn on every alt-tab.
+static KEYS_QUIET: AtomicBool = AtomicBool::new(false);
+
+/// Where the keys should work: the game, or one of our windows that sits over it (price window, map tracker,
+/// F2 panel…), not the editor's main window and not any other program.
+#[cfg(windows)]
+fn keys_zone(app: &AppHandle) -> bool {
+    game_in_front() || (ours_in_front() && !app.get_webview_window("main").is_some_and(|w| w.is_focused().unwrap_or(false)))
+}
+#[cfg(not(windows))]
+fn keys_zone(_app: &AppHandle) -> bool { true }
+
+/// Registers the keys from the saved settings when the game comes in front, and lets them go when it doesn't.
+fn start_hotkey_focus_watcher(app: AppHandle) {
+    thread::spawn(move || loop {
+        thread::sleep(Duration::from_millis(150));
+        let want = keys_zone(&app);
+        if want == KEYS_ON.load(Ordering::Relaxed) { continue; }
+        if want {
+            let s = app.state::<AppState>().store.lock().unwrap().settings.clone();
+            KEYS_QUIET.store(true, Ordering::Relaxed);
+            let _ = register_hotkeys_now(&app, &s);
+            KEYS_QUIET.store(false, Ordering::Relaxed);
+        } else {
+            let _ = app.global_shortcut().unregister_all();
+        }
+        KEYS_ON.store(want, Ordering::Relaxed);
+    });
+}
+
+/// (Re)registers hotkeys from settings (checking every key works), then lets them go again straight away if the
+/// game isn't in front; the focus watcher takes them back when it is. Errors name the key that failed.
 fn register_hotkeys(app: &AppHandle, s: &Settings) -> Result<(), String> {
+    register_hotkeys_now(app, s)?;
+    if keys_zone(app) { KEYS_ON.store(true, Ordering::Relaxed); }
+    else { let _ = app.global_shortcut().unregister_all(); KEYS_ON.store(false, Ordering::Relaxed); }
+    Ok(())
+}
+
+fn register_hotkeys_now(app: &AppHandle, s: &Settings) -> Result<(), String> {
+    let warn = |m: String| { if !KEYS_QUIET.load(Ordering::Relaxed) { let _ = app.emit("hotkey-warning", m); } };
     let mut wanted = vec![(s.key_quick_edit.as_str(), HotAction::QuickEdit), (s.key_batch.as_str(), HotAction::Batch),
         (s.key_reload.as_str(), HotAction::Reload), (s.key_build.as_str(), HotAction::Build)];
     if !s.key_price.trim().is_empty() { wanted.push((s.key_price.as_str(), HotAction::Price)); }
@@ -82,13 +124,13 @@ fn register_hotkeys(app: &AppHandle, s: &Settings) -> Result<(), String> {
         let soft = matches!(action, HotAction::Atlas | HotAction::Play(_) | HotAction::Wiki | HotAction::Read);
         let sc: Shortcut = match key.parse() {
             Ok(sc) => sc,
-            Err(_) if soft => { let _ = app.emit("hotkey-warning", format!("“{key}” isn't a key the app understands: pick another in Settings")); continue; }
+            Err(_) if soft => { let _ = warn(format!("“{key}” isn't a key the app understands: pick another in Settings")); continue; }
             Err(_) => return Err(format!("“{key}” isn't a key the app understands")),
         };
         if parsed.iter().any(|(p, _): &(Shortcut, HotAction)| p.id() == sc.id()) {
             // The newer keys: if one clashes with a key he already uses, skip it rather than lose his other keys.
             if soft {
-                let _ = app.emit("hotkey-warning", format!("The atlas strategy key “{key}” is already used for something else: pick another in Settings"));
+                let _ = warn(format!("The atlas strategy key “{key}” is already used for something else: pick another in Settings"));
                 continue;
             }
             return Err(format!("“{key}” is used for two things"));
@@ -105,16 +147,16 @@ fn register_hotkeys(app: &AppHandle, s: &Settings) -> Result<(), String> {
             Ok(()) => { map.insert(sc.id(), action); }
             // Another price checker (e.g. Awakened PoE Trade) may own Ctrl+D: carry on without it.
             Err(e) if action == HotAction::Price => {
-                let _ = app.emit("hotkey-warning", format!("Price check key unavailable (another program may own it): {e}"));
+                let _ = warn(format!("Price check key unavailable (another program may own it): {e}"));
             }
             Err(e) if action == HotAction::Atlas => {
-                let _ = app.emit("hotkey-warning", format!("Atlas strategy key unavailable (another program may own it): {e}"));
+                let _ = warn(format!("Atlas strategy key unavailable (another program may own it): {e}"));
             }
             Err(e) if matches!(action, HotAction::Play(_) | HotAction::Wiki | HotAction::Read) => {
-                let _ = app.emit("hotkey-warning", format!("A play window key is unavailable (another program may own it): {e}"));
+                let _ = warn(format!("A play window key is unavailable (another program may own it): {e}"));
             }
             Err(e) if matches!(action, HotAction::Chat(_)) => {
-                let _ = app.emit("hotkey-warning", format!("A chat hotkey is unavailable (another program may own it): {e}"));
+                let _ = warn(format!("A chat hotkey is unavailable (another program may own it): {e}"));
             }
             Err(e) => return Err(format!("Couldn't use that key (another program may own it): {e}")),
         }
@@ -2809,6 +2851,7 @@ pub fn run() {
                 let _ = register_hotkeys(app.handle(), &Settings::default());
             }
             start_batch_watcher(app.handle().clone());
+            start_hotkey_focus_watcher(app.handle().clone());
             start_whisper_watcher(app.handle().clone());
             play_app::start_watchers(app.handle().clone());
             start_tree_watcher(app.handle().clone());

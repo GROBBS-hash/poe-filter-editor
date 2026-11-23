@@ -48,6 +48,11 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **In-game keys only while the game is in front (23 Nov, not released yet).** He couldn't refresh his browser with F5:
+  the keys were held for the whole PC. Now `start_hotkey_focus_watcher` (lib.rs) checks the window in front every 150 ms:
+  the game, or one of our windows over it (not the editor's main window) → keys registered; anything else → all let go,
+  like Awakened PoE Trade. `register_hotkeys` still checks every key on save/start, then lets them go if the game isn't
+  in front; re-registering on alt-tab is quiet (no repeated "key unavailable" warnings).
 - **Sell in bulk (23 Nov, released in 0.2.52).** New page Money → Sell in bulk (Bulky-style helper; he picked mock-up B
   "groups + sell basket" from `.claude/mock-bulk-sell.html`, not committed). Reads the last Stash worth scan
   (`WealthStore.last_items`, so top 3000 by value; "Read my stash again" runs `wealth_scan`), adds up unlisted items by
@@ -979,6 +984,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
+- [ ] (next) Alt-tab out of the game: F5 refreshes the browser, F2/F7/Ctrl+D etc. do nothing outside the game; back in the game they all work again (also with the price window or map tracker in front).
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
 (move them to "Confirmed in game") as he reports back, and add new features here as they land.
 Confirmed in game so far: basic Ctrl+D price check (trade search returned listings); 20 Nov: weapon + armour
