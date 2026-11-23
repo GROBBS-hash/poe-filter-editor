@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import SharePacks from "./Share";
 import { Tip } from "./Help";
 import { Overview, ProfileInfo, STRICTNESS_NAMES } from "./types";
 
@@ -86,6 +87,7 @@ export default function Profiles({ ov, active, onChange, onNew }: { ov: Overview
         </ul>
         {msg && <div className="note">{msg}</div>}
       </div>
+      <SharePacks active={active} names={ov.profiles.map((p) => p.name)} onChange={onChange} />
       <div className="card">
         <h2>Save “{active.name}” as a new filter</h2>
         <p className="muted">Great for going stricter as the league goes on, without touching your league-start filter.</p>

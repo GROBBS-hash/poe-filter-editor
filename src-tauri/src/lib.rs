@@ -1894,6 +1894,71 @@ fn create_profile(state: State<AppState>, name: String, game: Game, base_path: O
     Ok(id)
 }
 
+/// A share pack for a filter: its edits, saved looks, theme and price settings (never NeverSink's file).
+#[derive(Serialize)]
+struct PackOut { code: String, file_name: String, summary: filter_core::share::PackSummary }
+
+#[tauri::command]
+fn export_pack(state: State<AppState>, id: String) -> Result<PackOut, String> {
+    let store = state.store.lock().unwrap();
+    let pack = filter_core::share::export(&store, &id).ok_or("Filter not found")?;
+    let safe: String = pack.name.chars().map(|c| if c.is_alphanumeric() || c == ' ' || c == '-' { c } else { '_' }).collect();
+    Ok(PackOut { code: filter_core::share::to_code(&pack), file_name: format!("{}.lodestone", safe.trim()), summary: filter_core::share::summary(&pack) })
+}
+
+/// Saves a filter's share pack as a file (where the save box said).
+#[tauri::command]
+fn save_pack_file(state: State<AppState>, id: String, path: String) -> Result<(), String> {
+    let store = state.store.lock().unwrap();
+    let pack = filter_core::share::export(&store, &id).ok_or("Filter not found")?;
+    std::fs::write(&path, filter_core::share::to_file(&pack)).map_err(err)
+}
+
+/// A pack from a pasted code, or from a pack file.
+fn read_pack_from(text: Option<String>, path: Option<String>) -> Result<filter_core::share::SharePack, String> {
+    let text = match (text, path) {
+        (Some(t), _) if !t.trim().is_empty() => t,
+        (_, Some(p)) => {
+            let meta = std::fs::metadata(&p).map_err(err)?;
+            if meta.len() > 20_000_000 { return Err("That file is far too big to be a share pack".into()); }
+            std::fs::read_to_string(&p).map_err(|_| "That file couldn't be read".to_string())?
+        }
+        _ => return Err("Paste a share code or pick a pack file".into()),
+    };
+    filter_core::share::from_text(&text)
+}
+
+/// What a pack holds, to show before importing.
+#[tauri::command]
+fn read_pack(text: Option<String>, path: Option<String>) -> Result<filter_core::share::PackSummary, String> {
+    read_pack_from(text, path).map(|p| filter_core::share::summary(&p))
+}
+
+/// Adds a pack as a new filter on your own NeverSink file (the pack's strictness, downloaded fresh), then switches to it.
+#[tauri::command]
+fn import_pack(state: State<AppState>, text: Option<String>, path: Option<String>, name: String) -> Result<String, String> {
+    let pack = read_pack_from(text, path)?;
+    if state.store.lock().unwrap().profiles.values().any(|p| p.name.eq_ignore_ascii_case(name.trim())) {
+        return Err(format!("You already have a filter called {}", name.trim()));
+    }
+    let (base_file, strictness) = match pack.strictness {
+        Some(level) => (download_neversink(&state, pack.game, level.min(6))?.0.display().to_string(), Some(level.min(6))),
+        None => {
+            // Made on someone's own file: use yours for that game (the active filter's, else any).
+            let store = state.store.lock().unwrap();
+            let mine = store.active.as_ref().and_then(|id| store.profiles.get(id)).filter(|p| p.game == pack.game)
+                .or_else(|| store.profiles.values().find(|p| p.game == pack.game))
+                .ok_or("Set up a filter for that game first: the pack goes on top of your own NeverSink filter")?;
+            (mine.base_file.clone(), mine.strictness)
+        }
+    };
+    let mut store = state.store.lock().unwrap();
+    let id = filter_core::share::import(&mut store, &pack, &name, &base_file, strictness)?;
+    store.active = Some(id.clone());
+    save_and_build(&state, &store, &id)?;
+    Ok(id)
+}
+
 #[tauri::command]
 fn set_active(state: State<AppState>, id: String) -> Result<(), String> {
     let mut store = state.store.lock().unwrap();
@@ -2844,6 +2909,10 @@ pub fn run() {
             delete_look,
             set_rule_off,
             set_rule_look,
+            export_pack,
+            save_pack_file,
+            read_pack,
+            import_pack,
             get_settings,
             save_settings,
             search_items,

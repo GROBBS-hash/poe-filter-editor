@@ -132,6 +132,12 @@ mockIPC((cmd, args) => {
     rules = rules.map((r) => r.look === a.oldName ? { ...r, look: a.look.name } : r); relook(); return [];
   }
   if (cmd === "delete_look") { const n = (args as { name: string }).name; looks = looks.filter((l) => l.name !== n); rules = rules.map((r) => r.look === n ? { ...r, look: null, detail: { ...r.detail, look: null } } : r); return null; }
+  // Share packs (Filters page).
+  if (cmd === "export_pack") return { code: "LODE1:eNrtWm1v2zYQ_iuEPrexJcf50m9pm24BsqFo0hRY0Q-0RNtcJFIjqThO0P-" + "x".repeat(300), file_name: "Mid-Game.lodestone",
+    summary: { name: "Mid-Game", game: "Poe1", strictness: 2, edits: rules.length, edits_off: rules.filter((r) => r.off).length, looks: looks.map((l) => l.name), theme: "Ember", prices: true } };
+  if (cmd === "read_pack") { const t = String((args as { text?: string }).text ?? ""); if (!t.startsWith("LODE1:")) throw "That isn't a share code or pack file (codes start with LODE1:)";
+    return { name: "Sam's Strict", game: "Poe1", strictness: 3, edits: 31, edits_off: 2, looks: ["Chase", "Quiet"], theme: "Ember", prices: true }; }
+  if (cmd === "import_pack") return "sams-strict";
   if (cmd === "set_rule_off") { const a = args as { index: number; off: boolean }; rules = rules.map((r, i) => i === a.index ? { ...r, off: a.off, detail: { ...r.detail, off: a.off } } : r); return []; }
   if (cmd === "wealth_get") return wealth;
   if (cmd === "buy_base_item") return { total: 3480, ilvl: 75, notables: [["Doryani's Lesson", 68], ["Inspired Oppression", 75], ["Overshock", 50]] };

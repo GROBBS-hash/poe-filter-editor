@@ -26,6 +26,7 @@ pub mod related;
 pub mod rules;
 pub mod saved;
 pub mod search;
+pub mod share;
 pub mod themes;
 pub mod tiers;
 pub mod wealth;

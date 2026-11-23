@@ -48,6 +48,25 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **Saved looks, edits switched off, share packs (PoeFilterX ideas 7a–7c, 23 Nov, not released yet).** He picked
+  layout A for both from mock-ups (`.claude/mock-saved-looks.html`, `.claude/mock-share-packs.html`, not committed).
+  - Saved looks: `Store.looks` (global, like themes) = name + `CustomStyle`. Edits point at one with `look` on
+    `Rule::Override` / `Rule::Tier`; `Store::save_look` re-writes every linked edit's actions in every filter (and
+    renames links), `delete_look` keeps the colours and drops the link. Hidden edits can't take a look. Any hand-made
+    look change on an edit (Customise, quick sound…) stops it following the saved look.
+    F2: "My saved looks" label buttons under Quick highlight + "+ Save this look" (names the item's current look).
+    Batch mode: a "Saved look" choice per item (and "A saved look…" for all). My edits: "My saved looks" card on top
+    (Change / Rename / Delete, "used by N edits", + New look); a gold tag on edits that use one. Code: `src/Looks.tsx`,
+    styles in `src/looks.css` (kept out of styles.css so the atlas session's edits don't clash).
+  - Off switch: `off` on every rule kind; `apply_with_extra` skips it, `shadowed_by` / Tiers' "changed" marks ignore it.
+    Green switch per edit on My edits; off edits stay listed, greyed, "Off · not in the filter". Any change to a tier
+    edit switches it back on. Older settings files load unchanged (`core/tests/looks_and_off.rs`).
+  - Share packs (`core/src/share.rs`): edits (parent's first) + the looks they use + theme (a custom one travels whole)
+    + price settings + levelling choices + strictness; never NeverSink's file. Short code `LODE1:` + zlib + URL-safe
+    base64, or a `.lodestone` JSON file. Import adds a new filter on a fresh download of the pack's strictness (or your
+    own base for that game), switches to it; a look/theme name you already use for something else comes in as
+    "<name> (<pack name>)". Filters page → "Share with friends" box (`src/Share.tsx`).
+  - Not built: 7d chat commands (low priority).
 - **Atlas optimiser: "Build my own" tab (23 Nov, not released yet).** Step 3 of ATLAS_STRATEGY_PLAN.md; layout A he chose.
   - Second tab in "Build an atlas from strategies", same mechanic tiles (+ Div cards). Fewest points / Balanced / Most
     profit with their point counts, the tree, "Doing the most" (why each notable: "Harvest node · taken by 5 of 7
@@ -940,6 +959,18 @@ Everything below was built since GROBBS last tested and has only been checked wi
 Confirmed in game so far: basic Ctrl+D price check (trade search returned listings); 20 Nov: weapon + armour
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
+**Saved looks, switch edits off, share packs (23 Nov, not released yet):**
+- [ ] F2 on a highlighted item → "+ Save this look" → name it "My chase look": it appears as a label button.
+  F2 on another item → click it: that item gets the same look after F4.
+- [ ] My edits → My saved looks → Change "My chase look" (e.g. beam colour), Save: every item using it changes after F4.
+  Rename it: the gold tag on those edits shows the new name. Delete it: the items keep their colours.
+- [ ] Batch mode: pick "Saved look" for an item (or "A saved look…" for all), Save: they take that look.
+- [ ] My edits: click the green switch on an edit: it greys out, "Off · not in the filter"; after F4 the item is back to
+  NeverSink's look. Switch it on again: your edit is back.
+- [ ] Filters → Share with friends → Copy share code, paste it into the "Use a friend's" box: it shows the summary;
+  "Add as a new filter" adds a copy (downloads that strictness) and switches to it. "Save as a file…" / "Open a pack
+  file…" do the same with a file.
+
 **Tiers: step conditions, jewels first (23 Nov, released in 0.2.46):**
 - [ ] (0.2.49) Ctrl+F opens the search box: pick an item and its edit panel opens; type "hide normal 2h swords"
   and Enter: the editor works out the change and asks "Do it?".
@@ -1494,7 +1525,7 @@ when the game window isn't found. Check in game: the window's spot, and that it 
 5. **Atlas Strategy Builder (idea 23 Nov; step 1 creator picks + step 3 optimiser done 23 Nov, see Done; next: editing a saved tree, wealth-tracker results).** Pick strategies (e.g. Ritual + Harvest) → creator-pick trees
    (Maxroll, Mobalytics, YouTube) to load and adjust, plus an optimiser for his own trees. Full plan: `ATLAS_STRATEGY_PLAN.md`.
 6. Deferred earlier: PoE 2 coverage. Batch mode tidy-up done 21 Nov (see "Batch mode"). (Installer + auto-update done 21 Nov: see "Installer and updates".)
-7. **Ideas from PoeFilterX (he asked 23 Nov to add these; do 7a + 7b first).** github.com/SteffenBlake/PoeFilterX is a
+7. **Ideas from PoeFilterX (he asked 23 Nov; 7a, 7b and 7c done 23 Nov, see Done; 7d left).** github.com/SteffenBlake/PoeFilterX is a
    code-style filter "transpiler" (multi-file, .fss style sheets, JSON/env variables, npm packages). Its syntax doesn't
    fit our no-code users, and profiles-with-parent + price tiers already cover its inheritance and variables. Worth taking:
    - 7a. **Saved looks** (their style sheets): save a look once ("My chase look": text/border/background, size, beam,
