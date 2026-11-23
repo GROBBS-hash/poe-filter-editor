@@ -48,6 +48,16 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **Atlas: edit a saved tree + Totals (23 Nov, not released yet).** He picked layout B and asked for poeatlas-style totals.
+  - Atlas page → a strategy → **Edit this tree**: click a grey point to add it (shortest way there), a gold one to take
+    it off (with anything only joined through it); hover shows it first in green/red with "+N / −N points". Side panel:
+    points / 150 (red when over), each change with its points and its own Undo, Undo last, Cancel, Save or "Save as a
+    new strategy" (keeps the old one). Core `AtlasStore::set_tree` + `Graph::joined_order` (atlas.rs, tested);
+    command `atlas_save_tree`; `Strategy.edited`. Front: `src/AtlasEditor.tsx`, `src/atlasEdit.ts` (pathTo / cutOff),
+    AtlasTreeView `hint` / `onPick` / `onHoverNode`.
+  - **Totals** under every tree (`src/AtlasTotals.tsx`): same stat lines added up ("+435% Surpassing Chance to contain a
+    Shrine"), grouped by mechanic with its picture (threads where there is one); while editing each line shows
+    +N / −N / new / removed and changed lines come first.
 - **Saved looks, edits switched off, share packs (PoeFilterX ideas 7a–7c, 23 Nov, released in 0.2.51).** He picked
   layout A for both from mock-ups (`.claude/mock-saved-looks.html`, `.claude/mock-share-packs.html`, not committed).
   - Saved looks: `Store.looks` (global, like themes) = name + `CustomStyle`. Edits point at one with `look` on
@@ -1468,6 +1478,7 @@ when the game window isn't found. Check in game: the window's spot, and that it 
       if some still look missing in F6, ask which stage and which gems.
 
 **Atlas strategies (Endgame → Atlas, F7, new 20 Nov)**
+- [ ] (next) Atlas page → a strategy → Edit this tree: hover shows green/red with points; click adds/removes; Undo one change; Save as new keeps the old one; F7 shows the edited tree. Totals under the tree read right (e.g. shrine surpassing chance).
 - [ ] (0.2.51) Atlas page → Build my own: pick e.g. Harvest + Breach; the three point counts show; the tree looks sensible for those mechanics; Never on a node rebuilds without it; Save as my strategy → shows on F7.
 - [ ] (0.2.50) Atlas page "Build an atlas from strategies": pick e.g. Harvest + Breach, press Use this tree on one; it lands in My strategies, shows in game on F7, and matches what maxroll shows.
 - [ ] Import a maxroll farming strategy link and a pathofexile.com atlas tree link; both show the tree on the page.
@@ -1522,7 +1533,7 @@ when the game window isn't found. Check in game: the window's spot, and that it 
    fixed at registration), scopes account:characters + account:stashes, 10 h access / 7 day refresh tokens, User-Agent
    "OAuth {clientId}/{version} (contact: …)"; its character endpoint still returns experience, so XP per hour could come
    back. The "Log in with pathofexile.com" button (built 22 Nov, see Done) covers it until then.
-5. **Atlas Strategy Builder (idea 23 Nov; step 1 creator picks + step 3 optimiser done 23 Nov, see Done; next: editing a saved tree, wealth-tracker results).** Pick strategies (e.g. Ritual + Harvest) → creator-pick trees
+5. **Atlas Strategy Builder (idea 23 Nov; step 1 creator picks + step 3 optimiser done 23 Nov, see Done; tree editing + totals done 23 Nov; next: wealth-tracker results).** Pick strategies (e.g. Ritual + Harvest) → creator-pick trees
    (Maxroll, Mobalytics, YouTube) to load and adjust, plus an optimiser for his own trees. Full plan: `ATLAS_STRATEGY_PLAN.md`.
 6. Deferred earlier: PoE 2 coverage. Batch mode tidy-up done 21 Nov (see "Batch mode"). (Installer + auto-update done 21 Nov: see "Installer and updates".)
 7. **Ideas from PoeFilterX (he asked 23 Nov; 7a, 7b and 7c done 23 Nov, see Done; 7d left).** github.com/SteffenBlake/PoeFilterX is a

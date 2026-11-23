@@ -175,6 +175,15 @@ mockIPC((cmd, args) => {
   if (cmd === "atlas_own_notes") { const a = args as { id: number; text: string }; atlas = { ...atlas, list: atlas.list.map((s) => s.id === a.id ? { ...s, own_notes: a.text } : s) }; return atlas; }
   if (cmd === "atlas_delete") { const a = args as { id: number }; atlas = { ...atlas, list: atlas.list.filter((s) => s.id !== a.id) }; return atlas; }
   if (cmd === "atlas_import") throw "The preview can't reach maxroll: try it in the app";
+  if (cmd === "atlas_save_tree") {
+    const a = args as { id: number; variant: number; nodes: number[]; choices: [number, number][]; asNew: string };
+    const pts = a.nodes.filter((n) => n !== 29045);
+    const edit = (s: (typeof atlas.list)[number]) => ({ ...s, variants: s.variants.map((x, i) => i === a.variant ? { ...x, nodes: [29045, ...pts], steps: atlasSteps(pts), choices: a.choices } : x) }) as typeof s;
+    const src = atlas.list.find((s) => s.id === a.id)!;
+    atlas = a.asNew ? { ...atlas, active: 77, list: [...atlas.list, { ...edit(src), id: 77, name: a.asNew }] }
+      : { ...atlas, active: a.id, list: atlas.list.map((s) => s.id === a.id ? edit(s) : s) };
+    return atlas;
+  }
   if (cmd === "atlas_optimise" || cmd === "atlas_save_plan") {
     // Stand-in for core atlas_opt.rs: maxroll's sample tree, shorter for fewer points, minus blocked nodes.
     const ask = (args as { ask: { mechanics: string[]; priority: string; lock: number[]; block: number[] } }).ask;

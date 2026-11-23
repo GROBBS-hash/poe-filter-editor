@@ -105,8 +105,13 @@ export function StepList({ steps, step, onStep }: { steps: AtlasStep[]; step: nu
  * The atlas passive tree: what you take in gold, the current step bright green with its name,
  * the rest of the atlas faint. Hover any point for its name. Scroll to zoom, drag to move.
  */
-export default function AtlasTreeView({ nodes, choices = [], steps, step, height = 520, compact, find }: {
+export default function AtlasTreeView({ nodes, choices = [], steps, step, height = 520, compact, find, hint, onPick, onHoverNode }: {
   nodes: number[]; choices?: [number, number][]; steps?: AtlasStep[]; step?: number; height?: number; compact?: boolean;
+  /** Editing: points a click would add (green) or take off (red). */
+  hint?: { add: number[]; cut: number[] };
+  /** Editing: a point was clicked (not dragged), and the point under the mouse. */
+  onPick?: (id: number) => void;
+  onHoverNode?: (id: number | null) => void;
   /** Centre the view on this node (`n` changes on every click, so the same node can be found again). */
   find?: { id: number; n: number } | null;
 }) {
@@ -117,6 +122,7 @@ export default function AtlasTreeView({ nodes, choices = [], steps, step, height
   const [areas, setAreas] = useState(false);
   const svg = useRef<SVGSVGElement | null>(null);
   const drag = useRef<{ x: number; y: number; box: Box } | null>(null);
+  const moved = useRef(false);
   // The view right now, and the glide to a new view when the step changes.
   const boxNow = useRef<Box | null>(null);
   boxNow.current = box;
@@ -158,6 +164,8 @@ export default function AtlasTreeView({ nodes, choices = [], steps, step, height
   }, [nodes, steps, step, stepping, tree]);
   const now = useMemo(() => new Set(stepping ? steps![step!].nodes.map(String) : []), [steps, step, stepping]);
   const picked = useMemo(() => new Map(choices.map(([n, e]) => [String(n), String(e)])), [choices]);
+  const hAdd = useMemo(() => new Set((hint?.add ?? []).map(String)), [hint?.add.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+  const hCut = useMemo(() => new Set((hint?.cut ?? []).map(String)), [hint?.cut.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** The view around these nodes, with room round the edge (never zoomed in too far). */
   const around = (ids: Iterable<string>): Box | null => {
@@ -226,7 +234,11 @@ export default function AtlasTreeView({ nodes, choices = [], steps, step, height
   const upp = Math.max(box.w / px, box.h / height);
   // Names: only this step's notables/keystones (and its last point), so the tree stays readable.
   const named = stepping ? [...now].filter((id) => { const n = tree.nodes[id]; return n && (n[2] === 1 || n[2] === 2 || Number(id) === steps![step!].node); }) : [];
-  const edgeClass = (a: string, b: string) => (on(a) && on(b) ? (now.has(a) || now.has(b) ? "e-now" : "e-on") : "e-off");
+  const edgeClass = (a: string, b: string) => {
+    if ((hAdd.has(a) || hAdd.has(b)) && (on(a) || hAdd.has(a)) && (on(b) || hAdd.has(b))) return "e-add";
+    if ((hCut.has(a) || hCut.has(b)) && on(a) && on(b)) return "e-cut";
+    return on(a) && on(b) ? (now.has(a) || now.has(b) ? "e-now" : "e-on") : "e-off";
+  };
 
   return (
     <div className={`treeview atlas-tv ${compact ? "compact" : ""}`}>
@@ -241,9 +253,10 @@ export default function AtlasTreeView({ nodes, choices = [], steps, step, height
       </div>
       <svg ref={svg} className="tv-svg atv-svg" style={{ height }} viewBox={`${box.x} ${box.y} ${box.w} ${box.h}`}
         onWheel={(e) => zoom(e.deltaY > 0 ? 1.18 : 0.85, e.clientX, e.clientY)}
-        onMouseDown={(e) => { stopGlide(); drag.current = { x: e.clientX, y: e.clientY, box }; }}
+        onMouseDown={(e) => { stopGlide(); moved.current = false; drag.current = { x: e.clientX, y: e.clientY, box }; }}
         onMouseMove={(e) => {
           if (!drag.current) return;
+          if (Math.abs(e.clientX - drag.current.x) + Math.abs(e.clientY - drag.current.y) > 4) moved.current = true;
           const r = svg.current!.getBoundingClientRect();
           const scale = Math.max(drag.current.box.w / r.width, drag.current.box.h / r.height);
           setBox({ ...drag.current.box, x: drag.current.box.x - (e.clientX - drag.current.x) * scale, y: drag.current.box.y - (e.clientY - drag.current.y) * scale });
@@ -274,12 +287,14 @@ export default function AtlasTreeView({ nodes, choices = [], steps, step, height
           {Object.entries(tree.nodes).map(([id, n]) => {
             const taken = on(id);
             const r = (taken ? R_ON : R_OFF)[n[2]] ?? 24;
-            const cls = `k${n[2]} ${taken ? (now.has(id) ? "now" : "on") : ""} ${find && String(find.id) === id ? "found" : ""}`;
+            const cls = `k${n[2]} ${taken ? (now.has(id) ? "now" : "on") : ""} ${hAdd.has(id) ? "add" : ""} ${hCut.has(id) ? "cut" : ""} ${find && String(find.id) === id ? "found" : ""}`;
             return (
               <g key={id}>
-                <circle cx={n[0]} cy={n[1]} r={Math.max(r, taken ? (n[2] === 1 || n[2] === 2 ? 5 : 3) * upp : 0)} className={cls} />
+                <circle cx={n[0]} cy={n[1]} r={Math.max(r, taken || hAdd.has(id) ? (n[2] === 1 || n[2] === 2 ? 5 : 3) * upp : 0)} className={cls} />
                 <circle cx={n[0]} cy={n[1]} r={Math.max(r, 7 * upp)} className="hit"
-                  onMouseEnter={(e) => setHover({ id, x: e.clientX, y: e.clientY })} onMouseLeave={() => setHover(null)} />
+                  onMouseEnter={(e) => { setHover({ id, x: e.clientX, y: e.clientY }); onHoverNode?.(Number(id)); }}
+                  onMouseLeave={() => { setHover(null); onHoverNode?.(null); }}
+                  onClick={() => { if (onPick && !moved.current) onPick(Number(id)); }} />
               </g>
             );
           })}
@@ -295,7 +310,9 @@ export default function AtlasTreeView({ nodes, choices = [], steps, step, height
         <div className="tv-tip" style={{ left: Math.min(hover.x + 14, window.innerWidth - 290), top: hover.y + 14 }}>
           <b>{hovered[3] || "Passive"}</b>
           {choiceText(hover.id) ? <div className="tv-pick">Pick: {choiceText(hover.id)}</div> : hovered[4].map((s, i) => <div key={i}>{s}</div>)}
-          {now.has(hover.id) ? <div className="tv-tag new">This step</div> : on(hover.id) && <div className="tv-tag on">Taken</div>}
+          {onPick && hAdd.size > 0 ? <div className="tv-tag add">Click to add · +{hAdd.size} point{hAdd.size > 1 ? "s" : ""}</div>
+            : onPick && hCut.size > 0 ? <div className="tv-tag cut">Click to take off · −{hCut.size} point{hCut.size > 1 ? "s" : ""}</div>
+            : now.has(hover.id) ? <div className="tv-tag new">This step</div> : on(hover.id) && <div className="tv-tag on">Taken</div>}
         </div>
       )}
     </div>
