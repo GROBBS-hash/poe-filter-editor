@@ -48,7 +48,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
-- **Atlas: "Build an atlas from strategies" (creator picks, 23 Nov, not released yet).** Step 1 of ATLAS_STRATEGY_PLAN.md.
+- **Atlas: "Build an atlas from strategies" (creator picks, 23 Nov, released in 0.2.50).** Step 1 of ATLAS_STRATEGY_PLAN.md.
   - Top of the Atlas page (he picked layout C from 4 mock-ups): tiles to pick what to farm (each with its thread picture;
     scarabs are gone since 3.30), then creator trees that fit, best match first ("✓ Both" / "1 of 2"), Maxroll team
     before Community. With nothing picked it shows the Maxroll team picks. "Use this tree" = the normal maxroll import
