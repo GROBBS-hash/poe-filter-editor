@@ -1000,8 +1000,8 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
-- [ ] (next) Map tracker: run two maps; the clock keeps going while you play (only stops in the Escape menu / skill tree / alt-tabbed), and the loot box says "Last map · <name>".
-- [ ] (next) When the pathofexile.com login runs out: the red message has a "Log in again" button on that page; after logging in, it carries on (Sell in bulk reads the stash again).
+- [ ] (0.2.55) Map tracker: run two maps; the clock keeps going while you play (only stops in the Escape menu / skill tree / alt-tabbed), and the loot box says "Last map · <name>".
+- [ ] (0.2.55) When the pathofexile.com login runs out: the red message has a "Log in again" button on that page; after logging in, it carries on (Sell in bulk reads the stash again).
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
 (move them to "Confirmed in game") as he reports back, and add new features here as they land.
 Confirmed in game so far: 23 Nov (0.2.53): F5 works outside the game, F2 works in game; basic Ctrl+D price check (trade search returned listings); 20 Nov: weapon + armour
