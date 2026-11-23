@@ -48,7 +48,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
-- **Sell in bulk (23 Nov, not released yet).** New page Money → Sell in bulk (Bulky-style helper; he picked mock-up B
+- **Sell in bulk (23 Nov, released in 0.2.52).** New page Money → Sell in bulk (Bulky-style helper; he picked mock-up B
   "groups + sell basket" from `.claude/mock-bulk-sell.html`, not committed). Reads the last Stash worth scan
   (`WealthStore.last_items`, so top 3000 by value; "Read my stash again" runs `wealth_scan`), adds up unlisted items by
   name and groups them by poe.ninja category (`core/src/bulk.rs`: Currency, Essences, Div cards, Fragments, Lifeforce,
@@ -63,7 +63,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   poe.ninja, Deafening Greed 10c vs 6.15c). Nothing is listed or traded for him: GGG gives apps no way to set prices.
   Code: `core/src/bulk.rs` (tests), `src-tauri/src/bulk_app.rs` (`bulk_get`, `bulk_basket`, `bulk_live`), `src/Bulk.tsx`,
   `src/bulk.css`; preview mocks in `src/preview-app.tsx`.
-- **Atlas: edit a saved tree + Totals (23 Nov, not released yet).** He picked layout B and asked for poeatlas-style totals.
+- **Atlas: edit a saved tree + Totals (23 Nov, released in 0.2.52).** He picked layout B and asked for poeatlas-style totals.
   - Atlas page → a strategy → **Edit this tree**: click a grey point to add it (shortest way there), a gold one to take
     it off (with anything only joined through it); hover shows it first in green/red with "+N / −N points". Side panel:
     points / 150 (red when over), each change with its points and its own Undo, Undo last, Cancel, Save or "Save as a
@@ -984,7 +984,7 @@ Everything below was built since GROBBS last tested and has only been checked wi
 Confirmed in game so far: basic Ctrl+D price check (trade search returned listings); 20 Nov: weapon + armour
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
-**Sell in bulk (23 Nov, not released yet):**
+**Sell in bulk (23 Nov, released in 0.2.52):**
 - [ ] Money → Sell in bulk: your groups show with item pictures (after a Stash worth scan, or "Read my stash again").
 - [ ] Tick a few essences or currency: the basket shows the total, and per item what to type. Right-click one in a public
   premium tab → Exact price → type it (e.g. 43/12, chaos): the trade site shows the right price each.
@@ -1500,7 +1500,7 @@ when the game window isn't found. Check in game: the window's spot, and that it 
       if some still look missing in F6, ask which stage and which gems.
 
 **Atlas strategies (Endgame → Atlas, F7, new 20 Nov)**
-- [ ] (next) Atlas page → a strategy → Edit this tree: hover shows green/red with points; click adds/removes; Undo one change; Save as new keeps the old one; F7 shows the edited tree. Totals under the tree read right (e.g. shrine surpassing chance).
+- [ ] (0.2.52) Atlas page → a strategy → Edit this tree: hover shows green/red with points; click adds/removes; Undo one change; Save as new keeps the old one; F7 shows the edited tree. Totals under the tree read right (e.g. shrine surpassing chance).
 - [ ] (0.2.51) Atlas page → Build my own: pick e.g. Harvest + Breach; the three point counts show; the tree looks sensible for those mechanics; Never on a node rebuilds without it; Save as my strategy → shows on F7.
 - [ ] (0.2.50) Atlas page "Build an atlas from strategies": pick e.g. Harvest + Breach, press Use this tree on one; it lands in My strategies, shows in game on F7, and matches what maxroll shows.
 - [ ] Import a maxroll farming strategy link and a pathofexile.com atlas tree link; both show the tree on the page.
