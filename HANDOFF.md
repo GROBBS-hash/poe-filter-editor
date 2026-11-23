@@ -48,6 +48,9 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **Build my own: click a node to see what it does + Totals (23 Nov, not released yet).** From his screenshot: clicking a
+  "Doing the most" row opens what that node does (the picked option for multiple-choice ones) and zooms the tree to it
+  (outlined); the Totals panel now shows under the optimiser's tree too (AtlasPicks.tsx BuildOwn, `.ap-does`).
 - **In-game keys only while the game is in front (23 Nov, not released yet).** He couldn't refresh his browser with F5:
   the keys were held for the whole PC. Now `start_hotkey_focus_watcher` (lib.rs) checks the window in front every 150 ms:
   the game, or one of our windows over it (not the editor's main window) → keys registered; anything else → all let go,
@@ -1505,6 +1508,7 @@ when the game window isn't found. Check in game: the window's spot, and that it 
       if some still look missing in F6, ask which stage and which gems.
 
 **Atlas strategies (Endgame → Atlas, F7, new 20 Nov)**
+- [ ] (next) Build my own: click a name under "Doing the most": it shows what the node does and the tree zooms to it; Totals show under the tree.
 - [ ] (0.2.52) Atlas page → a strategy → Edit this tree: hover shows green/red with points; click adds/removes; Undo one change; Save as new keeps the old one; F7 shows the edited tree. Totals under the tree read right (e.g. shrine surpassing chance).
 - [ ] (0.2.51) Atlas page → Build my own: pick e.g. Harvest + Breach; the three point counts show; the tree looks sensible for those mechanics; Never on a node rebuilds without it; Save as my strategy → shows on F7.
 - [ ] (0.2.50) Atlas page "Build an atlas from strategies": pick e.g. Harvest + Breach, press Use this tree on one; it lands in My strategies, shows in game on F7, and matches what maxroll shows.

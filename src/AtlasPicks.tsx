@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useState } from "react";
-import AtlasTreeView, { type AtlasStep, type AtlasStore } from "./AtlasTreeView";
+import AtlasTreeView, { type AtlasData, type AtlasStep, type AtlasStore, loadAtlas } from "./AtlasTreeView";
+import AtlasTotals from "./AtlasTotals";
 import { ItemIcon } from "./icons";
 
 /** One creator tree from public/atlas_picks.json (built by tools/build_atlas_picks.mjs). */
@@ -158,18 +159,20 @@ function BuildOwn({ sel, onClear, onSaved }: { sel: string[]; onClear: () => voi
   const [plans, setPlans] = useState<Partial<Record<Priority, Plan>>>({});
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
-  const [names, setNames] = useState<Record<number, string>>({});
+  const [tree, setTree] = useState<AtlasData | null>(null);
+  const names = useMemo(() => {
+    const m: Record<number, string> = {};
+    for (const [id, n] of Object.entries(tree?.nodes ?? {})) m[Number(id)] = n[3];
+    return m;
+  }, [tree]);
+  // The row opened in "Doing the most" (shows what the node does), and the tree zooming to it.
+  const [openNode, setOpenNode] = useState<number | null>(null);
+  const [find, setFind] = useState<{ id: number; n: number } | null>(null);
 
   useEffect(() => { try { localStorage.setItem("atlas-opt-prio", prio); } catch { /* fine */ } }, [prio]);
   useEffect(() => { saveList("atlas-opt-lock", lock); saveList("atlas-opt-block", block); }, [lock, block]);
-  // Node names for the Always / Never chips (a blocked node isn't in the plan any more).
-  useEffect(() => {
-    fetch("/atlas_poe1.json").then((r) => r.json()).then((d) => {
-      const m: Record<number, string> = {};
-      for (const [id, n] of Object.entries(d.nodes as Record<string, unknown[]>)) m[Number(id)] = String(n[3] ?? "");
-      setNames(m);
-    }).catch(() => {});
-  }, []);
+  // The atlas data: names for the Always / Never chips (a blocked node isn't in the plan any more) and what each node does.
+  useEffect(() => { loadAtlas().then(setTree).catch(() => setTree(null)); }, []);
   useEffect(() => {
     if (sel.length === 0) { setPlans({}); return; }
     let live = true;
@@ -196,14 +199,33 @@ function BuildOwn({ sel, onClear, onSaved }: { sel: string[]; onClear: () => voi
     } catch (e) { setErr(String(e)); }
     setSaving(false);
   };
+  /** What a node does: the option picked for a multiple-choice notable, else its own lines. */
+  const does = (id: number): string[] => {
+    const n = tree?.nodes[String(id)];
+    if (!n) return [];
+    const eff = plan?.choices.find(([c]) => c === id)?.[1];
+    const pick = eff != null ? tree?.choices[String(id)]?.[String(eff)] : undefined;
+    return (pick ? [pick] : n[4] ?? []).map((s) => s.replace(/\s*\n\s*/g, " "));
+  };
+  const toggleOpen = (id: number) => {
+    setOpenNode((o) => (o === id ? null : id));
+    setFind((f) => ({ id, n: (f?.n ?? 0) + 1 }));
+  };
   const row = (w: NodeWork, weak = false) => (
-    <div key={w.node} className={`ap-work ${weak ? "weak" : ""}`}>
-      <b>{w.name}</b>
+    <div key={w.node} className={`ap-work ${weak ? "weak" : ""} ${openNode === w.node ? "open" : ""}`}>
+      <button className="ap-work-name" onClick={() => toggleOpen(w.node)} aria-expanded={openNode === w.node} title="What it does (and find it on the tree)">
+        <b>{w.name}</b><span className="ap-caret" aria-hidden="true">{openNode === w.node ? "▾" : "▸"}</span>
+      </button>
       <span className="ap-acts">
         <button className={`ap-mini lock ${lock.includes(w.node) ? "on" : ""}`} onClick={() => always(w.node)} title="Always keep this in">Always</button>
         <button className={`ap-mini block ${block.includes(w.node) ? "on" : ""}`} onClick={() => never(w.node)} title="Leave this out and build around it">Never</button>
       </span>
       <span className="ap-why">{w.why}</span>
+      {openNode === w.node && (
+        <div className="ap-does">
+          {does(w.node).map((l, i) => <div key={i}>{l}</div>)}
+        </div>
+      )}
     </div>
   );
 
@@ -230,7 +252,7 @@ function BuildOwn({ sel, onClear, onSaved }: { sel: string[]; onClear: () => voi
       {plan && <>
         <div className="ap-step">3 · Your tree · {plan.points} of {plan.budget} points</div>
         <div className="ap-own">
-          <div className="ap-own-tree"><AtlasTreeView key={plan.nodes.length + plan.nodes.slice(-1).join()} nodes={plan.nodes} choices={plan.choices} height={620} /></div>
+          <div className="ap-own-tree"><AtlasTreeView key={plan.nodes.length + plan.nodes.slice(-1).join()} nodes={plan.nodes} choices={plan.choices} height={620} find={find} /></div>
           <div className="ap-own-side">
             <b>Doing the most</b>
             <div className="muted small">Always = keep it in. Never = leave it out and build around it.</div>
@@ -242,6 +264,7 @@ function BuildOwn({ sel, onClear, onSaved }: { sel: string[]; onClear: () => voi
             </>}
           </div>
         </div>
+        <AtlasTotals nodes={plan.nodes} choices={plan.choices} />
       </>}
     </>
   );
