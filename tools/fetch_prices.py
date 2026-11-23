@@ -53,7 +53,10 @@ def tinted(url):
         opts = json.loads(raw)[2]
     except Exception:
         return False
-    return isinstance(opts, dict) and any(k in opts for k in ("mc", "mo", "ms"))
+    # Plain art only has these; anything else is a mark: "mc" conqueror (Veritania…), "mg"/"mi" Elder guardian,
+    # "mm" Maven's, and so on (poe.ninja's 'Map (Tier 16)' lines, 23 Nov).
+    plain = {"f", "w", "h", "scale", "mn", "mt"}
+    return isinstance(opts, dict) and any(k not in plain for k in opts)
 
 
 def add_icon(game, name, url):
