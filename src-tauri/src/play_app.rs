@@ -189,6 +189,13 @@ pub fn on_line(app: &AppHandle, line: &str) {
                 save = true;
             }
             MapChange::Finished(_) => {
+                // Paused for most of the map: the bar's normal look was learnt wrong, so learn it again next map.
+                let relearn = with_store(app, |s| {
+                    let bad = s.maps.history.last().is_some_and(|l| journey::pause_look_suspect(l.in_map, l.paused));
+                    if bad { s.menu.hud.clear(); }
+                    bad
+                });
+                if relearn { with_live(|l| l.steady.reset()); }
                 // Roughly what the earnings session made over that map.
                 let now_value = session_value(app);
                 with_store(app, |s| if let Some(last) = s.maps.history.last_mut() {
@@ -646,6 +653,8 @@ fn pick_character(app: &AppHandle, list: &serde_json::Value) -> Option<serde_jso
 fn start_pause_watch(app: AppHandle) {
     let mut learn: Vec<Vec<[u8; 3]>> = vec![];
     let mut away_streak = 0u32;
+    // The bar a second ago: a menu holds still, play doesn't (MenuLook::covered_still).
+    let mut prev: Vec<[u8; 3]> = vec![];
     thread::spawn(move || loop {
         thread::sleep(Duration::from_secs(1));
         let (on, look, inside, in_for) = with_store(&app, |s| {
@@ -660,6 +669,7 @@ fn start_pause_watch(app: AppHandle) {
             set(false, unix());
             with_live(|l| l.steady.reset());
             learn.clear();
+            prev.clear();
             away_streak = 0;
             continue;
         }
@@ -667,6 +677,7 @@ fn start_pause_watch(app: AppHandle) {
         // One of our own windows in front (the tracker, the price window): leave the clock as it is.
         if !game_in_front() {
             learn.clear();
+            prev.clear();
             if ours_in_front() { away_streak = 0; continue; }
             away_streak += 1;
             if away_streak == 2 { set(true, unix() - 1); with_live(|l| l.steady.reset()); }
@@ -700,7 +711,8 @@ fn start_pause_watch(app: AppHandle) {
             continue;
         }
         let centre = if look.esc.is_empty() { vec![] } else { screen::sample_points(&journey::centre_points(rect)).unwrap_or_default() };
-        let covered = look.covered(&hud, &centre);
+        let covered = look.covered_still(&hud, &prev, &centre);
+        prev = hud.clone();
         if let Some(state) = with_live(|l| { l.pause_note.clear(); l.steady.feed(covered) }) {
             // Two readings a second apart agreed: it changed about a second ago.
             set(state, unix() - 1);

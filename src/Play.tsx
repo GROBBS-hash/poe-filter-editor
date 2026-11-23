@@ -571,7 +571,8 @@ function TrackerLoot({ v }: { v: TrackerView }) {
   if (!p.on) return null;
   const cur = v.current?.loot ?? [];
   const last = v.recent[0]?.loot ?? [];
-  const [label, loot] = cur.length > 0 ? ["This map", cur] : last.length > 0 ? ["Last map", last] : ["This map", [] as LootLine[]];
+  // Says which map, so a boss fight's loot (the Maven's Orb of Conflict) isn't taken for the map you're in now (23 Nov).
+  const [label, loot] = cur.length > 0 ? ["This map", cur] : last.length > 0 ? [`Last map · ${v.recent[0].name}`, last] : ["This map", [] as LootLine[]];
   const total = lootTotal(loot);
   const shown = loot.filter((l) => !p.hide.includes(l.cat));
   const best = shown.filter((l) => l.value >= p.min_chaos).slice(0, 4);

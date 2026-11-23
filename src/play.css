@@ -152,3 +152,5 @@
 .loot-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px 18px; }
 .loot-kind-h { display: flex; align-items: center; font-size: 12.5px; font-weight: 650; margin-bottom: 2px; }
 .loot-kind-h > span:last-child { margin-left: auto; font-variant-numeric: tabular-nums; }
+/* "Last map · <name>": a long name stays on one line. */
+.loot-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

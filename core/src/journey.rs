@@ -311,6 +311,21 @@ impl MenuLook {
         let esc_up = !self.esc.is_empty() && !centre.is_empty() && changed_share(&self.esc, centre) <= 0.2;
         bar_gone || esc_up
     }
+
+    /// Like `covered`, but a menu also has to hold still: the skill tree and the Escape menu don't move, while play
+    /// does. Points that land on the game world instead of the bar (his 4K screen, 23 Nov: Forge of the Phoenix
+    /// counted 12 s with 159 s "paused") change every second while you play, so they never stop the clock.
+    /// `prev` = the bar sampled a second earlier (empty at first).
+    pub fn covered_still(&self, hud: &[[u8; 3]], prev: &[[u8; 3]], centre: &[[u8; 3]]) -> bool {
+        let still = prev.is_empty() || changed_share(prev, hud) < 0.15;
+        still && self.covered(hud, centre)
+    }
+}
+
+/// A map that was "paused" for most of the time you were in it: the normal look of the bar was learnt wrong, so it's
+/// learnt again on the next map. Alt-tabbed stretches count too, which at worst means learning it again.
+pub fn pause_look_suspect(in_map: i64, paused: i64) -> bool {
+    paused >= 60 && paused > in_map * 2
 }
 
 /// Smooths the once-a-second check: the clock only stops or starts after two readings in a row agree.
@@ -696,6 +711,25 @@ mod tests {
         assert_eq!(session_start(&hist, Some(&cur), 11_800, 1800), Some((10_000, 3)));
         // Long after the last map: no session to carry on.
         assert_eq!(session_start(&hist, None, 20_000, 1800), None);
+    }
+
+    #[test]
+    fn menu_must_hold_still() {
+        let normal: Vec<[u8; 3]> = (0..100).map(|i| [i as u8, 50, 50]).collect();
+        let look = MenuLook { hud: normal.clone(), ..Default::default() };
+        // Playing with points on the moving world: very different from the learnt look, and from a second ago.
+        let a: Vec<[u8; 3]> = (0..100).map(|i| [(i * 2) as u8, 200, 10]).collect();
+        let b: Vec<[u8; 3]> = (0..100).map(|i| [(i * 2) as u8, 10, 200]).collect();
+        assert!(look.covered(&b, &[]), "the old check called this a menu");
+        assert!(!look.covered_still(&b, &a, &[]), "moving: not a menu");
+        // A real menu: different from the normal bar, and the same as a second ago.
+        assert!(look.covered_still(&b, &b, &[]));
+        // The normal bar: never a menu.
+        assert!(!look.covered_still(&normal, &normal, &[]));
+        // His runs: 12 s in, 159 s paused → learn again; a 30 s Escape break in a 3 minute map → keep it.
+        assert!(pause_look_suspect(12, 159));
+        assert!(!pause_look_suspect(150, 30));
+        assert!(!pause_look_suspect(10, 40));
     }
 
     #[test]

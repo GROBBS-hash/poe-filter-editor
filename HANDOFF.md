@@ -48,6 +48,13 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **Map tracker: clock no longer stops while you play; Last map names the map (23 Nov, not released yet).** His Forge of
+  the Phoenix showed 0:12 "paused": the log has ~3 min inside, play.json had in_map 12 / paused 159 (earlier maps the
+  same: 10/325, 1/61). The auto-learnt bar look on his 3840x2160 screen didn't match the bar, so moving play looked like
+  a menu. Now `MenuLook::covered_still` also needs the bar to hold still for a second (menus don't move, play does), and
+  a finished map paused for most of its time (`pause_look_suspect`: paused ≥ 60 s and > 2× in_map) clears the learnt
+  look so it's learnt again next map (his bad look clears after the next map). The "1 death" and Orb of Conflict were
+  real: the Maven fight (MavenBoss counts as a map since 0.2.50); the loot box now says "Last map · <name>".
 - **"Log in again" right where the login error shows (23 Nov, not released yet).** He asked after Sell in bulk said his login
   had expired. `src/LoginNeeded.tsx`: `PoeLogin` (moved from Wealth.tsx, re-exported there) and `ErrNote`: an error that
   mentions the login (`needsLogin`) shows "Your pathofexile.com login has run out" + a gold **Log in again** button (the
@@ -993,6 +1000,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
+- [ ] (next) Map tracker: run two maps; the clock keeps going while you play (only stops in the Escape menu / skill tree / alt-tabbed), and the loot box says "Last map · <name>".
 - [ ] (next) When the pathofexile.com login runs out: the red message has a "Log in again" button on that page; after logging in, it carries on (Sell in bulk reads the stash again).
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
 (move them to "Confirmed in game") as he reports back, and add new features here as they land.
