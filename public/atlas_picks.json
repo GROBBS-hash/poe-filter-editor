@@ -1,0 +1,307 @@
+{
+ "built": "2026-11-23",
+ "picks": [
+  {
+   "id": "xn4dwq0g",
+   "group": "maxroll",
+   "name": "Rare Monster Stacking Strategy",
+   "author": "bawloch",
+   "mechanics": [
+    "legion",
+    "abyss",
+    "bestiary",
+    "rare monsters"
+   ],
+   "category": "endgame",
+   "season": "3300",
+   "updated": "2026-11-23",
+   "maps": [
+    "Dunes Map"
+   ],
+   "points": 148
+  },
+  {
+   "id": "li2pay02",
+   "group": "maxroll",
+   "name": "Abyss Maps/Thread Farm",
+   "author": "milkybk",
+   "mechanics": [
+    "abyss",
+    "breach",
+    "bestiary"
+   ],
+   "category": "endgame",
+   "season": "3300",
+   "updated": "2026-11-22",
+   "maps": [
+    "City Square Map"
+   ],
+   "points": 174
+  },
+  {
+   "id": "ue4lfx0g",
+   "group": "maxroll",
+   "name": "Harvest & Essences",
+   "author": "manni",
+   "mechanics": [
+    "harvest",
+    "essence"
+   ],
+   "category": "endgame",
+   "season": "3300",
+   "updated": "2026-11-22",
+   "maps": [
+    "City Square Map"
+   ],
+   "points": 199
+  },
+  {
+   "id": "3j41p602",
+   "group": "maxroll",
+   "name": "\"The Humble Potato Farmer\": Low-Tier Easy Blight & Flora Harvest Farming Strategy",
+   "author": "ziggyd",
+   "mechanics": [
+    "blight",
+    "harvest"
+   ],
+   "category": "endgame",
+   "season": "3300",
+   "updated": "2026-11-21",
+   "maps": [
+    "Pit Map"
+   ],
+   "points": 150
+  },
+  {
+   "id": "ew296k0g",
+   "group": "maxroll",
+   "name": "Incursion Farming Strategy",
+   "author": "zenm",
+   "mechanics": [
+    "incursion"
+   ],
+   "category": "endgame",
+   "season": "3300",
+   "updated": "2026-11-21",
+   "maps": [
+    "Strand Map",
+    "Dunes Map",
+    "Silo Map"
+   ],
+   "points": 151
+  },
+  {
+   "id": "9l355o0g",
+   "group": "maxroll",
+   "name": "Blight",
+   "author": "aer0",
+   "mechanics": [
+    "blight"
+   ],
+   "category": "endgame",
+   "season": "3300",
+   "updated": "2026-11-20",
+   "maps": [],
+   "points": 150
+  },
+  {
+   "id": "n1cm70gm",
+   "group": "maxroll",
+   "name": "Nightmare Map Boss Rushing",
+   "author": "crouchingtuna",
+   "mechanics": [
+    "bosses"
+   ],
+   "category": "endgame",
+   "season": "3300",
+   "updated": "2026-11-18",
+   "maps": [],
+   "points": 154
+  },
+  {
+   "id": "oz1lwj0g",
+   "group": "maxroll",
+   "name": "Goratha League Start Atlas Essences and Shrines",
+   "author": "goratha",
+   "mechanics": [
+    "essence",
+    "shrines"
+   ],
+   "category": "starter",
+   "season": "3300",
+   "updated": "2026-11-12",
+   "maps": [],
+   "points": 144
+  },
+  {
+   "id": "vg1ga30g",
+   "group": "maxroll",
+   "name": "Leaguestart Shrine/Magic Atlas",
+   "author": "palsteron",
+   "mechanics": [
+    "shrines",
+    "magic monsters"
+   ],
+   "category": "starter",
+   "season": "3300",
+   "updated": "2026-11-12",
+   "maps": [],
+   "points": 105
+  },
+  {
+   "id": "o53tct02",
+   "group": "community",
+   "name": "Betrayal",
+   "author": "stualex",
+   "mechanics": [
+    "betrayal"
+   ],
+   "category": "endgame",
+   "season": "3300",
+   "updated": "2026-11-23",
+   "maps": [],
+   "points": 150
+  },
+  {
+   "id": "i35nlu02",
+   "group": "community",
+   "name": "Harvest Settlers",
+   "author": "giapreys",
+   "mechanics": [
+    "harvest",
+    "settlers"
+   ],
+   "category": "endgame",
+   "season": "3300",
+   "updated": "2026-11-22",
+   "maps": [],
+   "points": 148
+  },
+  {
+   "id": "q056du0g",
+   "group": "community",
+   "name": "Breach+Harvest",
+   "author": "iagoowender",
+   "mechanics": [
+    "breach",
+    "harvest",
+    "abyss"
+   ],
+   "category": "endgame",
+   "season": "3300",
+   "updated": "2026-11-22",
+   "maps": [
+    "Desert Spring Map"
+   ],
+   "points": 150
+  },
+  {
+   "id": "jq52i20g",
+   "group": "community",
+   "name": "Abyss Deli 1 Thread and GO!",
+   "author": "mbXtreme",
+   "mechanics": [
+    "abyss",
+    "delirium"
+   ],
+   "category": "endgame",
+   "season": "3300",
+   "updated": "2026-11-22",
+   "maps": [],
+   "points": 150
+  },
+  {
+   "id": "1q5lb90g",
+   "group": "community",
+   "name": "triple threads abyss brechas y legion",
+   "author": "Avila07",
+   "mechanics": [
+    "abyss",
+    "breach",
+    "legion"
+   ],
+   "category": "endgame",
+   "season": "3300",
+   "updated": "2026-11-23",
+   "maps": [],
+   "points": 138
+  },
+  {
+   "id": "jk2yun02",
+   "group": "community",
+   "name": "T17 Boss, Shrine, Lost Ship, Merc",
+   "author": "MultiplePunchMan",
+   "mechanics": [
+    "bosses",
+    "shrines",
+    "mercenaries"
+   ],
+   "category": "endgame",
+   "season": "3300",
+   "updated": "2026-11-20",
+   "maps": [],
+   "points": 150
+  },
+  {
+   "id": "af3cit0g",
+   "group": "community",
+   "name": "Incursion + shrines",
+   "author": "Beniamin",
+   "mechanics": [
+    "incursion",
+    "shrines"
+   ],
+   "category": "endgame",
+   "season": "3300",
+   "updated": "2026-11-20",
+   "maps": [],
+   "points": 150
+  },
+  {
+   "id": "mp3c6z0g",
+   "group": "community",
+   "name": "Alva Essence",
+   "author": "Ozze",
+   "mechanics": [
+    "incursion",
+    "essence"
+   ],
+   "category": "endgame",
+   "season": "3300",
+   "updated": "2026-11-20",
+   "maps": [],
+   "points": 101
+  },
+  {
+   "id": "4239rr02",
+   "group": "community",
+   "name": "Memory rush",
+   "author": "magovermelho",
+   "mechanics": [
+    "memories"
+   ],
+   "category": "endgame",
+   "season": "3300",
+   "updated": "2026-11-20",
+   "maps": [],
+   "points": 135
+  },
+  {
+   "id": "3r3l5a02",
+   "group": "community",
+   "name": "HARVEST GO GO GO",
+   "author": "stevan.lopes",
+   "mechanics": [
+    "harvest",
+    "ritual",
+    "expedition",
+    "betrayal"
+   ],
+   "category": "endgame",
+   "season": "3300",
+   "updated": "2026-11-20",
+   "maps": [],
+   "points": 149
+  }
+ ]
+}
