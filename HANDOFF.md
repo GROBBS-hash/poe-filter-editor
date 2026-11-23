@@ -48,7 +48,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
-- **Saved looks, edits switched off, share packs (PoeFilterX ideas 7a–7c, 23 Nov, not released yet).** He picked
+- **Saved looks, edits switched off, share packs (PoeFilterX ideas 7a–7c, 23 Nov, released in 0.2.51).** He picked
   layout A for both from mock-ups (`.claude/mock-saved-looks.html`, `.claude/mock-share-packs.html`, not committed).
   - Saved looks: `Store.looks` (global, like themes) = name + `CustomStyle`. Edits point at one with `look` on
     `Rule::Override` / `Rule::Tier`; `Store::save_look` re-writes every linked edit's actions in every filter (and
@@ -67,7 +67,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
     own base for that game), switches to it; a look/theme name you already use for something else comes in as
     "<name> (<pack name>)". Filters page → "Share with friends" box (`src/Share.tsx`).
   - Not built: 7d chat commands (low priority).
-- **Atlas optimiser: "Build my own" tab (23 Nov, not released yet).** Step 3 of ATLAS_STRATEGY_PLAN.md; layout A he chose.
+- **Atlas optimiser: "Build my own" tab (23 Nov, released in 0.2.51).** Step 3 of ATLAS_STRATEGY_PLAN.md; layout A he chose.
   - Second tab in "Build an atlas from strategies", same mechanic tiles (+ Div cards). Fewest points / Balanced / Most
     profit with their point counts, the tree, "Doing the most" (why each notable: "Harvest node · taken by 5 of 7
     Harvest/Breach trees") and "Doing little", Always / Never on each (chips to undo), Save as my strategy (site
@@ -959,7 +959,7 @@ Everything below was built since GROBBS last tested and has only been checked wi
 Confirmed in game so far: basic Ctrl+D price check (trade search returned listings); 20 Nov: weapon + armour
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
-**Saved looks, switch edits off, share packs (23 Nov, not released yet):**
+**Saved looks, switch edits off, share packs (23 Nov, released in 0.2.51):**
 - [ ] F2 on a highlighted item → "+ Save this look" → name it "My chase look": it appears as a label button.
   F2 on another item → click it: that item gets the same look after F4.
 - [ ] My edits → My saved looks → Change "My chase look" (e.g. beam colour), Save: every item using it changes after F4.
@@ -1468,7 +1468,7 @@ when the game window isn't found. Check in game: the window's spot, and that it 
       if some still look missing in F6, ask which stage and which gems.
 
 **Atlas strategies (Endgame → Atlas, F7, new 20 Nov)**
-- [ ] (next) Atlas page → Build my own: pick e.g. Harvest + Breach; the three point counts show; the tree looks sensible for those mechanics; Never on a node rebuilds without it; Save as my strategy → shows on F7.
+- [ ] (0.2.51) Atlas page → Build my own: pick e.g. Harvest + Breach; the three point counts show; the tree looks sensible for those mechanics; Never on a node rebuilds without it; Save as my strategy → shows on F7.
 - [ ] (0.2.50) Atlas page "Build an atlas from strategies": pick e.g. Harvest + Breach, press Use this tree on one; it lands in My strategies, shows in game on F7, and matches what maxroll shows.
 - [ ] Import a maxroll farming strategy link and a pathofexile.com atlas tree link; both show the tree on the page.
 - [ ] Rename / delete / "In game" pick work and are still there after restarting the editor.
