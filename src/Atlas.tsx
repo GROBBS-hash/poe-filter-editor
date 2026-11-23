@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
 import AtlasTreeView, { AtlasStore, AtlasStrategy, ChoiceList, StepBar, StepList, StrategyNotes, useStep } from "./AtlasTreeView";
 import { PageLoading } from "./Loading";
+import AtlasPicks from "./AtlasPicks";
 
 const SITE: Record<string, string> = { maxroll: "maxroll", official: "pathofexile.com" };
 
@@ -43,8 +44,10 @@ export default function Atlas() {
 
   return (
     <div className="atlas-page">
+      <AtlasPicks store={store} onShow={(id) => setSel(id)}
+        onImported={(s, m) => { setStore(s); setSel(s.active); setMsg(`${m} (${key})`); }} />
       <div className="card">
-        <h2>Add a strategy <Tip>A <b>maxroll farming strategy</b> link (maxroll.gg/poe/farming-strategy-planner/…) or a
+        <h2>Add a strategy from a link <Tip>A <b>maxroll farming strategy</b> link (maxroll.gg/poe/farming-strategy-planner/…) or a
           <b> pathofexile.com atlas tree</b> link. maxroll strategies bring their notes, map device and threads too.</Tip></h2>
         <p className="muted small">Paste a maxroll strategy or pathofexile.com atlas tree link.</p>
         <div className="row">

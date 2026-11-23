@@ -48,6 +48,15 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **Atlas: "Build an atlas from strategies" (creator picks, 23 Nov, not released yet).** Step 1 of ATLAS_STRATEGY_PLAN.md.
+  - Top of the Atlas page (he picked layout C from 4 mock-ups): tiles to pick what to farm (each with its thread picture;
+    scarabs are gone since 3.30), then creator trees that fit, best match first ("✓ Both" / "1 of 2"), Maxroll team
+    before Community. With nothing picked it shows the Maxroll team picks. "Use this tree" = the normal maxroll import
+    (your own copy in My strategies, shown in game; the creator's original is untouched); already saved → "In My strategies".
+  - Data: `public/atlas_picks.json`, 19 hand-picked maxroll strategies for 3.30 with hand-set mechanics, built by
+    `node tools/build_atlas_picks.mjs` (ids + tags at its top; one request a second). Refresh each league. The tree is
+    read live when he presses Use. maxroll's team has no Ritual tree this league; its community list is mostly unnamed tests.
+  - Files: `src/AtlasPicks.tsx`, `.ap-*` styles. Mock-ups: `.claude/mock-atlas-picks.html` (not committed).
 - **F2 "Modify this rule" + hover, memory maps tracked (23 Nov, not released yet).** From his 0.2.49 play.
   - F2: the button says "Modify this rule" again (he prefers it), and the Shown by box lights up gold on hover and
     opens the rule when clicked, like before (ItemPanel `RuleBox`, `.qm-rule.can-open`).
@@ -1415,6 +1424,7 @@ when the game window isn't found. Check in game: the window's spot, and that it 
       if some still look missing in F6, ask which stage and which gems.
 
 **Atlas strategies (Endgame → Atlas, F7, new 20 Nov)**
+- [ ] (next) Atlas page "Build an atlas from strategies": pick e.g. Harvest + Breach, press Use this tree on one; it lands in My strategies, shows in game on F7, and matches what maxroll shows.
 - [ ] Import a maxroll farming strategy link and a pathofexile.com atlas tree link; both show the tree on the page.
 - [ ] Rename / delete / "In game" pick work and are still there after restarting the editor.
 - [ ] F7 in game shows the window without taking the game's focus (you can keep moving); F7 again hides it.
@@ -1467,7 +1477,7 @@ when the game window isn't found. Check in game: the window's spot, and that it 
    fixed at registration), scopes account:characters + account:stashes, 10 h access / 7 day refresh tokens, User-Agent
    "OAuth {clientId}/{version} (contact: …)"; its character endpoint still returns experience, so XP per hour could come
    back. The "Log in with pathofexile.com" button (built 22 Nov, see Done) covers it until then.
-5. **Atlas Strategy Builder (idea 23 Nov, not started).** Pick strategies (e.g. Ritual + Harvest) → creator-pick trees
+5. **Atlas Strategy Builder (idea 23 Nov; step 1 creator picks done 23 Nov, see Done).** Pick strategies (e.g. Ritual + Harvest) → creator-pick trees
    (Maxroll, Mobalytics, YouTube) to load and adjust, plus an optimiser for his own trees. Full plan: `ATLAS_STRATEGY_PLAN.md`.
 6. Deferred earlier: PoE 2 coverage. Batch mode tidy-up done 21 Nov (see "Batch mode"). (Installer + auto-update done 21 Nov: see "Installer and updates".)
 

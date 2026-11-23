@@ -43,6 +43,14 @@ The optimiser needs a rough value for each node per strategy. Options, simplest 
 - Wealth tracker: save each tree under a strategy name so earnings can be compared per tree.
 - Map check: flag map mods that clash with the chosen strategy.
 
+## Progress
+
+- 23 Nov: step 1 built ("Build an atlas from strategies" on the Atlas page, layout C). 19 maxroll trees for 3.30 in
+  `public/atlas_picks.json` (`node tools/build_atlas_picks.mjs` to refresh). Mobalytics and YouTube not added yet.
+- Scarabs are gone since 3.30: mechanics go in the map device as Threads. Tiles use thread pictures.
+- Saving a pick already makes a separate copy (the creator's tree stays on maxroll), so step 2 is about editing
+  the copy's tree in the app, which isn't possible yet.
+
 ## Suggested Build Order
 
 1. Creator picks with a small hand-picked list of trees, loaded into the existing planner.
