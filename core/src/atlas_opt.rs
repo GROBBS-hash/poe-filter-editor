@@ -58,6 +58,28 @@ pub const MECHANICS: &[(&str, &[&str], &[&str])] = &[
     ("rarity", &["Rarity of Items found in your Maps"], &[]),
 ];
 
+/// A map has one influence of each kind, so a node for the other side does nothing for that map (he spotted
+/// 23 Nov: the tree took both Eater of Worlds and Searing Exarch pack size). Each group: (what it's called, sides,
+/// words that put a node on that side).
+pub const ONE_PER_MAP: &[(&str, &[(&str, &[&str])])] = &[
+    ("Eldritch influence", &[
+        ("Eater of Worlds", &["Influenced by The Eater of Worlds", "influenced by The Eater of Worlds", "Eater of Worlds Altars"]),
+        ("Searing Exarch", &["Influenced by The Searing Exarch", "influenced by The Searing Exarch", "Searing Exarch Altar"]),
+    ]),
+    ("map influence", &[
+        ("Conquerors", &["Influenced by Conquerors"]),
+        ("Shaper", &["Influenced by The Shaper"]),
+        ("Elder", &["Influenced by The Elder"]),
+    ]),
+];
+
+/// Which side of each one-per-map group a node is on (group index, side index).
+fn side_of(text: &str) -> Vec<(usize, usize)> {
+    ONE_PER_MAP.iter().enumerate().filter_map(|(gi, (_, sides))| {
+        sides.iter().position(|(_, words)| words.iter().any(|w| text.contains(w))).map(|si| (gi, si))
+    }).collect()
+}
+
 /// The travel options, not mechanics: a node tagged only with these still counts as "all-round".
 pub const TRAVEL: &[&str] = &["pack size", "explicit effect", "threads", "maps found", "rarity"];
 
@@ -68,6 +90,8 @@ struct Node {
     text: String,
     /// Mechanics the text names (1.0) or whose area it sits in (0.7).
     tags: HashMap<&'static str, f32>,
+    /// One-per-map sides it's on (see ONE_PER_MAP).
+    sides: Vec<(usize, usize)>,
 }
 
 struct PickTree {
@@ -104,7 +128,8 @@ fn data() -> &'static Data {
                 if words.iter().any(|w| text.contains(w)) { tags.insert(*m, 1.0); }
                 else if region.as_ref().is_some_and(|r| areas.contains(&r.as_str())) { tags.insert(*m, 0.7); }
             }
-            nodes.insert(id, Node { kind: n[2].as_u64().unwrap_or(0) as u8, name, text, tags });
+            let sides = side_of(&text);
+            nodes.insert(id, Node { kind: n[2].as_u64().unwrap_or(0) as u8, name, text, tags, sides });
         }
         let mut choices: HashMap<u32, Vec<(u32, String)>> = HashMap::new();
         for (node, effects) in v["choices"].as_object().into_iter().flatten() {
@@ -173,6 +198,9 @@ pub struct Plan {
     pub weak: Vec<NodeWork>,
     /// Creator trees it learned from for these mechanics.
     pub trees_used: usize,
+    /// Plain-words notes, e.g. "Eater of Worlds side only: a map has one Eldritch influence".
+    #[serde(default)]
+    pub notes: Vec<String>,
 }
 
 /// Values for every node, for the picked mechanics.
@@ -208,15 +236,11 @@ fn label(m: &str) -> String {
     c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default()
 }
 
-/// Builds a tree for the strategies asked for.
-pub fn optimise(ask: &Ask) -> Plan {
+/// Grows the tree from the start and the locked nodes, taking the path with the most value per point each time.
+/// Returns the order taken and how many of those were locked.
+fn grow(v: &HashMap<u32, f32>, budget: usize, lock: &[u32], block: &HashSet<u32>) -> (Vec<u32>, usize) {
     let g = graph();
-    let d = data();
-    let vals = values(&ask.mechanics);
-    let budget = if ask.budget == 0 { MAX_POINTS } else { ask.budget.min(MAX_POINTS) };
-    let block: HashSet<u32> = ask.block.iter().copied().filter(|b| *b != g.start).collect();
-    // Locked nodes first (joined up the shortest way).
-    let mut order = g.fill_paths(&ask.lock, &block);
+    let mut order = g.fill_paths(lock, block);
     let mut have: HashSet<u32> = order.iter().copied().collect();
     let locked = order.len();
     loop {
@@ -239,10 +263,10 @@ pub fn optimise(ask: &Ask) -> Plan {
         // The path with the most value per point.
         let mut best: Option<(f32, f32, u32)> = None;
         for (&t, &dt) in &dist {
-            if dt == 0 || vals.v.get(&t).copied().unwrap_or(0.0) <= 0.0 { continue; }
+            if dt == 0 || v.get(&t).copied().unwrap_or(0.0) <= 0.0 { continue; }
             let mut gain = 0.0;
             let mut cur = t;
-            while !have.contains(&cur) { gain += vals.v.get(&cur).copied().unwrap_or(0.0); cur = prev[&cur]; }
+            while !have.contains(&cur) { gain += v.get(&cur).copied().unwrap_or(0.0); cur = prev[&cur]; }
             let ratio = gain / dt as f32;
             let better = match best { None => true, Some((r, gn, id)) => ratio > r + 1e-6 || ((ratio - r).abs() <= 1e-6 && (gain > gn || (gain == gn && t < id))) };
             if better { best = Some((ratio, gain, t)); }
@@ -255,6 +279,47 @@ pub fn optimise(ask: &Ask) -> Plan {
         path.reverse();
         for p in path { have.insert(p); order.push(p); }
     }
+    (order, locked)
+}
+
+/// Builds a tree for the strategies asked for.
+pub fn optimise(ask: &Ask) -> Plan {
+    let g = graph();
+    let d = data();
+    let mut vals = values(&ask.mechanics);
+    let budget = if ask.budget == 0 { MAX_POINTS } else { ask.budget.min(MAX_POINTS) };
+    let block: HashSet<u32> = ask.block.iter().copied().filter(|b| *b != g.start).collect();
+
+    // One side of each one-per-map group: a locked node picks it, else try each side worth anything and keep the
+    // best tree. Nodes for the other sides are worth nothing (still fine to walk through).
+    let forced: HashMap<usize, usize> = ask.lock.iter().filter_map(|id| d.nodes.get(id)).flat_map(|n| n.sides.iter().copied()).collect();
+    let worth = |gi: usize, si: usize| d.nodes.iter().any(|(id, n)| n.sides.contains(&(gi, si)) && vals.v.get(id).copied().unwrap_or(0.0) > 0.0);
+    let options: Vec<Vec<usize>> = ONE_PER_MAP.iter().enumerate().map(|(gi, (_, sides))| {
+        if let Some(s) = forced.get(&gi) { return vec![*s]; }
+        let w: Vec<usize> = (0..sides.len()).filter(|si| worth(gi, *si)).collect();
+        if w.is_empty() { vec![0] } else { w }
+    }).collect();
+    let mut combos: Vec<Vec<usize>> = vec![vec![]];
+    for opts in &options {
+        combos = combos.into_iter().flat_map(|c| opts.iter().map(move |s| { let mut c = c.clone(); c.push(*s); c })).collect();
+    }
+    let mut best: Option<(f32, Vec<usize>, Vec<u32>, usize, HashMap<u32, f32>)> = None;
+    for pick in combos {
+        let v: HashMap<u32, f32> = vals.v.iter().map(|(id, x)| {
+            let off = d.nodes[id].sides.iter().any(|(gi, si)| pick[*gi] != *si);
+            (*id, if off { 0.0 } else { *x })
+        }).collect();
+        let (order, locked) = grow(&v, budget, &ask.lock, &block);
+        let total: f32 = order.iter().map(|n| v.get(n).copied().unwrap_or(0.0)).sum();
+        if best.as_ref().map_or(true, |b| total > b.0 + 1e-4) { best = Some((total, pick, order, locked, v)); }
+    }
+    let (_, pick, mut order, locked, v) = best.expect("at least one combination");
+    vals.v = v;
+    // Name the side taken, where the tree has nodes for it.
+    let notes: Vec<String> = ONE_PER_MAP.iter().enumerate().filter_map(|(gi, (what, sides))| {
+        let used = order.iter().any(|id| d.nodes[id].sides.contains(&(gi, pick[gi])) && vals.v[id] > 0.0);
+        used.then(|| format!("{} side only: a map has one {what}", sides[pick[gi]].0))
+    }).collect();
     // Taken best first, so "fewest points" keeps the start that gives 60% of the value and "balanced" 85%.
     // Any start of the order is joined up (each node joins one taken before it).
     let keep = match ask.priority { Priority::Profit => 1.0, Priority::Balanced => 0.85, Priority::Fewest => 0.6 };
@@ -297,7 +362,7 @@ pub fn optimise(ask: &Ask) -> Plan {
     }).collect();
 
     let fits = d.picks.iter().filter(|p| p.mechanics.iter().any(|m| wanted.contains(&m.as_str()))).count();
-    Plan { steps: g.steps(&order), points: order.len() - 1, nodes: order, choices, budget, top, weak, trees_used: fits }
+    Plan { steps: g.steps(&order), points: order.len() - 1, nodes: order, choices, budget, top, weak, trees_used: fits, notes }
 }
 
 /// Every mechanic the optimiser knows (for the picker), with how many atlas nodes it has.
@@ -359,6 +424,30 @@ mod tests {
     }
 
     #[test]
+    fn one_influence_per_map() {
+        // 23 Nov: Ritual + Pack size + Map mod effect took both Eater of Worlds and Searing Exarch pack size.
+        let d = data();
+        for pr in [Priority::Profit, Priority::Balanced, Priority::Fewest] {
+            let p = optimise(&ask(&["ritual", "pack size", "explicit effect"], pr));
+            for (gi, (what, sides)) in ONE_PER_MAP.iter().enumerate() {
+                // Nodes of a second side can only be there as a way through, never as notables.
+                let notable_sides: HashSet<usize> = p.nodes.iter().filter(|id| matches!(d.nodes[*id].kind, 1 | 2))
+                    .flat_map(|id| d.nodes[id].sides.iter().filter(|(g, _)| *g == gi).map(|(_, s)| *s)).collect();
+                assert!(notable_sides.len() <= 1, "{pr:?}: notables for {} {what} sides: {:?}", notable_sides.len(), sides);
+            }
+        }
+        let p = optimise(&ask(&["ritual", "pack size"], Priority::Profit));
+        let eldritch: HashSet<usize> = p.nodes.iter().flat_map(|id| d.nodes[id].sides.iter().filter(|(g, _)| *g == 0).map(|(_, s)| *s)).collect();
+        assert!(eldritch.len() <= 1, "both Eldritch sides' pack size: {}", p.notes.join("; "));
+        // Locking an Exarch node puts the tree on the Exarch side.
+        let exarch = d.nodes.iter().find(|(_, n)| n.name == "Word of the Exarch").map(|(id, _)| *id).unwrap();
+        let mut a = ask(&["ritual", "pack size"], Priority::Profit);
+        a.lock = vec![exarch];
+        let q = optimise(&a);
+        assert!(!q.nodes.iter().any(|id| d.nodes[id].sides.contains(&(0, 0)) && d.nodes[id].text.contains("Pack Size")), "{:?}", q.notes);
+    }
+
+    #[test]
     fn lock_and_block() {
         let g = graph();
         let base = optimise(&ask(&["breach"], Priority::Profit));
@@ -388,7 +477,7 @@ fn show() {
     let m: Vec<String> = std::env::var("ATLAS_OPT").unwrap_or("harvest,breach".into()).split(',').map(String::from).collect();
     for pr in [Priority::Fewest, Priority::Balanced, Priority::Profit] {
         let p = optimise(&Ask { mechanics: m.clone(), priority: pr, ..Default::default() });
-        println!("{pr:?}: {} points, {} trees", p.points, p.trees_used);
+        println!("{pr:?}: {} points, {} trees, {:?}", p.points, p.trees_used, p.notes);
         if let Ok(dir) = std::env::var("ATLAS_OPT_OUT") {
             let _ = std::fs::write(format!("{dir}/plan_{pr:?}.json"), serde_json::to_string(&p).unwrap());
         }

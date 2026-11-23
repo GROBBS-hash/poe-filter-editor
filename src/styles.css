@@ -2333,3 +2333,11 @@ button.qm-rule:hover, .qm-rule.can-open:hover { border-color: var(--gold); backg
 .ap-travel { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); }
 .ap-travel .ap-tile { flex-direction: row; justify-content: flex-start; gap: 8px; padding: 6px 10px; text-align: left; }
 .ap-travel .ap-tile .item-icon { width: 30px; height: 30px; }
+
+/* Find on the atlas (23 Nov) */
+.atv-find { flex: 0 1 260px; padding: 4px 8px; background: var(--input); border: 1px solid var(--line); color: var(--text); border-radius: 6px; font-size: 12px; }
+.atv-find-name { color: #59d0ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+.atv-nodes circle.found-now { stroke: #ffffff; stroke-width: 30; }
+.ap-notes { color: var(--gold); }
+.atlas-tv .tv-tools { flex-wrap: wrap; }
+.atv-find-n { white-space: nowrap; }

@@ -160,7 +160,7 @@ export default function AtlasPicks({ store, onImported, onShow }: {
 
 type NodeWork = { node: number; name: string; value: number; why: string };
 type Plan = { nodes: number[]; steps: AtlasStep[]; choices: [number, number][]; points: number; budget: number;
-  top: NodeWork[]; weak: NodeWork[]; trees_used: number };
+  top: NodeWork[]; weak: NodeWork[]; trees_used: number; notes?: string[] };
 type Priority = "fewest" | "balanced" | "profit";
 const PRIORITIES: [Priority, string][] = [["fewest", "Fewest points"], ["balanced", "Balanced"], ["profit", "Most profit"]];
 
@@ -270,6 +270,7 @@ function BuildOwn({ sel, onClear, onSaved }: { sel: string[]; onClear: () => voi
       {err && <div className="small at-msg">{err}</div>}
       {plan && <>
         <div className="ap-step">3 · Your tree · {plan.points} of {plan.budget} points</div>
+        {(plan.notes ?? []).length > 0 && <div className="small ap-notes">{plan.notes!.join(" · ")}. Lock in (Always) a node of the other side to switch.</div>}
         <div className="ap-own">
           <div className="ap-own-tree"><AtlasTreeView key={plan.nodes.length + plan.nodes.slice(-1).join()} nodes={plan.nodes} choices={plan.choices} height={620} find={find} /></div>
           <div className="ap-own-side">

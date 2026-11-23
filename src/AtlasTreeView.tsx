@@ -120,6 +120,9 @@ export default function AtlasTreeView({ nodes, choices = [], steps, step, height
   const [px, setPx] = useState(600); // the drawing's width on screen, for text sizes
   const [hover, setHover] = useState<{ id: string; x: number; y: number } | null>(null);
   const [areas, setAreas] = useState(false);
+  // "Find on the atlas" (he asked 23 Nov): name or what it does; Enter goes to the next one.
+  const [q, setQ] = useState("");
+  const [hit, setHit] = useState(-1);
   const svg = useRef<SVGSVGElement | null>(null);
   const drag = useRef<{ x: number; y: number; box: Box } | null>(null);
   const moved = useRef(false);
@@ -168,6 +171,16 @@ export default function AtlasTreeView({ nodes, choices = [], steps, step, height
   }, [nodes, steps, step, stepping, tree]);
   const now = useMemo(() => new Set(stepping ? steps![step!].nodes.map(String) : []), [steps, step, stepping]);
   const picked = useMemo(() => new Map(choices.map(([n, e]) => [String(n), String(e)])), [choices]);
+  const needle = q.trim().toLowerCase();
+  // Notables and keystones first, so Enter visits the big ones before the small path points.
+  const matches = useMemo(() => {
+    if (!tree || needle.length < 3) return [] as string[];
+    const out = Object.entries(tree.nodes).filter(([id, n]) =>
+      [n[3], ...(n[4] ?? []), ...Object.values(tree.choices[id] ?? {})].join(" ").toLowerCase().includes(needle));
+    out.sort((a, b) => Number(b[1][2] === 1 || b[1][2] === 2) - Number(a[1][2] === 1 || a[1][2] === 2));
+    return out.map(([id]) => id);
+  }, [tree, needle]);
+  const matchSet = useMemo(() => new Set(matches), [matches]);
   const hAdd = useMemo(() => new Set((hint?.add ?? []).map(String)), [hint?.add.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
   const hCut = useMemo(() => new Set((hint?.cut ?? []).map(String)), [hint?.cut.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -215,6 +228,21 @@ export default function AtlasTreeView({ nodes, choices = [], steps, step, height
     const b = boxNow.current, w = 3600, h = b ? 3600 * (b.h / b.w) : 3600;
     glide({ x: n[0] - w / 2, y: n[1] - h / 2, w, h });
   }, [find?.n, tree]); // eslint-disable-line react-hooks/exhaustive-deps
+  // New search words: show all the matches at once.
+  useEffect(() => {
+    setHit(-1);
+    const b = matches.length ? around(matches) : null;
+    if (b) glide(b);
+  }, [matches]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** Zooms in on match i (wraps round). */
+  const goHit = (i: number) => {
+    if (!tree || matches.length === 0) return;
+    const k = ((i % matches.length) + matches.length) % matches.length;
+    const n = tree.nodes[matches[k]];
+    const b = boxNow.current, w = 3600, h = b ? 3600 * (b.h / b.w) : 3600;
+    setHit(k);
+    glide({ x: n[0] - w / 2, y: n[1] - h / 2, w, h });
+  };
 
   if (!tree || !box) return <div className="empty" style={{ height }}>Loading the atlas…</div>;
 
@@ -238,6 +266,11 @@ export default function AtlasTreeView({ nodes, choices = [], steps, step, height
   const upp = Math.max(box.w / px, box.h / height);
   // Names: only this step's notables/keystones (and its last point), so the tree stays readable.
   const named = stepping ? [...now].filter((id) => { const n = tree.nodes[id]; return n && (n[2] === 1 || n[2] === 2 || Number(id) === steps![step!].node); }) : [];
+  // Searching: name the notables found (all of them when there are few, else just the one Enter is on).
+  if (matches.length > 0) {
+    const big = matches.filter((id) => tree.nodes[id][2] === 1 || tree.nodes[id][2] === 2);
+    for (const id of big.length <= 12 ? big : hit >= 0 ? [matches[hit]] : []) if (!named.includes(id)) named.push(id);
+  }
   const edgeClass = (a: string, b: string) => {
     if ((hAdd.has(a) || hAdd.has(b)) && (on(a) || hAdd.has(a)) && (on(b) || hAdd.has(b))) return "e-add";
     if ((hCut.has(a) || hCut.has(b)) && on(a) && on(b)) return "e-cut";
@@ -248,6 +281,18 @@ export default function AtlasTreeView({ nodes, choices = [], steps, step, height
     <div className={`treeview atlas-tv ${compact ? "compact" : ""}`}>
       <div className="tv-tools">
         {!stepping && <span className="muted small">{Math.max(0, have.size - 1)} points</span>}
+        <input className="atv-find" placeholder="Find on the atlas (e.g. pack size, Exarch)…" value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.preventDefault(); goHit(hit + (e.shiftKey ? -1 : 1)); }
+            else if (e.key === "Escape") setQ("");
+          }} />
+        {needle.length >= 3 && <span className="muted small atv-find-n" title="Enter = next one, Shift+Enter = back, Esc = clear">
+          {matches.length === 0 ? "none found" : hit >= 0 ? `${hit + 1} of ${matches.length}` : `${matches.length} found · Enter`}
+        </span>}
+        {needle.length >= 3 && matches.length > 0 && hit >= 0 && tree.nodes[matches[hit]] && (
+          <b className="small atv-find-name">{tree.nodes[matches[hit]][3]}</b>
+        )}
         <span className="grow" />
         <button className={`link small ${areas ? "atv-on" : ""}`} onClick={() => setAreas(!areas)} title="Show the names of the atlas areas (Breach, Delirium…)">Area names</button>
         <button className="link small" onClick={() => zoom(0.7)} title="Zoom in">＋</button>
@@ -291,7 +336,7 @@ export default function AtlasTreeView({ nodes, choices = [], steps, step, height
           {Object.entries(tree.nodes).map(([id, n]) => {
             const taken = on(id);
             const r = (taken ? R_ON : R_OFF)[n[2]] ?? 24;
-            const cls = `k${n[2]} ${taken ? (now.has(id) ? "now" : "on") : ""} ${hAdd.has(id) ? "add" : ""} ${hCut.has(id) ? "cut" : ""} ${find && String(find.id) === id ? "found" : ""}`;
+            const cls = `k${n[2]} ${taken ? (now.has(id) ? "now" : "on") : ""} ${hAdd.has(id) ? "add" : ""} ${hCut.has(id) ? "cut" : ""} ${(find && String(find.id) === id) || matchSet.has(id) ? "found" : ""} ${hit >= 0 && matches[hit] === id ? "found-now" : ""}`;
             return (
               <g key={id}>
                 <circle cx={n[0]} cy={n[1]} r={Math.max(r, taken || hAdd.has(id) ? (n[2] === 1 || n[2] === 2 ? 5 : 3) * upp : 0)} className={cls} />
