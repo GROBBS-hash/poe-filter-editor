@@ -1480,6 +1480,19 @@ when the game window isn't found. Check in game: the window's spot, and that it 
 5. **Atlas Strategy Builder (idea 23 Nov; step 1 creator picks done 23 Nov, see Done).** Pick strategies (e.g. Ritual + Harvest) → creator-pick trees
    (Maxroll, Mobalytics, YouTube) to load and adjust, plus an optimiser for his own trees. Full plan: `ATLAS_STRATEGY_PLAN.md`.
 6. Deferred earlier: PoE 2 coverage. Batch mode tidy-up done 21 Nov (see "Batch mode"). (Installer + auto-update done 21 Nov: see "Installer and updates".)
+7. **Ideas from PoeFilterX (he asked 23 Nov to add these; do 7a + 7b first).** github.com/SteffenBlake/PoeFilterX is a
+   code-style filter "transpiler" (multi-file, .fss style sheets, JSON/env variables, npm packages). Its syntax doesn't
+   fit our no-code users, and profiles-with-parent + price tiers already cover its inheritance and variables. Worth taking:
+   - 7a. **Saved looks** (their style sheets): save a look once ("My chase look": text/border/background, size, beam,
+     icon, sound) and point edits at it by name; changing the look updates every edit that uses it. Today each
+     `Rule::Override` / `Rule::Tier` keeps its own copy of the actions. Keep it per profile or global, and let F2 /
+     batch mode pick a saved look in one click.
+   - 7b. **Switch an edit off without deleting it** (their `[ .. ]` blocks): an on/off toggle per saved edit, skipped in
+     `apply_with_extra`; useful for trying stricter settings and going back.
+   - 7c. **Share packs with friends** (their package system, made simple): export a profile's edits + saved looks +
+     theme + price settings as a file / short code, import onto your own NeverSink base. Matters once friends use it.
+   - 7d. Low priority: **chat commands** (on their "investigating" list): read typed commands like "!strict" from
+     Client.txt (journey.rs already tails it) to switch filters or change a rule. F5 already cycles filters.
 
 ## Known caveats
 - This cloud workspace can't reach pathofexile.com / poe.ninja / poeprices.info, so network code is only tested by
