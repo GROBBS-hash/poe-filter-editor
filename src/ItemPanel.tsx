@@ -4,6 +4,7 @@ import { Item, RARITY_COLOUR, itemSub, itemTitle } from "./types";
 import { LookChips, looksChanged, useLooks } from "./Looks";
 import StyleEditor, { CurrentStyle, CustomStyle, GAME_COLOURS, LookButton, fromCurrent } from "./StyleEditor";
 import { ItemIcon } from "./icons";
+import { mapItemIcon } from "./mapIcons";
 import BaseUniques from "./BaseUniques";
 
 export type Picked = { item: Item; from_screen: boolean; screen_text?: string | null; confidence: number; rarity_unsure?: boolean };
@@ -410,7 +411,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
         </div>
       )}
       <div className="qm-head with-icon">
-        <ItemIcon name={item.rarity === "Unique" ? item.name : null} base={item.base_type || null} size={40} />
+        <ItemIcon name={item.rarity === "Unique" ? item.name : mapItemIcon(item)} base={item.base_type || null} size={40} />
         <div className="qm-head-text">
         <div className="qm-name" style={{ color: RARITY_COLOUR[item.rarity] ?? "#ddd" }}>{itemTitle(item)}</div>
         <div className="qm-sub">{itemSub(item)}</div>

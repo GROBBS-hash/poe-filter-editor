@@ -11,6 +11,11 @@ export type Item = {
   corrupted: boolean;
   mirrored: boolean;
   unidentified: boolean;
+  /** Maps: blighted / blight-ravaged, and the conqueror or Elder guardian it belongs to (for its picture). */
+  blighted?: boolean;
+  uber_blighted?: boolean;
+  zana_memory?: boolean;
+  occupied_by?: string | null;
 };
 
 export type Action = "hide" | "highlight" | "louder" | "quieter";

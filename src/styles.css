@@ -2309,3 +2309,7 @@ button.qm-rule:hover, .qm-rule.can-open:hover { border-color: var(--gold); backg
 .login-needed { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 16px; color: var(--text); }
 .login-needed b { color: var(--gold); font-weight: 600; }
 .login-needed .row { margin: 0 !important; }
+/* Map tiers → Special maps: each kind's own picture (conquerors, Elder guardians, Blighted, Valdo…; 23 Nov). */
+.mt-pics { display: inline-flex; align-items: center; gap: 2px; margin-right: 8px; vertical-align: middle; }
+.mt-pics .item-icon { object-fit: contain; }
+.mt-zana-name { display: inline-flex; align-items: center; }

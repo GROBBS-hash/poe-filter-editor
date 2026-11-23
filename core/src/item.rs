@@ -39,6 +39,24 @@ pub struct Item {
     /// Has an implicit mod (maps: "Map contains Drox's Citadel"), NeverSink's `HasImplicitMod`.
     #[serde(default)]
     pub has_implicit: bool,
+    /// Maps: the conqueror ("Drox") or Elder guardian ("The Enslaver") the map belongs to, for its picture.
+    #[serde(default)]
+    pub occupied_by: Option<String>,
+}
+
+/// "Map contains Drox's Citadel" → "Drox"; "Map is occupied by The Enslaver" → "The Enslaver";
+/// "Area is influenced by Veritania, the Redeemer" → "Veritania". (implicit) tags are dropped.
+fn map_occupant(line: &str) -> Option<String> {
+    let l = line.trim().trim_end_matches("(implicit)").trim();
+    let who = if let Some(r) = l.strip_prefix("Map contains ") {
+        r.strip_suffix("'s Citadel")?.to_string()
+    } else if let Some(r) = l.strip_prefix("Map is occupied by ") {
+        r.to_string()
+    } else if let Some(r) = l.strip_prefix("Area is influenced by ") {
+        r.split(',').next()?.to_string()
+    } else { return None };
+    let who = who.trim().to_string();
+    (!who.is_empty() && !who.contains("Originator")).then_some(who)
 }
 
 /// Map names carry their special kind: "Blighted Map (Tier 3)", "Blight-ravaged Map (Tier 16)".
@@ -125,6 +143,9 @@ pub fn parse_item(text: &str) -> Option<Item> {
             item.zana_memory = true;
         } else if line.starts_with("{ Implicit Modifier") || line.ends_with("(implicit)") {
             item.has_implicit = true;
+            if item.occupied_by.is_none() { item.occupied_by = map_occupant(line); }
+        } else if let Some(who) = map_occupant(line).filter(|_| item.occupied_by.is_none()) {
+            item.occupied_by = Some(who);
         } else if *line == "Corrupted" {
             item.corrupted = true;
         } else if *line == "Mirrored" {
@@ -221,6 +242,17 @@ mod tests {
         assert_eq!(i.quality, Some(20));
         assert_eq!(max_links(i.sockets.as_deref().unwrap()), 3);
         assert!(i.corrupted);
+    }
+
+    #[test]
+    fn map_occupants() {
+        let map = |line: &str| parse_item(&format!("Item Class: Maps\nRarity: Rare\nGrim Trail\nMap (Tier 16)\n--------\nMap Tier: 16\n--------\n{line}\n")).unwrap();
+        assert_eq!(map("Map contains Drox's Citadel (implicit)").occupied_by.as_deref(), Some("Drox"));
+        assert_eq!(map("Map is occupied by The Enslaver (implicit)").occupied_by.as_deref(), Some("The Enslaver"));
+        assert_eq!(map("Area is influenced by Veritania, the Redeemer (implicit)").occupied_by.as_deref(), Some("Veritania"));
+        let z = map("Area is influenced by the Originator's Memories (implicit)");
+        assert_eq!(z.occupied_by, None);
+        assert!(z.zana_memory);
     }
 
     #[test]

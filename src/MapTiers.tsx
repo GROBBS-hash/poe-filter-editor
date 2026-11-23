@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
+import { ItemIcon } from "./icons";
+import { tierMapIcons } from "./mapIcons";
 import { Tip } from "./Help";
 import StyleEditor, { CurrentStyle, LookButton, Preview, fromCurrent } from "./StyleEditor";
 
@@ -187,6 +189,7 @@ export default function MapTiers({ profileId, onChange, onOpen, focus }: { profi
                   <input type="checkbox" checked={all} disabled={busy}
                     ref={(el) => { if (el) el.indeterminate = !all && !none; }}
                     onChange={(e) => change(s.type_path, s.tiers.map((r) => r.tier), { show: e.target.checked }, `${s.title} ${e.target.checked ? "shown" : "hidden"}.`)} />
+                  <MapPics names={[...new Set(s.tiers.flatMap((r) => tierMapIcons(s.type_path, r.tier)))]} />
                   <span>{s.title}</span>
                 </label>
                 {!bands && <LookButton className="tier-look" title={`Change the look of every rule in ${s.title}`} onClick={() => setEditing(editing === sk ? null : sk)}>
@@ -209,7 +212,7 @@ export default function MapTiers({ profileId, onChange, onOpen, focus }: { profi
                 const ek = "z:" + rk + ":" + r.tier;
                 return (
                   <div key={r.tier} className={`mt-zana ${shown(r) ? "" : "off"}`}>
-                    <span className="mt-zana-name">{r.name}</span>
+                    <span className="mt-zana-name"><MapPics names={tierMapIcons(s.type_path, r.tier)} size={26} />{r.name}</span>
                     <span className="mt-demo">
                       <span className="mt-demo-one"><LookButton title={`Change the look of ${r.name}`} onClick={() => setEditing(editing === ek ? null : ek)}>
                         <Preview s={fromCurrent(r.style, "Maps")} text={text} /></LookButton><span className="muted small">{citadel ? "Citadel" : "Originator"}</span></span>
@@ -239,4 +242,9 @@ export default function MapTiers({ profileId, onChange, onOpen, focus }: { profi
       {msg && <div className="note">{msg}</div>}
     </div>
   );
+}
+
+/** The right game picture(s) for a kind of map: each conqueror's or Elder guardian's own map, Blighted, Valdo… */
+function MapPics({ names, size = 30 }: { names: string[]; size?: number }) {
+  return <span className="mt-pics">{names.slice(0, 4).map((n) => <span key={n} title={n}><ItemIcon name={n} size={size} /></span>)}</span>;
 }

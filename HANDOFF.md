@@ -48,6 +48,13 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **Right map pictures (23 Nov).** He saw Veritania's conqueror art on Originator maps. poe.ninja lists each map tier
+  several times (plain + per conqueror / Elder guardian); the price job took the first. `tools/fetch_prices.py` `tinted()`:
+  a picture with any extra mark (mc conqueror, mg/mi Elder guardian, mm Maven…) loses to the plain one (live on the prices
+  branch 23 Nov, no release needed). `src/mapIcons.ts`: `tierMapIcons` (Map tiers → Special maps rows: each conqueror's /
+  Elder guardian's map, Blighted / Blight-ravaged, Valdo, Nightmare, Shaper Guardian, plain for Originator, which is how
+  the game shows them) and `mapItemIcon` (F2). Core `Item.occupied_by` from "Map contains Drox's Citadel" / "Map is occupied
+  by The Enslaver" / "Area is influenced by Veritania, …" (tested). Not released yet.
 - **Price window: "Which stat to untick?" fits (23 Nov, not released yet).** It was width 100% plus the window's 12px side margin, so it ran off the right edge; now it fills between the margins like the rest (`.tw-untick-ask`, `.tw-untick` use margin-block).
 - **No false "that tier is gone" lines (23 Nov, not released yet).** Saving a look showed 11 "Couldn't change … that tier
   is gone" lines: Red-Maps (Uber Strict) inherits Mid-Game's (Very Strict) tier edits, and NeverSink switches those tiers
@@ -1006,6 +1013,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
+- [ ] (next) Map pictures: a plain T16 map shows the plain XVI art (not Veritania's); Map tiers → Special maps rows show conqueror / Elder guardian / Blighted / Valdo pictures; F2 on a conqueror map shows that conqueror's art.
 - [ ] (0.2.55) Map tracker: run two maps; the clock keeps going while you play (only stops in the Escape menu / skill tree / alt-tabbed), and the loot box says "Last map · <name>".
 - [ ] (0.2.55) When the pathofexile.com login runs out: the red message has a "Log in again" button on that page; after logging in, it carries on (Sell in bulk reads the stash again).
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
