@@ -1508,7 +1508,7 @@ when the game window isn't found. Check in game: the window's spot, and that it 
       if some still look missing in F6, ask which stage and which gems.
 
 **Atlas strategies (Endgame → Atlas, F7, new 20 Nov)**
-- [ ] (next) Build my own: click a name under "Doing the most": it shows what the node does and the tree zooms to it; Totals show under the tree.
+- [ ] (0.2.54) Build my own: click a name under "Doing the most": it shows what the node does and the tree zooms to it; Totals show under the tree.
 - [ ] (0.2.52) Atlas page → a strategy → Edit this tree: hover shows green/red with points; click adds/removes; Undo one change; Save as new keeps the old one; F7 shows the edited tree. Totals under the tree read right (e.g. shrine surpassing chance).
 - [ ] (0.2.51) Atlas page → Build my own: pick e.g. Harvest + Breach; the three point counts show; the tree looks sensible for those mechanics; Never on a node rebuilds without it; Save as my strategy → shows on F7.
 - [ ] (0.2.50) Atlas page "Build an atlas from strategies": pick e.g. Harvest + Breach, press Use this tree on one; it lands in My strategies, shows in game on F7, and matches what maxroll shows.
