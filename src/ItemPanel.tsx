@@ -52,9 +52,9 @@ function RuleLine({ src, hidden, onOpen, action }: { src?: Source; hidden: boole
     </>
   );
   return (
-    <div className="qm-rule">
+    <div className={`qm-rule ${onOpen ? "can-open" : ""}`} onClick={onOpen} title={onOpen ? "Opens this rule in the editor" : undefined}>
       {body}
-      {onOpen && <button className="qm-change qm-rule-btn" onClick={onOpen} title="Opens this rule in the editor">{action}</button>}
+      {onOpen && <button className="qm-change qm-rule-btn" onClick={(e) => { e.stopPropagation(); onOpen(); }}>{action}</button>}
     </div>
   );
 }
@@ -459,7 +459,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
               <>
                 <div className="qm-chips">{chips.filter(Boolean).map((c) => <span key={c} className="qm-chip">{c}</span>)}</div>
                 <RuleLine src={src} hidden={!shown(v.visibility)} onOpen={canOpen ? change : undefined}
-                  action={shown(v.visibility) ? "Change this look" : "Change this rule"} />
+                  action="Modify this rule" />
               </>
             );
           })()}

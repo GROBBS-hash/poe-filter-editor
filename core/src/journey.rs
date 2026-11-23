@@ -71,9 +71,16 @@ pub fn parse_line(line: &str) -> Option<PlayEvent> {
     None
 }
 
-/// Map areas (PoE 1 "MapWorlds…", PoE 2 "Map…"); not hideouts, towns or the campaign.
+/// Areas the map device opens that aren't named "Map…": Originator memories and Venarius
+/// ("Synthesis_MapGuardian4" = Rewritten Distant Memory, 23 Nov), conquerors and Sirus, the Maven,
+/// breachstones and league bosses. Not the Maven's Crucible hub or sub-areas inside a map.
+const DEVICE_AREAS: &[&str] = &["Synthesis_Map", "AtlasExilesBoss", "MavenBoss", "BreachBoss", "AbyssLeagueBoss",
+    "AzmeriLeagueBoss", "FaridunLeagueBoss", "ChayulaLeagueTowerBoss"];
+
+/// Map areas (PoE 1 "MapWorlds…", PoE 2 "Map…", plus [`DEVICE_AREAS`]); not hideouts, towns or the campaign.
 pub fn is_map_area(id: &str) -> bool {
-    id.starts_with("Map") && !id.contains("Hideout") && !id.starts_with("MapDevice")
+    (id.starts_with("Map") && !id.contains("Hideout") && !id.starts_with("MapDevice"))
+        || DEVICE_AREAS.iter().any(|p| id.starts_with(p))
 }
 
 /// Hideouts and towns (the places you go between maps).
@@ -627,6 +634,16 @@ mod tests {
     use super::*;
 
     const T: &str = "2026/11/18 19:48:01 1234567 cff94598 [INFO Client 9876]";
+
+    #[test]
+    fn map_areas() {
+        for id in ["MapWorldsStrand", "Synthesis_MapGuardian4", "Synthesis_MapBoss", "AtlasExilesBoss5", "MavenBoss", "MapAtziri"] {
+            assert!(is_map_area(id), "{id}");
+        }
+        for id in ["HideoutSpace", "MapWorldsHideout", "MavenHub", "2_11_endgame_town", "KalguuranSettlersLeague", "DeepwaterEncounter"] {
+            assert!(!is_map_area(id), "{id}");
+        }
+    }
 
     #[test]
     fn reads_log_lines() {

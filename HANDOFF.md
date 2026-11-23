@@ -48,6 +48,12 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **F2 "Modify this rule" + hover, memory maps tracked (23 Nov, not released yet).** From his 0.2.49 play.
+  - F2: the button says "Modify this rule" again (he prefers it), and the Shown by box lights up gold on hover and
+    opens the rule when clicked, like before (ItemPanel `RuleBox`, `.qm-rule.can-open`).
+  - Map tracker missed "Rewritten Distant Memory": its area id is `Synthesis_MapGuardian4`, not "Map…". `is_map_area`
+    (journey.rs) now also counts `DEVICE_AREAS`: Originator memories / Venarius, conquerors + Sirus, Maven, breachstones,
+    league bosses (from his Client.txt). Not the Maven hub, the settlement or sub-areas inside a map.
 - **One search, on Ctrl+F (23 Nov, released in 0.2.49).** He asked to merge the Find page and Ctrl+K and make Ctrl+F the key.
   - Ctrl+F opens the search box (Ctrl+K still works quietly); the sidebar button and Home show Ctrl+F. It lists items first,
     then Tiers rules, pages, help, and for 3+ words a "Make a change: “…”" row that runs the plain-words box.
@@ -915,7 +921,8 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 **Tiers: step conditions, jewels first (23 Nov, released in 0.2.46):**
 - [ ] (0.2.49) Ctrl+F opens the search box: pick an item and its edit panel opens; type "hide normal 2h swords"
   and Enter: the editor works out the change and asks "Do it?".
-- [ ] (0.2.49) F2: one gold "Change this look" button inside the Shown by box.
+- [ ] (next) F2: one gold "Modify this rule" button inside the Shown by box; the box glows gold on hover.
+- [ ] (next) Map tracker starts a run in memory maps (Rewritten Distant Memory) and boss fights (conquerors, Maven).
 - [ ] (0.2.49) Map tracker shows everything without scrolling (grows and shrinks with what it shows).
 - [ ] (0.2.49) Ctrl+D "sells for about" sits near the 3rd cheapest listing.
 - [ ] (0.2.48) Ctrl+D: resist / life total rows show a T badge; a unique opens with its own numbers; "Instant buyout
