@@ -86,6 +86,23 @@ impl Graph {
         order
     }
 
+    /// The points in an order you could take them (each joined to one before it), keeping the given order where
+    /// it already works; points not joined to the start through the others are left out. Start node first.
+    pub fn joined_order(&self, nodes: &[u32]) -> Vec<u32> {
+        let want: HashSet<u32> = nodes.iter().copied().filter(|n| self.has(*n)).collect();
+        let mut have: HashSet<u32> = HashSet::from([self.start]);
+        let mut order = vec![self.start];
+        let mut left: Vec<u32> = nodes.iter().copied().filter(|n| *n != self.start && want.contains(n)).collect();
+        left.dedup();
+        loop {
+            // The first one in the list that joins what we have.
+            let Some(i) = left.iter().position(|n| self.neighbours(*n).iter().any(|m| have.contains(m))) else { break };
+            let n = left.remove(i);
+            if have.insert(n) { order.push(n); }
+        }
+        order
+    }
+
     /// The tree in steps, like maxroll's "Leveling Path": a step ends at each notable or keystone,
     /// or where the next point isn't joined to this one (a new branch). Named after its last point.
     pub fn steps(&self, nodes: &[u32]) -> Vec<Step> {
@@ -178,6 +195,8 @@ pub struct Strategy {
     pub variants: Vec<Variant>,
     /// Your own notes, typed on the Atlas page.
     pub own_notes: String,
+    /// When you last changed its tree in the editor (0 = never).
+    pub edited: u64,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -218,6 +237,34 @@ impl AtlasStore {
         let s = self.list.iter_mut().find(|s| s.id == id).ok_or("That strategy is gone")?;
         s.name = name.trim().to_string();
         Ok(())
+    }
+
+    /// Saves an edited tree: over the strategy's tree, or (with a name) as a new strategy, leaving the old one
+    /// as it was. Points are put in an order where each joins one before it; points cut off from the start are
+    /// dropped. Returns the id it's saved under (shown in game from now on).
+    pub fn set_tree(&mut self, id: u64, variant: usize, nodes: &[u32], choices: &[(u32, u32)], as_new: Option<&str>, now: u64) -> Result<u64, String> {
+        let g = graph();
+        let st = self.list.iter().find(|s| s.id == id).ok_or("That strategy is gone")?;
+        if variant >= st.variants.len() { return Err("That tree is gone".into()); }
+        let order = g.joined_order(nodes);
+        let kept: HashSet<u32> = order.iter().copied().collect();
+        let choices: Vec<(u32, u32)> = choices.iter().copied().filter(|(n, _)| kept.contains(n)).collect();
+        let mut s = st.clone();
+        let v = &mut s.variants[variant];
+        v.steps = g.steps(&order);
+        v.nodes = order;
+        v.choices = choices;
+        s.edited = now;
+        match as_new {
+            Some(name) => Ok(self.add(s, name)),
+            None => {
+                let slot = self.list.iter_mut().find(|x| x.id == id).unwrap();
+                *slot = s;
+                self.active = Some(id);
+                self.variant = variant;
+                Ok(id)
+            }
+        }
     }
 
     pub fn set_own_notes(&mut self, id: u64, text: &str) {
@@ -595,6 +642,32 @@ mod tests {
         assert_eq!(l[1].text, "Run City Square Map maps.");
         assert_eq!((l[2].kind.as_str(), l[2].depth), ("li", 0));
         assert_eq!((l[3].text.as_str(), l[3].depth), ("Breach Thread · Ritual Thread", 1));
+    }
+
+    #[test]
+    fn edit_tree() {
+        let g = graph();
+        let a = g.fill_paths(&[21453], &HashSet::new());
+        let mut st = AtlasStore::default();
+        let id = st.add(Strategy { name: "Shrines".into(), site: "maxroll".into(), variants: vec![Variant { name: "T".into(), nodes: a.clone(), ..Default::default() }], ..Default::default() }, "");
+        // Reversed order and a stray far-away point: back in a joined order, stray dropped.
+        let mut edited: Vec<u32> = a.iter().rev().copied().collect();
+        let stray = *g.info.keys().find(|n| !a.contains(n) && g.neighbours(**n).iter().all(|m| !a.contains(m))).unwrap();
+        edited.push(stray);
+        let new_id = st.set_tree(id, 0, &edited, &[(stray, 1)], Some("Shrines (mine)"), 5).unwrap();
+        assert_ne!(new_id, id);
+        let mine = st.list.iter().find(|s| s.id == new_id).unwrap();
+        assert_eq!(mine.variants[0].nodes.len(), a.len());
+        assert!(!mine.variants[0].nodes.contains(&stray) && mine.variants[0].choices.is_empty());
+        assert_eq!(mine.edited, 5);
+        assert_eq!(mine.variants[0].steps.last().unwrap().total, a.len() - 1);
+        // The original is untouched.
+        assert_eq!(st.list.iter().find(|s| s.id == id).unwrap().variants[0].nodes, a);
+        // Saving over: only the start left when everything is removed.
+        st.set_tree(id, 0, &[], &[], None, 6).unwrap();
+        assert_eq!(st.list.iter().find(|s| s.id == id).unwrap().variants[0].nodes, vec![g.start]);
+        assert_eq!(st.active, Some(id));
+        assert!(st.set_tree(id, 3, &[], &[], None, 7).is_err());
     }
 
     #[test]

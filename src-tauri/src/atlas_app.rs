@@ -164,3 +164,10 @@ pub fn atlas_save_plan(app: AppHandle, ask: filter_core::atlas_opt::Ask, name: S
     let strat = Strategy { name: format!("{} (optimiser)", mechs.join(" + ")), site: "optimiser".into(), imported: now(), variants: vec![variant], ..Default::default() };
     with_store(&app, true, |s| { s.add(strat, &name); s.clone() })
 }
+
+/// Saves a tree edited on the Atlas page: over the strategy (`as_new` empty) or as a new strategy with that name.
+#[tauri::command]
+pub fn atlas_save_tree(app: AppHandle, id: u64, variant: usize, nodes: Vec<u32>, choices: Vec<(u32, u32)>, as_new: String) -> Result<AtlasStore, String> {
+    let name = as_new.trim().to_string();
+    with_store(&app, true, |s| s.set_tree(id, variant, &nodes, &choices, (!name.is_empty()).then_some(name.as_str()), now()).map(|_| s.clone()))?
+}
