@@ -48,14 +48,14 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
-- **Atlas optimiser fixes from his Ritual test (23 Nov, not released yet).** Ritual only skipped Flexible Dogma etc. and
+- **Atlas optimiser fixes from his Ritual test (23 Nov, released in 0.2.56).** Ritual only skipped Flexible Dogma etc. and
   took Harvest nodes (+265% Sacred Flora): the only "Ritual" creator tree is mostly Harvest and creator popularity
   counted for every node. Now (atlas_opt.rs `values`): picked-mechanic nodes weigh 2× (notables 6), creator trees only
   help nodes for a picked mechanic or all-round ones, other mechanics' nodes get nothing. Test `ritual_takes_ritual`
   (Balanced has every Ritual notable, no Harvest notable). New travel options (`TRAVEL`): pack size, map mod effect,
   threads found, maps found, item rarity, as an "Also spend points on" row on Build my own (not used for creator-tree
   matching). Scrolling over the atlas (and character) tree zooms it only, the page stays put (non-passive wheel listener).
-- **One rule in charge: F2 "Whole group / Just this item" + "Your edit wins" notes (23 Nov, not released yet).** He
+- **One rule in charge: F2 "Whole group / Just this item" + "Your edit wins" notes (23 Nov, released in 0.2.56).** He
   had F2 edits "Rare/Normal Map (Tier 16)" (GOOD MAP look) covering every T16 map, so the Originator look on Map
   tiers never showed. He picked 1A + 2A + 3A from `.claude/mock-one-rule.html`:
   - F2: when a NeverSink tier decides the item (not your edit), a switch **Whole group / Just this item** (remembered,
@@ -71,9 +71,9 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   branch 23 Nov, no release needed). `src/mapIcons.ts`: `tierMapIcons` (Map tiers → Special maps rows: each conqueror's /
   Elder guardian's map, Blighted / Blight-ravaged, Valdo, Nightmare, Shaper Guardian, plain for Originator, which is how
   the game shows them) and `mapItemIcon` (F2). Core `Item.occupied_by` from "Map contains Drox's Citadel" / "Map is occupied
-  by The Enslaver" / "Area is influenced by Veritania, …" (tested). Not released yet.
-- **Price window: "Which stat to untick?" fits (23 Nov, not released yet).** It was width 100% plus the window's 12px side margin, so it ran off the right edge; now it fills between the margins like the rest (`.tw-untick-ask`, `.tw-untick` use margin-block).
-- **No false "that tier is gone" lines (23 Nov, not released yet).** Saving a look showed 11 "Couldn't change … that tier
+  by The Enslaver" / "Area is influenced by Veritania, …" (tested). Released in 0.2.56.
+- **Price window: "Which stat to untick?" fits (23 Nov, released in 0.2.56).** It was width 100% plus the window's 12px side margin, so it ran off the right edge; now it fills between the margins like the rest (`.tw-untick-ask`, `.tw-untick` use margin-block).
+- **No false "that tier is gone" lines (23 Nov, released in 0.2.56).** Saving a look showed 11 "Couldn't change … that tier
   is gone" lines: Red-Maps (Uber Strict) inherits Mid-Game's (Very Strict) tier edits, and NeverSink switches those tiers
   off at Uber Strict ("#Show # $type->… $tier->…"). He chose to just hide the message (not switch them on for Show
   edits): `filter::has_commented` → no warning when the tier is there but switched off (rules.rs apply). Real tiers that
@@ -91,10 +91,10 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   site's own login window); once logged in, `onRetry` re-runs what failed (Stash worth: the last action; Sell in bulk:
   the stash read or live prices; map tracker: carries on next map). Used on Stash worth, Sell in bulk, map tracker,
   price window and trades window. No pop-up by itself (it could jump up mid-map).
-- **Build my own: click a node to see what it does + Totals (23 Nov, not released yet).** From his screenshot: clicking a
+- **Build my own: click a node to see what it does + Totals (23 Nov, released in 0.2.54).** From his screenshot: clicking a
   "Doing the most" row opens what that node does (the picked option for multiple-choice ones) and zooms the tree to it
   (outlined); the Totals panel now shows under the optimiser's tree too (AtlasPicks.tsx BuildOwn, `.ap-does`).
-- **In-game keys only while the game is in front (23 Nov, not released yet).** He couldn't refresh his browser with F5:
+- **In-game keys only while the game is in front (23 Nov, released in 0.2.53).** He couldn't refresh his browser with F5:
   the keys were held for the whole PC. Now `start_hotkey_focus_watcher` (lib.rs) checks the window in front every 150 ms:
   the game, or one of our windows over it (not the editor's main window) → keys registered; anything else → all let go,
   like Awakened PoE Trade. `register_hotkeys` still checks every key on save/start, then lets them go if the game isn't
@@ -1030,9 +1030,9 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
-- [ ] (next) Build my own: Ritual only → every Ritual notable (Flexible Dogma, A Light in the Dark…) and no Sacred Flora totals; tick Pack size → pack size nodes join; scrolling over the tree doesn't scroll the page.
-- [ ] (next) Map tiers: the Originator and Tier 16 rows say "Your edit wins: Rare Map (Tier 16)"; Remove it → the Originator look shows on the ground after F4. F2 on an Originator map: "Whole group" changes the Originator look on the Map tiers page; "Just this item" makes your own edit.
-- [ ] (next) Map pictures: a plain T16 map shows the plain XVI art (not Veritania's); Map tiers → Special maps rows show conqueror / Elder guardian / Blighted / Valdo pictures; F2 on a conqueror map shows that conqueror's art.
+- [ ] (0.2.56) Build my own: Ritual only → every Ritual notable (Flexible Dogma, A Light in the Dark…) and no Sacred Flora totals; tick Pack size → pack size nodes join; scrolling over the tree doesn't scroll the page.
+- [ ] (0.2.56) Map tiers: the Originator and Tier 16 rows say "Your edit wins: Rare Map (Tier 16)"; Remove it → the Originator look shows on the ground after F4. F2 on an Originator map: "Whole group" changes the Originator look on the Map tiers page; "Just this item" makes your own edit.
+- [ ] (0.2.56) Map pictures: a plain T16 map shows the plain XVI art (not Veritania's); Map tiers → Special maps rows show conqueror / Elder guardian / Blighted / Valdo pictures; F2 on a conqueror map shows that conqueror's art.
 - [ ] (0.2.55) Map tracker: run two maps; the clock keeps going while you play (only stops in the Escape menu / skill tree / alt-tabbed), and the loot box says "Last map · <name>".
 - [ ] (0.2.55) When the pathofexile.com login runs out: the red message has a "Log in again" button on that page; after logging in, it carries on (Sell in bulk reads the stash again).
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
