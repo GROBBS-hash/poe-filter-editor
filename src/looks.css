@@ -33,14 +33,14 @@
 .lk-edit .text { margin: 0 0 8px; }
 
 /* On/off switch per edit; an edit that's off stays listed, greyed out. */
-.onoff { flex: none; width: 34px; height: 19px; padding: 0; border-radius: 10px; border: none; position: relative;
-  background: #4a5262; cursor: pointer; }
-.onoff::after { content: ""; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px; border-radius: 50%; background: #e6e8ed;
-  transition: left .15s; }
-.onoff.on { background: var(--green); }
-.onoff.on::after { left: 17px; }
-.onoff:hover:not(:disabled) { background: #5b6476; }
-.onoff.on:hover:not(:disabled) { background: #4fbf6e; }
+.onoff { flex: none; width: 28px; height: 16px; min-height: 0; min-width: 0; padding: 0; border-radius: 8px; position: relative;
+  background: #3a404c; border: 1px solid var(--line-2); cursor: pointer; }
+.onoff::after { content: ""; position: absolute; top: 2px; left: 2px; width: 10px; height: 10px; border-radius: 50%; background: var(--muted);
+  transition: left .15s, background .15s; }
+.onoff.on { background: color-mix(in srgb, var(--green) 30%, var(--raised)); border-color: color-mix(in srgb, var(--green) 55%, transparent); }
+.onoff.on::after { left: 14px; background: var(--green); }
+.onoff:hover:not(:disabled) { background: #444b58; border-color: var(--muted); }
+.onoff.on:hover:not(:disabled) { background: color-mix(in srgb, var(--green) 40%, var(--raised)); border-color: var(--green); }
 .rule-line .onoff { margin-right: 2px; }
 .rules li.is-off .rule-main { opacity: .45; filter: grayscale(1); }
 .rules li.is-off .rule-scope { font-style: italic; }
