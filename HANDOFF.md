@@ -48,7 +48,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
-- **Atlas: one influence per map + Find on the atlas (23 Nov, not released yet).** He saw Ritual + Pack size + Map mod
+- **Atlas: one influence per map + Find on the atlas (23 Nov, released in 0.2.57).** He saw Ritual + Pack size + Map mod
   take both Eater of Worlds and Searing Exarch pack size; a map only has one Eldritch influence (and one of Conquerors /
   Shaper / Elder). atlas_opt.rs `ONE_PER_MAP`: the optimiser tries each side (`grow` per combination), keeps the best
   tree, and nodes for the other side are worth nothing (still walkable). Locking (Always) a node of a side forces that
@@ -1037,7 +1037,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
-- [ ] (next) Build my own, Ritual + Pack size + Map mod effect: only Eater of Worlds (or only Exarch) nodes, never both, and the gold note under "3 · Your tree" says which; Always on Word of the Exarch switches to the Exarch side. Type "pack size" in "Find on the atlas": nodes ringed, Enter steps through them.
+- [ ] (0.2.57) Build my own, Ritual + Pack size + Map mod effect: only Eater of Worlds (or only Exarch) nodes, never both, and the gold note under "3 · Your tree" says which; Always on Word of the Exarch switches to the Exarch side. Type "pack size" in "Find on the atlas": nodes ringed, Enter steps through them.
 - [ ] (0.2.56) Build my own: Ritual only → every Ritual notable (Flexible Dogma, A Light in the Dark…) and no Sacred Flora totals; tick Pack size → pack size nodes join; scrolling over the tree doesn't scroll the page.
 - [ ] (0.2.56) Map tiers: the Originator and Tier 16 rows say "Your edit wins: Rare Map (Tier 16)"; Remove it → the Originator look shows on the ground after F4. F2 on an Originator map: "Whole group" changes the Originator look on the Map tiers page; "Just this item" makes your own edit.
 - [ ] (0.2.56) Map pictures: a plain T16 map shows the plain XVI art (not Veritania's); Map tiers → Special maps rows show conqueror / Elder guardian / Blighted / Valdo pictures; F2 on a conqueror map shows that conqueror's art.
