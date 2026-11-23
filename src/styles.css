@@ -2313,3 +2313,18 @@ button.qm-rule:hover, .qm-rule.can-open:hover { border-color: var(--gold); backg
 .mt-pics { display: inline-flex; align-items: center; gap: 2px; margin-right: 8px; vertical-align: middle; }
 .mt-pics .item-icon { object-fit: contain; }
 .mt-zana-name { display: inline-flex; align-items: center; }
+/* F2: "All <group>" / "Just <this item>" (one rule in charge, 2A + 1A he chose 23 Nov). */
+.qm-scope-box { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.qm-scope { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.qm-scope button { flex: 1; min-width: 0; border: 0; border-right: 1px solid var(--line); border-radius: 0; background: var(--raised); color: var(--text-2);
+  padding: 6px 8px; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qm-scope button:last-child { border-right: 0; }
+.qm-scope button.on { background: var(--gold-bg); color: var(--gold); font-weight: 600; }
+.qm-applies { font-size: 12.5px; color: var(--text-2); background: var(--raised); border-radius: 6px; padding: 6px 9px; }
+.qm-applies b { color: var(--gold); font-weight: 600; }
+/* Map tiers: "Your edit wins" when one of your own edits decides how these maps look (3A, 23 Nov). */
+.mt-wins { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 8px 0 2px; padding: 7px 10px; border-radius: 8px;
+  background: var(--gold-bg); border: 1px solid color-mix(in srgb, var(--gold) 45%, var(--line)); font-size: 13px; color: var(--text-2); }
+.mt-wins b { color: var(--gold); font-weight: 600; }
+.mt-wins-badge { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #1a1405; background: var(--gold); border-radius: 4px; padding: 1px 6px; }
+.mt-zana .mt-wins { flex-basis: 100%; }

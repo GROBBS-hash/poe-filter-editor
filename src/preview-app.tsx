@@ -261,6 +261,11 @@ mockIPC((cmd, args) => {
   if (cmd === "batch_forget") { const k = (args as { keys: string[] | null }).keys; batchItems = k ? batchItems.filter((i) => !k.includes(`${i.rarity}|${i.base_type}|${i.rarity === "Unique" ? i.name ?? "" : ""}`)) : []; return null; }
   if (cmd === "item_status") {
     const it = (args as { item: { base_type: string } }).item;
+    // Like his Red-Maps: an F2 edit on every rare Tier 16 map wins over the Map tiers looks ("Your edit wins").
+    if (it.base_type === "Map (Tier 16)") return { area_level: 83, stackable: false, status: { assumptions: [], by_stack: [], verdict: { visibility: "Show", reason: "",
+      by_user_edit: true, uncertain: [], decided_by: "Style: Rare Map (Tier 16)",
+      style: { font_size: 45, text: [145, 30, 220, 255], border: [145, 30, 220, 255], background: [255, 255, 255, 255] },
+      source: { kind: "edit", label: "Style: Rare Map (Tier 16)", type_path: [], tier: null, section: null, tier_name: null } } } };
     const hidden = it.base_type === "Iron Ring";
     return { area_level: 83, stackable: false, status: { assumptions: [], by_stack: [], verdict: { visibility: hidden ? "Hide" : "Show", reason: "", by_user_edit: false, uncertain: [], decided_by: "",
       style: { font_size: 40, text: [255, 255, 255, 255], border: null, background: [0, 0, 0, 200] },

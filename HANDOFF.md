@@ -48,6 +48,16 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **One rule in charge: F2 "Whole group / Just this item" + "Your edit wins" notes (23 Nov, not released yet).** He
+  had F2 edits "Rare/Normal Map (Tier 16)" (GOOD MAP look) covering every T16 map, so the Originator look on Map
+  tiers never showed. He picked 1A + 2A + 3A from `.claude/mock-one-rule.html`:
+  - F2: when a NeverSink tier decides the item (not your edit), a switch **Whole group / Just this item** (remembered,
+    `f2.scope`, default whole group) and a line saying what changes. Whole group → new command `apply_to_tier` (tier
+    edit: show/hide, style or saved look) so the Tiers / Map tiers page and the game match; Just this item → your own
+    edit as before. Stack cut-offs stay item edits.
+  - Map tiers: each band's top tier and each Originator / citadel rule gets a sample rare map asked via `item_status`;
+    when your edit decides it, a gold **Your edit wins** note with its look, Change my edit (opens it) and Remove it.
+  - Checked on his real Red-Maps.filter: rare Originator T16 → "Style: Rare Map (Tier 16)" (`status_real` test, ignored).
 - **Right map pictures (23 Nov).** He saw Veritania's conqueror art on Originator maps. poe.ninja lists each map tier
   several times (plain + per conqueror / Elder guardian); the price job took the first. `tools/fetch_prices.py` `tinted()`:
   a picture with any extra mark (mc conqueror, mg/mi Elder guardian, mm Maven…) loses to the plain one (live on the prices
@@ -1013,6 +1023,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
+- [ ] (next) Map tiers: the Originator and Tier 16 rows say "Your edit wins: Rare Map (Tier 16)"; Remove it → the Originator look shows on the ground after F4. F2 on an Originator map: "Whole group" changes the Originator look on the Map tiers page; "Just this item" makes your own edit.
 - [ ] (next) Map pictures: a plain T16 map shows the plain XVI art (not Veritania's); Map tiers → Special maps rows show conqueror / Elder guardian / Blighted / Valdo pictures; F2 on a conqueror map shows that conqueror's art.
 - [ ] (0.2.55) Map tracker: run two maps; the clock keeps going while you play (only stops in the Escape menu / skill tree / alt-tabbed), and the loot box says "Last map · <name>".
 - [ ] (0.2.55) When the pathofexile.com login runs out: the red message has a "Log in again" button on that page; after logging in, it carries on (Sell in bulk reads the stash again).

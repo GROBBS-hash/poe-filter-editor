@@ -28,6 +28,50 @@ export default function MapTiers({ profileId, onChange, onOpen, focus }: { profi
 
   const load = () => invoke<MapData>("get_map_tiers", { id: profileId }).then(setData).catch((e) => setMsg(String(e)));
   useEffect(() => { load(); }, [profileId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // "Your edit wins here" (3A, 23 Nov): a sample map of each kind, asked who decides its look. When it's one of your
+  // own edits (e.g. F2's "Rare Map (Tier 16)" covering Originator maps too), that row says so.
+  const [wins, setWins] = useState<Record<string, Win>>({});
+  useEffect(() => {
+    if (!data) return;
+    let live = true;
+    (async () => {
+      const out: Record<string, Win> = {};
+      for (const [key, item] of winSamples(data)) {
+        try {
+          const r = await invoke<{ status: { verdict: { source?: { kind: string; label: string } | null; decided_by: string; style: CurrentStyle; visibility: string } } }>(
+            "item_status", { item, fromScreen: false });
+          const v = r.status.verdict;
+          if (v.source?.kind === "edit") out[key] = { label: v.decided_by, style: v.style, hidden: v.visibility === "Hide", source: v.source };
+        } catch { /* no verdict: say nothing */ }
+      }
+      if (live) setWins(out);
+    })();
+    return () => { live = false; };
+  }, [data]);
+  const removeEdit = async (w: Win) => {
+    setBusy(true);
+    try {
+      const [id, index] = await invoke<[string, number, unknown]>("get_rule", { id: null, index: null, label: w.label });
+      await invoke("delete_rule", { id, index });
+      setMsg(`Removed your edit “${w.label}”: the look here shows in game now. Press F4 in game.`); onChange(); await load();
+    } catch (e) { setMsg(String(e)); }
+    setBusy(false);
+  };
+  const winNote = (key: string, what: string) => {
+    const w = wins[key];
+    if (!w) return null;
+    return (
+      <div className="mt-wins">
+        <span className="mt-wins-badge">Your edit wins</span>
+        <span className="mt-wins-text">In game {what} {w.hidden ? <>are <b>hidden</b> by</> : <>show</>} your edit <b>{w.label.replace(/^(Style|Hide|Highlight|Preset): /, "")}</b>{w.hidden ? "" : ":"}</span>
+        {!w.hidden && <Preview s={fromCurrent(w.style, "Maps")} text="Map" />}
+        <span className="grow" />
+        <button className="link small" onClick={() => invoke("open_rule", { source: w.source })}>Change my edit</button>
+        <button className="link small" disabled={busy} onClick={() => removeEdit(w)}>Remove it, use this look</button>
+      </div>
+    );
+  };
   useEffect(() => {
     if (!focus || !data) return;
     window.setTimeout(() => document.querySelector(`[data-special="${CSS.escape(focus)}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
@@ -120,6 +164,7 @@ export default function MapTiers({ profileId, onChange, onOpen, focus }: { profi
                   onClick={() => change(MAPS, rows.map((r) => r.tier), { reset: true }, `${label} is back to NeverSink's.`)}>Reset</button>
               </span>
             </div>
+            {winNote("band:" + b, `rare Tier ${Math.max(...rows.map((x) => x.map_tier))} maps`)}
             {editing === b && (
               <div className="qm tier-edit">
                 <StyleEditor start={fromCurrent(rows[rows.length - 1].style, "Maps")} label={`Map (Tier ${rows[rows.length - 1].map_tier})`}
@@ -218,6 +263,7 @@ export default function MapTiers({ profileId, onChange, onOpen, focus }: { profi
                         <Preview s={fromCurrent(r.style, "Maps")} text={text} /></LookButton><span className="muted small">{citadel ? "Citadel" : "Originator"}</span></span>
                       {plain && <span className="mt-demo-one"><Preview s={fromCurrent(plain.style, "Maps")} text={text} /><span className="muted small">plain map</span></span>}
                     </span>
+                    {winNote(`${rk}:${r.tier}`, `rare ${citadel ? "citadel" : "Originator"} maps like these`)}
                     {editing === ek && (
                       <div className="qm tier-edit">
                         <StyleEditor start={fromCurrent(r.style, "Maps")} label={text}
@@ -247,4 +293,32 @@ export default function MapTiers({ profileId, onChange, onOpen, focus }: { profi
 /** The right game picture(s) for a kind of map: each conqueror's or Elder guardian's own map, Blighted, Valdo… */
 function MapPics({ names, size = 30 }: { names: string[]; size?: number }) {
   return <span className="mt-pics">{names.slice(0, 4).map((n) => <span key={n} title={n}><ItemIcon name={n} size={size} /></span>)}</span>;
+}
+
+type Win = { label: string; style: CurrentStyle; hidden: boolean; source: unknown };
+
+/** A rare map of this tier as F2 would read it (for asking who decides its look). */
+function sampleMap(tier: number, extra: Record<string, unknown> = {}) {
+  return { item_class: "Maps", rarity: "Rare", name: null, base_type: `Map (Tier ${tier})`, map_tier: tier, item_level: 83,
+    corrupted: false, mirrored: false, unidentified: false, ...extra };
+}
+
+/** One sample map per row that can be beaten by your own edits: each band's top tier, and each Originator / citadel rule. */
+function winSamples(data: MapData): [string, ReturnType<typeof sampleMap>][] {
+  const out: [string, ReturnType<typeof sampleMap>][] = [];
+  for (const b of new Set(data.tiers.map((t) => t.band))) {
+    const top = Math.max(...data.tiers.filter((t) => t.band === b).map((t) => t.map_tier));
+    out.push(["band:" + b, sampleMap(top)]);
+  }
+  for (const s of data.special) {
+    const zana = s.tiers.every((t) => t.tier.startsWith("zana"));
+    const citadel = s.type_path[1] === "implicitmod";
+    if (!zana && !citadel) continue;
+    const rk = s.type_path.join(">") + (zana ? ">zana" : "");
+    for (const r of s.tiers) {
+      const t = r.tier === "zanamap" || r.tier === "t1" ? 16 : 10;
+      out.push([`${rk}:${r.tier}`, sampleMap(t, zana ? { zana_memory: true, map_kind_known: true } : { has_implicit: true, occupied_by: "Drox" })]);
+    }
+  }
+  return out;
 }

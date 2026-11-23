@@ -2078,6 +2078,30 @@ fn apply_custom_style(state: State<AppState>, item: Item, style: Option<CustomSt
     Ok(ActionResult { label, warnings })
 }
 
+/// F2 with "All <group>" picked (23 Nov, he chose 2A): the change goes to the rule already in charge, the NeverSink
+/// tier the Tiers / Map tiers pages show, instead of a new edit on top, so the page and the game always match.
+/// `show` false hides the whole tier; `style` (or the saved look `look`) restyles it.
+#[tauri::command]
+fn apply_to_tier(state: State<AppState>, type_path: Vec<String>, tier: String, show: bool, style: Option<CustomStyle>,
+                 look: Option<String>) -> Result<ActionResult, String> {
+    let mut store = state.store.lock().unwrap();
+    let id = store.active.clone().ok_or("Set up a profile first")?;
+    let saved = look.as_deref().map(|n| store.find_look(n).cloned().ok_or_else(|| format!("There's no saved look called “{n}” any more"))).transpose()?;
+    let style = saved.as_ref().map(|l| l.style.clone()).or(style);
+    let label = format!("{} (whole group)", filter_core::tiers::tier_name(&tier));
+    remember(&state, &store, &id, &label);
+    let p = store.profiles.get_mut(&id).ok_or("Profile not found")?;
+    tier_edit(&mut p.rules, &type_path, &tier, Some(show), if show { style.as_ref() } else { None }, None, None, false);
+    if let (Some(l), true) = (&saved, show) {
+        if let Some(Rule::Tier { look, .. }) = p.rules.iter_mut().rev()
+            .find(|r| matches!(r, Rule::Tier { type_path: tp, tier: t, .. } if *tp == type_path && *t == tier)) {
+            *look = Some(l.name.clone());
+        }
+    }
+    let warnings = save_and_build(&state, &store, &id)?;
+    Ok(ActionResult { label, warnings })
+}
+
 fn active_game(state: &AppState) -> Game {
     let store = state.store.lock().unwrap();
     store.active.as_ref().and_then(|id| store.profiles.get(id)).map(|p| p.game).unwrap_or(Game::Poe1)
@@ -2990,7 +3014,7 @@ pub fn run() {
             apply_level_preset,
             ask,
             get_history,
-            get_icons,
+            get_icons, apply_to_tier,
             preview_drops,
             go_back
         ])

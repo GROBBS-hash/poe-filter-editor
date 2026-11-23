@@ -255,8 +255,21 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
   const opts = (extraOpts: { min_stack?: number; below_stack?: number } = {}) =>
     ({ same_rarity: !anyRarity, max_item_level: null, when, corrupted: onlyCorrupted, ...extraOpts });
 
+  /** "All <group>" (change the NeverSink rule in charge, like the Tiers / Map tiers page) or "Just this" (your own
+   *  edit on top). He chose this switch (2A) on 23 Nov so only one rule decides a look; remembered. */
+  const [scope, setScopeRaw] = useState<"group" | "item">(() => { try { return localStorage.getItem("f2.scope") === "item" ? "item" : "group"; } catch { return "group"; } });
+  const setScope = (s: "group" | "item") => { setScopeRaw(s); try { localStorage.setItem("f2.scope", s); } catch { /* not kept */ } };
+  const groupSrc = status?.verdict.source;
+  /** The NeverSink rule in charge, when there is one F2 can change for the whole group. */
+  const group = !replacing && groupSrc?.kind === "neversink" && groupSrc.type_path.length > 0 && groupSrc.tier ? groupSrc : null;
+  const groupName = group ? (group.tier_name ?? group.tier ?? "") : "";
+
   /** Every change goes through here: a new edit, or (when editing a rule) that rule replaced. */
   const commit = (show: boolean, style: CustomStyle | null, stack: { min_stack?: number; below_stack?: number }, addNew = false, look: string | null = null) => {
+    // "All <group>": change the rule already in charge (stack cut-offs stay your own edits).
+    if (group && scope === "group" && stack.min_stack === undefined && stack.below_stack === undefined) {
+      return saved(invoke("apply_to_tier", { typePath: group.type_path, tier: group.tier, show, style, look }));
+    }
     if (replacing && !addNew) {
       const d = replacing.detail;
       const keepStack = stack.min_stack === undefined && stack.below_stack === undefined;
@@ -474,6 +487,17 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
               </>
             );
           })()}
+          {group && (
+            <div className="qm-scope-box">
+              <div className="qm-scope" role="radiogroup" aria-label="What the buttons below change">
+                <button role="radio" aria-checked={scope === "group"} className={scope === "group" ? "on" : ""} onClick={() => setScope("group")} title={`All of ${groupName}`}>Whole group</button>
+                <button role="radio" aria-checked={scope === "item"} className={scope === "item" ? "on" : ""} onClick={() => setScope("item")} title={`Just ${itemTitle(item)}`}>Just this item</button>
+              </div>
+              <div className="qm-applies">{scope === "group"
+                ? <>Changes <b>{groupName}</b> (every one of them), the same rule as on the Tiers page.</>
+                : <>Makes your own edit for just <b>{itemTitle(item)}</b>, shown in My edits. It wins over <b>{groupName}</b>.</>}</div>
+            </div>
+          )}
           {status!.by_stack.length > 0 && <div className="qm-facts">Stacks: {stackLine(status!.by_stack)}</div>}
           {(v.uncertain.length > 0 || status!.assumptions.length > 0 || extra?.area_level != null) && (
             <div className="qm-unsure" title={[

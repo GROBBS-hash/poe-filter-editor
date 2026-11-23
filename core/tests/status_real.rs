@@ -206,3 +206,19 @@ fn ground_rare_isnt_read_as_its_unique() {
     apply_tooltip_checked(&segs, &mut it, &t, Some(seen), 83);
     assert_eq!((it.rarity.as_str(), it.item_level), ("Rare", Some(86)));
 }
+
+/// Dev check on his own built filter (23 Nov): who decides a rare Originator T16 map? His F2 edit "Rare Map (Tier 16)"
+/// covers every T16 map, so the Map tiers page's Originator look never shows (the "Your edit wins" note).
+/// `LODESTONE_FILTER="<path to Red-Maps.filter>" cargo test -p filter-core --test status_real originator -- --ignored --nocapture`
+#[test]
+#[ignore]
+fn originator_t16_decided_by_edit() {
+    let path = std::env::var("LODESTONE_FILTER").expect("LODESTONE_FILTER");
+    let segs = parse_filter(&std::fs::read_to_string(path).unwrap());
+    let mut it = parse_item("Item Class: Maps\nRarity: Rare\nGrim Trail\nMap (Tier 16)\n--------\nMap Tier: 16\n--------\nItem Level: 83\n--------\nArea is influenced by the Originator's Memories (implicit)\n").unwrap();
+    fill_class(&mut it);
+    assert!(it.zana_memory);
+    let s = status(&segs, &it, Some(83), false);
+    println!("decided by {:?} (user edit: {})", s.verdict.decided_by, s.verdict.by_user_edit);
+    assert!(s.verdict.by_user_edit);
+}
