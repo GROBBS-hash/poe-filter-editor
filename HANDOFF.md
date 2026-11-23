@@ -1460,7 +1460,9 @@ when the game window isn't found. Check in game: the window's spot, and that it 
    fixed at registration), scopes account:characters + account:stashes, 10 h access / 7 day refresh tokens, User-Agent
    "OAuth {clientId}/{version} (contact: …)"; its character endpoint still returns experience, so XP per hour could come
    back. The "Log in with pathofexile.com" button (built 22 Nov, see Done) covers it until then.
-5. Deferred earlier: PoE 2 coverage. Batch mode tidy-up done 21 Nov (see "Batch mode"). (Installer + auto-update done 21 Nov: see "Installer and updates".)
+5. **Atlas Strategy Builder (idea 23 Nov, not started).** Pick strategies (e.g. Ritual + Harvest) → creator-pick trees
+   (Maxroll, Mobalytics, YouTube) to load and adjust, plus an optimiser for his own trees. Full plan: `ATLAS_STRATEGY_PLAN.md`.
+6. Deferred earlier: PoE 2 coverage. Batch mode tidy-up done 21 Nov (see "Batch mode"). (Installer + auto-update done 21 Nov: see "Installer and updates".)
 
 ## Known caveats
 - This cloud workspace can't reach pathofexile.com / poe.ninja / poeprices.info, so network code is only tested by
