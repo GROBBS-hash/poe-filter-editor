@@ -984,7 +984,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
-- [ ] (next) Alt-tab out of the game: F5 refreshes the browser, F2/F7/Ctrl+D etc. do nothing outside the game; back in the game they all work again (also with the price window or map tracker in front).
+- [ ] (0.2.53) Alt-tab out of the game: F5 refreshes the browser, F2/F7/Ctrl+D etc. do nothing outside the game; back in the game they all work again (also with the price window or map tracker in front).
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
 (move them to "Confirmed in game") as he reports back, and add new features here as they land.
 Confirmed in game so far: basic Ctrl+D price check (trade search returned listings); 20 Nov: weapon + armour
