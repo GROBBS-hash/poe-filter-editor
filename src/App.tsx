@@ -20,6 +20,7 @@ import Gear from "./Gear";
 import MyBuild from "./MyBuild";
 import Maps from "./Maps";
 import Wealth from "./Wealth";
+import Bulk from "./Bulk";
 import PlayTools from "./Play";
 import Atlas from "./Atlas";
 import Craft from "./Craft";
@@ -31,7 +32,7 @@ import { HOTKEYS, keyOf } from "./hotkeys";
 /** Where the main window's look is kept (Settings writes it too). */
 export const APP_LOOK_KEY = "app.look";
 
-type Tab = "home" | "help" | "find" | "presets" | "tiers" | "gear" | "build" | "maps" | "atlas" | "wealth" | "pricecheck" | "craft" | "play" | "edits" | "prices" | "themes" | "batch" | "profiles" | "settings";
+type Tab = "home" | "help" | "find" | "presets" | "tiers" | "gear" | "build" | "maps" | "atlas" | "wealth" | "bulk" | "pricecheck" | "craft" | "play" | "edits" | "prices" | "themes" | "batch" | "profiles" | "settings";
 
 /** Small line icons for the side menu. */
 /** Each page's colour: a tinted tile behind its menu icon (and page title) so the menu is easy to scan. */
@@ -39,7 +40,7 @@ const COLOURS: Record<Tab, string> = {
   find: "#6aa8ff", tiers: "#ff8a65", presets: "#b48cff", themes: "#ff7eb6", prices: "#5fd38a",
   edits: "#4fd1c5", batch: "#ffa95a",
   build: "#7ad0ff", gear: "#f0b45a",
-  maps: "#8bd67a", atlas: "#a78bfa", wealth: "#f5c542", pricecheck: "#f5c542", craft: "#ff9f6b", play: "#6fd0a6",
+  maps: "#8bd67a", atlas: "#a78bfa", wealth: "#f5c542", bulk: "#f5c542", pricecheck: "#f5c542", craft: "#ff9f6b", play: "#6fd0a6",
   profiles: "#9fb0c8", settings: "#9fb0c8", help: "#6aa8ff", home: "#e2b96f",
 };
 
@@ -58,6 +59,7 @@ const ICONS: Record<Tab, string> = {
   atlas: "M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 3v18M4 7.5l8 4.5 8-4.5",
   wealth: "M4 7h16v12H4zM4 7l2-3h12l2 3M9 12h6",
   pricecheck: "M3 12V4h8l10 10-8 8zM7.5 7.5h.01",
+  bulk: "M4 9h16l-1.5 11h-13zM8 9l4-5 4 5M9 13v4M15 13v4",
   play: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2",
   craft: "M14 4l6 6-3 3-6-6zM11 7L4 14l2 2 7-7M6 16l-2 4 4-2M15 15l5 5",
   profiles: "M3 7h6l2 2h10v10H3zM3 7v12",
@@ -104,6 +106,7 @@ const MENU: { group: string; sub?: string; colour?: string; items: MenuItem[] }[
   { group: "Money", sub: "What items sell for, what your stash is worth, what you earn", colour: G_MONEY, items: [
     { id: "pricecheck", name: "Price check", hint: "What an item sells for: hover it in game and press Ctrl+D. Plus your saved and live searches" },
     { id: "wealth", name: "Stash worth", hint: "What your stash is worth, what to sell, and what each farming strategy earns" },
+    { id: "bulk", name: "Sell in bulk", hint: "Sell lots of one kind (currency, essences, cards, lifeforce…): the price to type in game, the total and a Discord post" },
   ] },
 ];
 /** A page's colour: its group's colour, or its own (Home, Settings, Help). */
@@ -356,6 +359,7 @@ export default function App() {
       {tab === "maps" && <Maps />}
       {tab === "atlas" && <Atlas />}
       {tab === "wealth" && <Wealth />}
+      {tab === "bulk" && <Bulk />}
       {tab === "pricecheck" && <PriceCheck keys={keys} />}
       {tab === "play" && <PlayTools />}
       {tab === "craft" && <Craft />}

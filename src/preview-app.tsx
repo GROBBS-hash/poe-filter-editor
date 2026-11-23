@@ -139,6 +139,30 @@ mockIPC((cmd, args) => {
     return { name: "Sam's Strict", game: "Poe1", strictness: 3, edits: 31, edits_off: 2, looks: ["Chase", "Quiet"], theme: "Ember", prices: true }; }
   if (cmd === "import_pack") return "sams-strict";
   if (cmd === "set_rule_off") { const a = args as { index: number; off: boolean }; rules = rules.map((r, i) => i === a.index ? { ...r, off: a.off, detail: { ...r.detail, off: a.off } } : r); return []; }
+  // Sell in bulk: a few groups, the basket priced like the app (fraction "total/count" in chaos, divines from 1 div each).
+  if (cmd === "bulk_get") return { divine: 180, league: "Keepers", scanned: Math.floor(Date.now() / 1000) - 1500, profile: "", has_sessid: true,
+    groups: ["Currency", "Essences", "Div cards", "Fragments", "Lifeforce", "Threads"],
+    items: ([["Divine Orb", "Currency", 3, 180, "$$$"], ["Orb of Alchemy", "Currency", 380, 0.3, "Dump 1, Currency"], ["Orb of Fusing", "Currency", 140, 0.45, "Currency"],
+      ["Deafening Essence of Contempt", "Essences", 18, 6, "Dump 1"], ["Deafening Essence of Greed", "Essences", 24, 4, "Dump 1, Dump 2"], ["Shrieking Essence of Hatred", "Essences", 40, 1.2, "Dump 2"], ["Screaming Essence of Woe", "Essences", 3, 0.5, "Dump 2"],
+      ["The Wrath", "Div cards", 9, 11, "Cards"], ["Rain of Chaos", "Div cards", 30, 0.4, "Cards"], ["Fragment of the Hydra", "Fragments", 4, 30, "Frags"],
+      ["Wild Crystallised Lifeforce", "Lifeforce", 4200, 0.02, "Dump 2"], ["Abyss Thread", "Threads", 12, 3, "Dump 1"]] as [string, string, number, number, string][])
+      .map(([name, group, have, each, tabs]) => ({ name, group, have, each, icon: "", tabs, set: name === "The Wrath" ? 8 : name === "Rain of Chaos" ? 8 : null })) };
+  if (cmd === "bulk_basket") {
+    const a = args as { picks: { name: string; count: number; each: number }[]; discount: number; title: string; character: string };
+    const gcd = (x: number, y: number): number => (y ? gcd(y, x % y) : Math.max(1, x));
+    const rows = a.picks.map((p) => {
+      const each = p.each * (1 - a.discount / 100);
+      if (each >= 180) { const d = Math.round(each / 18) / 10; return { name: p.name, count: p.count, note: { amount: String(d), currency: "divine", each: d * 180 }, total: d * 180 * p.count }; }
+      const t = Math.max(1, Math.round(each * p.count)); const g = gcd(t, p.count);
+      return { name: p.name, count: p.count, note: { amount: p.count / g === 1 ? String(t / g) : `${t / g}/${p.count / g}`, currency: "chaos", each: t / p.count }, total: t };
+    });
+    const total = rows.reduce((s, r) => s + r.total, 0);
+    const txt = (c: number) => (c >= 180 ? `${Math.round(c)}c (${+(c / 180).toFixed(1)} div)` : `${Math.round(c)}c`);
+    const post = rows.length ? [`WTS Keepers · ${a.title || "Bulk"}`, ...rows.map((r) => `${r.count}x ${r.name} · ${Math.round(r.total)}c`),
+      `All for ${txt(total)}${a.discount ? ` · ${a.discount}% under market` : ""}`, ...(a.character ? [`IGN: @${a.character}`] : [])].join("\n") : "";
+    return { rows, total, total_text: txt(total), post };
+  }
+  if (cmd === "bulk_live") return new Promise((r) => setTimeout(() => r({ chaos: (args as { each: number }).each * ((args as { name: string }).name.includes("Lifeforce") ? 50 : 0.92), offers: 20, url: "", fair: !(args as { name: string }).name.includes("Lifeforce") }), 400));
   if (cmd === "wealth_get") return wealth;
   if (cmd === "buy_base_item") return { total: 3480, ilvl: 75, notables: [["Doryani's Lesson", 68], ["Inspired Oppression", 75], ["Overshock", 50]] };
   if (cmd === "get_price_settings") return { settings: { enabled: false, groups: [{ group: "DivinationCards", enabled: true, tiers: [], hide_below: null }, { group: "Uniques", enabled: true, tiers: [], hide_below: null }] }, info: { unit: "chaos", league: "Keepers", updated: new Date().toISOString(), count: 18432 } };

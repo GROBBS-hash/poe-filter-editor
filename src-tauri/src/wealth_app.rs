@@ -239,6 +239,12 @@ fn view(app: &AppHandle) -> WealthView {
     }
 }
 
+/// The last scan's priced items and its snapshot (for Sell in bulk).
+pub(crate) fn last_scan(app: &AppHandle) -> (Vec<Valued>, Option<Snapshot>) {
+    let state = app.state::<AppState>();
+    with_store(&state, |s| (s.last_items.clone(), s.snapshots.last().cloned()))
+}
+
 #[tauri::command]
 pub fn wealth_get(app: AppHandle) -> WealthView { view(&app) }
 

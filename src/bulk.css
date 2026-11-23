@@ -1,0 +1,35 @@
+/* Sell in bulk (Bulk.tsx): group cards + list on the left, sell basket on the right (mock-up B, 23 Nov). */
+.bk-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.bk-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(300px, 1fr); gap: 12px; align-items: start; }
+@media (max-width: 900px) { .bk-grid { grid-template-columns: 1fr; } }
+.bk-cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.bk-cat { display: flex; gap: 10px; align-items: center; text-align: left; padding: 9px 10px; border-radius: 10px;
+  background: var(--panel); border: 1px solid var(--line); cursor: pointer; }
+.bk-cat:hover { border-color: var(--line-2); }
+.bk-cat.on { border-color: var(--gold); background: var(--gold-bg); }
+.bk-cat b { display: block; font-weight: 600; }
+.bk-cat .item-icon { flex: none; }
+.bk-list-head { justify-content: space-between; }
+.bk-list-head h2 { margin: 0; }
+.bk-table tr { cursor: pointer; }
+.bk-table tr:hover td { background: rgba(255, 255, 255, .03); }
+.bk-table tr.on td { background: var(--gold-bg); }
+.bk-table td { vertical-align: middle; }
+.bk-table .n, .bk-notes .n, .bk-table th.n { text-align: right; white-space: nowrap; }
+.bk-tag { margin-left: 6px; font-size: 11px; border-radius: 4px; padding: 1px 6px; background: rgba(98, 207, 128, .15); color: var(--green); }
+.bk-min { margin-top: 8px; gap: 6px; }
+.bk-min input { width: 56px; margin: 0 4px; }
+.bk-basket { position: sticky; top: 12px; }
+.bk-basket h3 { font-size: 14px; margin: 14px 0 4px; font-weight: 600; }
+.bk-disc { gap: 8px; }
+.bk-disc input[type=range] { accent-color: var(--gold); flex: 1; min-width: 100px; }
+.bk-gold { color: var(--gold); min-width: 56px; }
+.bk-total { display: flex; flex-direction: column; gap: 2px; background: var(--gold-bg); border: 1px solid rgba(220, 178, 90, .35);
+  border-radius: 8px; padding: 10px 12px; margin: 10px 0 4px; }
+.bk-note { font-family: Consolas, monospace; color: var(--gold); background: #0f1115; border-radius: 5px; padding: 2px 7px; }
+.bk-sub { font-size: 12px; color: var(--muted); margin-top: 2px;  font-family: inherit; }
+.bk-notes .bk-sub input.bk-count { width: 64px; height: 22px; padding: 0 4px; margin: 0 3px; font-size: 12px; font-variant: normal; }
+.bk-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.bk-inputs label { display: flex; flex-direction: column; font-size: 12px; color: var(--muted); }
+.bk-post { font-family: Consolas, monospace; font-size: 12px; background: #0f1115; border-radius: 6px; padding: 10px; white-space: pre-wrap;
+  color: var(--text-2); margin: 8px 0; max-height: 260px; overflow: auto; }

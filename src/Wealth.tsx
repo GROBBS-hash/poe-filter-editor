@@ -526,7 +526,7 @@ export default function Wealth() {
 
 /** Lights these items up in the game's stash: types a search of their names into the stash search box (it's also
  *  copied). The game's box holds 250 characters, so a long list starts with the most valuable ones. */
-function HighlightInStash({ names }: { names: string[] }) {
+export function HighlightInStash({ names }: { names: string[] }) {
   const [note, setNote] = useState("");
   const go = (typeIt: boolean) => {
     setNote("");

@@ -48,6 +48,21 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **Sell in bulk (23 Nov, not released yet).** New page Money → Sell in bulk (Bulky-style helper; he picked mock-up B
+  "groups + sell basket" from `.claude/mock-bulk-sell.html`, not committed). Reads the last Stash worth scan
+  (`WealthStore.last_items`, so top 3000 by value; "Read my stash again" runs `wealth_scan`), adds up unlisted items by
+  name and groups them by poe.ninja category (`core/src/bulk.rs`: Currency, Essences, Div cards, Fragments, Lifeforce,
+  Threads, Catalysts, Fossils, Oils, Delirium orbs, Omens, Eldritch, Maps, Tattoos & runegrafts; uniques, gems, rares and
+  Chaos Orbs left out). Left: group cards + the group's items (tick, hide stacks under N chaos). Right: sell basket with a
+  "market −N%" slider (0–30, default 10), the total, per item the amount to type in the game's Exact price box
+  (`price_note`: whole-number fraction "total/count" in chaos, reduced, e.g. 43/12; divines with one decimal for items
+  worth a divine or more after the discount), "sell N of M", Highlight in stash (Wealth's `HighlightInStash`), and a
+  WTS post for Discord/TFT (title + "IGN: @name" remembered). "Check live prices" asks the bulk exchange for the 12 most
+  valuable picks one at a time (`bulk_live`, stock-weighted middle like Ctrl+D); a live rate more than 3x off poe.ninja
+  is ignored (`fair_live`; tested live 23 Nov: Wild Lifeforce's cheapest chaos offer was 1c each vs 0.02c on
+  poe.ninja, Deafening Greed 10c vs 6.15c). Nothing is listed or traded for him: GGG gives apps no way to set prices.
+  Code: `core/src/bulk.rs` (tests), `src-tauri/src/bulk_app.rs` (`bulk_get`, `bulk_basket`, `bulk_live`), `src/Bulk.tsx`,
+  `src/bulk.css`; preview mocks in `src/preview-app.tsx`.
 - **Atlas: edit a saved tree + Totals (23 Nov, not released yet).** He picked layout B and asked for poeatlas-style totals.
   - Atlas page → a strategy → **Edit this tree**: click a grey point to add it (shortest way there), a gold one to take
     it off (with anything only joined through it); hover shows it first in green/red with "+N / −N points". Side panel:
@@ -969,6 +984,13 @@ Everything below was built since GROBBS last tested and has only been checked wi
 Confirmed in game so far: basic Ctrl+D price check (trade search returned listings); 20 Nov: weapon + armour
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
+**Sell in bulk (23 Nov, not released yet):**
+- [ ] Money → Sell in bulk: your groups show with item pictures (after a Stash worth scan, or "Read my stash again").
+- [ ] Tick a few essences or currency: the basket shows the total, and per item what to type. Right-click one in a public
+  premium tab → Exact price → type it (e.g. 43/12, chaos): the trade site shows the right price each.
+- [ ] "Check live prices": the live rate shows under each item; lifeforce says "too far off: kept poe.ninja".
+- [ ] Highlight in stash lights up the basket's items; Copy post gives a sensible Discord post.
+
 **Saved looks, switch edits off, share packs (23 Nov, released in 0.2.51):**
 - [ ] F2 on a highlighted item → "+ Save this look" → name it "My chase look": it appears as a label button.
   F2 on another item → click it: that item gets the same look after F4.
@@ -1519,8 +1541,7 @@ when the game window isn't found. Check in game: the window's spot, and that it 
       "Best strategies" ranks runs.
 
 ## Left to do (agreed order)
-0. **Play tools (22 Nov) released in 0.2.39.** Not built yet: live rank/race tracker (PoeRank-style), bulk-selling helper
-   (Bulky-style), PoE 2's campaign route, crafting methods still unmodelled (veiled, conqueror exalts, awakener,
+0. **Play tools (22 Nov) released in 0.2.39.** Bulk-selling helper done 23 Nov (Sell in bulk, see Done). Not built yet: live rank/race tracker (PoeRank-style), PoE 2's campaign route, crafting methods still unmodelled (veiled, conqueror exalts, awakener,
    recombinators, beastcraft), PoE 2 crafting.
 1. **GROBBS to work through "Still to check in game" above**; fix what he reports.
 2. Wealth tracker follow-ups (real account tested and rares priced via the trade site, 21 Nov):
