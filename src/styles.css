@@ -2222,3 +2222,29 @@ button.qm-rule:hover, .qm-rule.can-open:hover { border-color: var(--gold); backg
 .ap-fit.part { color: var(--muted); }
 .ap-none { padding: 6px 2px 10px; }
 .ap .primary { color: #1a1405; font-weight: 700; }
+/* "Build my own" tab (atlas optimiser, layout A he chose 23 Nov). */
+.ap-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 6px 0 8px; }
+.ap-tabs button { background: none; border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 7px 14px; color: var(--muted); }
+.ap-tabs button:hover:not(:disabled) { background: none; color: var(--text); }
+.ap-tabs button.on { color: var(--text); border-bottom-color: var(--gold); }
+.ap-how { margin: 0; }
+.ap-seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.ap-seg button { border: 0; border-right: 1px solid var(--line); border-radius: 0; background: var(--raised); color: var(--text-2); padding: 6px 14px; }
+.ap-seg button:last-child { border-right: 0; }
+.ap-seg button.on { background: var(--gold-bg); color: var(--gold); font-weight: 600; }
+.ap-pins { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; }
+.ap-pin { border-radius: 999px; padding: 2px 10px; font-size: 12.5px; background: var(--raised); }
+.ap-pin.lock { border-color: color-mix(in srgb, var(--green) 50%, var(--line)); color: var(--green); }
+.ap-pin.block { border-color: color-mix(in srgb, var(--red) 45%, var(--line)); color: var(--red); }
+.ap-own { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 14px; align-items: start; }
+.ap-own-side { max-height: 640px; overflow: auto; padding-right: 4px; }
+.ap-work { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; padding: 7px 4px; border-bottom: 1px solid var(--line); }
+.ap-work b { font-size: 13.5px; }
+.ap-work.weak b { color: var(--text-2); font-weight: 500; }
+.ap-why { grid-column: 1; color: var(--muted); font-size: 12px; }
+.ap-acts { grid-row: 1 / 3; grid-column: 2; display: flex; gap: 4px; }
+.ap-mini { font-size: 11.5px; padding: 2px 8px; border-radius: 5px; background: var(--raised); color: var(--text-2); }
+.ap-mini.lock:hover:not(:disabled), .ap-mini.lock.on { border-color: color-mix(in srgb, var(--green) 50%, var(--line)); color: var(--green); background: color-mix(in srgb, var(--green) 10%, var(--raised)); }
+.ap-mini.block:hover:not(:disabled), .ap-mini.block.on { border-color: color-mix(in srgb, var(--red) 45%, var(--line)); color: var(--red); background: color-mix(in srgb, var(--red) 10%, var(--raised)); }
+.ap-weak-h { display: block; margin-top: 14px; }
+@media (max-width: 1100px) { .ap-own { grid-template-columns: 1fr; } .ap-own-side { max-height: none; } }

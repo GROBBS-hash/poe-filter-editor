@@ -51,6 +51,9 @@ The optimiser needs a rough value for each node per strategy. Options, simplest 
 - Saving a pick already makes a separate copy (the creator's tree stays on maxroll), so step 2 is about editing
   the copy's tree in the app, which isn't possible yet.
 
+- 23 Nov: step 3 built ("Build my own" tab, layout A): optimiser in `core/src/atlas_opt.rs` using options 1 + 2 below
+  (node text / tree areas, and which nodes creator trees take). Option 3 (wealth tracker results) is still to do.
+
 ## Suggested Build Order
 
 1. Creator picks with a small hand-picked list of trees, loaded into the existing planner.

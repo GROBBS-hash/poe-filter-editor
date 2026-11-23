@@ -147,6 +147,20 @@ mockIPC((cmd, args) => {
   if (cmd === "atlas_own_notes") { const a = args as { id: number; text: string }; atlas = { ...atlas, list: atlas.list.map((s) => s.id === a.id ? { ...s, own_notes: a.text } : s) }; return atlas; }
   if (cmd === "atlas_delete") { const a = args as { id: number }; atlas = { ...atlas, list: atlas.list.filter((s) => s.id !== a.id) }; return atlas; }
   if (cmd === "atlas_import") throw "The preview can't reach maxroll: try it in the app";
+  if (cmd === "atlas_optimise" || cmd === "atlas_save_plan") {
+    // Stand-in for core atlas_opt.rs: maxroll's sample tree, shorter for fewer points, minus blocked nodes.
+    const ask = (args as { ask: { mechanics: string[]; priority: string; lock: number[]; block: number[] } }).ask;
+    const n = ask.priority === "fewest" ? 60 : ask.priority === "balanced" ? 90 : mxVariant.history.length;
+    const pts = [...new Set([...ask.lock, ...mxVariant.history.slice(0, n)])].filter((x: number) => !ask.block.includes(x));
+    const nodes = atlasData.nodes as unknown as Record<string, [number, number, number, string]>;
+    const notable = pts.filter((x: number) => nodes[x]?.[2] === 1);
+    const work = (x: number, i: number) => ({ node: x, name: nodes[x][3], value: 4 - i * 0.1, why: `${ask.mechanics[0]} node · taken by ${5 - (i % 4)} of 7 trees` });
+    const plan = { nodes: [29045, ...pts], steps: atlasSteps(pts), choices: [], points: pts.length, budget: 150,
+      top: notable.slice(0, 10).map(work), weak: notable.slice(10, 12).map((x: number, i: number) => ({ ...work(x, i), why: "on the way to better nodes" })), trees_used: 7 };
+    if (cmd === "atlas_optimise") return plan;
+    atlas = { ...atlas, active: 99, list: [...atlas.list, { ...atlas.list[0], id: 99, name: `${ask.mechanics.join(" + ")} (optimiser)`, site: "optimiser", link: "" }] };
+    return atlas;
+  }
   if (cmd === "pob_get") return pob();
   if (cmd === "build_tree_opt") return [true, "P"];
   if (cmd === "list_sounds") return [];

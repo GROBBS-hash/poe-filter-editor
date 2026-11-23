@@ -48,6 +48,19 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **Atlas optimiser: "Build my own" tab (23 Nov, not released yet).** Step 3 of ATLAS_STRATEGY_PLAN.md; layout A he chose.
+  - Second tab in "Build an atlas from strategies", same mechanic tiles (+ Div cards). Fewest points / Balanced / Most
+    profit with their point counts, the tree, "Doing the most" (why each notable: "Harvest node · taken by 5 of 7
+    Harvest/Breach trees") and "Doing little", Always / Never on each (chips to undo), Save as my strategy (site
+    "optimiser", notes say how it was built). Picks, priority and Always/Never are remembered (localStorage).
+  - Core `core/src/atlas_opt.rs`: node value = 3x(notable) x text/area match for the mechanics (MECHANICS table: words +
+    the tree area names, e.g. "Sacred Flora" = Harvest) + 2x share of the creator trees for those mechanics taking it
+    + 0.3x share of all creator trees. Then best value-per-point path from the start (locks first, never through
+    blocks) to 150 points; Fewest / Balanced cut that order at 60% / 85% of its value (Harvest + Breach: 76 / 120 / 150).
+    Multiple-choice notables pick the effect naming a picked mechanic. Commands `atlas_optimise`, `atlas_save_plan`.
+    Dev look: `ATLAS_OPT=harvest,breach cargo test -p filter-core --lib atlas_opt::show -- --ignored --nocapture`.
+  - Creator trees now carry their nodes in `public/atlas_picks.json` (targets/exclude; filled by fill_paths) for this.
+  - Mock-ups: `.claude/mock-atlas-optimiser.html` (not committed).
 - **Atlas: "Build an atlas from strategies" (creator picks, 23 Nov, released in 0.2.50).** Step 1 of ATLAS_STRATEGY_PLAN.md.
   - Top of the Atlas page (he picked layout C from 4 mock-ups): tiles to pick what to farm (each with its thread picture;
     scarabs are gone since 3.30), then creator trees that fit, best match first ("✓ Both" / "1 of 2"), Maxroll team
@@ -1424,6 +1437,7 @@ when the game window isn't found. Check in game: the window's spot, and that it 
       if some still look missing in F6, ask which stage and which gems.
 
 **Atlas strategies (Endgame → Atlas, F7, new 20 Nov)**
+- [ ] (next) Atlas page → Build my own: pick e.g. Harvest + Breach; the three point counts show; the tree looks sensible for those mechanics; Never on a node rebuilds without it; Save as my strategy → shows on F7.
 - [ ] (0.2.50) Atlas page "Build an atlas from strategies": pick e.g. Harvest + Breach, press Use this tree on one; it lands in My strategies, shows in game on F7, and matches what maxroll shows.
 - [ ] Import a maxroll farming strategy link and a pathofexile.com atlas tree link; both show the tree on the page.
 - [ ] Rename / delete / "In game" pick work and are still there after restarting the editor.
@@ -1477,7 +1491,7 @@ when the game window isn't found. Check in game: the window's spot, and that it 
    fixed at registration), scopes account:characters + account:stashes, 10 h access / 7 day refresh tokens, User-Agent
    "OAuth {clientId}/{version} (contact: …)"; its character endpoint still returns experience, so XP per hour could come
    back. The "Log in with pathofexile.com" button (built 22 Nov, see Done) covers it until then.
-5. **Atlas Strategy Builder (idea 23 Nov; step 1 creator picks done 23 Nov, see Done).** Pick strategies (e.g. Ritual + Harvest) → creator-pick trees
+5. **Atlas Strategy Builder (idea 23 Nov; step 1 creator picks + step 3 optimiser done 23 Nov, see Done; next: editing a saved tree, wealth-tracker results).** Pick strategies (e.g. Ritual + Harvest) → creator-pick trees
    (Maxroll, Mobalytics, YouTube) to load and adjust, plus an optimiser for his own trees. Full plan: `ATLAS_STRATEGY_PLAN.md`.
 6. Deferred earlier: PoE 2 coverage. Batch mode tidy-up done 21 Nov (see "Batch mode"). (Installer + auto-update done 21 Nov: see "Installer and updates".)
 7. **Ideas from PoeFilterX (he asked 23 Nov to add these; do 7a + 7b first).** github.com/SteffenBlake/PoeFilterX is a

@@ -6,7 +6,7 @@ import AtlasTreeView, { AtlasStore, AtlasStrategy, ChoiceList, StepBar, StepList
 import { PageLoading } from "./Loading";
 import AtlasPicks from "./AtlasPicks";
 
-const SITE: Record<string, string> = { maxroll: "maxroll", official: "pathofexile.com" };
+const SITE: Record<string, string> = { maxroll: "maxroll", official: "pathofexile.com", optimiser: "built by the optimiser" };
 
 /** Endgame → Atlas: import atlas strategies from a link, keep them by name, pick the one shown in game. */
 export default function Atlas() {
