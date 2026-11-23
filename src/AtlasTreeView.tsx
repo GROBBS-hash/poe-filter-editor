@@ -210,6 +210,8 @@ export default function AtlasTreeView({ nodes, choices = [], steps, step, height
     setBox({ x: Math.min(...xs) - pad, y: Math.min(...ys) - pad, w: Math.max(...xs) - Math.min(...xs) + pad * 2, h: Math.max(...ys) - Math.min(...ys) + pad * 2 });
   };
   useEffect(() => {
+    // Editing: a click adds or takes off points; keep the view where he zoomed to (he asked 23 Nov).
+    if (onPick && boxNow.current) return;
     const b = stepping ? around(have) : null;
     if (b) setBox(b); else fit();
   }, [tree, nodes.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
