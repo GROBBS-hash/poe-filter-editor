@@ -9,9 +9,21 @@ use std::collections::HashSet;
 #[serde(tag = "kind")]
 pub enum Rule {
     /// A block placed at the very top of the filter, so it wins over everything.
-    Override { label: String, show: bool, conditions: Vec<String>, actions: Vec<String> },
+    Override {
+        label: String, show: bool, conditions: Vec<String>, actions: Vec<String>,
+        /// Switched off: kept in the list but left out when the filter is built.
+        #[serde(default, skip_serializing_if = "is_false")]
+        off: bool,
+        /// Uses this saved look: changing the look changes this edit's actions too.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        look: Option<String>,
+    },
     /// Move a base into another of NeverSink's tiers within the same section.
-    MoveBase { type_path: Vec<String>, base: String, to_tier: String },
+    MoveBase {
+        type_path: Vec<String>, base: String, to_tier: String,
+        #[serde(default, skip_serializing_if = "is_false")]
+        off: bool,
+    },
     /// Change one of NeverSink's tiers as a whole: show/hide it, or give it a new look.
     Tier {
         type_path: Vec<String>, tier: String, show: Option<bool>, actions: Option<Vec<String>>,
@@ -24,7 +36,60 @@ pub enum Rule {
         /// Changed conditions of this step ("ItemLevel" -> ">= 84", "" = removed), from the Tiers page's chips.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         conds: Option<crate::conds::CondEdits>,
+        #[serde(default, skip_serializing_if = "is_false")]
+        off: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        look: Option<String>,
     },
+}
+
+fn is_false(b: &bool) -> bool { !*b }
+
+impl Rule {
+    /// Switched off (kept, but not in the filter).
+    pub fn is_off(&self) -> bool {
+        match self { Rule::Override { off, .. } | Rule::MoveBase { off, .. } | Rule::Tier { off, .. } => *off }
+    }
+    pub fn set_off(&mut self, v: bool) {
+        match self { Rule::Override { off, .. } | Rule::MoveBase { off, .. } | Rule::Tier { off, .. } => *off = v }
+    }
+    /// The saved look this edit uses, if any.
+    pub fn look(&self) -> Option<&str> {
+        match self { Rule::Override { look, .. } | Rule::Tier { look, .. } => look.as_deref(), Rule::MoveBase { .. } => None }
+    }
+    /// Points this edit at a saved look and gives it that look's lines. A hidden edit (or a moved
+    /// base) has no look to take, so it's left alone. Returns whether it changed.
+    pub fn use_look(&mut self, name: &str, style: &CustomStyle) -> bool {
+        match self {
+            Rule::Override { show: true, actions, look, .. } => { *actions = style_actions(style); *look = Some(name.to_string()); true }
+            Rule::Tier { show, actions, look, .. } if *show != Some(false) => {
+                *actions = Some(style_actions(style)); *look = Some(name.to_string()); true
+            }
+            _ => false,
+        }
+    }
+    /// Forgets the saved look (the edit keeps its current colours).
+    pub fn drop_look(&mut self) {
+        if let Rule::Override { look, .. } | Rule::Tier { look, .. } = self { *look = None; }
+    }
+}
+
+/// A look saved once under a name ("My chase look") that many edits can use.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SavedLook { pub name: String, pub style: CustomStyle }
+
+/// Gives every edit that uses `name` the look's lines again. Returns how many changed.
+pub fn refresh_look(rules: &mut [Rule], name: &str, style: &CustomStyle) -> usize {
+    rules.iter_mut().filter(|r| r.look() == Some(name)).map(|r| r.use_look(name, style)).filter(|x| *x).count()
+}
+
+/// Points every edit using `old` at `new` (a renamed look).
+pub fn rename_look(rules: &mut [Rule], old: &str, new: &str) {
+    for r in rules.iter_mut() {
+        if let Rule::Override { look, .. } | Rule::Tier { look, .. } = r {
+            if look.as_deref() == Some(old) { *look = Some(new.to_string()); }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -148,7 +213,7 @@ pub fn quick_rule(item: &Item, action: Action, colour_name: Option<&str>, opts: 
         Action::Louder => (true, vec!["SetFontSize 45".into(), "PlayAlertSound 2 300".into()], "Louder"),
         Action::Quieter => (true, vec!["SetFontSize 26".into(), "DisableDropSound True".into()], "Quieter"),
     };
-    Rule::Override { label: format!("{verb}: {who}"), show, conditions, actions }
+    Rule::Override { label: format!("{verb}: {who}"), show, conditions, actions, off: false, look: None }
 }
 
 // ---------- full custom look ----------
@@ -247,7 +312,7 @@ pub fn style_actions(s: &CustomStyle) -> Vec<String> {
 pub fn custom_rule(item: &Item, style: &CustomStyle, opts: &MatchOpts) -> Rule {
     let Rule::Override { label, conditions, .. } = quick_rule(item, Action::Highlight, None, opts) else { unreachable!() };
     let who = label.trim_start_matches("Highlight: ").to_string();
-    Rule::Override { label: format!("Style: {who}"), show: true, conditions, actions: style_actions(style) }
+    Rule::Override { label: format!("Style: {who}"), show: true, conditions, actions: style_actions(style), off: false, look: None }
 }
 
 // ---------- editing saved rules ----------
@@ -269,6 +334,10 @@ pub struct RuleDetail {
     #[serde(default)]
     pub corrupted: bool,
     pub style: crate::evaluate::Style,
+    /// The saved look it uses, if any.
+    pub look: Option<String>,
+    /// Switched off.
+    pub off: bool,
 }
 
 /// Changes to apply to a saved edit.
@@ -284,6 +353,9 @@ pub struct RuleEdit {
     pub when: When,
     #[serde(default)]
     pub corrupted: bool,
+    /// Use this saved look (and keep following it).
+    #[serde(default)]
+    pub look: Option<String>,
 }
 
 fn first_quoted(line: &str) -> Option<String> {
@@ -291,13 +363,14 @@ fn first_quoted(line: &str) -> Option<String> {
 }
 
 pub fn rule_detail(rule: &Rule) -> Option<RuleDetail> {
-    let Rule::Override { label, show, conditions, actions } = rule else { return None };
+    let Rule::Override { label, show, conditions, actions, look, off } = rule else { return None };
     if label.starts_with("Preset:") {
         return None; // presets cover many items; they're removed, not edited
     }
     let mut d = RuleDetail {
         label: label.clone(), show: *show, item_class: String::new(), base_type: String::new(),
         rarity: None, min_stack: None, below_stack: None, when: When::Always, corrupted: false, style: crate::evaluate::style_of(actions),
+        look: look.clone(), off: *off,
     };
     for c in conditions {
         let c = c.trim();
@@ -327,7 +400,8 @@ pub fn same_slot(a: &Rule, b: &Rule) -> bool {
 /// For each edit, the newer edit that always wins over it (so it never
 /// applies), if any. Newer edits sit higher in the filter.
 pub fn shadowed_by(rules: &[Rule]) -> Vec<Option<usize>> {
-    let details: Vec<Option<RuleDetail>> = rules.iter().map(rule_detail).collect();
+    // A switched-off edit neither applies nor hides older ones.
+    let details: Vec<Option<RuleDetail>> = rules.iter().map(|r| if r.is_off() { None } else { rule_detail(r) }).collect();
     (0..rules.len()).map(|i| {
         let old = details[i].as_ref()?;
         (i + 1..rules.len()).rev().find(|&j| {
@@ -431,16 +505,17 @@ pub fn apply_with_extra(segs: &mut Vec<Segment>, rules: &[Rule], extra: &str, nl
     // NeverSink ships his citadel (conqueror) map rules switched off; the app switches them on so those maps stand out.
     crate::filter::enable_commented(segs, &["maps", "implicitmod"]);
     let mut top = format!("{START}{nl}# Edits made with the live editor. Rebuilt automatically; edit in the app.{nl}{nl}");
-    for rule in rules.iter().rev() {
+    // Switched-off edits stay in the list but are left out of the filter.
+    for rule in rules.iter().rev().filter(|r| !r.is_off()) {
         match rule {
-            Rule::Override { label, show, conditions, actions } => {
+            Rule::Override { label, show, conditions, actions, .. } => {
                 top.push_str(&format!("{} # {label}{nl}", if *show { "Show" } else { "Hide" }));
                 for l in conditions.iter().chain(actions) {
                     top.push_str(&format!("    {l}{nl}"));
                 }
                 top.push_str(nl);
             }
-            Rule::Tier { type_path, tier, show, actions, min_stack, min_item_tier, conds } => {
+            Rule::Tier { type_path, tier, show, actions, min_stack, min_item_tier, conds, .. } => {
                 let mut found = false;
                 for seg in segs.iter_mut() {
                     let Segment::Block(b) = seg else { continue };
@@ -456,7 +531,7 @@ pub fn apply_with_extra(segs: &mut Vec<Segment>, rules: &[Rule], extra: &str, nl
                     warnings.push(format!("Couldn't change {} {tier}: that tier is gone in this version", type_path.join(" > ")));
                 }
             }
-            Rule::MoveBase { type_path, base, to_tier } if to_tier.is_empty() => {
+            Rule::MoveBase { type_path, base, to_tier, .. } if to_tier.is_empty() => {
                 // Take the item out of every tier of this section.
                 for seg in segs.iter_mut() {
                     let Segment::Block(b) = seg else { continue };
@@ -465,7 +540,7 @@ pub fn apply_with_extra(segs: &mut Vec<Segment>, rules: &[Rule], extra: &str, nl
                     if bases.iter().any(|x| x == base) { bases.retain(|x| x != base); b.set_base_types(&bases); }
                 }
             }
-            Rule::MoveBase { type_path, base, to_tier } => {
+            Rule::MoveBase { type_path, base, to_tier, .. } => {
                 let tp: Vec<&str> = type_path.iter().map(String::as_str).collect();
                 if !move_base(segs, &tp, base, to_tier) {
                     warnings.push(format!("Couldn't move {base} to {} {to_tier}: that tier is gone in this version", type_path.join(" > ")));
@@ -556,7 +631,7 @@ mod tests {
         let d = rule_detail(&hide).unwrap();
         assert_eq!((d.base_type.as_str(), d.item_class.as_str(), d.below_stack, d.show), ("Gold", "Gold", Some(500), false));
         // Raise the cut-off to 800.
-        let e = RuleEdit { show: false, style: None, every_rarity: false, min_stack: None, below_stack: Some(800), when: When::Always, corrupted: false };
+        let e = RuleEdit { show: false, style: None, every_rarity: false, min_stack: None, below_stack: Some(800), when: When::Always, corrupted: false, look: None };
         let Rule::Override { label, conditions, .. } = edited_rule(&hide, &e).unwrap() else { panic!() };
         assert_eq!(label, "Hide: Gold (stacks under 800)");
         assert!(conditions.contains(&"StackSize < 800".to_string()));
@@ -568,7 +643,7 @@ mod tests {
         let r = custom_rule(&belt, &style, &MatchOpts::default());
         assert_eq!(rule_detail(&r).unwrap().rarity.as_deref(), Some("Unique"));
         assert_eq!(rule_detail(&r).unwrap().style.font_size, Some(40));
-        let e = RuleEdit { show: true, style: Some(CustomStyle { text: [9, 9, 9, 255], ..style }), every_rarity: true, min_stack: None, below_stack: None, when: When::Always , corrupted: false };
+        let e = RuleEdit { show: true, style: Some(CustomStyle { text: [9, 9, 9, 255], ..style }), every_rarity: true, min_stack: None, below_stack: None, when: When::Always , corrupted: false, look: None };
         let Rule::Override { conditions, actions, .. } = edited_rule(&r, &e).unwrap() else { panic!() };
         assert!(!conditions.iter().any(|c| c.starts_with("Rarity")));
         assert!(actions.contains(&"SetTextColor 9 9 9 255".to_string()));

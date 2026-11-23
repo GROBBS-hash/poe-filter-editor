@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Item, RARITY_COLOUR, itemSub, itemTitle } from "./types";
+import { LookChips, looksChanged, useLooks } from "./Looks";
 import StyleEditor, { CurrentStyle, CustomStyle, GAME_COLOURS, LookButton, fromCurrent } from "./StyleEditor";
 import { ItemIcon } from "./icons";
 import BaseUniques from "./BaseUniques";
@@ -11,6 +12,8 @@ export type Picked = { item: Item; from_screen: boolean; screen_text?: string | 
 export type RuleDetail = {
   label: string; show: boolean; item_class: string; base_type: string; rarity?: string | null;
   min_stack?: number | null; below_stack?: number | null; when?: When; corrupted?: boolean; style: CurrentStyle;
+  /** The saved look it uses, if any. */
+  look?: string | null; off?: boolean;
 };
 export type When = "always" | "levelling" | "maps";
 export type Replacing = { id: string; index: number; detail: RuleDetail };
@@ -252,18 +255,18 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
     ({ same_rarity: !anyRarity, max_item_level: null, when, corrupted: onlyCorrupted, ...extraOpts });
 
   /** Every change goes through here: a new edit, or (when editing a rule) that rule replaced. */
-  const commit = (show: boolean, style: CustomStyle | null, stack: { min_stack?: number; below_stack?: number }, addNew = false) => {
+  const commit = (show: boolean, style: CustomStyle | null, stack: { min_stack?: number; below_stack?: number }, addNew = false, look: string | null = null) => {
     if (replacing && !addNew) {
       const d = replacing.detail;
       const keepStack = stack.min_stack === undefined && stack.below_stack === undefined;
       return saved(invoke("update_rule", { id: replacing.id, index: replacing.index, edit: {
         show, style, every_rarity: anyRarity, when, corrupted: onlyCorrupted,
         min_stack: keepStack ? d.min_stack ?? null : stack.min_stack ?? null,
-        below_stack: keepStack ? d.below_stack ?? null : stack.below_stack ?? null,
+        below_stack: keepStack ? d.below_stack ?? null : stack.below_stack ?? null, look,
       } }));
     }
     return show && style
-      ? saved(invoke("apply_custom_style", { item: picked.item, style, opts: opts(stack) }), addNew)
+      ? saved(invoke("apply_custom_style", { item: picked.item, style, opts: opts(stack), look }), addNew)
       : saved(invoke("apply_quick_action", { item: picked.item, action: "hide", colour: null, opts: opts(stack) }), addNew);
   };
   const hide = () => commit(false, null, {});
@@ -287,10 +290,17 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
   // Stack rules always sit alongside your other rules for this item ("hide the
   // small piles" + "style the big ones"), so they're added, never swapped in.
   const hideBelow = (n: number) => commit(false, null, { below_stack: n }, true);
-  const saveStyle = (style: CustomStyle) => {
+  /** `look`: a saved look's name; the edit then follows that look when it's changed later. */
+  const saveStyle = (style: CustomStyle, look: string | null = null) => {
     const minStack = editing ? editing.minStack : 1;
     setEditingRaw(false);
-    commit(true, style, minStack > 1 ? { min_stack: minStack } : {}, minStack > 1);
+    commit(true, style, minStack > 1 ? { min_stack: minStack } : {}, minStack > 1, look);
+  };
+  const [looks] = useLooks();
+  const saveLook = async (name: string) => {
+    await invoke("save_look", { look: { name, style: current() }, oldName: null });
+    looksChanged();
+    setToast(`Saved “${name}”. Click it on any item to give it this look.`);
   };
   const openRule = async (label: string) => {
     try {
@@ -530,6 +540,14 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
             onClick={() => highlight(c)} disabled={!status && !wholeType} />
         ))}
       </div>
+      {(status || wholeType) && (looks.length > 0 || shown(status?.verdict.visibility ?? "Show")) && (
+        <>
+          <div className="qm-label">My saved looks</div>
+          <LookChips text={item.base_type || item.item_class} looks={looks} picked={replacing?.detail.look}
+            onPick={(l) => saveStyle(l.style, l.name)}
+            onSave={shown(status?.verdict.visibility ?? "Show") ? saveLook : undefined} />
+        </>
+      )}
       <button className="qm-custom" onClick={() => setEditing(true)} disabled={!status && !wholeType}>
         Customise colours, beam, icon & sound…
       </button>

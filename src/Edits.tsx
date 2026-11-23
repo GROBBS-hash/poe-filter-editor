@@ -6,6 +6,7 @@ import ItemPanel, { RuleDetail, itemFromRule } from "./ItemPanel";
 import { ItemIcon } from "./icons";
 import DropPreview from "./DropPreview";
 import { LookButton } from "./StyleEditor";
+import { SavedLooksCard } from "./Looks";
 
 const css = (c?: number[] | null) => (c ? `rgba(${c[0]},${c[1]},${c[2]},${(c[3] ?? 255) / 255})` : "transparent");
 
@@ -112,6 +113,14 @@ export default function Edits({ profile, onChange, focus }: { profile: ProfileIn
     setOpen(null);
     onChange();
   };
+  /** Off = kept in the list but left out of the filter (handy for trying a stricter setting and going back). */
+  const setOff = async (r: RuleInfo, off: boolean) => {
+    try {
+      await invoke("set_rule_off", { id: profile.id, index: r.index, off });
+      setMsg(`${off ? "Switched off" : "Switched back on"}: ${r.label.replace(/^Preset: [^:]+: /, "")}. Press F4 in game.`);
+      onChange();
+    } catch (e) { setMsg(String(e)); }
+  };
   const rebuild = async () => {
     try {
       const w = await invoke<string[]>("rebuild", { id: profile.id });
@@ -150,6 +159,7 @@ export default function Edits({ profile, onChange, focus }: { profile: ProfileIn
 
   return (
     <>
+    <SavedLooksCard onChange={onChange} />
     <div className="card">
       <div className="row between">
         <h2>Edits in “{profile.name}” <Tip>Every change you've made to this filter. Newer edits win over older ones.
@@ -181,11 +191,15 @@ export default function Edits({ profile, onChange, focus }: { profile: ProfileIn
                 </div>
                 <ul className="rules">
                   {rules.map((r) => (
-                    <li key={r.index} data-rule={r.index} className={`${open?.index === r.index ? "open" : ""} ${r.shadowed_by ? "unused" : ""}`}>
+                    <li key={r.index} data-rule={r.index} className={`${open?.index === r.index ? "open" : ""} ${r.shadowed_by ? "unused" : ""} ${r.off ? "is-off" : ""}`}>
                       <div className="rule-line">
+                        <button type="button" role="switch" aria-checked={!r.off} className={`onoff ${r.off ? "" : "on"}`}
+                          title={r.off ? "Off: kept here but not in the filter. Click to switch it back on." : "On. Click to switch it off without deleting it."}
+                          onClick={() => setOff(r, !r.off)} />
                         <span className="rule-main">
                           <Look r={r} onEdit={() => { setLookFirst(true); if (open?.index !== r.index) edit(r.index); }} />
-                          <span className="rule-scope">{scope(r) || (r.detail ? "" : r.label.replace(/^Preset: [^:]+: /, ""))}</span>
+                          <span className="rule-scope">{r.off ? "Off · not in the filter" : scope(r) || (r.detail ? "" : r.label.replace(/^Preset: [^:]+: /, ""))}</span>
+                          {r.look && <span className="look-tag" title="Uses this saved look: change the look above and this edit changes too">{r.look}</span>}
                         </span>
                         <span>
                           <button className="link" onClick={() => { setLookFirst(false); edit(r.index); }}>{open?.index === r.index ? "Close" : "Edit"}</button>

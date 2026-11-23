@@ -73,4 +73,8 @@ export type RuleInfo = {
       beam?: string | null; muted: boolean; sound?: string | null; minimap_parts?: [number, string, string] | null; label_hidden?: boolean };
   } | null;
   shadowed_by?: string | null;
+  /** Switched off: listed, but left out of the filter. */
+  off?: boolean;
+  /** The saved look it uses, if any. */
+  look?: string | null;
 };

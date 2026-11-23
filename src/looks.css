@@ -1,0 +1,51 @@
+/* Saved looks (Looks.tsx) and the on/off switch on My edits. */
+
+/* Label buttons: a small copy of the label with the look's name under it. */
+.lk-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+.lk-chip { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 6px 4px; max-width: 132px;
+  background: var(--raised); border: 1px solid var(--line); border-radius: 7px; cursor: pointer; }
+.lk-chip:hover:not(:disabled) { border-color: var(--gold); background: var(--raised); }
+.lk-chip.on { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; background: var(--gold-bg); }
+.lk-chip .se-preview { max-width: 118px; font-size: 13px !important; font-family: var(--game-font); }
+.lk-chip small { font-size: 11px; color: var(--text-2); max-width: 118px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lk-chip.lk-add { justify-content: center; border-style: dashed; color: var(--text-2); font-size: 12px; line-height: 1.25; min-height: 50px; }
+.lk-chips.small .lk-chip { padding: 4px 5px 3px; }
+.lk-chips.small .lk-chip .se-preview { font-size: 11.5px !important; padding: 1px 6px; }
+.lk-name { display: flex; gap: 6px; align-items: center; margin: 0 0 8px; }
+.lk-name .text { margin: 0; flex: 1; min-width: 0; }
+.lk-err { color: var(--red); font-size: 12px; margin: -4px 0 8px; }
+
+/* My edits: the saved looks card. */
+.lk-list { list-style: none; margin: 4px 0 0; padding: 0; }
+.lk-list > li { border-top: 1px solid var(--line); padding: 7px 0; }
+.lk-list > li:first-child { border-top: none; }
+.lk-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.lk-prev { background: none; border: none; padding: 0; }
+.lk-prev:hover:not(:disabled) { background: none; outline: 1px solid var(--gold); outline-offset: 2px; }
+.lk-prev .se-preview { font-family: var(--game-font); font-size: 15px !important; }
+.lk-what { flex: 1; min-width: 80px; }
+.lk-rename { flex: 1; display: flex; gap: 6px; align-items: center; min-width: 200px; }
+.lk-rename .text { margin: 0; }
+.lk-used { font-size: 12px; color: var(--text-2); white-space: nowrap; }
+.lk-btns { display: flex; white-space: nowrap; }
+.lk-sure { color: var(--red) !important; }
+.lk-edit { margin: 8px 0 4px; padding: 10px; background: var(--raised); border-radius: 8px; max-width: 420px; }
+.lk-edit .text { margin: 0 0 8px; }
+
+/* On/off switch per edit; an edit that's off stays listed, greyed out. */
+.onoff { flex: none; width: 34px; height: 19px; padding: 0; border-radius: 10px; border: none; position: relative;
+  background: #4a5262; cursor: pointer; }
+.onoff::after { content: ""; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px; border-radius: 50%; background: #e6e8ed;
+  transition: left .15s; }
+.onoff.on { background: var(--green); }
+.onoff.on::after { left: 17px; }
+.onoff:hover:not(:disabled) { background: #5b6476; }
+.onoff.on:hover:not(:disabled) { background: #4fbf6e; }
+.rule-line .onoff { margin-right: 2px; }
+.rules li.is-off .rule-main { opacity: .45; filter: grayscale(1); }
+.rules li.is-off .rule-scope { font-style: italic; }
+.look-tag { font-size: 11px; color: var(--gold); background: var(--gold-bg); border-radius: 10px; padding: 1px 8px; white-space: nowrap; }
+
+/* Batch mode: saved looks under an item. */
+.batch-looks { flex-basis: 100%; }
+.rule-line .rule-main { flex: 1; }

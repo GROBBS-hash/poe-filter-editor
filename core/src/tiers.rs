@@ -33,7 +33,7 @@ pub struct TierRow {
 pub fn mark_changed(sections: &mut [Section], rules: &[crate::rules::Rule]) {
     for s in sections.iter_mut() {
         for t in s.tiers.iter_mut() {
-            t.changed = rules.iter().filter_map(|r| match r {
+            t.changed = rules.iter().filter(|r| !r.is_off()).filter_map(|r| match r {
                 crate::rules::Rule::Tier { type_path, tier, conds: Some(c), .. } if *type_path == s.type_path && *tier == t.tier => Some(c.keys().cloned().collect::<Vec<_>>()),
                 _ => None,
             }).flatten().collect();
@@ -843,14 +843,14 @@ mod tests {
         // Switching the upgrade borders off empties their look but keeps them as pass-through rules.
         let up = m.extras[0].tiers.clone();
         let mut off = crate::filter::parse_filter(&fixture());
-        let rules: Vec<Rule> = up.iter().map(|t| Rule::Tier { type_path: vec!["maps".into()], tier: t.clone(), show: None, actions: Some(vec![]), min_stack: None, min_item_tier: None, conds: None }).collect();
+        let rules: Vec<Rule> = up.iter().map(|t| Rule::Tier { type_path: vec!["maps".into()], tier: t.clone(), show: None, actions: Some(vec![]), min_stack: None, min_item_tier: None, conds: None, off: false, look: None }).collect();
         apply(&mut off, &rules, "
 ");
         assert!(!super::map_tiers(&off).extras[0].on);
         // Hiding tiers 1-3 survives as tier rules.
         let mut segs = segs;
         let rules: Vec<Rule> = m.tiers.iter().filter(|t| t.map_tier < 4).map(|t| Rule::Tier {
-            type_path: vec!["maps".into()], tier: t.row.tier.clone(), show: Some(false), actions: None, min_stack: None, min_item_tier: None, conds: None }).collect();
+            type_path: vec!["maps".into()], tier: t.row.tier.clone(), show: Some(false), actions: None, min_stack: None, min_item_tier: None, conds: None, off: false, look: None }).collect();
         assert!(apply(&mut segs, &rules, "\n").is_empty());
         let after = super::map_tiers(&segs);
         assert!(after.tiers.iter().all(|t| (t.row.visibility == "Hide") == (t.map_tier < 4)));
@@ -911,7 +911,7 @@ mod tests {
         let mut segs = parse_filter(&fixture());
         let before = sections(&segs);
         let from = before[0].tiers.iter().find(|t| t.bases.contains(&"Chaos Orb".to_string())).unwrap().tier.clone();
-        let rules = vec![Rule::MoveBase { type_path: vec!["currency".into()], base: "Chaos Orb".into(), to_tier: "t2divine".into() }];
+        let rules = vec![Rule::MoveBase { type_path: vec!["currency".into()], base: "Chaos Orb".into(), to_tier: "t2divine".into(), off: false }];
         assert!(apply(&mut segs, &rules, "\r\n").is_empty());
         let after = sections(&parse_filter(&render_filter(&segs)));
         let has = |t: &str| after[0].tiers.iter().find(|x| x.tier == t).unwrap().bases.contains(&"Chaos Orb".to_string());
@@ -929,7 +929,7 @@ mod tests {
         // A currency NeverSink only tiers as single drops.
         let base = secs[0].tiers.iter().flat_map(|t| t.bases.iter()).find(|b| !stacked.contains(b)).unwrap().clone();
         let mut segs = parse_filter(&text);
-        apply(&mut segs, &[Rule::MoveBase { type_path: vec!["currency".into(), "stackedsix".into()], base: base.clone(), to_tier: "t7".into() }], "\r\n");
+        apply(&mut segs, &[Rule::MoveBase { type_path: vec!["currency".into(), "stackedsix".into()], base: base.clone(), to_tier: "t7".into(), off: false }], "\r\n");
         let segs = parse_filter(&render_filter(&segs));
         let it = |n| crate::item::Item { item_class: "Stackable Currency".into(), rarity: "Currency".into(), base_type: base.clone(), stack_size: Some(n), ..Default::default() };
         let v6 = status(&segs, &it(6), Some(70), false).verdict;
@@ -940,7 +940,7 @@ mod tests {
         assert!(ch.iter().any(|c| c.title == "Stacks of 6+" && c.current.as_deref() == Some("t7")));
         // Taking it out again.
         let mut segs2 = parse_filter(&render_filter(&segs));
-        apply(&mut segs2, &[Rule::MoveBase { type_path: vec!["currency".into(), "stackedsix".into()], base: base.clone(), to_tier: String::new() }], "\r\n");
+        apply(&mut segs2, &[Rule::MoveBase { type_path: vec!["currency".into(), "stackedsix".into()], base: base.clone(), to_tier: String::new(), off: false }], "\r\n");
         let segs2 = parse_filter(&render_filter(&segs2));
         assert!(stack_choices(&segs2, &base).iter().all(|c| c.current.is_none()));
         let w = stack_choices(&segs2, "Scroll of Wisdom");
@@ -951,10 +951,10 @@ mod tests {
     fn tier_rule_hides_and_restyles() {
         let mut segs = parse_filter(&fixture());
         let rules = vec![
-            Rule::Tier { type_path: vec!["currency".into()], tier: "t5alchemy".into(), show: Some(false), actions: None, min_stack: None, min_item_tier: None, conds: None },
-            Rule::Tier { type_path: vec!["gold".into()], tier: "stack2".into(), show: None, actions: None, min_stack: Some(800), min_item_tier: None, conds: None },
+            Rule::Tier { type_path: vec!["currency".into()], tier: "t5alchemy".into(), show: Some(false), actions: None, min_stack: None, min_item_tier: None, conds: None, off: false, look: None },
+            Rule::Tier { type_path: vec!["gold".into()], tier: "stack2".into(), show: None, actions: None, min_stack: Some(800), min_item_tier: None, conds: None, off: false, look: None },
             Rule::Tier { type_path: vec!["divination".into()], tier: "t1".into(), show: None,
-                actions: Some(vec!["SetFontSize 45".into(), "SetTextColor 1 2 3 255".into()]), min_stack: None, min_item_tier: None, conds: None },
+                actions: Some(vec!["SetFontSize 45".into(), "SetTextColor 1 2 3 255".into()]), min_stack: None, min_item_tier: None, conds: None, off: false, look: None },
         ];
         let w = apply(&mut segs, &rules, "\r\n");
         assert!(w.is_empty(), "{w:?}");

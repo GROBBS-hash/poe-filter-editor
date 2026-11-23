@@ -3,7 +3,7 @@
 
 use crate::filter::{parse_filter, render_filter};
 use crate::prices::{price_blocks, PriceFile, PriceSettings};
-use crate::rules::{apply_with_extra, Rule};
+use crate::rules::{apply_with_extra, refresh_look, rename_look, Rule, SavedLook};
 use crate::themes::{apply_theme, builtin_themes, find_theme, Theme};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fs, io, path::Path};
@@ -42,6 +42,9 @@ pub struct Store {
     /// Themes you've made.
     #[serde(default)]
     pub themes: Vec<Theme>,
+    /// Looks saved under a name ("My chase look") that edits in any filter can use.
+    #[serde(default)]
+    pub looks: Vec<SavedLook>,
     #[serde(default)]
     pub settings: Settings,
 }
@@ -176,6 +179,46 @@ impl Store {
         self.profiles.insert(id.clone(), p);
         Some(id)
     }
+
+    /// Saves a look (new, changed or renamed from `old_name`) and gives every edit that uses it the new
+    /// lines. Returns the filters whose edits changed, so they can be rebuilt.
+    pub fn save_look(&mut self, look: SavedLook, old_name: Option<&str>) -> Result<Vec<String>, String> {
+        let name = look.name.trim().to_string();
+        if name.is_empty() { return Err("Give the look a name".into()); }
+        let old = old_name.map(str::trim).filter(|o| !o.is_empty());
+        if self.looks.iter().any(|l| l.name.eq_ignore_ascii_case(&name) && Some(l.name.as_str()) != old) {
+            return Err(format!("You already have a look called “{name}”"));
+        }
+        let look = SavedLook { name: name.clone(), ..look };
+        match old.and_then(|o| self.looks.iter().position(|l| l.name == o)) {
+            Some(i) => self.looks[i] = look.clone(),
+            None => self.looks.push(look.clone()),
+        }
+        let mut changed = Vec::new();
+        for p in self.profiles.values_mut() {
+            if let Some(o) = old.filter(|o| *o != name) { rename_look(&mut p.rules, o, &name); }
+            if p.rules.iter().any(|r| r.look() == Some(name.as_str())) {
+                refresh_look(&mut p.rules, &name, &look.style);
+                changed.push(p.id.clone());
+            }
+        }
+        Ok(changed)
+    }
+
+    /// Deletes a saved look. Edits that used it keep their colours; they just stop following it.
+    pub fn delete_look(&mut self, name: &str) {
+        self.looks.retain(|l| l.name != name);
+        for p in self.profiles.values_mut() {
+            for r in p.rules.iter_mut().filter(|r| r.look() == Some(name)) { r.drop_look(); }
+        }
+    }
+
+    /// How many edits (in every filter) use this look.
+    pub fn look_uses(&self, name: &str) -> usize {
+        self.profiles.values().flat_map(|p| &p.rules).filter(|r| r.look() == Some(name)).count()
+    }
+
+    pub fn find_look(&self, name: &str) -> Option<&SavedLook> { self.looks.iter().find(|l| l.name == name) }
 
     /// Parent edits first, then this profile's own, so the child wins.
     pub fn resolved_rules(&self, id: &str) -> Vec<Rule> {

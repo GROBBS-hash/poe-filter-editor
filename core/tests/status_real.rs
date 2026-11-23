@@ -158,7 +158,7 @@ fn jewel_step_conditions() {
     assert_eq!((before.visibility.as_str(), before.decided_by.contains("anyrare")), ("Show", true), "{}", before.decided_by);
     let mut c = std::collections::BTreeMap::new();
     c.insert("ItemLevel".to_string(), ">= 84".to_string());
-    let rule = Rule::Tier { type_path: vec!["jewels".into(), "generic".into()], tier: "anyrare".into(), show: None, actions: None, min_stack: None, min_item_tier: None, conds: Some(c) };
+    let rule = Rule::Tier { type_path: vec!["jewels".into(), "generic".into()], tier: "anyrare".into(), show: None, actions: None, min_stack: None, min_item_tier: None, conds: Some(c), off: false, look: None };
     assert!(apply(&mut segs, &[rule], "\n").is_empty());
     let low = status(&segs, &jewel(70), Some(83), false).verdict;
     let high = status(&segs, &jewel(85), Some(83), false).verdict;
@@ -177,7 +177,7 @@ fn gear_step_conditions() {
     assert!(!before.decided_by.contains("t1_86"), "{}", before.decided_by);
     let mut c = std::collections::BTreeMap::new();
     c.insert("ItemLevel".to_string(), ">= 84".to_string());
-    let rule = Rule::Tier { type_path: vec!["crafting".into(), "generalgear".into()], tier: "t1_86".into(), show: None, actions: None, min_stack: None, min_item_tier: None, conds: Some(c) };
+    let rule = Rule::Tier { type_path: vec!["crafting".into(), "generalgear".into()], tier: "t1_86".into(), show: None, actions: None, min_stack: None, min_item_tier: None, conds: Some(c), off: false, look: None };
     assert!(apply(&mut segs, &[rule], "\n").is_empty());
     let after = status(&segs, &belt(), Some(83), false).verdict;
     println!("before {} by {}; after {} by {}", before.visibility, before.decided_by, after.visibility, after.decided_by);

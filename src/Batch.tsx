@@ -6,11 +6,13 @@ import { Action, COLOURS, Item, RARITY_COLOUR, itemSub, itemTitle } from "./type
 import { ItemIcon } from "./icons";
 import { WinBar } from "./WinFrame";
 import { friendly } from "./errors";
+import { LookChips, useLooks } from "./Looks";
 
 /** "Leave" = keep it as the filter has it (take it off the list without an edit). */
-type Choice = Action | "leave";
+type Choice = Action | "leave" | "look";
 type Status = { visibility: string; reason: string; by_user_edit: boolean };
-type Entry = { item: Item; choice: Choice; colour: string; now?: Status | null };
+/** `look`: the saved look picked for it (choice "look"). */
+type Entry = { item: Item; choice: Choice; colour: string; look?: string; now?: Status | null };
 
 /** Same as the app's batch_key: one entry per rarity, base and (uniques) name. */
 const key = (i: Item) => `${i.rarity}|${i.base_type}|${i.rarity === "Unique" ? i.name ?? "" : ""}`;
@@ -29,6 +31,8 @@ export default function Batch({ on, onChange }: { on: boolean; onChange: () => v
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
   const bk = useBatchKey();
+  const [looks] = useLooks();
+  const choices: [Choice, string][] = looks.length ? [...CHOICES.slice(0, 4), ["look", "Saved look"], CHOICES[4]] : CHOICES;
 
   // What the filter does to an item now: hidden things default to Highlight, shown things to Hide.
   const withStatus = (item: Item): Entry => ({ item, choice: "hide", colour: "purple" });
@@ -53,7 +57,9 @@ export default function Batch({ on, onChange }: { on: boolean; onChange: () => v
 
   const toggle = async () => { await invoke("set_batch_mode", { on: !on }); onChange(); };
   const update = (i: number, patch: Partial<Entry>) => setList((l) => l.map((x, j) => (j === i ? { ...x, ...patch } : x)));
-  const setAll = (choice: Choice) => setList((l) => l.map((x) => ({ ...x, choice })));
+  const setAll = (choice: Choice) => setList((l) => l.map((x) => ({ ...x, choice, look: x.look ?? looks[0]?.name })));
+  /** Everything takes one saved look. */
+  const allLook = (name: string) => setList((l) => l.map((x) => ({ ...x, choice: "look", look: name })));
   const forget = (keys: string[] | null) => invoke("batch_forget", { keys }).catch(() => {});
   const remove = (e: Entry) => { forget([key(e.item)]); setList((l) => l.filter((x) => x !== e)); };
 
@@ -65,7 +71,10 @@ export default function Batch({ on, onChange }: { on: boolean; onChange: () => v
     for (const e of list) {
       if (e.choice === "leave") { done.push(key(e.item)); continue; }
       try {
-        await invoke("apply_quick_action", { item: e.item, action: e.choice, colour: e.colour, opts: null });
+        if (e.choice === "look") {
+          if (!e.look) throw new Error("Pick a saved look");
+          await invoke("apply_custom_style", { item: e.item, style: null, opts: null, look: e.look });
+        } else await invoke("apply_quick_action", { item: e.item, action: e.choice, colour: e.colour, opts: null });
         done.push(key(e.item));
       } catch (err) { failed.push(`${itemTitle(e.item)}: ${friendly(err)}`); }
     }
@@ -100,6 +109,12 @@ export default function Batch({ on, onChange }: { on: boolean; onChange: () => v
           <div className="row batch-all">
             <span className="muted small">Set all to</span>
             {CHOICES.map(([c, label]) => <button key={c} className="small" onClick={() => setAll(c)}>{label}</button>)}
+            {looks.length > 0 && (
+              <select className="small" value="" onChange={(e) => e.target.value && allLook(e.target.value)} title="Give every item one of your saved looks">
+                <option value="">A saved look…</option>
+                {looks.map((l) => <option key={l.name} value={l.name}>{l.name}</option>)}
+              </select>
+            )}
             <button className="link small batch-clear" onClick={() => { forget(null); setList([]); setMsg(""); }}>Clear the list</button>
           </div>
           <ul className="batch">
@@ -114,8 +129,9 @@ export default function Batch({ on, onChange }: { on: boolean; onChange: () => v
                 </span>
                 <span className="batch-choice">
                   <span className="seg">
-                    {CHOICES.map(([c, label]) => (
-                      <button key={c} className={e.choice === c ? "on" : ""} onClick={() => update(i, { choice: c })}>{label}</button>
+                    {choices.map(([c, label]) => (
+                      <button key={c} className={e.choice === c ? "on" : ""}
+                        onClick={() => update(i, { choice: c, look: c === "look" ? e.look ?? looks[0]?.name : e.look })}>{label}</button>
                     ))}
                   </span>
                   {e.choice === "highlight" && <span className="batch-colours">{COLOURS.map((c) => (
@@ -124,6 +140,12 @@ export default function Batch({ on, onChange }: { on: boolean; onChange: () => v
                   ))}</span>}
                   <button className="link small" title="Take it off the list" onClick={() => remove(e)}>✕</button>
                 </span>
+                {e.choice === "look" && (
+                  <span className="batch-looks">
+                    <LookChips small text={e.item.base_type || e.item.item_class} looks={looks} picked={e.look}
+                      onPick={(l) => update(i, { look: l.name })} />
+                  </span>
+                )}
               </li>
             ))}
           </ul>

@@ -139,11 +139,11 @@ pub fn farm_rules(id: &str, style: &CustomStyle) -> Vec<Rule> {
     let mut out = Vec::new();
     if !bases.is_empty() {
         out.push(Rule::Override { label: format!("Preset: {title} items stand out"), show: true,
-            conditions: vec![format!("BaseType == {}", quote(&bases))], actions: style_actions(style) });
+            conditions: vec![format!("BaseType == {}", quote(&bases))], actions: style_actions(style), off: false, look: None });
     }
     for c in classes {
         out.push(Rule::Override { label: format!("Preset: {title} ({c}) stand out"), show: true,
-            conditions: vec![format!("Class == \"{c}\"")], actions: style_actions(style) });
+            conditions: vec![format!("Class == \"{c}\"")], actions: style_actions(style), off: false, look: None });
     }
     out
 }
@@ -284,13 +284,13 @@ pub fn level_rules_opts(game: Game, o: &LevelOptions, style: &CustomStyle) -> Ve
             let mut c = v;
             c.extend(base.iter().cloned());
             if !poe1 || o.aggressive {
-                out.push(Rule::Override { label: label.clone(), show: false, conditions: c, actions: vec![] });
+                out.push(Rule::Override { label: label.clone(), show: false, conditions: c, actions: vec![], off: false, look: None });
             } else {
                 let mut early = c.clone();
                 early.extend(["AreaLevel <= 28".to_string(), "LinkedSockets < 3".to_string()]);
                 c.extend(["AreaLevel > 28".to_string(), "LinkedSockets < 4".to_string()]);
-                out.push(Rule::Override { label: label.clone(), show: false, conditions: early, actions: vec![] });
-                out.push(Rule::Override { label: label.clone(), show: false, conditions: c, actions: vec![] });
+                out.push(Rule::Override { label: label.clone(), show: false, conditions: early, actions: vec![], off: false, look: None });
+                out.push(Rule::Override { label: label.clone(), show: false, conditions: c, actions: vec![], off: false, look: None });
             }
         }
     };
@@ -298,7 +298,7 @@ pub fn level_rules_opts(game: Game, o: &LevelOptions, style: &CustomStyle) -> Ve
     if !keep.is_empty() {
         out.push(Rule::Override { label: lbl("your weapons stand out"), show: true,
             conditions: vec!["AreaLevel < 68".into(), "Rarity <= Rare".into(), format!("Class == {}", quote(&keep))],
-            actions: style_actions(style) });
+            actions: style_actions(style), off: false, look: None });
         if !other.is_empty() {
             hide(&mut out, lbl("other weapons hidden"), vec![format!("Class == {}", quote(&other))]);
         }
@@ -321,15 +321,15 @@ pub fn level_rules_opts(game: Game, o: &LevelOptions, style: &CustomStyle) -> Ve
             let base = vec![format!("AreaLevel >= {n}"), "AreaLevel < 68".into(), "Rarity <= Magic".into(), format!("Class == {}", quote(&classes))];
             let label = lbl(&format!("white & blue {what} hidden from area {n}"));
             if !poe1 || o.aggressive {
-                out.push(Rule::Override { label, show: false, conditions: base, actions: vec![] });
+                out.push(Rule::Override { label, show: false, conditions: base, actions: vec![], off: false, look: None });
                 return;
             }
             let mut early = base.clone();
             early.extend(["AreaLevel <= 28".to_string(), "LinkedSockets < 3".to_string()]);
             let mut late = base;
             late.extend(["AreaLevel > 28".to_string(), "LinkedSockets < 4".to_string()]);
-            out.push(Rule::Override { label: label.clone(), show: false, conditions: early, actions: vec![] });
-            out.push(Rule::Override { label, show: false, conditions: late, actions: vec![] });
+            out.push(Rule::Override { label: label.clone(), show: false, conditions: early, actions: vec![], off: false, look: None });
+            out.push(Rule::Override { label, show: false, conditions: late, actions: vec![], off: false, look: None });
         };
         push(&mut out, "weapons", keep.clone());
         if o.hide_armour {
@@ -344,7 +344,7 @@ pub fn level_rules_opts(game: Game, o: &LevelOptions, style: &CustomStyle) -> Ve
                 out.push(Rule::Override { label: lbl(&format!("{class} progression")), show: true,
                     conditions: vec![format!("AreaLevel >= {from}"), format!("AreaLevel < {below}"), "Rarity <= Magic".into(),
                         format!("Class == \"{class}\""), format!("BaseType == {}", quote(&bases))],
-                    actions: style_actions(&subtle) });
+                    actions: style_actions(&subtle), off: false, look: None });
             }
         }
     }
@@ -352,7 +352,7 @@ pub fn level_rules_opts(game: Game, o: &LevelOptions, style: &CustomStyle) -> Ve
         let bases: Vec<String> = MINION_BASES.iter().map(|b| b.to_string()).collect();
         out.push(Rule::Override { label: lbl("minion bases stand out"), show: true,
             conditions: vec!["AreaLevel < 68".into(), "Rarity <= Rare".into(), format!("BaseType == {}", quote(&bases))],
-            actions: style_actions(style) });
+            actions: style_actions(style), off: false, look: None });
     }
     out
 }
