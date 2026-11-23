@@ -50,7 +50,16 @@ pub const MECHANICS: &[(&str, &[&str], &[&str])] = &[
     ("torment", &["Torment", "Possess"], &["Torment"]),
     ("mirage", &["Mirage"], &["Mirage"]),
     ("gold", &[], &["Gold"]),
+    // Travel nodes (he asked 23 Nov): all-round map juice you path through on the way to your mechanics.
+    ("pack size", &["increased Pack Size in your Maps", "Monster Packs"], &[]),
+    ("explicit effect", &["effect of Explicit Modifiers on your Maps"], &[]),
+    ("threads", &["Threads found"], &[]),
+    ("maps found", &["Maps found in your Maps", "Map Tier"], &[]),
+    ("rarity", &["Rarity of Items found in your Maps"], &[]),
 ];
+
+/// The travel options, not mechanics: a node tagged only with these still counts as "all-round".
+pub const TRAVEL: &[&str] = &["pack size", "explicit effect", "threads", "maps found", "rarity"];
 
 #[allow(dead_code)] // name / text: read by the tests and the dev printout
 struct Node {
@@ -181,7 +190,13 @@ fn values(mechs: &[String]) -> Values {
         let p = if fits.is_empty() { 0.0 } else { taken as f32 / fits.len() as f32 };
         let g = d.picks.iter().filter(|p| p.nodes.contains(&id)).count() as f32 / all;
         let weight = if matches!(n.kind, 1 | 2) { 3.0 } else { 1.0 };
-        v.insert(id, weight * r + 2.0 * p + 0.3 * g);
+        // All-round: no mechanic of its own (map sustain, small path points). A node for a mechanic you didn't pick
+        // gets nothing from creator trees: the only "Ritual" creator tree is mostly Harvest (23 Nov, Ritual-only
+        // went for Sacred Flora instead of Flexible Dogma).
+        let generic = n.tags.keys().all(|k| TRAVEL.contains(k));
+        let helped = r > 0.0 || generic;
+        let val = weight * r * 2.0 + if helped { 1.5 * p } else { 0.0 } + if generic { 0.3 * g } else { 0.0 };
+        v.insert(id, val);
         rel.insert(id, r);
         pop.insert(id, (taken, fits.len()));
     }
@@ -326,6 +341,21 @@ mod tests {
         let balanced = optimise(&ask(&["harvest", "breach"], Priority::Balanced));
         assert!(fewest.points <= balanced.points && balanced.points <= p.points, "{} {} {}", fewest.points, balanced.points, p.points);
         assert!(fewest.points >= 20, "fewest still builds something: {}", fewest.points);
+    }
+
+    #[test]
+    fn ritual_takes_ritual() {
+        // 23 Nov: Ritual only skipped Flexible Dogma and went for Sacred Flora (the one "Ritual" creator tree is Harvest).
+        let d = data();
+        let ritual: Vec<u32> = d.nodes.iter().filter(|(_, n)| matches!(n.kind, 1 | 2) && n.tags.get("ritual") == Some(&1.0)).map(|(id, _)| *id).collect();
+        assert!(ritual.len() >= 8);
+        let p = optimise(&ask(&["ritual"], Priority::Balanced));
+        for id in &ritual { assert!(p.nodes.contains(id), "missing {}", d.nodes[id].name); }
+        let harvest = p.nodes.iter().filter(|id| matches!(d.nodes[id].kind, 1 | 2) && d.nodes[id].tags.get("harvest") == Some(&1.0)).count();
+        assert_eq!(harvest, 0, "Harvest notables in a Ritual-only tree");
+        // A travel pick adds its nodes too.
+        let q = optimise(&ask(&["ritual", "pack size"], Priority::Balanced));
+        assert!(q.nodes.iter().any(|id| d.nodes[id].tags.get("pack size") == Some(&1.0)));
     }
 
     #[test]

@@ -48,6 +48,13 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **Atlas optimiser fixes from his Ritual test (23 Nov, not released yet).** Ritual only skipped Flexible Dogma etc. and
+  took Harvest nodes (+265% Sacred Flora): the only "Ritual" creator tree is mostly Harvest and creator popularity
+  counted for every node. Now (atlas_opt.rs `values`): picked-mechanic nodes weigh 2× (notables 6), creator trees only
+  help nodes for a picked mechanic or all-round ones, other mechanics' nodes get nothing. Test `ritual_takes_ritual`
+  (Balanced has every Ritual notable, no Harvest notable). New travel options (`TRAVEL`): pack size, map mod effect,
+  threads found, maps found, item rarity, as an "Also spend points on" row on Build my own (not used for creator-tree
+  matching). Scrolling over the atlas (and character) tree zooms it only, the page stays put (non-passive wheel listener).
 - **One rule in charge: F2 "Whole group / Just this item" + "Your edit wins" notes (23 Nov, not released yet).** He
   had F2 edits "Rare/Normal Map (Tier 16)" (GOOD MAP look) covering every T16 map, so the Originator look on Map
   tiers never showed. He picked 1A + 2A + 3A from `.claude/mock-one-rule.html`:
@@ -1023,6 +1030,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
+- [ ] (next) Build my own: Ritual only → every Ritual notable (Flexible Dogma, A Light in the Dark…) and no Sacred Flora totals; tick Pack size → pack size nodes join; scrolling over the tree doesn't scroll the page.
 - [ ] (next) Map tiers: the Originator and Tier 16 rows say "Your edit wins: Rare Map (Tier 16)"; Remove it → the Originator look shows on the ground after F4. F2 on an Originator map: "Whole group" changes the Originator look on the Map tiers page; "Just this item" makes your own edit.
 - [ ] (next) Map pictures: a plain T16 map shows the plain XVI art (not Veritania's); Map tiers → Special maps rows show conqueror / Elder guardian / Blighted / Valdo pictures; F2 on a conqueror map shows that conqueror's art.
 - [ ] (0.2.55) Map tracker: run two maps; the clock keeps going while you play (only stops in the Escape menu / skill tree / alt-tabbed), and the loot box says "Last map · <name>".

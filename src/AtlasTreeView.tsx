@@ -151,7 +151,11 @@ export default function AtlasTreeView({ nodes, choices = [], steps, step, height
     if (!el) return;
     const ro = new ResizeObserver(() => setPx(el.getBoundingClientRect().width || 600));
     ro.observe(el);
-    return () => ro.disconnect();
+    // Scrolling over the tree zooms it and nothing else: the page must not scroll too (he asked 23 Nov). React's own
+    // wheel handler can't stop that (it's passive), so a plain listener does.
+    const stop = (e: WheelEvent) => e.preventDefault();
+    el.addEventListener("wheel", stop, { passive: false });
+    return () => { ro.disconnect(); el.removeEventListener("wheel", stop); };
   }, [tree, box != null]);
 
   const stepping = !!steps && steps.length > 0 && step != null;

@@ -84,6 +84,14 @@ export default function TreeView({ nodes, previous, height = 520, ascendancy, ma
   const drag = useRef<{ x: number; y: number; box: Box } | null>(null);
 
   useEffect(() => { loadTree().then(setTree).catch(() => setTree(null)); }, []);
+  // Scrolling over the tree zooms it; the page stays put (React's wheel handler is passive and can't stop it).
+  useEffect(() => {
+    const el = svg.current;
+    if (!el) return;
+    const stop = (e: WheelEvent) => e.preventDefault();
+    el.addEventListener("wheel", stop, { passive: false });
+    return () => el.removeEventListener("wheel", stop);
+  }, [tree, box != null]);
 
   const have = useMemo(() => new Set(nodes.map(String)), [nodes]);
   const before = useMemo(() => new Set((previous ?? []).map(String)), [previous]);

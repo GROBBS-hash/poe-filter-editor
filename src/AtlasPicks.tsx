@@ -22,8 +22,14 @@ const MECHS: [string, string, string][] = [
 ];
 /** Only on "Build my own" (no creator tree for them, but the optimiser knows their nodes). */
 const OWN_ONLY = ["divination cards"];
-const ITEM: Record<string, string> = Object.fromEntries(MECHS.map(([k, , item]) => [k, item]));
-const LABEL: Record<string, string> = Object.fromEntries(MECHS.map(([k, label]) => [k, label]));
+/** "Also spend points on": all-round travel nodes for Build my own (he asked 23 Nov), keys as in core atlas_opt TRAVEL. */
+const TRAVEL: [string, string, string][] = [
+  ["pack size", "Pack size", "Cartographer's Chisel"], ["explicit effect", "Map mod effect", "Orb of Alchemy"],
+  ["threads", "Threads found", "Frayed Thread"], ["maps found", "Maps found", "Map (Tier 16)"], ["rarity", "Item rarity", "Exalted Orb"],
+];
+const TRAVEL_KEYS = TRAVEL.map(([k]) => k);
+const ITEM: Record<string, string> = Object.fromEntries([...MECHS, ...TRAVEL].map(([k, , item]) => [k, item]));
+const LABEL: Record<string, string> = Object.fromEntries([...MECHS, ...TRAVEL].map(([k, label]) => [k, label]));
 const link = (id: string) => `https://maxroll.gg/poe/farming-strategy-planner/${id}`;
 
 function ago(day: string) {
@@ -67,13 +73,15 @@ export default function AtlasPicks({ store, onImported, onShow }: {
 
   if (!picks || picks.length === 0) return null;
 
-  const fit = (p: Pick) => sel.filter((m) => p.mechanics.includes(m)).length;
-  const shown = (sel.length === 0 ? picks.filter((p) => p.group === "maxroll") : picks.filter((p) => fit(p) > 0))
+  // Creator trees only know mechanics: travel options and own-only picks don't narrow them.
+  const ms = sel.filter((m) => !TRAVEL_KEYS.includes(m) && !OWN_ONLY.includes(m));
+  const fit = (p: Pick) => ms.filter((m) => p.mechanics.includes(m)).length;
+  const shown = (ms.length === 0 ? picks.filter((p) => p.group === "maxroll") : picks.filter((p) => fit(p) > 0))
     .slice().sort((a, b) => fit(b) - fit(a) || (a.group === b.group ? 0 : a.group === "maxroll" ? -1 : 1) || b.updated.localeCompare(a.updated));
   const list = all ? shown : shown.slice(0, 5);
   const saved = (id: string) => store.list.find((s) => s.link.includes(id));
   const toggle = (m: string) => setSel((s) => s.includes(m) ? s.filter((x) => x !== m) : [...s, m]);
-  const names = sel.map((m) => LABEL[m] ?? m);
+  const names = ms.map((m) => LABEL[m] ?? m);
 
   const use = async (p: Pick) => {
     setBusy(p.id); setErr("");
@@ -108,9 +116,20 @@ export default function AtlasPicks({ store, onImported, onShow }: {
           );
         })}
       </div>
+      {own && <>
+        <div className="ap-step">Also spend points on <span className="ap-step-note">(the nodes you travel through)</span></div>
+        <div className="ap-tiles ap-travel">
+          {TRAVEL.map(([m, label]) => (
+            <button key={m} className={`ap-tile ${sel.includes(m) ? "on" : ""}`} onClick={() => toggle(m)} title={label}>
+              <ItemIcon name={ITEM[m]} size={34} />
+              <span>{label}</span>
+            </button>
+          ))}
+        </div>
+      </>}
       {own ? <BuildOwn sel={sel} onClear={() => setSel([])} onSaved={onImported} /> : <>
       <div className="ap-step">
-        {sel.length === 0 ? "2 · Maxroll team picks (choose above to narrow it down)" : `2 · Creator trees for ${names.join(" + ")}`}
+        {ms.length === 0 ? "2 · Maxroll team picks (choose above to narrow it down)" : `2 · Creator trees for ${names.join(" + ")}`}
         {sel.length > 0 && <button className="link small" onClick={() => setSel([])}>Clear</button>}
       </div>
       {list.length === 0 && <div className="muted small ap-none">No creator tree has these yet. Try fewer, or paste a link below.</div>}
@@ -124,7 +143,7 @@ export default function AtlasPicks({ store, onImported, onShow }: {
               <div><b>{p.name.replace(/^"[^"]*":\s*/, "")}</b> <span className={`ap-badge ${p.group}`}>{p.group === "maxroll" ? "Maxroll team" : "Community"}</span></div>
               <div className="muted small">by {p.author} · {p.points} points · updated {ago(p.updated)}{p.maps[0] ? ` · runs ${p.maps[0]}` : ""}</div>
             </div>
-            {sel.length > 1 && <span className={`ap-fit ${n === sel.length ? "" : "part"}`}>{n === sel.length ? (sel.length === 2 ? "✓ Both" : "✓ All") : `${n} of ${sel.length}`}</span>}
+            {ms.length > 1 && <span className={`ap-fit ${n === ms.length ? "" : "part"}`}>{n === ms.length ? (ms.length === 2 ? "✓ Both" : "✓ All") : `${n} of ${ms.length}`}</span>}
             <button className="link small" onClick={() => invoke("open_url", { url: link(p.id) })}>maxroll</button>
             {mine
               ? <button onClick={() => onShow(mine.id)} title="You already saved a copy">In My strategies</button>
