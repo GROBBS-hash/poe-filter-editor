@@ -1,4 +1,5 @@
 import { friendly } from "./errors";
+import { ErrNote } from "./LoginNeeded";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
@@ -151,7 +152,7 @@ function SavedPanel({ list, setList, onRun }: { list: Saved[]; setList: (l: Save
           </li>
         ))}
       </ul>
-      {err && <div className="qm-warn">{err}</div>}
+      <ErrNote msg={err} className="qm-warn" />
     </div>
   );
 }
@@ -807,7 +808,7 @@ export default function TradeWindow() {
         <div className="qm-warn tw-thin" title="poe.ninja's price comes from the few that sold. The filter's worth line counts cards like this under 50c as worthless.">
           Hardly traded: about {Math.max(1, Math.round(check.sold))} sold recently on the exchange, so this price is a guess.</div>
       )}
-      {err && <div className="qm-warn">{err}</div>}
+      <ErrNote msg={err} className="qm-warn" />
       {res && res.total === 0 && searched === searchKey(setup) && (setup.filters.some((f) => f.enabled) || (setup.base_only && setup.category) || setup.ilvl_min) && (
         <UntickHelp state={untick} onAsk={() => { setUntick("busy");
             invoke<{ key: string; label: string; total: number }[]>("trade_untick_one", { setup }).then(setUntick).catch((e) => setUntick(String(e))); }}

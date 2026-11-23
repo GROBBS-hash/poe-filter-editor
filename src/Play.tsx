@@ -4,7 +4,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ResizeGrips, WinBar, useFitHeight } from "./WinFrame";
 import { CurrencyIcon, ItemIcon } from "./icons";
-import { PoeLogin } from "./Wealth";
+import { ErrNote, PoeLogin, needsLogin } from "./LoginNeeded";
 import syndicate from "./data/syndicate.json";
 import anoints from "./data/anoints.json";
 import "./play.css";
@@ -581,7 +581,7 @@ function TrackerLoot({ v }: { v: TrackerView }) {
   const s = v.session;
   return (
     <div className="trk-sec">
-      {loot.length === 0 ? <div className="pw-small">{v.loot_note || (v.inside ? "Loot shows when you leave the map (your bags are read as you go in and out)." : "Loot per map: run a map and it shows here.")}</div> : <>
+      {loot.length === 0 ? <div className="pw-small">{needsLogin(v.loot_note) ? <ErrNote msg={v.loot_note} onRetry={() => {}} /> : v.loot_note || (v.inside ? "Loot shows when you leave the map (your bags are read as you go in and out)." : "Loot per map: run a map and it shows here.")}</div> : <>
         <div className="pw-row between"><span className="loot-label">{label}</span>
           <span className="loot-total">{Math.round(total).toLocaleString()}c{v.divine ? <span className="pw-small"> ≈ {(total / v.divine).toFixed(1)} div</span> : null}</span></div>
         <LootBar loot={loot.filter((l) => !p.hide.includes(l.cat))} />
@@ -660,7 +660,7 @@ export function TrackerSettings() {
             <input className="num" type="number" min={0} step={1} style={{ width: 70 }} value={lp.min_chaos} onChange={(e) => loot({ min_chaos: Math.max(0, +e.target.value) })} />
             <span className="small">chaos</span><span className="muted small">Cheaper drops are added up in one line.</span></div>
         </>}
-        {v.loot_note && <p className="note small">{v.loot_note}</p>}
+        <ErrNote msg={v.loot_note} className="note small" onRetry={() => {}} />
       </div>
     </>
   );

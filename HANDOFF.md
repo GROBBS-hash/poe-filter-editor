@@ -48,6 +48,12 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **"Log in again" right where the login error shows (23 Nov, not released yet).** He asked after Sell in bulk said his login
+  had expired. `src/LoginNeeded.tsx`: `PoeLogin` (moved from Wealth.tsx, re-exported there) and `ErrNote`: an error that
+  mentions the login (`needsLogin`) shows "Your pathofexile.com login has run out" + a gold **Log in again** button (the
+  site's own login window); once logged in, `onRetry` re-runs what failed (Stash worth: the last action; Sell in bulk:
+  the stash read or live prices; map tracker: carries on next map). Used on Stash worth, Sell in bulk, map tracker,
+  price window and trades window. No pop-up by itself (it could jump up mid-map).
 - **Build my own: click a node to see what it does + Totals (23 Nov, not released yet).** From his screenshot: clicking a
   "Doing the most" row opens what that node does (the picked option for multiple-choice ones) and zooms the tree to it
   (outlined); the Totals panel now shows under the optimiser's tree too (AtlasPicks.tsx BuildOwn, `.ap-does`).
@@ -987,6 +993,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
+- [ ] (next) When the pathofexile.com login runs out: the red message has a "Log in again" button on that page; after logging in, it carries on (Sell in bulk reads the stash again).
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
 (move them to "Confirmed in game") as he reports back, and add new features here as they land.
 Confirmed in game so far: 23 Nov (0.2.53): F5 works outside the game, F2 works in game; basic Ctrl+D price check (trade search returned listings); 20 Nov: weapon + armour

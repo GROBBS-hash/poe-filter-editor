@@ -139,6 +139,9 @@ mockIPC((cmd, args) => {
     return { name: "Sam's Strict", game: "Poe1", strictness: 3, edits: 31, edits_off: 2, looks: ["Chase", "Quiet"], theme: "Ember", prices: true }; }
   if (cmd === "import_pack") return "sams-strict";
   if (cmd === "set_rule_off") { const a = args as { index: number; off: boolean }; rules = rules.map((r, i) => i === a.index ? { ...r, off: a.off, detail: { ...r.detail, off: a.off } } : r); return []; }
+  // An expired pathofexile.com login: the stash scan says so (shows the "Log in again" message). The login window can't open here.
+  if (cmd === "wealth_scan") throw "Your pathofexile.com login has expired: press \"Log in again\" (or \"Log in with pathofexile.com\" in Settings → Map tracker).";
+  if (cmd === "poe_login") return null;
   // Sell in bulk: a few groups, the basket priced like the app (fraction "total/count" in chaos, divines from 1 div each).
   if (cmd === "bulk_get") return { divine: 180, league: "Keepers", scanned: Math.floor(Date.now() / 1000) - 1500, profile: "", has_sessid: true,
     groups: ["Currency", "Essences", "Div cards", "Fragments", "Lifeforce", "Threads"],

@@ -1,10 +1,11 @@
 import { Spinner } from "./TradeWindow";
 import { usePersist } from "./usePersist";
 import { friendly } from "./errors";
+import { ErrNote, PoeLogin } from "./LoginNeeded";
 import { PageLoading } from "./Loading";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CurrencyIcon } from "./icons";
 
 export type Tab = { index: number; name: string; kind: string; colour: string };
@@ -234,28 +235,7 @@ function Profiles({ v, setV, setErr, busy }: { v: WealthView; setV: (w: WealthVi
 }
 
 /** Wealth tracker page: stash worth, things worth selling, and earnings per strategy. */
-/** "Log in with pathofexile.com": opens the site's login page in a small window; when you're logged in there, your
- *  account and POESESSID are saved and onDone gets the account name ("Name#1234"). */
-export function PoeLogin({ onDone, onError, big }: { onDone?: (account: string) => void; onError?: (e: string) => void; big?: boolean }) {
-  const [waiting, setWaiting] = useState(false);
-  const [done, setDone] = useState("");
-  useEffect(() => {
-    const un = listen<{ ok: boolean; account: string | null; error: string | null }>("poe-login", (e) => {
-      setWaiting(false);
-      if (e.payload.ok && e.payload.account) { setDone(e.payload.account); onDone?.(e.payload.account); }
-      else if (e.payload.error) onError?.(e.payload.error);
-    });
-    return () => { un.then((f) => f()); };
-  }, []);
-  const go = () => { setWaiting(true); setDone(""); invoke("poe_login").catch((e) => { setWaiting(false); onError?.(friendly(e)); }); };
-  return (
-    <div className="row" style={{ margin: "8px 0" }}>
-      <button className={big ? "primary" : ""} onClick={go}>{waiting ? "Waiting for you to log in…" : "Log in with pathofexile.com"}</button>
-      {waiting && <span className="muted small">Log in in the window that opened (it closes by itself).</span>}
-      {done && !waiting && <span className="w-full small">Logged in as {done}</span>}
-    </div>
-  );
-}
+export { PoeLogin } from "./LoginNeeded";
 
 export default function Wealth() {
   const [v, setV] = useState<WealthView | null>(null);
@@ -284,7 +264,10 @@ export default function Wealth() {
 
   // Logged in through the "Log in with pathofexile.com" window: connect straight away.
   const loggedIn = (account: string) => { setAccount(account); run("setup", "wealth_setup", { account, sessid: null }).then((w) => { if (w) setShowSetup(false); }); };
+  // What to do again after logging in from an expired-login message.
+  const again = useRef<(() => void) | null>(null);
   const run = async (label: string, cmd: string, args: Record<string, unknown> = {}): Promise<WealthView | null> => {
+    again.current = () => { run(label, cmd, args); };
     setBusy(label); setErr(""); setProgress(null);
     let out: WealthView | null = null;
     try { out = await invoke<WealthView>(cmd, args); setV(out); } catch (e) { setErr(friendly(e)); }
@@ -304,7 +287,7 @@ export default function Wealth() {
   };
   const names = useMemo(() => [...new Set((v?.sessions ?? []).map((s) => s.name))], [v]);
 
-  if (!v) return err ? <div className="card">{err}</div> : <PageLoading />;
+  if (!v) return err ? <ErrNote msg={err} className="card" onRetry={() => { setErr(""); invoke<WealthView>("wealth_get").then(setV).catch((e) => setErr(friendly(e))); }} /> : <PageLoading />;
   const connected = v.has_sessid && v.account && v.tabs.length > 0;
   // History and totals for the profile in use ("" = whole stash) in this league.
   const mine = v.snapshots.filter((s) => s.league === v.league && (s.profile ?? "") === (v.active ?? ""));
@@ -343,7 +326,7 @@ export default function Wealth() {
           </details>
         </div>
       )}
-      {err && <div className="card note warn-text">{err}</div>}
+      <ErrNote msg={err} className="card note warn-text" onRetry={() => { setErr(""); if (again.current) again.current(); else invoke<WealthView>("wealth_get").then(setV).catch(() => {}); }} />
       {connected && last && (
         <div className="tiles">
           <div className="tile gold">

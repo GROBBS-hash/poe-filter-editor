@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { friendly } from "./errors";
+import { ErrNote } from "./LoginNeeded";
 import { CurrencyIcon, ItemIcon } from "./icons";
 import { usePersist } from "./usePersist";
 import { PageLoading } from "./Loading";
@@ -85,7 +86,10 @@ export default function Bulk() {
 
   const copy = (key: string, text: string) => invoke("copy_text", { text }).then(() => { setCopied(key); setTimeout(() => setCopied(""), 1500); });
 
+  // What to do again after logging in from an expired-login message.
+  const again = useRef<(() => void) | null>(null);
   const scan = async () => {
+    again.current = scan;
     setBusy("scan"); setErr(""); setProgress(null);
     try { await invoke("wealth_scan"); await load(); } catch (e) { setErr(friendly(e)); }
     setBusy(""); setProgress(null);
@@ -93,6 +97,7 @@ export default function Bulk() {
 
   // Asks the trade site's bulk exchange, one item at a time (its limits are strict; the app waits its turn).
   const checkLive = async () => {
+    again.current = checkLive;
     const names = Object.keys(picks).filter((n) => byName.has(n)).sort((a, b) => market(b) * (picks[b]?.count ?? 0) - market(a) * (picks[a]?.count ?? 0)).slice(0, 12);
     setBusy("live"); setErr("");
     for (const [i, name] of names.entries()) {
@@ -105,7 +110,7 @@ export default function Bulk() {
     setBusy(""); setProgress(null);
   };
 
-  if (!v) return err ? <div className="card">{err}</div> : <PageLoading />;
+  if (!v) return err ? <ErrNote msg={err} className="card" onRetry={() => { setErr(""); load(); }} /> : <PageLoading />;
   const divine = v.divine;
   const inBasket = Object.keys(picks).filter((n) => byName.has(n));
 
@@ -123,7 +128,7 @@ export default function Bulk() {
           <button onClick={scan} disabled={!!busy || !v.has_sessid}>{busy === "scan" ? "Reading…" : "Read my stash again"}</button>
         </div>
       </div>
-      {err && <div className="card note warn-text">{err}</div>}
+      <ErrNote msg={err} className="card note warn-text" onRetry={() => { setErr(""); (again.current ?? load)(); }} />
 
       {v.items.length === 0 ? (
         <div className="card"><h2>Nothing to sell in bulk yet</h2>

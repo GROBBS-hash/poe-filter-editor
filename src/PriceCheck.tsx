@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { friendly } from "./errors";
+import { ErrNote } from "./LoginNeeded";
 import { Tip } from "./Help";
 import { keyOf } from "./hotkeys";
 
@@ -57,7 +58,7 @@ export default function PriceCheck({ keys }: { keys: Record<string, string> }) {
               </li>
             ))}
           </ul>}
-        {err && <div className="qm-warn">{err}</div>}
+        <ErrNote msg={err} className="qm-warn" />
       </div>
 
       <div className="card">

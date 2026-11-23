@@ -2305,3 +2305,7 @@ button.qm-rule:hover, .qm-rule.can-open:hover { border-color: var(--gold); backg
 .ap-work.open .ap-work-name { color: var(--gold); }
 .ap-does { grid-column: 1 / -1; margin-top: 6px; padding: 8px 10px; border-left: 2px solid var(--gold); background: var(--panel); border-radius: 0 6px 6px 0;
   font-size: 12.5px; color: var(--text); display: flex; flex-direction: column; gap: 3px; }
+/* "Your pathofexile.com login has run out" with its own Log in again button (any page, 23 Nov). */
+.login-needed { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 16px; color: var(--text); }
+.login-needed b { color: var(--gold); font-weight: 600; }
+.login-needed .row { margin: 0 !important; }
