@@ -21,11 +21,18 @@ const reply = {
         : { kind: "edit", label: "Orb of Unmaking", type_path: [], tier: null, section: null, tier_name: null } } },
 };
 mockWindows("overlay");
-mockIPC((cmd) => {
+mockIPC((cmd, args) => {
   if (cmd === "check_item" || cmd === "item_status") return reply;
   if (cmd === "item_price") return [0.82, "chaos"];
   if (cmd === "stack_choices") return [];
   if (cmd === "get_icons") return {};
+  // Saved looks (?looks=0 for none yet).
+  if (cmd === "list_looks") return params.get("looks") === "0" ? [] : [
+    { name: "My chase look", used_by: 2, style: { font_size: 45, text: [255, 60, 60, 255], border: [255, 60, 60, 255], background: [20, 20, 20, 240], beam: { colour: "Red", temp: false }, minimap: null, sound: { kind: "Default" }, label_hidden: false } },
+    { name: "Good stuff", used_by: 5, style: { font_size: 42, text: [255, 200, 40, 255], border: [255, 200, 40, 255], background: [20, 20, 20, 240], beam: { colour: "Yellow", temp: false }, minimap: null, sound: { kind: "Default" }, label_hidden: false } },
+    { name: "Quiet", used_by: 0, style: { font_size: 30, text: [170, 170, 170, 255], border: null, background: [0, 0, 0, 150], beam: null, minimap: null, sound: { kind: "Off" }, label_hidden: false } },
+  ];
+  if (cmd === "apply_custom_style") { (window as unknown as { lastApply: unknown }).lastApply = args; return { label: "Style: Orb of Unmaking", warnings: [] }; }
   return null;
 }, { shouldMockEvents: true });
 document.body.className = "overlay";

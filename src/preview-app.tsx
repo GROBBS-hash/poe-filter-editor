@@ -109,8 +109,30 @@ const atlasWindow = location.search.includes("atlas-window");
 const playWin = new URLSearchParams(location.search).get("play") ?? (location.search.includes("sheet") ? "sheet" : null);
 const sheetWin = playWin != null;
 mockWindows(playWin ? playWin : atlasWindow ? "atlas" : buildWin ? "build" : "main");
+// My edits + saved looks: a few edits, two using "My chase look", one switched off.
+const lookStyle = (rgb: number[], beam: string | null) => ({ font_size: 45, text: [...rgb, 255], border: [...rgb, 255], background: [20, 20, 20, 240],
+  beam: beam ? { colour: beam, temp: false } : null, minimap: beam ? { size: 1, colour: beam, shape: "Star" } : null, sound: { kind: "Default" }, label_hidden: false });
+let looks = [{ name: "My chase look", style: lookStyle([255, 60, 60], "Red") }, { name: "Good stuff", style: lookStyle([255, 200, 40], "Yellow") }];
+const curStyle = (s: { font_size: number; text: number[]; border: number[] | null; background: number[]; beam: { colour: string } | null }) =>
+  ({ font_size: s.font_size, text: s.text, border: s.border, background: s.background, beam: s.beam?.colour ?? null, muted: false });
+const edit = (base: string, cls: string, look: string | null, off = false, show = true) => {
+  const st = looks.find((l) => l.name === look)?.style ?? lookStyle([180, 140, 255], null);
+  return { label: `${show ? "Style" : "Hide"}: ${base}`, off, look, detail: { label: `${show ? "Style" : "Hide"}: ${base}`, show, item_class: cls, base_type: base, rarity: null, style: curStyle(st), look, off } };
+};
+let rules = [edit("Divine Orb", "Stackable Currency", "My chase look"), edit("Mirror of Kalandra", "Stackable Currency", "My chase look"),
+  edit("Chaos Orb", "Stackable Currency", null, true), edit("Iron Ring", "Rings", null, false, false)];
+const relook = () => { rules = rules.map((r) => r.look ? edit(r.detail.base_type, r.detail.item_class, looks.some((l) => l.name === r.look) ? r.look : null, r.off, r.detail.show) : r); };
 mockIPC((cmd, args) => {
-  if (cmd === "overview") return { profiles: [{ id: "mid", name: "Mid-Game", game: "Poe1", base_file: "", output_file: "", rules: [] }], active: "mid", poe1_dir: "", poe2_dir: "", batch_on: false };
+  if (cmd === "overview") return { profiles: [{ id: "mid", name: "Mid-Game", game: "Poe1", base_file: "", output_file: "Mid-Game.filter", rules: rules.map((r, index) => ({ index, shadowed_by: null, ...r })) }], active: "mid", poe1_dir: "", poe2_dir: "", batch_on: false };
+  if (cmd === "list_looks") return looks.map((l) => ({ ...l, used_by: rules.filter((r) => r.look === l.name).length }));
+  if (cmd === "save_look") {
+    const a = args as { look: { name: string; style: ReturnType<typeof lookStyle> }; oldName: string | null };
+    if (looks.some((l) => l.name.toLowerCase() === a.look.name.toLowerCase() && l.name !== a.oldName)) throw `You already have a look called “${a.look.name}”`;
+    looks = a.oldName ? looks.map((l) => l.name === a.oldName ? a.look : l) : [...looks, a.look];
+    rules = rules.map((r) => r.look === a.oldName ? { ...r, look: a.look.name } : r); relook(); return [];
+  }
+  if (cmd === "delete_look") { const n = (args as { name: string }).name; looks = looks.filter((l) => l.name !== n); rules = rules.map((r) => r.look === n ? { ...r, look: null, detail: { ...r.detail, look: null } } : r); return null; }
+  if (cmd === "set_rule_off") { const a = args as { index: number; off: boolean }; rules = rules.map((r, i) => i === a.index ? { ...r, off: a.off, detail: { ...r.detail, off: a.off } } : r); return []; }
   if (cmd === "wealth_get") return wealth;
   if (cmd === "buy_base_item") return { total: 3480, ilvl: 75, notables: [["Doryani's Lesson", 68], ["Inspired Oppression", 75], ["Overshock", 50]] };
   if (cmd === "get_price_settings") return { settings: { enabled: false, groups: [{ group: "DivinationCards", enabled: true, tiers: [], hide_below: null }, { group: "Uniques", enabled: true, tiers: [], hide_below: null }] }, info: { unit: "chaos", league: "Keepers", updated: new Date().toISOString(), count: 18432 } };
