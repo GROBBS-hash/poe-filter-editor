@@ -48,6 +48,11 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **No false "that tier is gone" lines (23 Nov, not released yet).** Saving a look showed 11 "Couldn't change … that tier
+  is gone" lines: Red-Maps (Uber Strict) inherits Mid-Game's (Very Strict) tier edits, and NeverSink switches those tiers
+  off at Uber Strict ("#Show # $type->… $tier->…"). He chose to just hide the message (not switch them on for Show
+  edits): `filter::has_commented` → no warning when the tier is there but switched off (rules.rs apply). Real tiers that
+  really vanish still warn. Dev check on his file: `cargo test -p filter-core --lib commented_tests -- --include-ignored`.
 - **Map tracker: clock no longer stops while you play; Last map names the map (23 Nov, released in 0.2.55).** His Forge of
   the Phoenix showed 0:12 "paused": the log has ~3 min inside, play.json had in_map 12 / paused 159 (earlier maps the
   same: 10/325, 1/61). The auto-learnt bar look on his 3840x2160 screen didn't match the bar, so moving play looked like

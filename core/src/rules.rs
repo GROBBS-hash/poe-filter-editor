@@ -527,7 +527,9 @@ pub fn apply_with_extra(segs: &mut Vec<Segment>, rules: &[Rule], extra: &str, nl
                     if let Some(n) = min_item_tier { b.set_min("UnidentifiedItemTier", *n); }
                     if let Some(c) = conds { b.set_conds(c); }
                 }
-                if !found {
+                // Switched off by NeverSink at this strictness (a parent filter's edit on a stricter one): nothing to
+                // change and nothing wrong, so no warning (he asked 23 Nov: the "gone" lines were false).
+                if !found && !crate::filter::has_commented(segs, type_path, tier) {
                     warnings.push(format!("Couldn't change {} {tier}: that tier is gone in this version", type_path.join(" > ")));
                 }
             }

@@ -147,6 +147,21 @@ fn block_keyword(t: &str) -> Option<&'static str> {
 
 /// Switches on NeverSink's commented-out blocks of one `$type` (e.g. `maps->implicitmod`, which he ships
 /// as "#Show" lines), in place, so they work like his other rules. Returns how many were switched on.
+/// Is this tier in the filter but switched off ("#Show # $type->… $tier->…")? NeverSink does that at stricter
+/// levels (Uber Strict turns off the levelling rares, stacked fragments…), so an edit made on a looser filter has
+/// nothing to change there, but the tier isn't gone.
+pub fn has_commented(segs: &[Segment], type_path: &[String], tier: &str) -> bool {
+    segs.iter().any(|s| {
+        let Segment::Raw(raw) = s else { return false };
+        raw.lines().any(|line| {
+            let Some(u) = line.trim_start().strip_prefix('#') else { return false };
+            if block_keyword(u).is_none() { return false; }
+            let (path, t) = parse_tag(u.trim_end());
+            path == type_path && t.as_deref() == Some(tier)
+        })
+    })
+}
+
 pub fn enable_commented(segs: &mut Vec<Segment>, type_path: &[&str]) -> usize {
     let mut count = 0;
     let mut i = 0;
@@ -258,4 +273,36 @@ pub fn move_base(segs: &mut [Segment], type_path: &[&str], base: &str, to_tier: 
         }
     }
     placed
+}
+
+#[cfg(test)]
+mod commented_tests {
+    use super::*;
+
+    #[test]
+    fn switched_off_tier_is_not_gone() {
+        let text = "Show # %D4 $type->leveling->rare->armours $tier->general !x\n\tRarity Rare\n\n\
+#Show # %DS3 $type->fragments $tier->t3stackedex !fragments_b\n#\tStackSize >= 3\n#\tClass == \"Map Fragments\"\n\n";
+        let segs = parse_filter(text);
+        let p = |s: &str| s.split("->").map(String::from).collect::<Vec<_>>();
+        assert!(has_commented(&segs, &p("fragments"), "t3stackedex"));
+        assert!(!has_commented(&segs, &p("fragments"), "t3"));
+        // A switched-on block isn't "commented".
+        assert!(!has_commented(&segs, &p("leveling->rare->armours"), "general"));
+    }
+
+    /// His real Uber Strict file (dev only): every tier the 23 Nov message called "gone" is switched off there.
+    #[test]
+    #[ignore]
+    fn his_uber_strict() {
+        let dir = std::env::var("APPDATA").unwrap() + "/com.grobbs.poefiltereditor/neversink/poe1/NeverSink's filter - 5-UBER-STRICT.filter";
+        let segs = parse_filter(&std::fs::read_to_string(dir).unwrap());
+        let p = |s: &str| s.split("->").map(String::from).collect::<Vec<_>>();
+        for (path, tier) in [("fragments", "t3stackedex"), ("gear->tiered", "t2r3"), ("rr", "t3"), ("leveling->rare->armours", "shields"),
+            ("leveling->rare->armours", "general"), ("leveling->rare->armours", "quivers"), ("leveling->rare->armours", "bodyarmours"),
+            ("leveling->rare->armours", "bootsfocus"), ("leveling->rare->caster", "general"), ("leveling->rare->caster", "earlylevels"),
+            ("leveling->normalmagic->4l", "general")] {
+            assert!(has_commented(&segs, &p(path), tier), "{path} {tier}");
+        }
+    }
 }
