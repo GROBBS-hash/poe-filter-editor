@@ -21,7 +21,7 @@ use filter_core::{
     prices::{default_settings, price_of, PriceFile, PriceSettings},
     profiles::{build_with_prices, render_profile, Game, Settings, Store},
     themes::{builtin_themes, Theme},
-    rules::{add_rule, shadowed_by, custom_rule, edited_rule, known_bases, locate, quick_rule, rule_detail, Action, CustomStyle, Location, MatchOpts, Rule, RuleDetail, RuleEdit},
+    rules::{add_rule, shadowed_by, custom_rule, edited_rule, known_bases, locate, quick_rule, rule_detail, Action, CustomStyle, Location, MatchOpts, Rule, RuleDetail, RuleEdit, SavedLook},
 };
 use serde::Serialize;
 use std::{
@@ -1370,18 +1370,22 @@ struct RuleInfo {
     detail: Option<RuleDetail>,
     /// A newer edit always wins over this one, so it never applies.
     shadowed_by: Option<String>,
+    /// Switched off: listed, but left out of the filter.
+    off: bool,
+    /// The saved look it uses, if any.
+    look: Option<String>,
 }
 
 fn rule_label(r: &Rule) -> String {
     match r {
         Rule::Override { label, .. } => label.clone(),
-        Rule::MoveBase { type_path, base, to_tier } if to_tier.is_empty() => {
+        Rule::MoveBase { type_path, base, to_tier, .. } if to_tier.is_empty() => {
             format!("Tier: {base} taken out of {}", type_path.join(" > "))
         }
-        Rule::MoveBase { type_path, base, to_tier } => {
+        Rule::MoveBase { type_path, base, to_tier, .. } => {
             format!("Tier: {base} moved to {} {}", type_path.join(" > "), filter_core::tiers::tier_name(to_tier))
         }
-        Rule::Tier { type_path, tier, show, actions, min_stack, min_item_tier, conds } => {
+        Rule::Tier { type_path, tier, show, actions, min_stack, min_item_tier, conds, .. } => {
             let what = match (show, actions, min_stack) {
                 (Some(false), ..) => "hidden".to_string(),
                 (_, Some(_), _) => "restyled".to_string(),
@@ -1710,7 +1714,7 @@ fn move_tier_item(state: State<AppState>, id: String, type_path: Vec<String>, ba
     remember(&state, &store, &id, &format!("Moved {base} to {}", filter_core::tiers::tier_name(&to_tier)));
     let p = store.profiles.get_mut(&id).ok_or("Profile not found")?;
     p.rules.retain(|r| !matches!(r, Rule::MoveBase { type_path: tp, base: b, .. } if *tp == type_path && *b == base));
-    p.rules.push(Rule::MoveBase { type_path, base, to_tier });
+    p.rules.push(Rule::MoveBase { type_path, base, to_tier, off: false });
     save_and_build(&state, &store, &id)
 }
 
@@ -1743,11 +1747,13 @@ fn tier_edit(rules: &mut Vec<Rule>, type_path: &[String], tier: &str, show: Opti
         // Also undo items dragged into this tier.
         rules.retain(|r| !matches!(r, Rule::MoveBase { type_path: tp, to_tier, .. } if tp.as_slice() == type_path && to_tier == tier));
     } else {
-        let (old_show, old_actions, old_stack, old_it, old_conds) = match old {
-            Some(Rule::Tier { show, actions, min_stack, min_item_tier, conds, .. }) => (show, actions, min_stack, min_item_tier, conds), _ => (None, None, None, None, None) };
+        let (old_show, old_actions, old_stack, old_it, old_conds, old_look) = match old {
+            Some(Rule::Tier { show, actions, min_stack, min_item_tier, conds, look, .. }) => (show, actions, min_stack, min_item_tier, conds, look), _ => (None, None, None, None, None, None) };
         rules.push(Rule::Tier { type_path: type_path.to_vec(), tier: tier.to_string(), show: show.or(old_show),
             actions: style.map(filter_core::rules::style_actions).or(old_actions), min_stack: min_stack.or(old_stack),
-            min_item_tier: min_item_tier.or(old_it), conds: old_conds });
+            min_item_tier: min_item_tier.or(old_it), conds: old_conds,
+            // Any change switches it back on; a new look of its own stops it following a saved look.
+            off: false, look: if style.is_some() { None } else { old_look } });
     }
 }
 
@@ -1811,6 +1817,8 @@ fn overview(state: State<AppState>) -> Overview {
                         label: rule_label(r),
                         detail: rule_detail(r),
                         shadowed_by: sh[index].map(|j| rule_label(&p.rules[j])),
+                        off: r.is_off(),
+                        look: r.look().map(str::to_string),
                     }).collect()
                 },
             })
@@ -1947,10 +1955,14 @@ fn apply_quick_action(
 
 /// Saves a full custom look (colours, beam, map icon, sound) for this item.
 #[tauri::command]
-fn apply_custom_style(state: State<AppState>, item: Item, style: CustomStyle, opts: Option<MatchOpts>) -> Result<ActionResult, String> {
+fn apply_custom_style(state: State<AppState>, item: Item, style: Option<CustomStyle>, opts: Option<MatchOpts>, look: Option<String>) -> Result<ActionResult, String> {
     let mut store = state.store.lock().unwrap();
     let id = store.active.clone().ok_or("Set up a profile first")?;
-    let rule = custom_rule(&item, &style, &opts.unwrap_or_default());
+    // With a saved look: its colours, and the edit keeps following it.
+    let saved = look.as_deref().map(|n| store.find_look(n).cloned().ok_or_else(|| format!("There's no saved look called “{n}” any more"))).transpose()?;
+    let style = saved.as_ref().map(|l| l.style.clone()).or(style).ok_or("Pick a look first")?;
+    let mut rule = custom_rule(&item, &style, &opts.unwrap_or_default());
+    if let Some(l) = &saved { rule.use_look(&l.name, &l.style); }
     let label = rule_label(&rule);
     remember(&state, &store, &id, &label);
     add_rule(&mut store.profiles.get_mut(&id).ok_or("Profile not found")?.rules, rule);
@@ -2098,7 +2110,8 @@ fn get_rule(state: State<AppState>, id: Option<String>, index: Option<usize>, la
 fn update_rule(state: State<AppState>, id: String, index: usize, edit: RuleEdit) -> Result<ActionResult, String> {
     let mut store = state.store.lock().unwrap();
     let old = store.profiles.get(&id).ok_or("Profile not found")?.rules.get(index).ok_or("That edit no longer exists")?;
-    let new = edited_rule(old, &edit).ok_or("This edit can't be changed")?;
+    let mut new = edited_rule(old, &edit).ok_or("This edit can't be changed")?;
+    if let Some(l) = edit.look.as_deref().filter(|_| edit.show).and_then(|n| store.find_look(n)) { new.use_look(&l.name, &l.style); }
     let label = rule_label(&new);
     remember(&state, &store, &id, &format!("Changed: {label}"));
     let p = store.profiles.get_mut(&id).ok_or("Profile not found")?;
@@ -2373,6 +2386,76 @@ fn delete_theme(state: State<AppState>, name: String) -> Result<(), String> {
     store.save(&state.store_path).map_err(err)?;
     for id in ids { let _ = save_and_build(&state, &store, &id); }
     Ok(())
+}
+
+/// Rebuilds these filters and every filter that builds on one of them.
+fn rebuild_with_children(state: &AppState, store: &Store, changed: &[String]) -> Vec<String> {
+    let ids: Vec<String> = store.profiles.keys().filter(|id| {
+        let mut cur = store.profiles.get(*id);
+        let mut n = 0;
+        while let Some(p) = cur {
+            if changed.contains(&p.id) { return true; }
+            n += 1;
+            if n > 20 { break; }
+            cur = p.parent.as_deref().and_then(|pid| store.profiles.get(pid));
+        }
+        false
+    }).cloned().collect();
+    ids.iter().flat_map(|id| save_and_build(state, store, id).unwrap_or_else(|e| vec![e])).collect()
+}
+
+#[derive(Serialize)]
+struct LookInfo { name: String, style: CustomStyle, used_by: usize }
+
+/// Your saved looks ("My chase look"), with how many edits use each.
+#[tauri::command]
+fn list_looks(state: State<AppState>) -> Vec<LookInfo> {
+    let store = state.store.lock().unwrap();
+    store.looks.iter().map(|l| LookInfo { name: l.name.clone(), style: l.style.clone(), used_by: store.look_uses(&l.name) }).collect()
+}
+
+/// Saves a look (new, changed, or renamed from `old_name`); every edit using it changes too.
+#[tauri::command]
+fn save_look(state: State<AppState>, look: SavedLook, old_name: Option<String>) -> Result<Vec<String>, String> {
+    let mut store = state.store.lock().unwrap();
+    let changed = store.save_look(look, old_name.as_deref())?;
+    store.save(&state.store_path).map_err(err)?;
+    Ok(rebuild_with_children(&state, &store, &changed))
+}
+
+/// Deletes a saved look. Edits that used it keep their colours.
+#[tauri::command]
+fn delete_look(state: State<AppState>, name: String) -> Result<(), String> {
+    let mut store = state.store.lock().unwrap();
+    store.delete_look(&name);
+    store.save(&state.store_path).map_err(err)
+}
+
+/// Switches an edit off (kept in the list, left out of the filter) or back on.
+#[tauri::command]
+fn set_rule_off(state: State<AppState>, id: String, index: usize, off: bool) -> Result<Vec<String>, String> {
+    let mut store = state.store.lock().unwrap();
+    let label = rule_label(store.profiles.get(&id).ok_or("Profile not found")?.rules.get(index).ok_or("That edit no longer exists")?);
+    remember(&state, &store, &id, &format!("{}: {label}", if off { "Switched off" } else { "Switched on" }));
+    store.profiles.get_mut(&id).ok_or("Profile not found")?.rules[index].set_off(off);
+    store.save(&state.store_path).map_err(err)?;
+    Ok(rebuild_with_children(&state, &store, &[id]))
+}
+
+/// Points an edit at a saved look (it takes that look now and follows later changes), or with no look stops following one.
+#[tauri::command]
+fn set_rule_look(state: State<AppState>, id: String, index: usize, look: Option<String>) -> Result<Vec<String>, String> {
+    let mut store = state.store.lock().unwrap();
+    let saved = look.as_deref().map(|n| store.find_look(n).cloned().ok_or_else(|| format!("There's no saved look called “{n}” any more"))).transpose()?;
+    let label = rule_label(store.profiles.get(&id).ok_or("Profile not found")?.rules.get(index).ok_or("That edit no longer exists")?);
+    remember(&state, &store, &id, &format!("Look changed: {label}"));
+    let r = &mut store.profiles.get_mut(&id).ok_or("Profile not found")?.rules[index];
+    match &saved {
+        Some(l) => if !r.use_look(&l.name, &l.style) { return Err("A hidden edit has no look to change".into()); },
+        None => r.drop_look(),
+    }
+    store.save(&state.store_path).map_err(err)?;
+    Ok(rebuild_with_children(&state, &store, &[id]))
 }
 
 #[tauri::command]
@@ -2756,6 +2839,11 @@ pub fn run() {
             set_base,
             save_theme,
             delete_theme,
+            list_looks,
+            save_look,
+            delete_look,
+            set_rule_off,
+            set_rule_look,
             get_settings,
             save_settings,
             search_items,
@@ -2774,6 +2862,7 @@ pub fn run() {
             hide_build_window,
             atlas_app::atlas_list, atlas_app::atlas_import, atlas_app::atlas_rename, atlas_app::atlas_delete, atlas_app::atlas_use,
             atlas_app::atlas_own_notes, atlas_app::atlas_official_link, atlas_app::hide_atlas_window,
+            atlas_app::atlas_optimise, atlas_app::atlas_save_plan,
             play_app::level_view, play_app::level_move, play_app::level_jump_act, play_app::level_options, play_app::play_view,
             play_app::maps_done, play_app::maps_history, play_app::maps_clear, play_app::watch_action, play_app::searches_get,
             play_app::searches_save, play_app::search_type, play_app::stash_highlight, play_app::sheets_list, play_app::sheets_add,

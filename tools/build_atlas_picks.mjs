@@ -35,8 +35,13 @@ for (const [group, ids] of [["maxroll", MAXROLL], ["community", COMMUNITY]]) {
     const meta = parse(v.metadata) ?? {};
     const data = parse(v.data) ?? {};
     // Points in the biggest tree (history = hand-picked nodes; auto-pathing adds a few, so this is a floor).
-    let points = 0;
-    for (const p of data.profiles ?? []) for (const s of p.atlas?.variants ?? []) points = Math.max(points, (s.history ?? []).length);
+    // The biggest tree: its hand-picked nodes (+ pathing includes) and excludes. The app fills the paths
+    // (atlas.rs fill_paths) and learns from it which nodes creators take for each mechanic (the optimiser).
+    let points = 0, targets = [], exclude = [];
+    for (const p of data.profiles ?? []) for (const s of p.atlas?.variants ?? []) {
+      const h = [...(s.history ?? []), ...(s.pathing?.include ?? [])];
+      if (h.length > points) { points = (s.history ?? []).length; targets = h; exclude = s.pathing?.exclude ?? []; }
+    }
     const mechanics = [...new Set([...tags, ...(v.search_metadata?.mechanics ?? []), ...((meta.strategy?.threads ?? []).map((t) => t.mechanic))])].filter(Boolean);
     if (points < 5) { console.warn(`${id}: no tree, skipped`); await sleep(1000); continue; }
     picks.push({
@@ -48,7 +53,7 @@ for (const [group, ids] of [["maxroll", MAXROLL], ["community", COMMUNITY]]) {
       season: v.season ?? "",
       updated: (v.date ?? "").slice(0, 10),
       maps: v.search_metadata?.items ?? [],
-      points,
+      points, targets, exclude,
     });
     console.log(`${group} ${id} ${v.name} · ${points} pts · ${mechanics.join(", ")} · ${v.season} · ${v.date}`);
     await sleep(1000);

@@ -143,3 +143,24 @@ pub fn toggle_atlas_window(app: &AppHandle) {
 pub fn hide_atlas_window(app: AppHandle) {
     if let Some(w) = app.get_webview_window("atlas") { let _ = w.hide(); }
 }
+
+/// Atlas optimiser: a tree for the picked strategies (see core atlas_opt.rs). No network.
+#[tauri::command]
+pub fn atlas_optimise(ask: filter_core::atlas_opt::Ask) -> filter_core::atlas_opt::Plan {
+    filter_core::atlas_opt::optimise(&ask)
+}
+
+/// Saves the optimiser's tree as one of My strategies (and the one shown in game).
+#[tauri::command]
+pub fn atlas_save_plan(app: AppHandle, ask: filter_core::atlas_opt::Ask, name: String) -> Result<AtlasStore, String> {
+    use filter_core::atlas::{NoteLine, Notes, Variant};
+    let plan = filter_core::atlas_opt::optimise(&ask);
+    let mechs: Vec<String> = ask.mechanics.iter().map(|m| { let mut c = m.chars(); c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default() }).collect();
+    let how = match ask.priority { filter_core::atlas_opt::Priority::Profit => "most profit", filter_core::atlas_opt::Priority::Balanced => "balanced", filter_core::atlas_opt::Priority::Fewest => "fewest points" };
+    let mut lines = vec![NoteLine { kind: "p".into(), depth: 0, text: format!("Built by the optimiser for {} ({how}), {} points, from {} creator trees.", mechs.join(" + "), plan.points, plan.trees_used) }];
+    lines.extend(plan.top.iter().take(8).map(|w| NoteLine { kind: "li".into(), depth: 0, text: format!("{}: {}", w.name, w.why) }));
+    let variant = Variant { name: "Optimised tree".into(), nodes: plan.nodes, choices: plan.choices, steps: plan.steps,
+        notes: vec![Notes { title: "How it was built".into(), lines }] };
+    let strat = Strategy { name: format!("{} (optimiser)", mechs.join(" + ")), site: "optimiser".into(), imported: now(), variants: vec![variant], ..Default::default() };
+    with_store(&app, true, |s| { s.add(strat, &name); s.clone() })
+}

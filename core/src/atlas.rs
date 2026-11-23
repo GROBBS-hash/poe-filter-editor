@@ -51,6 +51,7 @@ impl Graph {
     pub fn has(&self, id: u32) -> bool { self.info.contains_key(&id) }
     pub fn kind(&self, id: u32) -> u8 { self.info.get(&id).map(|i| i.0).unwrap_or(0) }
     pub fn name(&self, id: u32) -> &str { self.info.get(&id).map(|i| i.1.as_str()).unwrap_or("") }
+    pub fn neighbours(&self, id: u32) -> &[u32] { self.adj.get(&id).map(|v| v.as_slice()).unwrap_or(&[]) }
 
     /// Every node the targets need, in the order you'd take them: each target in turn, after
     /// the shortest path joining it to what's taken so far (never through `exclude`). Like
