@@ -1037,6 +1037,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
+- [ ] (next) Edit this tree → take points off → Save: no "This page hit a problem" (reading 'nodes'). Cause: the remembered step was past the end of the shorter tree for one render; `useStep` now clamps what it returns.
 - [ ] (next) Edit this tree: zoom in, click points on and off; the view stays where you zoomed (it used to jump back to the whole tree on every click). AtlasTreeView skips the refit while `onPick` is set.
 - [ ] (0.2.57) Build my own, Ritual + Pack size + Map mod effect: only Eater of Worlds (or only Exarch) nodes, never both, and the gold note under "3 · Your tree" says which; Always on Word of the Exarch switches to the Exarch side. Type "pack size" in "Find on the atlas": nodes ringed, Enter steps through them.
 - [ ] (0.2.56) Build my own: Ritual only → every Ritual notable (Flexible Dogma, A Light in the Dark…) and no Sacred Flora totals; tick Pack size → pack size nodes join; scrolling over the tree doesn't scroll the page.

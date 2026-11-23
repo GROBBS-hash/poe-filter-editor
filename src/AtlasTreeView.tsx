@@ -47,7 +47,8 @@ export function useStep(key: string, count: number): [number, (i: number) => voi
     window.addEventListener("storage", on);
     return () => window.removeEventListener("storage", on);
   }); // eslint-disable-line react-hooks/exhaustive-deps
-  return [step, set];
+  // Kept in range right away: saving an edit with fewer steps used to show a step that's gone (crash, 23 Nov).
+  return [Math.min(step, Math.max(0, count - 1)), set];
 }
 
 // Dot sizes in tree units: taken notables and keystones stand out.
