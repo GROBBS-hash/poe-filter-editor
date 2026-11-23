@@ -984,10 +984,9 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
-- [ ] (0.2.53) Alt-tab out of the game: F5 refreshes the browser, F2/F7/Ctrl+D etc. do nothing outside the game; back in the game they all work again (also with the price window or map tracker in front).
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
 (move them to "Confirmed in game") as he reports back, and add new features here as they land.
-Confirmed in game so far: basic Ctrl+D price check (trade search returned listings); 20 Nov: weapon + armour
+Confirmed in game so far: 23 Nov (0.2.53): F5 works outside the game, F2 works in game; basic Ctrl+D price check (trade search returned listings); 20 Nov: weapon + armour
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
 **Sell in bulk (23 Nov, released in 0.2.52):**
