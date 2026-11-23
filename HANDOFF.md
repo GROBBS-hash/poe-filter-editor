@@ -57,7 +57,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
     `node tools/build_atlas_picks.mjs` (ids + tags at its top; one request a second). Refresh each league. The tree is
     read live when he presses Use. maxroll's team has no Ritual tree this league; its community list is mostly unnamed tests.
   - Files: `src/AtlasPicks.tsx`, `.ap-*` styles. Mock-ups: `.claude/mock-atlas-picks.html` (not committed).
-- **F2 "Modify this rule" + hover, memory maps tracked (23 Nov, not released yet).** From his 0.2.49 play.
+- **F2 "Modify this rule" + hover, memory maps tracked (23 Nov, released in 0.2.50).** From his 0.2.49 play.
   - F2: the button says "Modify this rule" again (he prefers it), and the Shown by box lights up gold on hover and
     opens the rule when clicked, like before (ItemPanel `RuleBox`, `.qm-rule.can-open`).
   - Map tracker missed "Rewritten Distant Memory": its area id is `Synthesis_MapGuardian4`, not "Map…". `is_map_area`
@@ -930,8 +930,8 @@ windows work (totals, DPS/defences, build box in the right slot). He found them 
 **Tiers: step conditions, jewels first (23 Nov, released in 0.2.46):**
 - [ ] (0.2.49) Ctrl+F opens the search box: pick an item and its edit panel opens; type "hide normal 2h swords"
   and Enter: the editor works out the change and asks "Do it?".
-- [ ] (next) F2: one gold "Modify this rule" button inside the Shown by box; the box glows gold on hover.
-- [ ] (next) Map tracker starts a run in memory maps (Rewritten Distant Memory) and boss fights (conquerors, Maven).
+- [ ] (0.2.50) F2: one gold "Modify this rule" button inside the Shown by box; the box glows gold on hover.
+- [ ] (0.2.50) Map tracker starts a run in memory maps (Rewritten Distant Memory) and boss fights (conquerors, Maven).
 - [ ] (0.2.49) Map tracker shows everything without scrolling (grows and shrinks with what it shows).
 - [ ] (0.2.49) Ctrl+D "sells for about" sits near the 3rd cheapest listing.
 - [ ] (0.2.48) Ctrl+D: resist / life total rows show a T badge; a unique opens with its own numbers; "Instant buyout
@@ -1424,7 +1424,7 @@ when the game window isn't found. Check in game: the window's spot, and that it 
       if some still look missing in F6, ask which stage and which gems.
 
 **Atlas strategies (Endgame → Atlas, F7, new 20 Nov)**
-- [ ] (next) Atlas page "Build an atlas from strategies": pick e.g. Harvest + Breach, press Use this tree on one; it lands in My strategies, shows in game on F7, and matches what maxroll shows.
+- [ ] (0.2.50) Atlas page "Build an atlas from strategies": pick e.g. Harvest + Breach, press Use this tree on one; it lands in My strategies, shows in game on F7, and matches what maxroll shows.
 - [ ] Import a maxroll farming strategy link and a pathofexile.com atlas tree link; both show the tree on the page.
 - [ ] Rename / delete / "In game" pick work and are still there after restarting the editor.
 - [ ] F7 in game shows the window without taking the game's focus (you can keep moving); F7 again hides it.
