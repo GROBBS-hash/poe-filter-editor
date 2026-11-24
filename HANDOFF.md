@@ -1038,6 +1038,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
+- [ ] (next) Build my own: click any point on the tree → it shows at the top of the side panel (what it does, in your tree or not) with Always / Never; Never takes it out and the tree stays zoomed where it was. Search matches word starts ("ore" finds Ore nodes, not "more").
 - [ ] (0.2.59) Atlas tree page → Add a strategy from a link → paste an Atlas Tree Planner link (atlas-blush-beta.vercel.app/#…): it imports with all 150 points and the options picked; "Open on Atlas Tree Planner" opens it again.
 - [ ] (0.2.59) Find on the atlas: type a mechanic ("harvest", "ritual", "div") → every node for it lights up blue, including ones in its area and ones not taken ("harvest" found 1 before, 56 now). Shared word list `src/atlasGroups.ts` (same as Totals) + nearest area name.
 - [ ] (0.2.58) Edit this tree → take points off → Save: no "This page hit a problem" (reading 'nodes'). Cause: the remembered step was past the end of the shorter tree for one render; `useStep` now clamps what it returns.

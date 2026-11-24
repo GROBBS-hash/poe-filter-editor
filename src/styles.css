@@ -2343,3 +2343,6 @@ button.qm-rule:hover, .qm-rule.can-open:hover { border-color: var(--gold); backg
 .atv-find-n { white-space: nowrap; }
 /* Search matches stand out even when not taken (24 Nov) */
 .atv-nodes circle.found:not(.on):not(.now) { fill: rgba(89, 208, 255, .55); }
+/* Build my own: the point clicked on the tree (24 Nov) */
+.ap-clicked { border: 1px solid var(--gold); background: color-mix(in srgb, var(--gold) 8%, transparent); border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; display: grid; gap: 6px; }
+.ap-clicked .ap-acts { justify-self: start; }

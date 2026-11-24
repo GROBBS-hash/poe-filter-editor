@@ -192,10 +192,13 @@ export default function AtlasTreeView({ nodes, choices = [], steps, step, height
     if (!tree || needle.length < 3) return [] as string[];
     const grp = groupFor(needle);
     const areas = grp ? [grp[1], ...(AREAS[grp[0]] ?? [])].map((a) => a.toLowerCase()) : [];
+    // Words start with what's typed: "ore" finds Ore Deposits, not "more" (24 Nov).
+    const esc = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const word = new RegExp(`(^|[^a-z])${esc}`, "i");
     const out = Object.entries(tree.nodes).filter(([id, n]) => {
       const text = [n[3], ...(n[4] ?? []), ...Object.values(tree.choices[id] ?? {})].join(" ");
       const area = (areaOf[id] ?? "").toLowerCase();
-      return text.toLowerCase().includes(needle) || area.includes(needle)
+      return word.test(text) || word.test(area)
         || (!!grp && (grp[3].test(text) || areas.includes(area)));
     });
     out.sort((a, b) => Number(b[1][2] === 1 || b[1][2] === 2) - Number(a[1][2] === 1 || a[1][2] === 2));
@@ -385,6 +388,7 @@ export default function AtlasTreeView({ nodes, choices = [], steps, step, height
           {onPick && hAdd.size > 0 ? <div className="tv-tag add">Click to add · +{hAdd.size} point{hAdd.size > 1 ? "s" : ""}</div>
             : onPick && hCut.size > 0 ? <div className="tv-tag cut">Click to take off · −{hCut.size} point{hCut.size > 1 ? "s" : ""}</div>
             : now.has(hover.id) ? <div className="tv-tag new">This step</div> : on(hover.id) && <div className="tv-tag on">Taken</div>}
+          {onPick && !hint && <div className="tv-tag">Click: Always / Never</div>}
         </div>
       )}
     </div>

@@ -187,6 +187,8 @@ function BuildOwn({ sel, onClear, onSaved }: { sel: string[]; onClear: () => voi
   // The row opened in "Doing the most" (shows what the node does), and the tree zooming to it.
   const [openNode, setOpenNode] = useState<number | null>(null);
   const [find, setFind] = useState<{ id: number; n: number } | null>(null);
+  // A point clicked on the tree: pinned at the top of the side panel with Always / Never (he asked 24 Nov).
+  const [clicked, setClicked] = useState<number | null>(null);
 
   useEffect(() => { try { localStorage.setItem("atlas-opt-prio", prio); } catch { /* fine */ } }, [prio]);
   useEffect(() => { saveList("atlas-opt-lock", lock); saveList("atlas-opt-block", block); }, [lock, block]);
@@ -230,8 +232,16 @@ function BuildOwn({ sel, onClear, onSaved }: { sel: string[]; onClear: () => voi
     setOpenNode((o) => (o === id ? null : id));
     setFind((f) => ({ id, n: (f?.n ?? 0) + 1 }));
   };
+  const pickOnTree = (id: number) => {
+    setClicked(id);
+    const listed = plan?.top.some((w) => w.node === id) || plan?.weak.some((w) => w.node === id);
+    setOpenNode(listed ? id : null);
+    requestAnimationFrame(() => {
+      document.querySelector(".ap-own-side")?.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  };
   const row = (w: NodeWork, weak = false) => (
-    <div key={w.node} className={`ap-work ${weak ? "weak" : ""} ${openNode === w.node ? "open" : ""}`}>
+    <div key={w.node} id={`ap-row-${w.node}`} className={`ap-work ${weak ? "weak" : ""} ${openNode === w.node ? "open" : ""}`}>
       <button className="ap-work-name" onClick={() => toggleOpen(w.node)} aria-expanded={openNode === w.node} title="What it does (and find it on the tree)">
         <b>{w.name}</b><span className="ap-caret" aria-hidden="true">{openNode === w.node ? "▾" : "▸"}</span>
       </button>
@@ -272,8 +282,23 @@ function BuildOwn({ sel, onClear, onSaved }: { sel: string[]; onClear: () => voi
         <div className="ap-step">3 · Your tree · {plan.points} of {plan.budget} points</div>
         {(plan.notes ?? []).length > 0 && <div className="small ap-notes">{plan.notes!.join(" · ")}. Lock in (Always) a node of the other side to switch.</div>}
         <div className="ap-own">
-          <div className="ap-own-tree"><AtlasTreeView key={plan.nodes.length + plan.nodes.slice(-1).join()} nodes={plan.nodes} choices={plan.choices} height={620} find={find} /></div>
+          <div className="ap-own-tree"><AtlasTreeView key={sel.join(",")} nodes={plan.nodes} choices={plan.choices} height={620} find={find} onPick={pickOnTree} /></div>
           <div className="ap-own-side">
+            {clicked != null && names[clicked] !== undefined && (
+              <div className="ap-clicked">
+                <div className="row-between">
+                  <b>{names[clicked] || "Passive"}</b>
+                  <button className="link small" onClick={() => setClicked(null)} aria-label="Close">✕</button>
+                </div>
+                <div className="muted small">{plan.nodes.includes(clicked) ? "In your tree" : "Not in your tree"}
+                  {lock.includes(clicked) ? " · Always" : block.includes(clicked) ? " · Never" : ""}</div>
+                <div className="ap-does">{does(clicked).map((l, i) => <div key={i}>{l}</div>)}</div>
+                <span className="ap-acts">
+                  <button className={`ap-mini lock ${lock.includes(clicked) ? "on" : ""}`} onClick={() => always(clicked)} title="Always keep this in">Always</button>
+                  <button className={`ap-mini block ${block.includes(clicked) ? "on" : ""}`} onClick={() => never(clicked)} title="Leave this out and build around it">Never</button>
+                </span>
+              </div>
+            )}
             <b>Doing the most</b>
             <div className="muted small">Always = keep it in. Never = leave it out and build around it.</div>
             {plan.top.map((w) => row(w))}
