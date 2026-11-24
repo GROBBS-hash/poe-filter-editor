@@ -155,7 +155,6 @@ export function LevelWindow() {
               you {v.char_level}{keep != null && keep < 0.99 ? ` · ${Math.round(keep * 100)}% XP` : ""}</span>}
           </span>
         </div>
-        {v.poe2 && <div className="pw-tag warn" style={{ marginTop: 5 }}>This route is PoE 1's campaign (PoE 2's isn't in yet)</div>}
         <LevelChips v={v} />
         {race && <RaceLine r={race} />}
         {v.steps.map((s, i) => <Step key={`${v.pos}-${i}`} s={s} cls={i < v.current ? "done" : i === v.current ? "now" : "next"} />)}

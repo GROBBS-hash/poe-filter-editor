@@ -502,6 +502,18 @@ pub fn route() -> &'static Route {
     R.get_or_init(|| serde_json::from_str(include_str!("../data/levelling.json")).expect("levelling.json"))
 }
 
+/// PoE 2's campaign route (from Exile UI's leveling guide, MIT; `node tools/build_levelling_poe2.mjs`). Its area ids are
+/// lower case ("g1_4"); the game logs "G1_4", so look them up with `area_key`.
+pub fn route_poe2() -> &'static Route {
+    static R: OnceLock<Route> = OnceLock::new();
+    R.get_or_init(|| serde_json::from_str(include_str!("../data/levelling_poe2.json")).expect("levelling_poe2.json"))
+}
+
+pub fn route_for(poe2: bool) -> &'static Route { if poe2 { route_poe2() } else { route() } }
+
+/// The id a route knows an area by (PoE 2's are lower case).
+pub fn area_key(poe2: bool, id: &str) -> String { if poe2 { id.to_lowercase() } else { id.to_string() } }
+
 /// Your levelling choices that change the route.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
@@ -826,6 +838,16 @@ mod tests {
         // A zone nowhere near: stay put.
         assert_eq!(advance(r, &vis, p2, "1_10_1"), None);
         assert!(step_text(r, &r.steps[0]).contains("Hillock"));
+    }
+
+    #[test]
+    fn poe2_route_follows_zones() {
+        let r = route_poe2();
+        assert!(r.steps.len() > 200);
+        let vis = steps_for(r, &RouteOptions::default());
+        let p = advance(r, &vis, 0, &area_key(true, "G1_2")).expect("Clearfell");
+        assert!(p > 0);
+        assert!(r.areas.contains_key("g1_town"));
     }
 
     #[test]

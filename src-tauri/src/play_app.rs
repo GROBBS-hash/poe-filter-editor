@@ -240,7 +240,9 @@ pub fn on_line(app: &AppHandle, line: &str) {
             with_live(|l| { l.zone = Some((id.clone(), *level, *time)); l.zone_name.clear(); });
             follow_route(app, id);
             // Race splits: the first time this character enters each act (maps count as act 11).
-            let act = journey::route().areas.get(id).map(|a| a.a).or_else(|| journey::is_map_area(id).then_some(11));
+            let poe2 = is_poe2(app);
+            let act = journey::route_for(poe2).areas.get(&journey::area_key(poe2, id)).map(|a| a.a)
+                .filter(|a| !poe2 || *a <= 6).or_else(|| journey::is_map_area(id).then_some(11));
             if let (Some(act), Some(me)) = (act, with_live(|l| l.character.as_ref().map(|c| c.0.clone()))) {
                 with_store(app, |s| s.races.act(&me, act, *time));
                 save = true;
@@ -280,8 +282,13 @@ fn emit_all(app: &AppHandle) {
 
 fn char_key() -> String { with_live(|l| l.character.as_ref().map(|c| c.0.clone())).unwrap_or_else(|| "_".into()) }
 
+/// Is the active filter for PoE 2 (the levelling route follows the game)?
+fn is_poe2(app: &AppHandle) -> bool { active_game(&app.state::<AppState>()) == Game::Poe2 }
+
 fn follow_route(app: &AppHandle, area: &str) {
-    let r = journey::route();
+    let poe2 = is_poe2(app);
+    let r = journey::route_for(poe2);
+    let area = &journey::area_key(poe2, area);
     let key = char_key();
     let moved = with_store(app, |s| {
         if s.level_manual { return false; }
@@ -373,7 +380,8 @@ fn step_view(r: &journey::Route, s: &journey::Step, class: &str, gems: &[String]
 
 #[tauri::command]
 pub fn level_view(app: AppHandle) -> LevelView {
-    let r = journey::route();
+    let poe2 = is_poe2(&app);
+    let r = journey::route_for(poe2);
     let key = char_key();
     let (opts, pos, manual) = with_store(&app, |s| (s.route.clone(), *s.level_pos.get(&key).unwrap_or(&0), s.level_manual));
     let vis = journey::steps_for(r, &opts);
@@ -387,9 +395,9 @@ pub fn level_view(app: AppHandle) -> LevelView {
     let (gem_search, left) = journey::gem_search(&gems, &r.gems);
     let zone_level = zone.as_ref().map(|z| z.1);
     let char_level = character.as_ref().map(|c| c.2);
-    let zone_label = zone.as_ref().map(|z| if !zone_name.is_empty() { zone_name.clone() } else { r.areas.get(&z.0).map(|a| a.n.clone()).unwrap_or_else(|| journey::map_name(&z.0)) });
+    let zone_label = zone.as_ref().map(|z| if !zone_name.is_empty() { zone_name.clone() } else { r.areas.get(&journey::area_key(poe2, &z.0)).map(|a| a.n.clone()).unwrap_or_else(|| journey::map_name(&z.0)) });
     // Trials: the route's "Complete the trial" steps, done once the route is past them.
-    let zone_id = zone.as_ref().map(|z| z.0.clone()).unwrap_or_default();
+    let zone_id = zone.as_ref().map(|z| journey::area_key(poe2, &z.0)).unwrap_or_default();
     let mut trials = vec![];
     let mut last_zone = String::new();
     for (p, &i) in vis.iter().enumerate() {
@@ -401,7 +409,8 @@ pub fn level_view(app: AppHandle) -> LevelView {
         }
     }
     let act_now = vis.get(pos).map(|&i| r.steps[i].act).unwrap_or(1);
-    let res_penalty = if pos + 1 >= vis.len() { -60 } else if act_now >= 6 { -30 } else { 0 };
+    // PoE 1 only: PoE 2's penalties differ (and change between patches), so it shows none rather than a wrong one.
+    let res_penalty = if poe2 { 0 } else if pos + 1 >= vis.len() { -60 } else if act_now >= 6 { -30 } else { 0 };
     LevelView {
         trials, res_penalty, poe2: active_game(&app.state::<AppState>()) == Game::Poe2,
         pos, total: vis.len(), current: pos - from, steps,
@@ -414,7 +423,7 @@ pub fn level_view(app: AppHandle) -> LevelView {
 /// The arrows: one step back or forward.
 #[tauri::command]
 pub fn level_move(app: AppHandle, by: i64) -> LevelView {
-    let r = journey::route();
+    let r = journey::route_for(is_poe2(&app));
     let key = char_key();
     with_store(&app, |s| {
         let n = journey::steps_for(r, &s.route).len() as i64;
@@ -430,7 +439,7 @@ pub fn level_move(app: AppHandle, by: i64) -> LevelView {
 /// Jump to the first step of an act (the act picker), or to a step number.
 #[tauri::command]
 pub fn level_jump_act(app: AppHandle, act: u32) -> LevelView {
-    let r = journey::route();
+    let r = journey::route_for(is_poe2(&app));
     let key = char_key();
     with_store(&app, |s| {
         let vis = journey::steps_for(r, &s.route);
@@ -444,7 +453,7 @@ pub fn level_jump_act(app: AppHandle, act: u32) -> LevelView {
 #[tauri::command]
 pub fn level_options(app: AppHandle, options: RouteOptions, manual: bool) -> LevelView {
     // Keep your place: find the same step in the new list.
-    let r = journey::route();
+    let r = journey::route_for(is_poe2(&app));
     let key = char_key();
     with_store(&app, |s| {
         let old = journey::steps_for(r, &s.route);
