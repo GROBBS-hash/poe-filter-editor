@@ -9,6 +9,7 @@ pub mod craft;
 pub mod ask;
 pub mod evaluate;
 pub mod farm;
+pub mod temple;
 pub mod explain;
 pub mod filter;
 pub mod gear;

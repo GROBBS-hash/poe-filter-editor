@@ -1,0 +1,278 @@
+{
+ "checked": "2026-11-24T10:07:08Z",
+ "plain": 10,
+ "rooms": [
+  {
+   "label": "Apex of Atzoatl",
+   "stats": [
+    "pseudo.pseudo_temple_apex"
+   ],
+   "listed": 5203,
+   "typical": 5
+  },
+  {
+   "label": "Toxic Grove (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_poison_room_3"
+   ],
+   "listed": 1075,
+   "typical": 10
+  },
+  {
+   "label": "Apex of Ascension (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_sacrifice_room_3"
+   ],
+   "listed": 2097,
+   "typical": 10
+  },
+  {
+   "label": "Storm of Corruption (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_storm_room_3"
+   ],
+   "listed": 1268,
+   "typical": 17
+  },
+  {
+   "label": "Defense Research Lab (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_trap_room_3"
+   ],
+   "listed": 985,
+   "typical": 19
+  },
+  {
+   "label": "Atlas of Worlds (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_cartography_room_3"
+   ],
+   "listed": 1597,
+   "typical": 10
+  },
+  {
+   "label": "Cradle of Creation (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_queens_chambers_3"
+   ],
+   "listed": 2872,
+   "typical": 55
+  },
+  {
+   "label": "Museum of Artefacts (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_chests_3"
+   ],
+   "listed": 1410,
+   "typical": 9
+  },
+  {
+   "label": "Locus of Corruption (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_corruption_room_3"
+   ],
+   "listed": 2599,
+   "typical": 195
+  },
+  {
+   "label": "Shrine of Unmaking (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_explosives_room_3"
+   ],
+   "listed": 1213,
+   "typical": 10
+  },
+  {
+   "label": "Chamber of Iron (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_armour_room_3"
+   ],
+   "listed": 1036,
+   "typical": 10
+  },
+  {
+   "label": "Hall of Champions (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_weapon_room_3"
+   ],
+   "listed": 1069,
+   "typical": 10
+  },
+  {
+   "label": "Hall of War (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_breeding_room_3"
+   ],
+   "listed": 1359,
+   "typical": 10
+  },
+  {
+   "label": "House of the Others (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_breach_room_3"
+   ],
+   "listed": 1415,
+   "typical": 10
+  },
+  {
+   "label": "Doryani's Institute (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_gem_room_3"
+   ],
+   "listed": 1733,
+   "typical": 195
+  },
+  {
+   "label": "Wealth of the Vaal (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_currency_vault_3"
+   ],
+   "listed": 1807,
+   "typical": 10
+  },
+  {
+   "label": "Glittering Halls (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_trinket_room_3"
+   ],
+   "listed": 1400,
+   "typical": 10
+  },
+  {
+   "label": "Factory (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_workshop_3"
+   ],
+   "listed": 1237,
+   "typical": 10
+  },
+  {
+   "label": "Temple Nexus (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_empowering_room_3"
+   ],
+   "listed": 1571,
+   "typical": 5
+  },
+  {
+   "label": "Sanctum of Immortality (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_healing_room_3"
+   ],
+   "listed": 910,
+   "typical": 7
+  },
+  {
+   "label": "Hybridisation Chamber (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_boss_minions_3"
+   ],
+   "listed": 1134,
+   "typical": 10
+  },
+  {
+   "label": "Crucible of Flame (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_boss_fire_3"
+   ],
+   "listed": 1127,
+   "typical": 10
+  },
+  {
+   "label": "Conduit of Lightning (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_boss_lightning_3"
+   ],
+   "listed": 1181,
+   "typical": 10
+  },
+  {
+   "label": "Sadist's Den (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_torment_3"
+   ],
+   "listed": 1043,
+   "typical": 8
+  },
+  {
+   "label": "Court of Sealed Death (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_strongbox_3"
+   ],
+   "listed": 1451,
+   "typical": 8
+  },
+  {
+   "label": "Hall of Legends (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_legion_3"
+   ],
+   "listed": 1388,
+   "typical": 10
+  },
+  {
+   "label": "Locus of Corruption (Tier 3) + Doryani's Institute (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_corruption_room_3",
+    "pseudo.pseudo_temple_gem_room_3"
+   ],
+   "listed": 867,
+   "typical": 195
+  },
+  {
+   "label": "Locus of Corruption (Tier 3) + Cradle of Creation (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_corruption_room_3",
+    "pseudo.pseudo_temple_queens_chambers_3"
+   ],
+   "listed": 1025,
+   "typical": 226
+  },
+  {
+   "label": "Locus of Corruption (Tier 3) + Defense Research Lab (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_corruption_room_3",
+    "pseudo.pseudo_temple_trap_room_3"
+   ],
+   "listed": 398,
+   "typical": 195
+  },
+  {
+   "label": "Doryani's Institute (Tier 3) + Cradle of Creation (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_gem_room_3",
+    "pseudo.pseudo_temple_queens_chambers_3"
+   ],
+   "listed": 692,
+   "typical": 390
+  },
+  {
+   "label": "Doryani's Institute (Tier 3) + Defense Research Lab (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_gem_room_3",
+    "pseudo.pseudo_temple_trap_room_3"
+   ],
+   "listed": 306,
+   "typical": 195
+  },
+  {
+   "label": "Cradle of Creation (Tier 3) + Defense Research Lab (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_queens_chambers_3",
+    "pseudo.pseudo_temple_trap_room_3"
+   ],
+   "listed": 454,
+   "typical": 195
+  },
+  {
+   "label": "Locus of Corruption (Tier 3) + Doryani's Institute (Tier 3) + Cradle of Creation (Tier 3)",
+   "stats": [
+    "pseudo.pseudo_temple_corruption_room_3",
+    "pseudo.pseudo_temple_gem_room_3",
+    "pseudo.pseudo_temple_queens_chambers_3"
+   ],
+   "listed": 289,
+   "typical": 390
+  }
+ ]
+}

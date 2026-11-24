@@ -11,7 +11,7 @@
     { "key": "betrayal", "label": "Betrayal", "ninja": "Betrayal", "thread": "Betrayal Thread", "pic": "Betrayal Thread", "names": ["Veiled Exalted Orb", "Veiled Chaos Orb", "Syndicate Medallion"], "unseen": "veiled items" },
     { "key": "ultimatum", "label": "Ultimatum", "ninja": "Ultimatum", "thread": "Ultimatum Thread", "pic": "Ultimatum Thread", "ends": ["Catalyst"], "not": ["Tainted Catalyst"], "unseen": "Inscribed Ultimatums" },
     { "key": "expedition", "label": "Expedition", "ninja": "Expedition", "thread": "Expedition Thread", "pic": "Expedition Thread", "cats": ["Artifact"], "unseen": "Logbooks and vendor rerolls" },
-    { "key": "incursion", "label": "Incursion", "ninja": "Incursion", "thread": "Incursion Thread", "pic": "Incursion Thread", "unseen": "temples (Chronicles)" },
+    { "key": "incursion", "label": "Incursion", "ninja": "Incursion", "thread": "Incursion Thread", "pic": "Incursion Thread", "unseen": "Incursion items and Vials" },
     { "key": "harvest", "label": "Harvest", "ninja": "Wildwood", "pic": "Wild Crystallised Lifeforce", "names": ["Wild Crystallised Lifeforce", "Vivid Crystallised Lifeforce", "Primal Crystallised Lifeforce", "Sacred Crystallised Lifeforce", "Sacred Blossom"] },
     { "key": "essence", "label": "Essence", "ninja": "Essence", "pic": "Deafening Essence of Greed", "cats": ["Essence"] },
     { "key": "delirium", "label": "Delirium", "ninja": "Delirium", "pic": "Simulacrum Splinter", "cats": ["DeliriumOrb"], "names": ["Simulacrum", "Simulacrum Splinter"], "unseen": "cluster jewels" }

@@ -6,7 +6,7 @@ import { ItemIcon } from "./icons";
 import { Tip } from "./Help";
 import "./farm.css";
 
-type Drop = { name: string; chaos: number; sold_div: number; change: number | null; jackpot: boolean };
+type Drop = { name: string; pic?: string; chaos: number; sold_div: number; change: number | null; jackpot: boolean };
 type Why = { text: string; src: string };
 type Thread = { key: string; thread: string; count: number; each: number; change: number | null };
 type MapTip = { map: string; why: Why[]; yours: [number, number] | null };
@@ -15,10 +15,10 @@ type Farm = { keys: string[]; title: string; score: number; value: number; stead
   also: [string, string][]; altar: Why | null; maps: MapTip[]; avoid: Why[]; creator: [string, string, string] | null; rolls: string | null; unseen: string[] };
 type Worth = { key: string; label: string; pic: string; share: number; steady: number; jackpots: number; raw: number; change: number | null;
   drops: Drop[]; unseen: string | null; estimate: boolean; blind: boolean };
-type Finder = { farms: Farm[]; mechanics: Worth[]; trees_from: string; trees: number; prices_from: string; divine: number };
+type Finder = { farms: Farm[]; mechanics: Worth[]; trees_from: string; trees: number; prices_from: string; temples_from: string; divine: number };
 type Ask = { count: "all" | "steady"; max_cost: number | null; size: number };
 
-const SRC: Record<string, string> = { maxroll: "maxroll", "poe.ninja": "players' trees", guides: "guide sites", community: "community tree", "patch notes": "patch notes" };
+const SRC: Record<string, string> = { maxroll: "maxroll", "poe.ninja": "players' trees", guides: "guide sites", community: "community tree", "patch notes": "patch notes", "trade site": "trade site" };
 const VERDICT: Record<string, string> = { "Under-farmed": "good", Strong: "good", Solid: "ok", Crowded: "warn" };
 const HINT: Record<string, string> = {
   "Under-farmed": "Its drops sell well and few players go for it", Strong: "Its drops sell well for how many players go for it",
@@ -87,7 +87,7 @@ function Card({ f, pics, best, div, onBuild }: { f: Farm; pics: Record<string, s
       <div className="ff-drops">
         {f.drops.slice(0, 6).map((d) => (
           <span key={d.name} title={`${d.name}: ${money(d.chaos, div)} each`}>
-            <ItemIcon name={d.name} base={d.name} size={30} /><small>{money(d.chaos, div)}</small>
+            <ItemIcon name={d.pic ?? d.name} base={d.pic ?? d.name} size={30} /><small>{money(d.chaos, div)}</small>
           </span>
         ))}
       </div>
@@ -142,8 +142,8 @@ export default function FarmFinder({ onBuild }: { onBuild: () => void }) {
     const load = () => invoke<Finder>("farm_find", { ask }).then((x) => { if (on) { setR(x); setErr(""); } }).catch((e) => { if (on) setErr(friendly(e)); });
     load();
     try { localStorage.setItem("farm-ask", JSON.stringify(ask)); } catch { /* fine */ }
-    const un = listen("prices-updated", load);
-    return () => { on = false; un.then((f) => f()); };
+    const un = [listen("prices-updated", load), listen("temples-updated", load)];
+    return () => { on = false; un.forEach((u) => u.then((f) => f())); };
   }, [ask]);
 
   const build = (f: Farm) => {
@@ -161,9 +161,9 @@ export default function FarmFinder({ onBuild }: { onBuild: () => void }) {
   return (
     <div className="card ff">
       <h2>What to farm today <Tip>Ranks mechanics, and mixes of them people really run together, by how much their drops sell for each player
-        going for them. It can't see drops per map, so treat it as a good starting point: your own maps are the proof. Raw currency and beasts
-        are estimates.</Tip></h2>
-      {r && <p className="muted small">Prices from {day(r.prices_from)} (poe.ninja) · {r.trees.toLocaleString()} players' trees from {day(r.trees_from)} · creator trees from maxroll</p>}
+        going for them. It can't see drops per map, so treat it as a good starting point: your own maps are the proof. Raw currency, beasts
+        and temples are estimates.</Tip></h2>
+      {r && <p className="muted small">Prices from {day(r.prices_from)} (poe.ninja) · {r.trees.toLocaleString()} players' trees from {day(r.trees_from)} · creator trees from maxroll · temples from {day(r.temples_from)} (trade site)</p>}
       <div className="row ff-opts">
         <Seg opts={[["All drops", "all"], ["Regular drops only", "steady"]] as [string, Ask["count"]][]} now={ask.count} set={(count) => setAsk({ ...ask, count })} />
         <Seg opts={COSTS} now={ask.max_cost} set={(max_cost) => setAsk({ ...ask, max_cost })} />
@@ -197,7 +197,7 @@ export default function FarmFinder({ onBuild }: { onBuild: () => void }) {
                 : <><td>{Math.round(m.steady)}</td><td>{Math.round(m.jackpots)}</td><td>{m.raw > 0 ? `~${Math.round(m.raw)}` : "–"}</td></>}
               <td>{(m.share * 100).toFixed(0)}%</td>
               <td><Change v={m.change} /></td>
-              <td><span className="ff-drops tiny">{m.drops.slice(0, 5).map((d) => <span key={d.name} title={`${d.name}: ${money(d.chaos, r.divine)}`}><ItemIcon name={d.name} base={d.name} size={22} /></span>)}</span></td>
+              <td><span className="ff-drops tiny">{m.drops.slice(0, 5).map((d) => <span key={d.name} title={`${d.name}: ${money(d.chaos, r.divine)}`}><ItemIcon name={d.pic ?? d.name} base={d.pic ?? d.name} size={22} /></span>)}</span></td>
             </tr>
           ))}</tbody>
         </table>

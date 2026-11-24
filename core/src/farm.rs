@@ -13,6 +13,7 @@
 //! items sold outside the exchange (beasts: only what's listed is known).
 
 use crate::prices::{PriceFile, PriceItem};
+use crate::temple::Temples;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::OnceLock;
@@ -121,6 +122,9 @@ fn mech(key: &str) -> Option<&'static Mech> { farms().mechanics.iter().find(|m| 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct Drop {
     pub name: String,
+    /// Picture, when it isn't the name's own (a temple room: the Chronicle).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pic: Option<String>,
     pub chaos: f64,
     /// Traded recently, in divines (listed ones count a tenth).
     pub sold_div: f64,
@@ -230,6 +234,7 @@ pub struct Finder {
     pub trees_from: String,
     pub trees: f64,
     pub prices_from: String,
+    pub temples_from: String,
     pub divine: f64,
 }
 
@@ -251,14 +256,29 @@ fn drops_of(m: &Mech, file: &PriceFile, div: f64) -> Vec<(Drop, bool)> {
             _ => return None,
         };
         // A week-old price that jumped tenfold on a handful of sales says nothing: the change is capped.
-        Some((Drop { name: i.name.clone(), chaos: i.value, sold_div: sold / div, change: i.change.map(|c| c.clamp(-99.0, 999.0)), jackpot: i.value >= div }, listed))
+        Some((Drop { name: i.name.clone(), pic: None, chaos: i.value, sold_div: sold / div, change: i.change.map(|c| c.clamp(-99.0, 999.0)), jackpot: i.value >= div }, listed))
     }).collect();
     out.sort_by(|a, b| b.0.sold_div.total_cmp(&a.0.sold_div));
     out
 }
 
+/// Temples by their best rooms: what they ask over a plain temple. Listed only, like beasts.
+fn temple_drops(t: &Temples, div: f64) -> Vec<(Drop, bool)> {
+    let mut out: Vec<(Drop, bool)> = vec![];
+    let mut dearer: Vec<&str> = vec![];
+    for r in t.worth().into_iter().filter(|r| r.stats.len() == 1) {
+        // A temple with two good rooms is sold once: it counts for the dearer one.
+        let both: u32 = dearer.iter().filter_map(|d| t.rooms.iter().find(|p| p.stats.len() == 2 && p.stats.iter().any(|s| s == d) && p.stats.contains(&r.stats[0]))).map(|p| p.listed).sum();
+        let n = r.listed.saturating_sub(both) as f64;
+        out.push((Drop { name: r.label.trim_end_matches(" (Tier 3)").to_string(), pic: Some(crate::temple::CHRONICLE.into()),
+            chaos: r.typical, sold_div: (r.typical - t.plain).max(0.0) * n * LISTED_COUNTS / div, change: None, jackpot: r.typical >= div }, true));
+        dearer.push(&r.stats[0]);
+    }
+    out
+}
+
 /// Every mechanic on its own.
-fn worths(file: &PriceFile, div: f64) -> Vec<Worth> {
+fn worths(file: &PriceFile, temples: &Temples, div: f64) -> Vec<Worth> {
     let f = farms();
     let pool: f64 = file.items.iter().filter(|i| f.raw.names.contains(&i.name)).filter_map(|i| i.volume).sum::<f64>() / div;
     let share = |m: &Mech| meta().share.get(&m.ninja).copied().unwrap_or(0.0);
@@ -266,7 +286,8 @@ fn worths(file: &PriceFile, div: f64) -> Vec<Worth> {
     let takers: f64 = 100.0 * f.raw.everyone + f.mechanics.iter().map(|m| share(m) * 100.0 * m.raw).sum::<f64>();
     f.mechanics.iter().map(|m| {
         let s = share(m);
-        let drops = drops_of(m, file, div);
+        let mut drops = drops_of(m, file, div);
+        if m.key == "incursion" { drops.extend(temple_drops(temples, div)); drops.sort_by(|a, b| b.0.sold_div.total_cmp(&a.0.sold_div)); }
         let per = |j: bool| drops.iter().filter(|d| d.0.jackpot == j).map(|d| d.0.sold_div).sum::<f64>() / (s * 100.0).max(1.0);
         let raw = if takers > 0.0 { pool / takers * m.raw } else { 0.0 };
         Worth {
@@ -339,10 +360,10 @@ fn combos() -> Vec<Vec<String>> {
 }
 
 /// The finder: cards best first (the mix of mechanics changes from card to card), and every mechanic on its own.
-pub fn find(file: &PriceFile, runs: Runs, ask: &FarmAsk) -> Finder {
+pub fn find(file: &PriceFile, temples: &Temples, runs: Runs, ask: &FarmAsk) -> Finder {
     let f = farms();
     let div = file.items.iter().find(|i| i.name == "Divine Orb").map(|i| i.value).filter(|v| *v > 0.0).unwrap_or(1.0);
-    let worth = worths(file, div);
+    let worth = worths(file, temples, div);
     let w = |k: &str| worth.iter().find(|x| x.key == k);
     let jack = if ask.count == Count::Steady { 0.0 } else { 1.0 };
     let mut list: Vec<Farm> = combos().into_iter().filter_map(|keys| {
@@ -364,7 +385,12 @@ pub fn find(file: &PriceFile, runs: Runs, ask: &FarmAsk) -> Finder {
 
         let mut why: Vec<Why> = vec![];
         for s in f.synergies.iter().filter(|s| s.with.iter().all(|k| keys.contains(k))) { why.push(Why { text: s.why.clone(), src: s.src.clone() }); }
-        let bonus = 1.0 + (SYNERGY * why.len() as f64).min(SYNERGY_MAX);
+        let helps = why.len();
+        if keys.iter().any(|k| k == "incursion") {
+            let best: Vec<String> = temples.worth().into_iter().take(4).map(|r| format!("{} {}", r.label.replace(" (Tier 3)", "").replace(" of Corruption", "").replace("'s Institute", "").replace(" of Creation", ""), if r.typical >= div { format!("{:.1} div", r.typical / div) } else { format!("{:.0}c", r.typical) })).collect();
+            if !best.is_empty() { why.push(Why { text: format!("Temples to build and sell, asking about: {}", best.join(", ")), src: "trade site".into() }); }
+        }
+        let bonus = 1.0 + (SYNERGY * helps as f64).min(SYNERGY_MAX);
         let mut pairs: Vec<(f64, f64, &str, &str)> = vec![];
         for (i, a) in parts.iter().enumerate() {
             for b in &parts[i + 1..] {
@@ -390,7 +416,7 @@ pub fn find(file: &PriceFile, runs: Runs, ask: &FarmAsk) -> Finder {
         } else { None };
         let mut drops: Vec<Drop> = parts.iter().flat_map(|p| p.1.drops.iter().take(6).cloned()).filter(|d| jack > 0.0 || !d.jackpot).collect();
         if parts.iter().any(|p| p.1.raw > 0.0) {
-            drops.extend(file.items.iter().filter(|i| f.raw.names.contains(&i.name)).filter_map(|i| Some(Drop { name: i.name.clone(), chaos: i.value,
+            drops.extend(file.items.iter().filter(|i| f.raw.names.contains(&i.name)).filter_map(|i| Some(Drop { name: i.name.clone(), pic: None, chaos: i.value,
                 sold_div: i.volume? / div * 0.02, change: i.change, jackpot: i.value >= div })).filter(|d| jack > 0.0 || !d.jackpot));
         }
         drops.sort_by(|a, b| b.sold_div.total_cmp(&a.sold_div));
@@ -459,7 +485,7 @@ pub fn find(file: &PriceFile, runs: Runs, ask: &FarmAsk) -> Finder {
     }
     let mut mechanics = worth;
     mechanics.sort_by(|a, b| (b.steady + b.jackpots * jack + b.raw).total_cmp(&(a.steady + a.jackpots * jack + a.raw)));
-    Finder { farms: farms_out, mechanics, trees_from: meta().updated.clone(), trees: meta().total, prices_from: file.updated.clone(), divine: div }
+    Finder { farms: farms_out, mechanics, trees_from: meta().updated.clone(), trees: meta().total, prices_from: file.updated.clone(), temples_from: temples.checked.clone(), divine: div }
 }
 
 /// Maps that suit these mechanics: each reason counts for how many of them it covers; a map to avoid for one is out
@@ -534,7 +560,7 @@ mod tests {
 
     #[test]
     fn combines_and_explains() {
-        let r = find(&file(), &[("Dunes".into(), 300), ("Dunes".into(), 420), ("Dunes".into(), 20)], &FarmAsk::default());
+        let r = find(&file(), Temples::shipped(), &[("Dunes".into(), 300), ("Dunes".into(), 420), ("Dunes".into(), 20)], &FarmAsk::default());
         let top = |k: &[&str]| r.farms.iter().find(|f| f.keys.iter().map(String::as_str).collect::<Vec<_>>() == k);
         // Legion + Beasts (and Abyss) go together, with Threads, altars, a map and your own time in it.
         let lb = r.farms.iter().find(|f| f.keys.contains(&"legion".to_string()) && f.keys.contains(&"bestiary".to_string())).expect("legion + beasts");
@@ -556,19 +582,20 @@ mod tests {
 
     #[test]
     fn counts_what_it_should() {
-        let r = find(&file(), &[], &FarmAsk::default());
+        let r = find(&file(), Temples::shipped(), &[], &FarmAsk::default());
         let blight = r.mechanics.iter().find(|m| m.key == "blight").unwrap();
         assert!(blight.drops.iter().all(|d| d.name != "Tainted Oil"), "Tainted Oil isn't Blight's");
         assert!(blight.jackpots > 0.0 && blight.steady > 0.0 && blight.drops[0].jackpot);
         let beasts = r.mechanics.iter().find(|m| m.key == "bestiary").unwrap();
         assert!(beasts.estimate && beasts.drops[0].sold_div < 275.0 * 2941.0 / 200.0);
-        assert!(r.mechanics.iter().find(|m| m.key == "incursion").unwrap().blind);
+        let temples = r.mechanics.iter().find(|m| m.key == "incursion").unwrap();
+        assert!(!temples.blind && temples.estimate && temples.drops.iter().all(|d| d.pic.as_deref() == Some("Chronicle of Atzoatl")), "temples have prices");
         // Steady only: Blight's Prismatic Oils don't count. No Threads: only farms without any.
-        let s = find(&file(), &[], &FarmAsk { count: Count::Steady, ..Default::default() });
+        let s = find(&file(), Temples::shipped(), &[], &FarmAsk { count: Count::Steady, ..Default::default() });
         assert!(s.farms.iter().all(|f| f.jackpots == 0.0 && f.drops.iter().all(|d| !d.jackpot)));
-        let free = find(&file(), &[], &FarmAsk { max_cost: Some(0.0), ..Default::default() });
+        let free = find(&file(), Temples::shipped(), &[], &FarmAsk { max_cost: Some(0.0), ..Default::default() });
         assert!(!free.farms.is_empty() && free.farms.iter().all(|f| f.threads.is_empty()));
-        let one = find(&file(), &[], &FarmAsk { size: 1, ..Default::default() });
+        let one = find(&file(), Temples::shipped(), &[], &FarmAsk { size: 1, ..Default::default() });
         assert!(one.farms.iter().all(|f| f.keys.len() == 1));
     }
 
@@ -582,11 +609,11 @@ mod tests {
         let play: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(data.join("play.json")).unwrap()).unwrap();
         let runs: Vec<(String, i64)> = play["maps"]["history"].as_array().unwrap().iter().map(|r| (r["name"].as_str().unwrap().into(), r["in_map"].as_i64().unwrap())).collect();
         for ask in [FarmAsk::default(), FarmAsk { count: Count::Steady, ..Default::default() }, FarmAsk { size: 2, ..Default::default() }] {
-            let r = find(&prices, &runs, &ask);
+            let r = find(&prices, Temples::shipped(), &runs, &ask);
             println!("== {ask:?}");
             for f in &r.farms { println!("{:5.1} {:40} value {:6.0} steady {:5.0} jack {:5.0} raw {:5.0} cost {:4.0}c {} players {:?} maps {:?} also {:?}", f.score, f.title, f.value, f.steady, f.jackpots, f.raw, f.cost, f.verdict, f.players.map(|p| (p * 1000.0).round() / 10.0), f.maps.iter().map(|m| (&m.map, m.yours)).collect::<Vec<_>>(), f.also.iter().map(|a| &a.0).collect::<Vec<_>>()); }
         }
-        let r = find(&prices, &runs, &FarmAsk::default());
+        let r = find(&prices, Temples::shipped(), &runs, &FarmAsk::default());
         for m in &r.mechanics { println!("{:12} share {:4.1}% steady {:5.0} jack {:5.0} raw {:4.0} blind {} top {:?}", m.key, m.share * 100.0, m.steady, m.jackpots, m.raw, m.blind, m.drops.iter().take(3).map(|d| format!("{} {:.0}div", d.name, d.sold_div)).collect::<Vec<_>>()); }
         for f in r.farms.iter().take(3) { println!("{f:#?}"); }
         if let Ok(o) = std::env::var("FARM_OUT") { std::fs::write(o, serde_json::to_string(&r).unwrap()).unwrap(); }

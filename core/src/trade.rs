@@ -173,7 +173,8 @@ impl StatIndex {
             for e in group["entries"].as_array().into_iter().flatten() {
                 let (Some(id), Some(text), Some(kind)) = (e["id"].as_str(), e["text"].as_str(), e["type"].as_str()) else { continue };
                 // Stats with a fixed option list ("Allocates #") are searched differently: skip.
-                if e.get("option").is_some() { continue; }
+                // (Temple rooms are open / closed: searched as open, see temple_rows.)
+                if e.get("option").is_some() && !id.starts_with("pseudo.pseudo_temple_") { continue; }
                 by_text.entry((kind.to_string(), text.replace('\n', " ").to_lowercase())).or_insert_with(|| id.to_string());
             }
         }
@@ -596,6 +597,7 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
     if is_map(&item) { filters.splice(0..0, crate::trade_rules::map_props(text, &item)); }
     // Heist contracts and blueprints: area level, wings, the job they need.
     filters.splice(0..0, crate::trade_rules::heist_props(text, &item));
+    filters.extend(temple_rows(text, index));
     // Influences ("Has Shaper Influence"), there to tick: the mods they bring are usually what's ticked.
     for inf in &item.influences {
         let id = index.pseudo_id(&format!("Has {inf} Influence")).unwrap_or_else(|| format!("pseudo.pseudo_has_{}_influence", inf.to_lowercase()));
@@ -702,6 +704,21 @@ fn base_item(text: &str, item: &Item, lines: &[ModLine], filters: &[StatFilter])
     if synthesised { misc.push("synthesised_item".into()); }
     if fractured { misc.push("fractured_item".into()); }
     Some(BaseItem { why, ids, ilvl_min: ilvl_min.filter(|l| *l > 0), misc })
+}
+
+/// A Chronicle of Atzoatl's open rooms: the ones worth something ticked.
+fn temple_rows(text: &str, index: &StatIndex) -> Vec<StatFilter> {
+    let Some((rooms, level)) = crate::temple::read(text) else { return vec![] };
+    let t = crate::temple::Temples::shipped();
+    let mut out: Vec<StatFilter> = rooms.iter().filter_map(|r| {
+        let id = index.pseudo_id(&format!("Has Room: {r}"))?;
+        let good = t.good(&id);
+        // "|1" = the room is open.
+        Some(StatFilter { id: format!("{id}|1"), label: r.clone(), kind: "pseudo".into(), enabled: good, junk: !r.contains("(Tier 3)") && !good, ..Default::default() })
+    }).collect();
+    out.sort_by_key(|f| (!f.enabled, f.junk));
+    if let Some(l) = level { out.push(StatFilter { id: "prop.area_level".into(), label: format!("Area level: {l}"), value: l as f64, min: Some(l.min(crate::temple::MIN_LEVEL) as f64), enabled: true, kind: "property".into(), ..Default::default() }); }
+    out
 }
 
 fn is_map(it: &Item) -> bool { it.item_class == "Maps" }
@@ -1286,6 +1303,22 @@ Item Level: 75
         let f = s.filters.iter().find(|f| f.id == "implicit.stat_curse").expect("corruption implicit row");
         assert_eq!(f.source.as_deref(), Some("corrupted"));
         assert!(f.enabled && f.min == Some(2.0), "{f:?}");
+    }
+
+    #[test]
+    fn temple_rooms_are_searched() {
+        let t = "Item Class: Misc Map Items\r\nRarity: Currency\r\nChronicle of Atzoatl\r\n--------\r\nArea Level: 80\r\n--------\r\nOpen Rooms:\r\nLocus of Corruption (Tier 3)\r\nHalls\r\n--------\r\nRight click this item to view the Temple of Atzoatl.\r\n";
+        let idx = StatIndex::from_json(&json!({ "result": [ { "label": "Pseudo", "entries": [
+            { "id": "pseudo.pseudo_temple_corruption_room_3", "text": "Has Room: Locus of Corruption (Tier 3)", "type": "pseudo", "option": { "options": [{ "id": 1, "text": "Open Room" }] } },
+            { "id": "pseudo.pseudo_temple_halls", "text": "Has Room: Halls", "type": "pseudo", "option": { "options": [] } } ]} ]}));
+        let mut s = setup(t, &idx).unwrap();
+        assert_eq!(s.filters.iter().filter(|f| f.kind == "pseudo").count(), 2, "{:?}", s.filters);
+        for f in &mut s.filters { f.enabled = true; }
+        let q = query(&s);
+        assert_eq!(q["query"]["type"], "Chronicle of Atzoatl");
+        let locus = q["query"]["stats"][0]["filters"].as_array().unwrap().iter().find(|f| f["id"] == "pseudo.pseudo_temple_corruption_room_3").unwrap().clone();
+        assert_eq!(locus["value"]["option"], 1);
+        assert_eq!(q["query"]["filters"]["map_filters"]["filters"]["area_level"]["min"], 75.0, "{q}");
     }
 
     #[test]
