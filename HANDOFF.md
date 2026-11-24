@@ -1040,6 +1040,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
+- [ ] (next) F2 on Omen of Return (hidden with "Just this item"): the chip says "Only Omen of Return hidden" and a gold "Just this item" line says the rest of its tier still shows. `Source.only_base` (evaluate.rs) = the one BaseType an edit names.
 - [ ] (next) Import a poe.ninja atlas tree (poe.ninja → Atlas Trees → open one → copy the link): it comes in whole. Price check on an empty slot / ground label now says "No item was copied: hold the mouse over the item itself…" instead of "That doesn't look like an item".
 - [ ] (0.2.60) Import a poeplanner atlas link (e.g. from a mobalytics guide: right-click the tree link → copy → paste): the tree comes in (no option picks: poeplanner doesn't keep them). A mobalytics page link explains to use the poeplanner link instead.
 - [ ] (0.2.60) Build my own: click any point on the tree → it shows at the top of the side panel (what it does, in your tree or not) with Always / Never; Never takes it out and the tree stays zoomed where it was. Search matches word starts ("ore" finds Ore nodes, not "more").

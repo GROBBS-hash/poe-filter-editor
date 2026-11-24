@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Item, RARITY_COLOUR, itemSub, itemTitle } from "./types";
 import { LookChips, looksChanged, useLooks } from "./Looks";
@@ -29,7 +29,9 @@ export function itemFromRule(d: RuleDetail): Item {
     corrupted: false, mirrored: false, unidentified: false,
   };
 }
-export type Source = { kind: string; label: string; type_path: string[]; tier: string | null; section: string | null; tier_name: string | null; conds?: string[] };
+export type Source = { kind: string; label: string; type_path: string[]; tier: string | null; section: string | null; tier_name: string | null; conds?: string[];
+  /** Your edit names only this one item. */
+  only_base?: string | null };
 const WHO: Record<string, string> = { neversink: "NeverSink", edit: "Your edit", preset: "Preset", price: "Price tier", none: "No rule" };
 
 /** NeverSink's internal section names in plain words ("normalmagic" -> "white & blue"). */
@@ -40,7 +42,7 @@ const plain = (p: string) => PLAIN[p] ?? p.replace(/([a-z])([A-Z])/g, "$1 $2");
 
 /** Which rule decides it, in the Tiers page's words (23 Nov: "a way to see what rule is showing this item"):
  *  "Shown by Crafting bases › Tier 1 bases, item level 86+", that rule's conditions as small chips; click to open it. */
-function RuleLine({ src, hidden, onOpen, action }: { src?: Source; hidden: boolean; onOpen?: () => void; action: string }) {
+function RuleLine({ src, hidden, onOpen, action, scope }: { src?: Source; hidden: boolean; onOpen?: () => void; action: string; scope?: ReactNode }) {
   if (!src) return null;
   const verb = hidden ? "Hidden by" : "Shown by";
   const name = src.label.replace(/^(Preset|Hide|Highlight|Louder|Quieter|Style): /, "");
@@ -52,6 +54,7 @@ function RuleLine({ src, hidden, onOpen, action }: { src?: Source; hidden: boole
     <>
       <span className="qm-rule-h">{src.kind === "none" ? "Rule" : verb}</span>
       <span className="qm-rule-name">{what}</span>
+      {scope && <span className="qm-rule-scope"><b>Just this item</b> · {scope}</span>}
       {(src.conds?.length ?? 0) > 0 && <span className="qm-rule-conds">{src.conds!.map((c) => <span key={c}>{c}</span>)}</span>}
     </>
   );
@@ -476,14 +479,20 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
             const src = v.source;
             const canOpen = !!src && src.kind !== "none" && (src.kind !== "neversink" || src.type_path.length > 0);
             const change = () => (v.by_user_edit && !replacing && src?.kind === "edit" ? openRule(v.decided_by) : invoke("open_rule", { source: src }));
+            // An edit for this one item (24 Nov: he couldn't tell it hid only Omen of Return, not every omen).
+            const only = (src?.kind === "edit" || src?.kind === "preset") && !!src.only_base;
+            const rest = groupName ? <>the rest of <b>{groupName}</b></> : "the rest of its group";
+            const scopeText = !only ? undefined : !shown(v.visibility)
+              ? <>only {src!.only_base} is hidden; {rest} still shows as before.</>
+              : <>only {src!.only_base} looks like this; {rest} keeps NeverSink's look.</>;
             const chips = shown(v.visibility)
               ? [st?.muted ? "No sound" : st?.sound ? `🔊 ${st.sound}` : "Default sound", st?.beam ? `${st.beam} beam` : "", st?.minimap ? "Map icon" : ""]
-              : ["Hidden on the ground"];
+              : [only ? `Only ${src!.only_base} hidden` : "Hidden on the ground"];
             return (
               <>
                 <div className="qm-chips">{chips.filter(Boolean).map((c) => <span key={c} className="qm-chip">{c}</span>)}</div>
                 <RuleLine src={src} hidden={!shown(v.visibility)} onOpen={canOpen ? change : undefined}
-                  action="Modify this rule" />
+                  action="Modify this rule" scope={scopeText} />
               </>
             );
           })()}

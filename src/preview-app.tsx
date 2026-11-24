@@ -268,6 +268,10 @@ mockIPC((cmd, args) => {
       style: { font_size: 45, text: [145, 30, 220, 255], border: [145, 30, 220, 255], background: [255, 255, 255, 255] },
       source: { kind: "edit", label: "Style: Rare Map (Tier 16)", type_path: [], tier: null, section: null, tier_name: null } } } };
     const hidden = it.base_type === "Iron Ring";
+    // Like his Omen of Return (24 Nov): hidden by an edit for just this one item.
+    if (hidden) return { area_level: 83, stackable: false, status: { assumptions: [], by_stack: [], verdict: { visibility: "Hide", reason: "", by_user_edit: true, uncertain: [],
+      decided_by: "Hide: Iron Ring", style: { font_size: 40, text: [255, 255, 255, 255], border: null, background: [0, 0, 0, 200] },
+      source: { kind: "edit", label: "Hide: Iron Ring", type_path: [], tier: null, section: null, tier_name: null, only_base: "Iron Ring" } } } };
     return { area_level: 83, stackable: false, status: { assumptions: [], by_stack: [], verdict: { visibility: hidden ? "Hide" : "Show", reason: "", by_user_edit: false, uncertain: [], decided_by: "",
       style: { font_size: 40, text: [255, 255, 255, 255], border: null, background: [0, 0, 0, 200] },
       source: { kind: "neversink", label: "", type_path: ["currency"], tier: "t4chaos", section: "Currency", tier_name: "Tier 4 · about a Chaos Orb", conds: ["stackable currency"] } } } };

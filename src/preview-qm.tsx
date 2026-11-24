@@ -18,7 +18,7 @@ const reply = {
       source: state === "show"
         ? { kind: "neversink", label: "", type_path: ["crafting", "generalgear"], tier: "t1_86", section: "Crafting bases", tier_name: "Tier 1 bases, item level 86+",
             conds: ["not mirrored", "not corrupted", "item level 86+", "white, magic, rare"] }
-        : { kind: "edit", label: "Orb of Unmaking", type_path: [], tier: null, section: null, tier_name: null } } },
+        : { kind: "edit", label: "Hide: Orb of Unmaking", type_path: [], tier: null, section: null, tier_name: null, only_base: "Orb of Unmaking" } } },
 };
 mockWindows("overlay");
 mockIPC((cmd, args) => {

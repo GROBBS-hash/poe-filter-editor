@@ -62,6 +62,17 @@ pub struct Source {
     /// That rule's conditions in plain words ("item level 86+", "not corrupted"), as the Tiers page shows them.
     #[serde(default)]
     pub conds: Vec<String>,
+    /// Your edit or preset names just one item (`BaseType == "Omen of Return"`): F2 says it covers only that
+    /// item, not the rest of its group (he asked 24 Nov).
+    #[serde(default)]
+    pub only_base: Option<String>,
+}
+
+/// The one base type a rule names, if it names exactly one.
+fn only_base(b: &Block) -> Option<String> {
+    let line = b.lines.iter().map(|l| l.trim()).find(|l| l.starts_with("BaseType"))?;
+    let names: Vec<&str> = line.split('"').skip(1).step_by(2).collect();
+    (names.len() == 1).then(|| names[0].to_string())
 }
 
 fn source_of(b: &Block) -> Source {
@@ -71,7 +82,7 @@ fn source_of(b: &Block) -> Source {
             else if label.starts_with("Price") { "price" }
             else if ["Hide: ", "Highlight: ", "Louder: ", "Quieter: ", "Style: "].iter().any(|p| label.starts_with(p)) { "edit" }
             else { "none" };
-        return Source { kind: kind.into(), label, ..Default::default() };
+        return Source { kind: kind.into(), only_base: only_base(b), label, ..Default::default() };
     }
     Source {
         kind: "neversink".into(),
@@ -81,6 +92,7 @@ fn source_of(b: &Block) -> Source {
         type_path: b.type_path.clone(),
         tier: b.tier.clone(),
         label: String::new(),
+        only_base: None,
     }
 }
 
