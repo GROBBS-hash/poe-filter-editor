@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
 import { friendly } from "./errors";
 import { ItemIcon } from "./icons";
+import { MechArt } from "./mechArt";
 import { Tip } from "./Help";
 import "./farm.css";
 
@@ -85,12 +86,12 @@ function Maps({ f }: { f: Farm }) {
   );
 }
 
-function Card({ f, pics, best, div, onBuild }: { f: Farm; pics: Record<string, string>; best: boolean; div: number; onBuild: () => void }) {
+function Card({ f, best, div, onBuild }: { f: Farm; best: boolean; div: number; onBuild: () => void }) {
   const [open, setOpen] = useState(false);
   return (
     <article className={`ff-card ${best ? "best" : ""}`}>
       <header>
-        <span className="ff-pics">{f.keys.map((k) => <ItemIcon key={k} name={pics[k]} size={38} />)}</span>
+        <span className="ff-pics">{f.keys.map((k) => <MechArt key={k} m={k} size={40} />)}</span>
         <div>{f.picked && <div className="ff-picked">Your pick</div>}<h3>{f.title}</h3><span className={`ff-tag ${VERDICT[f.verdict] ?? "ok"}`} title={HINT[f.verdict]}>{f.verdict}</span></div>
         <div className="ff-score" title="Against the best mix there is today"><b>{Math.round(f.score)}</b><span>/100</span></div>
       </header>
@@ -168,7 +169,6 @@ export default function FarmFinder({ onBuild }: { onBuild: () => void }) {
     } catch { /* fine */ }
     onBuild();
   };
-  const pics: Record<string, string> = Object.fromEntries((r?.mechanics ?? []).map((m) => [m.key, m.pic]));
   const rest = r?.farms.slice(3) ?? [];
   // Every mechanic by name, so each is always in the same place.
   const all = [...(r?.mechanics ?? [])].sort((a, b) => a.label.localeCompare(b.label));
@@ -190,7 +190,7 @@ export default function FarmFinder({ onBuild }: { onBuild: () => void }) {
           {want.length > 0 && <button className="link small" onClick={() => setAsk({ ...ask, want: [] })}>Clear</button>}</div>
         <div className="ap-tiles ff-tiles">{all.map((m) => (
           <button key={m.key} className={`ap-tile ${want.includes(m.key) ? "on" : ""}`} aria-pressed={want.includes(m.key)} onClick={() => toggle(m.key)} title={m.label}>
-            <ItemIcon name={m.pic} size={34} /><span>{m.label}</span>
+            <MechArt m={m.key} size={44} /><span>{m.label}</span>
           </button>
         ))}</div>
       </>}
@@ -204,13 +204,13 @@ export default function FarmFinder({ onBuild }: { onBuild: () => void }) {
       {r && r.farms.length === 0 && <div className="muted small">Nothing fits those choices.</div>}
       {r && want.length > 0 && <div className="ap-step">Your pick, and what goes with it</div>}
       {r && <div className="ff-cards">{r.farms.slice(0, 3).map((f, i) => (
-        <Card key={f.title} f={f} pics={pics} best={i === 0} div={r.divine} onBuild={() => build(f)} />
+        <Card key={f.title} f={f} best={i === 0} div={r.divine} onBuild={() => build(f)} />
       ))}</div>}
       {r && r.own.length > 0 && <>
         <div className="ap-step">Your trees so far <span className="ap-step-note">(loot in ordinary maps, hideout time included)</span></div>
         <div className="ff-own">{r.own.slice(0, 6).map((x) => (
           <div key={x.name}>
-            {x.keys.map((k) => <ItemIcon key={k} name={pics[k]} size={24} />)}
+            {x.keys.map((k) => <MechArt key={k} m={k} size={28} />)}
             <span><b>{x.name}</b><small>{x.title || "no farm of its own"}</small></span>
             <span className="ff-own-n"><Yours o={x.own} /></span>
           </div>
@@ -220,7 +220,7 @@ export default function FarmFinder({ onBuild }: { onBuild: () => void }) {
         <div className="ap-step">{want.length ? "More mixes with it" : "More ideas"} <span className="ap-step-note">(click one to see it)</span></div>
         <div className="ff-rest">{rest.map((f) => (
           <button key={f.title} onClick={() => pick(f.keys)} title={["Show this one", ...f.why.map((w) => "• " + w.text), ...f.warn.map((w) => "• " + w.text)].join("\n")}>
-            {f.keys.map((k) => <ItemIcon key={k} name={pics[k]} size={24} />)}
+            {f.keys.map((k) => <MechArt key={k} m={k} size={28} />)}
             <span><b>{f.title}</b><small>{Math.round(f.score)}/100{f.maps[0] ? ` · ${short(f.maps[0].map)}` : ""}{f.cost > 0 ? ` · ${money(f.cost, r.divine)} of Threads` : ""}</small></span>
           </button>
         ))}</div>
@@ -232,7 +232,7 @@ export default function FarmFinder({ onBuild }: { onBuild: () => void }) {
           <thead><tr><th>Mechanic</th><th>Regular drops</th><th>Big drops</th><th>Raw currency</th><th>Players</th><th>7 days</th><th>Sells most</th></tr></thead>
           <tbody>{r.mechanics.map((m) => (
             <tr key={m.key} className="ff-row" onClick={() => pick([m.key])} title={`Show ${m.label}`}>
-              <td><span className="row ff-m"><ItemIcon name={m.pic} size={26} /><b>{m.label}</b></span></td>
+              <td><span className="row ff-m"><MechArt m={m.key} size={28} /><b>{m.label}</b></span></td>
               {m.blind
                 ? <td colSpan={3} className="muted small">can't be ranked: {m.unseen ?? "its drops"} have no price list</td>
                 : <><td>{Math.round(m.steady)}</td><td>{Math.round(m.jackpots)}</td><td>{m.raw > 0 ? `~${Math.round(m.raw)}` : "–"}</td></>}

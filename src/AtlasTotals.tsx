@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { type AtlasData, loadAtlas } from "./AtlasTreeView";
 import { ItemIcon } from "./icons";
+import { MechArt, hasMechArt } from "./mechArt";
 import { GROUPS } from "./atlasGroups";
 
 const NUM = /\d+(?:\.\d+)?/g;
@@ -73,7 +74,7 @@ export default function AtlasTotals({ nodes, choices, base }: {
           return (
             <section key={g} className={`att-group ${changed ? "changed" : ""}`}>
               <header>
-                <span className="att-ic">{item ? <ItemIcon name={item} size={30} /> : null}</span>
+                <span className="att-ic">{hasMechArt(g) ? <MechArt m={g} size={30} /> : item ? <ItemIcon name={item} size={30} /> : null}</span>
                 <b>{label}</b>
                 {changed > 0 && <span className="att-chg">{changed} changed</span>}
               </header>

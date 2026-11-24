@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import AtlasTreeView, { type AtlasData, type AtlasStep, type AtlasStore, loadAtlas } from "./AtlasTreeView";
 import AtlasTotals from "./AtlasTotals";
 import { ItemIcon } from "./icons";
+import { MechArt, hasMechArt } from "./mechArt";
 
 /** One creator tree from public/atlas_picks.json (built by tools/build_atlas_picks.mjs). */
 type Pick = { id: string; group: "maxroll" | "community"; name: string; author: string; mechanics: string[];
@@ -38,7 +39,7 @@ function ago(day: string) {
 }
 
 function MechIcon({ m, size }: { m: string; size: number }) {
-  return <span className="ap-mi" title={LABEL[m] ?? m}><ItemIcon name={ITEM[m]} size={size} /></span>;
+  return <span className="ap-mi" title={LABEL[m] ?? m}>{hasMechArt(m) ? <MechArt m={m} size={size} /> : <ItemIcon name={ITEM[m]} size={size} />}</span>;
 }
 
 function readSel(): string[] {
@@ -110,7 +111,7 @@ export default function AtlasPicks({ store, onImported, onShow }: {
           return (
             <button key={m} className={`ap-tile ${sel.includes(m) ? "on" : ""}`} disabled={!own && n === 0 && !sel.includes(m)}
               onClick={() => toggle(m)} title={own ? label : n ? `${n} tree${n > 1 ? "s" : ""}` : "No creator tree for this yet"}>
-              <ItemIcon name={ITEM[m]} size={40} />
+              {hasMechArt(m) ? <MechArt m={m} size={44} /> : <ItemIcon name={ITEM[m]} size={40} />}
               <span>{label}</span>
             </button>
           );

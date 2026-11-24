@@ -68,3 +68,5 @@
 .ff-warn { color: var(--gold); }
 .ff-row { cursor: pointer; }
 .ff-row:hover td { background: var(--raised); }
+.mech-art { filter: brightness(1.3) saturate(1.1); display: inline-block; flex: none; background-repeat: no-repeat; border-radius: 50%; }
+.ff-pics .mech-art + .mech-art { margin-left: -10px; }
