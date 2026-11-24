@@ -4,9 +4,15 @@ import { invoke } from "@tauri-apps/api/core";
 import { ProfileInfo } from "./types";
 import DropPreview from "./DropPreview";
 import { LookButton } from "./StyleEditor";
+import { ItemIcon } from "./icons";
 
 type LevelLook = { text: number[]; border: number[] | null; background: number[] };
 type Theme = { name: string; levels: LevelLook[]; classic?: Record<string, number[]> | null; neversink_style?: string | null; game?: string | null };
+
+type CardLabel = { text: string; visibility: string; reason: string; by_user_edit: boolean;
+  item: { name?: string | null; base_type: string; rarity: string };
+  style: { text?: number[] | null; border?: number[] | null; background?: number[] | null } };
+type Cards = { cards: { name: string; labels: CardLabel[] }[]; examples: (string | null)[] };
 
 /** Classic style, same maths as the app's filter builder: the item kind's
  *  colour, more solid and brighter the better the item. */
@@ -30,14 +36,8 @@ const CLASSIC_SAMPLES: [string, string, number][] = [
   ["Fractured Vise", "Fractured", 2], ["Rare Ring", "Rare", 3], ["Plain Unique", "Unique", 4],
 ];
 
-const LEVELS = [
-  { name: "Chase", example: "Mirror of Kalandra" },
-  { name: "High", example: "Divine Orb" },
-  { name: "Good", example: "Chaos Orb" },
-  { name: "Medium", example: "Stygian Vise" },
-  { name: "Low", example: "Rare Ring" },
-  { name: "Junk", example: "Scroll of Wisdom" },
-];
+/** Value levels. What's at each one differs per filter, so example drops come from the app (`examples`). */
+const LEVELS = [{ name: "Chase" }, { name: "High" }, { name: "Good" }, { name: "Medium" }, { name: "Low" }, { name: "Junk" }];
 const NEVERSINK: Theme = { name: "", levels: [
   { text: [255, 0, 0, 255], border: [255, 0, 0, 255], background: [255, 255, 255, 255] },
   { text: [255, 255, 255, 255], border: [255, 255, 255, 255], background: [240, 90, 35, 255] },
@@ -52,7 +52,20 @@ const css = (c: number[] | null) => (c ? `rgba(${c[0]},${c[1]},${c[2]},${c[3] / 
 const hex = (c: number[]) => "#" + c.slice(0, 3).map((n) => n.toString(16).padStart(2, "0")).join("");
 const fromHex = (h: string, a = 255) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)).concat(a);
 
-function Samples({ t }: { t: Theme }) {
+/** A theme's card: real drops as this filter shows them with that theme (`labels`); plain level colours until they arrive. */
+function Samples({ t, labels }: { t: Theme; labels?: CardLabel[] }) {
+  if (labels?.length) {
+    return (
+      <div className="th-samples">
+        {labels.map((l) => (
+          <span key={l.text} className="th-label th-real" title={l.by_user_edit ? `${l.reason} (your own look: the same in every theme)` : l.reason}
+            style={{ color: css(l.style.text ?? [200, 200, 200, 255]), borderColor: css(l.style.border ?? null), background: css(l.style.background ?? [0, 0, 0, 190]) }}>
+            <ItemIcon name={l.item.rarity === "Unique" ? l.item.name ?? null : null} base={l.item.base_type} size={18} />{l.text}{l.by_user_edit && <i className="th-mine" />}
+          </span>
+        ))}
+      </div>
+    );
+  }
   if (t.classic) {
     return (
       <div className="th-samples">
@@ -67,15 +80,15 @@ function Samples({ t }: { t: Theme }) {
     <div className="th-samples">
       {t.levels.map((l, i) => (
         <span key={i} className="th-label" style={{ color: css(l.text), borderColor: css(l.border), background: css(l.background) }}>
-          {LEVELS[i].example}
+          {LEVELS[i].name}
         </span>
       ))}
     </div>
   );
 }
 
-function ThemeEditor({ start, isNew, onSave, onCancel }: {
-  start: Theme; isNew: boolean; onSave: (t: Theme) => void; onCancel: () => void;
+function ThemeEditor({ start, isNew, examples, onSave, onCancel }: {
+  start: Theme; isNew: boolean; examples: (string | null)[]; onSave: (t: Theme) => void; onCancel: () => void;
 }) {
   const [t, setT] = useState<Theme>(JSON.parse(JSON.stringify(start)));
   const setLevel = (i: number, patch: Partial<LevelLook>) =>
@@ -122,7 +135,7 @@ function ThemeEditor({ start, isNew, onSave, onCancel }: {
           <div key={i} className="th-edit-row">
             <span className="th-level">{LEVELS[i].name}</span>
             <span className="th-label" style={{ color: css(l.text), borderColor: css(l.border), background: css(l.background) }}>
-              {LEVELS[i].example}
+              {examples[i] ?? LEVELS[i].name}
             </span>
             <label>Text <input type="color" value={hex(l.text)} onChange={(e) => setLevel(i, { text: fromHex(e.target.value) })} /></label>
             <label>Border <input type="checkbox" checked={!!l.border}
@@ -151,6 +164,14 @@ export default function Themes({ profile, onChange }: { profile: ProfileInfo; on
   const [msg, setMsg] = useState("");
   /** Theme being previewed ("" = NeverSink's own colours). */
   const [previewing, setPreviewing] = useState<string | null>(null);
+
+  const [cards, setCards] = useState<Cards | null>(null);
+  // Real labels for every card: recomputed when the filter or your themes change.
+  useEffect(() => {
+    let on = true;
+    invoke<Cards>("theme_cards", { id: profile.id }).then((c) => { if (on) setCards(c); }).catch(() => { if (on) setCards(null); });
+    return () => { on = false; };
+  }, [profile, list]);
 
   const load = () => invoke<{ builtin: Theme[]; custom: Theme[] }>("list_themes").then(setList).catch((e) => setMsg(String(e)));
   useEffect(() => { load(); }, []);
@@ -186,7 +207,7 @@ export default function Themes({ profile, onChange }: { profile: ProfileInfo; on
   };
 
   if (editing) {
-    return <ThemeEditor start={editing.theme} isNew={!editing.oldName} onSave={save} onCancel={() => setEditing(null)} />;
+    return <ThemeEditor start={editing.theme} isNew={!editing.oldName} examples={cards?.examples ?? []} onSave={save} onCancel={() => setEditing(null)} />;
   }
   if (!list) return <div className="card">{msg || "Loading themes…"}</div>;
 
@@ -206,7 +227,7 @@ export default function Themes({ profile, onChange }: { profile: ProfileInfo; on
           </span>
         </div>
         <LookButton hint={kind === "custom" ? "edit colours" : "copy & edit colours"} title="Click to change these colours"
-          onClick={() => kind === "custom" ? setEditing({ theme: t, oldName: t.name }) : copyOf(t)}><Samples t={t} /></LookButton>
+          onClick={() => kind === "custom" ? setEditing({ theme: t, oldName: t.name }) : copyOf(t)}><Samples t={t} labels={cards?.cards.find((c) => c.name === (name ?? ""))?.labels} /></LookButton>
         <button className="link" onClick={() => setPreviewing(previewing === (name ?? "") ? null : (name ?? ""))}>
           {previewing === (name ?? "") ? "Close preview" : "Preview with real drops"}
         </button>
@@ -223,7 +244,7 @@ export default function Themes({ profile, onChange }: { profile: ProfileInfo; on
       <div className="card">
         <h2>Themes for “{profile.name}” <Tip>Recolours NeverSink's labels by how valuable they are, from Chase down to Junk.
           Sizes, beams, icons and sounds stay the same, and your own edits, tier changes and price tiers keep their own looks.
-          Use “Preview with real drops” to see it before switching.</Tip></h2>
+          Each card shows real drops as “{profile.name}” would show them; a gold dot marks your own looks (edits, tier changes, price tiers), which stay the same in every theme.</Tip></h2>
         <p className="muted small">Recolour the whole filter in one click. Sounds and your own edits stay as they are.</p>
         {msg && <div className="note">{msg}</div>}
       </div>

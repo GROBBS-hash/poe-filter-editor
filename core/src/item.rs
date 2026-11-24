@@ -105,6 +105,8 @@ pub fn parse_item(text: &str) -> Option<Item> {
             names.push(line);
         }
     }
+    // Wickerman body parts (3.30, "Item Class: Viscera") are copied without a Rarity line; the site calls them Normal.
+    if item.rarity.is_empty() && !item.item_class.is_empty() { item.rarity = "Normal".into(); }
     if item.rarity.is_empty() || names.is_empty() {
         return None;
     }

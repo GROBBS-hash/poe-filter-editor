@@ -2209,6 +2209,19 @@ fn preview_drops(app: AppHandle, state: State<AppState>, id: String, theme: Opti
     Ok(Preview { drops: preview(&parse_filter(&text), &extra, game, level), area_level: level })
 }
 
+/// The Themes page's cards: the same drops through this filter with every theme, so the colours are the real ones.
+#[tauri::command(async)]
+fn theme_cards(state: State<AppState>, id: String) -> Result<filter_core::preview::ThemeCards, String> {
+    // Copies, so the app isn't held up while it works through every theme.
+    let (store, game) = {
+        let store = state.store.lock().unwrap();
+        (store.clone(), store.profiles.get(&id).ok_or("Profile not found")?.game)
+    };
+    let prices = state.prices.lock().unwrap().get(&game).cloned();
+    let level = if game == Game::Poe1 { 83 } else { 80 };
+    filter_core::preview::theme_cards(&store, &id, &filter_dir(game), prices.as_ref(), level).map_err(err)
+}
+
 /// Item pictures for the active filter's game: name -> picture URL.
 #[tauri::command]
 fn get_icons(state: State<AppState>) -> std::collections::HashMap<String, String> {
@@ -3140,6 +3153,7 @@ pub fn run() {
             get_history,
             get_icons, apply_to_tier,
             preview_drops,
+            theme_cards,
             go_back
         ])
         .run(tauri::generate_context!())

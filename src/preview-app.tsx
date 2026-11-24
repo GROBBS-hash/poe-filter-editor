@@ -319,8 +319,10 @@ mockIPC((cmd, args) => {
     const lv = (h: number[]) => [0.42, 0.3, 0.2, 0.11, 0.05, 0].map((t, i) => ({
       text: h.map((c) => Math.min(255, Math.round(c * (1 - i * 0.12)))).concat(255), border: i < 3 ? h.concat(255) : null,
       background: h.map((c) => Math.floor(c * t)).concat([255, 245, 230, 210, 180, 140][i]) }));
-    return { builtin: [{ name: "Ember", levels: lv([255, 150, 60]) }, { name: "Frost", levels: lv([120, 200, 255]) }, { name: "Verdant", levels: lv([120, 230, 130]) }], custom: [] };
+    return { builtin: [{ name: "Classic PoE", levels: lv([255, 150, 60]) }, { name: "Ember", levels: lv([255, 150, 60]) }, { name: "Dracula", levels: lv([120, 200, 255]) }, { name: "NeverSink: Abyss", levels: lv([120, 230, 130]), neversink_style: "poe1_abyss", game: "poe1" }], custom: [] };
   }
+  // Its cards: real drops per theme (dev: dump his with THEME_CARDS_OUT=.claude/theme-cards.json, see preview.rs).
+  if (cmd === "theme_cards") return fetch("/.claude/theme-cards.json").then((r) => r.json());
   // Levelling gear page: a level 50 Elementalist and a few levelling uniques.
   if (cmd === "gear_setup") return { character: ["Witch", "Elementalist", 50], league: "Keepers", gems: { Body: ["Arc", "Spell Echo"] },
     stats: [{ id: "life", name: "Life" }, { id: "resistances", name: "Resistances" }, { id: "movement_speed", name: "Movement speed" }, { id: "spell_damage", name: "Spell damage" }] };

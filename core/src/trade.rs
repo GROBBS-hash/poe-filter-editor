@@ -390,6 +390,8 @@ pub fn mods(text: &str) -> Vec<ModLine> {
     // Mods come after the "Item Level" section.
     let Some(start) = sections.iter().position(|s| s.iter().any(|l| l.starts_with("Item Level:"))) else { return vec![] };
     let mut out = Vec::new();
+    // A Wickerman body part's own mod is an implicit on the trade site, but the copy doesn't mark it.
+    let body_part = sections[0].contains(&"Item Class: Viscera");
     for sec in &sections[start + 1..] {
         if sec.iter().any(|l| l.starts_with("Note:") || *l == "Corrupted" || *l == "Unidentified" || *l == "Mirrored"
             || l.starts_with("Place into") || l.starts_with("Right click") || l.starts_with("Travel to")) {
@@ -439,6 +441,7 @@ pub fn mods(text: &str) -> Vec<ModLine> {
                 else if l.ends_with("(enchant)") { "enchant".into() } else if l.ends_with("(fractured)") { "fractured".into() }
                 else if l.ends_with("(mutated)") { "mutated".into() }
                 else { header_kind.clone().unwrap_or_else(|| "explicit".into()) };
+            let kind = if body_part && kind == "explicit" { "implicit".to_string() } else { kind };
             let t = clean(l);
             // Under a "{ … Modifier }" heading every line is a mod, numbers or not ("…is Lucky while on Low Life").
             let numberless_ok = header_kind.is_some() || t.contains("Cannot") || t.contains("Has ") || t.starts_with("Allocates ");
@@ -586,6 +589,8 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
             if t.starts_with("Adds # Passive Skills") { enabled = true; max = min; }
             if t.starts_with("Added Small Passive Skills grant") { enabled = true; }
         }
+        // Wickerman body parts: the one mod is what you pay for.
+        if item.item_class == "Viscera" { enabled = true; }
         filters.push(StatFilter { id, label: m.text.clone(), value, min, max, enabled, kind, tier: m.tier, junk, roll: m.roll, range: m.range.clone(), affix: m.affix.clone(), source: m.source.clone() });
     }
     if is_map(&item) { filters.splice(0..0, crate::trade_rules::map_props(text, &item)); }
@@ -1277,6 +1282,38 @@ Item Level: 75
         let f = s.filters.iter().find(|f| f.id == "implicit.stat_curse").expect("corruption implicit row");
         assert_eq!(f.source.as_deref(), Some("corrupted"));
         assert!(f.enabled && f.min == Some(2.0), "{f:?}");
+    }
+
+    #[test]
+    fn wickerman_body_part() {
+        // 24 Nov: 3.30's body parts are copied without a Rarity line, so the price check said "No item was copied".
+        let text = "Item Class: Viscera
+Blackened Lungs
+--------
+Torso
+--------
+Item Level: 77
+--------
+25% increased Warcry Speed
+--------
+Take this to the Wickerman in a town or hideout to attach it.
+--------
+Note: ~b/o 1 alch
+";
+        let idx = StatIndex::from_json(&json!({ "result": [
+            { "label": "Explicit", "entries": [ { "id": "explicit.stat_1316278494", "text": "#% increased Warcry Speed", "type": "explicit" } ]},
+            { "label": "Implicit", "entries": [ { "id": "implicit.stat_1316278494", "text": "#% increased Warcry Speed", "type": "implicit" } ]},
+        ]}));
+        let s = setup(text, &idx).unwrap();
+        assert_eq!((s.item.base_type.as_str(), s.item.rarity.as_str(), s.item.item_level), ("Blackened Lungs", "Normal", Some(77)));
+        assert_eq!(s.filters.len(), 1, "{:?}", s.filters);
+        assert!(s.filters[0].id == "implicit.stat_1316278494" && s.filters[0].enabled && s.filters[0].min == Some(25.0));
+        assert_eq!(query(&s)["query"]["type"], "Blackened Lungs");
+        // The advanced copy, with the roll's range.
+        let adv = text.replace("25% increased", "{ Implicit Modifier — Speed }
+25(20-30)% increased");
+        assert_eq!(setup(&adv, &idx).unwrap().filters[0].id, "implicit.stat_1316278494");
+        assert!(parse_item("just some text I copied").is_none());
     }
 
     #[test]

@@ -35,7 +35,7 @@ pub struct Profile {
     pub levelling: Option<crate::search::LevelOptions>,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Store {
     pub profiles: BTreeMap<String, Profile>,
     pub active: Option<String>,
