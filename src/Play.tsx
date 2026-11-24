@@ -637,6 +637,7 @@ function LootBlock({ id, label, loot, p, divine }: { id: string; label: string; 
         </div>
       ))}</div>
       <div className="loot-grip" title="Drag down for more, up for less. Double-click: back to the best four"
+        onMouseDown={(e) => e.preventDefault()}
         onPointerDown={(e) => { drag.current = { y: e.screenY, n: best.length }; e.currentTarget.setPointerCapture(e.pointerId); e.preventDefault(); }}
         onPointerMove={move} onPointerUp={drop} onPointerCancel={drop}
         onDoubleClick={() => { setRows(null); keep(`trk.rows.${id}`, null); }}>
