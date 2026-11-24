@@ -54,5 +54,5 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## Path of Exile atlas tree art (league mechanic symbols: public/atlas-mastery.webp)
-https://github.com/grindinggear/atlastree-export (Grinding Gear Games' official export, 3.30.0). Art © Grinding Gear Games.
+## League mechanic icons (public/mech)
+Path of Exile minimap icons, art © Grinding Gear Games (as shown on poedb.tw). Abyss: from Exile UI (MIT, see above).
