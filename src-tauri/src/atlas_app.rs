@@ -61,6 +61,16 @@ fn add_missing_steps(app: &AppHandle) {
 fn fetch(link: &str) -> Result<Strategy, String> {
     Ok(match atlas::parse_link(link)? {
         Link::Official(code) => atlas::from_official(&code, link.trim())?,
+        Link::Planner { data_url, hash } => {
+            let resp = ureq::get(&data_url).set("User-Agent", UA).set("Accept", "application/json")
+                .timeout(Duration::from_secs(30)).call();
+            let v: serde_json::Value = match resp {
+                Ok(r) => r.into_json().map_err(|_| "The atlas planner sent something unexpected".to_string())?,
+                Err(ureq::Error::Status(code, _)) => return Err(format!("The atlas planner said no (error {code}); try again in a minute")),
+                Err(_) => return Err("Couldn't reach the atlas planner (is the internet on?)".into()),
+            };
+            atlas::from_planner(&hash, &v, link)?
+        }
         Link::Maxroll(id) => {
             let resp = ureq::get(&atlas::maxroll_api_url(&id)).set("User-Agent", UA).set("Accept", "application/json")
                 .timeout(Duration::from_secs(20)).call();

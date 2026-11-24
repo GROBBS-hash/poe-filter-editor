@@ -297,6 +297,9 @@ pub enum Link {
     Maxroll(String),
     /// pathofexile.com atlas tree code (base64).
     Official(String),
+    /// "Atlas Tree Planner" (atlas-blush-beta.vercel.app and copies): the tree is in the part after '#', read
+    /// against the planner's own data.json (its link format walks that file's graph).
+    Planner { data_url: String, hash: String },
 }
 
 /// Works out what a pasted link is. A bare maxroll id ("vg1ga30g") also works.
@@ -314,6 +317,17 @@ pub fn parse_link(text: &str) -> Result<Link, String> {
         if !lower.contains("atlas") { return Err("That's a pathofexile.com link, but not to the atlas tree".into()); }
         return Ok(Link::Official(last));
     }
+    // Atlas Tree Planner (he asked 24 Nov): "https://atlas-blush-beta.vercel.app/#<code>". Its data.json sits next
+    // to the page.
+    if let Some((page, hash)) = t.split_once('#') {
+        if page.to_lowercase().contains("atlas-blush") && !hash.trim().is_empty() {
+            let base = page.split('?').next().unwrap_or(page);
+            let dir = if base.ends_with('/') { base.to_string() } else if base.rsplit('/').next().is_some_and(|l| l.contains('.')) {
+                format!("{}/", base.rsplit_once('/').map(|x| x.0).unwrap_or(base))
+            } else { format!("{base}/") };
+            return Ok(Link::Planner { data_url: format!("{dir}data.json"), hash: hash.trim().to_string() });
+        }
+    }
     if lower.contains("poe.ninja") || lower.contains("poeplanner") {
         return Err("poe.ninja / poeplanner links aren't supported yet: use their \"Export to pathofexile.com\" link, or maxroll".into());
     }
@@ -323,7 +337,7 @@ pub fn parse_link(text: &str) -> Result<Link, String> {
     if !t.contains('/') && t.len() > 16 && t.chars().all(|c| c.is_ascii_alphanumeric() || "-_=+/".contains(c)) {
         return Ok(Link::Official(t.to_string()));
     }
-    Err("Paste a maxroll farming strategy link or a pathofexile.com atlas tree link".into())
+    Err("Paste a maxroll farming strategy link, a pathofexile.com atlas tree link or an Atlas Tree Planner link".into())
 }
 
 pub fn maxroll_api_url(id: &str) -> String { format!("https://planners.maxroll.gg/profiles/poe/{id}") }
@@ -388,6 +402,92 @@ pub fn from_official(code: &str, link: &str) -> Result<Strategy, String> {
     if known * 2 < nodes.len() { return Err("That atlas tree is from a different version of the game (most of its points aren't on today's atlas)".into()); }
     let all = g.fill_paths(&nodes, &HashSet::new());
     Ok(Strategy { site: "official".into(), link: link.to_string(), name: String::new(),
+        variants: vec![Variant { name: "Atlas tree".into(), steps: g.steps(&all), nodes: all, choices, notes: vec![] }], ..Default::default() })
+}
+
+// ---------- Atlas Tree Planner ----------
+
+/// Reads an Atlas Tree Planner link code against that planner's data.json. Three kinds:
+/// - compact (first byte 0xA1): from the start point, a breadth-first walk of its graph (neighbours in number
+///   order, masteries left out); one bit per newly reached neighbour says "taken", then 3 bits per taken
+///   multiple-choice notable for the option picked (index into its `variantEffects`);
+/// - old "id,id.option" lists;
+/// - a pathofexile.com tree code.
+pub fn decode_planner(hash: &str, data: &Value) -> Result<(Vec<u32>, Vec<(u32, u32)>), String> {
+    let hash = hash.trim().trim_start_matches('#');
+    let nodes = data["nodes"].as_object().ok_or("The planner's atlas data looks wrong")?;
+    let effect = |id: u32, index: usize| -> Option<u32> {
+        nodes.get(&id.to_string())?["variantEffects"].get(index)?["effect"].as_u64().map(|e| e as u32)
+    };
+    if hash.chars().all(|c| c.is_ascii_digit() || c == '.' || c == ',') {
+        let (mut ids, mut picks) = (vec![], vec![]);
+        for part in hash.split(',').filter(|p| !p.is_empty()) {
+            let mut it = part.split('.');
+            let Some(Ok(id)) = it.next().map(|x| x.parse::<u32>()) else { continue };
+            ids.push(id);
+            if let Some(Ok(i)) = it.next().map(|x| x.parse::<usize>()) { if let Some(e) = effect(id, i) { picks.push((id, e)); } }
+        }
+        if ids.is_empty() { return Err("That atlas tree link has no points in it".into()); }
+        return Ok((ids, picks));
+    }
+    let cfg = base64::engine::GeneralPurposeConfig::new()
+        .with_decode_padding_mode(base64::engine::DecodePaddingMode::Indifferent)
+        .with_decode_allow_trailing_bits(true);
+    let bytes = base64::engine::GeneralPurpose::new(&base64::alphabet::URL_SAFE, cfg).decode(hash.trim_end_matches('='))
+        .map_err(|_| "That atlas tree link looks broken (can't read its code)".to_string())?;
+    if bytes.first() != Some(&0xA1) { return decode_official(hash); }
+
+    // The planner's graph: links both ways between real nodes, none to or from masteries.
+    let mastery = |id: &str| nodes.get(id).is_some_and(|n| n["isMastery"].as_bool() == Some(true));
+    let mut adj: HashMap<u32, Vec<u32>> = HashMap::new();
+    for (id, n) in nodes {
+        if id == "root" { continue; }
+        let Ok(a) = id.parse::<u32>() else { continue };
+        for t in n["out"].as_array().into_iter().flatten().chain(n["in"].as_array().into_iter().flatten()) {
+            let Some(t) = t.as_str() else { continue };
+            if t == "root" || !nodes.contains_key(t) || mastery(id) || mastery(t) { continue; }
+            let Ok(b) = t.parse::<u32>() else { continue };
+            adj.entry(a).or_default().push(b);
+            adj.entry(b).or_default().push(a);
+        }
+    }
+    for v in adj.values_mut() { v.sort_unstable(); v.dedup(); }
+    let root: u32 = data["nodes"]["root"]["out"][0].as_str().and_then(|s| s.parse().ok()).ok_or("The planner's atlas data has no start point")?;
+    let mut pos = 8usize;
+    let mut bit = || -> bool { let b = bytes.get(pos >> 3).copied().unwrap_or(0) >> (7 - (pos & 7)) & 1; pos += 1; b == 1 };
+    let mut seen: HashSet<u32> = HashSet::from([root]);
+    let mut order = vec![root];
+    let mut i = 0;
+    while i < order.len() {
+        for &nb in adj.get(&order[i]).map(|v| v.as_slice()).unwrap_or(&[]) {
+            if !seen.insert(nb) { continue; }
+            if bit() { order.push(nb); }
+        }
+        i += 1;
+    }
+    let mut picks = vec![];
+    for &id in &order {
+        if nodes.get(&id.to_string()).is_some_and(|n| n["isMultipleChoiceVariant"].as_bool() == Some(true)) {
+            let index = (bit() as usize) * 4 + (bit() as usize) * 2 + bit() as usize;
+            if let Some(e) = effect(id, index) { picks.push((id, e)); }
+        }
+    }
+    let ids: Vec<u32> = order.into_iter().skip(1).collect();
+    if ids.is_empty() { return Err("That atlas tree link has no points in it".into()); }
+    Ok((ids, picks))
+}
+
+/// A strategy from an Atlas Tree Planner link (`data` is that planner's data.json).
+pub fn from_planner(hash: &str, data: &Value, link: &str) -> Result<Strategy, String> {
+    let (nodes, choices) = decode_planner(hash, data)?;
+    let g = graph();
+    let known = nodes.iter().filter(|n| g.has(**n)).count();
+    if known * 2 < nodes.len() { return Err("That atlas tree is from a different version of the game (most of its points aren't on today's atlas)".into()); }
+    let nodes: Vec<u32> = nodes.into_iter().filter(|n| g.has(*n)).collect();
+    let all = g.fill_paths(&nodes, &HashSet::new());
+    let kept: HashSet<u32> = all.iter().copied().collect();
+    let choices = choices.into_iter().filter(|(n, _)| kept.contains(n)).collect();
+    Ok(Strategy { site: "planner".into(), link: link.trim().to_string(), name: String::new(),
         variants: vec![Variant { name: "Atlas tree".into(), steps: g.steps(&all), nodes: all, choices, notes: vec![] }], ..Default::default() })
 }
 
@@ -564,6 +664,55 @@ mod tests {
         assert!(parse_link("https://www.pathofexile.com/trade/search/Standard").is_err());
         assert!(parse_link("https://poe.ninja/builds").is_err());
         assert!(parse_link("").is_err());
+    }
+
+    #[test]
+    fn planner_links() {
+        let l = parse_link("https://atlas-blush-beta.vercel.app/#oYL77Yu0pm3sd8UfPl_8J74326baPkjlfLb2XcTOVftZ").unwrap();
+        assert_eq!(l, Link::Planner { data_url: "https://atlas-blush-beta.vercel.app/data.json".into(), hash: "oYL77Yu0pm3sd8UfPl_8J74326baPkjlfLb2XcTOVftZ".into() });
+        let l = parse_link("https://atlas-blush-beta.vercel.app/index.html#abc").unwrap();
+        assert!(matches!(l, Link::Planner { data_url, .. } if data_url == "https://atlas-blush-beta.vercel.app/data.json"));
+        // A small made-up planner graph: root → 1, 1 – 2, 1 – 3 (a choice notable), 3 – 4 (a mastery: left out).
+        let data = serde_json::json!({ "nodes": {
+            "root": { "out": ["1"] },
+            "1": { "out": ["2", "3"], "in": [] },
+            "2": { "out": [], "in": ["1"] },
+            "3": { "out": ["4"], "in": ["1"], "isMultipleChoiceVariant": true, "variantEffects": [{ "effect": 70 }, { "effect": 71 }, { "effect": 72 }] },
+            "4": { "out": [], "in": ["3"], "isMastery": true },
+        }});
+        // Walk from 1: neighbours 2 (bit 0), 3 (bit 1); from 3 nothing new. Then node 3's pick: 010 = option 2.
+        // Bits after the marker: 0 1 0 1 0 → 0b0101_0000.
+        let code = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode([0xA1, 0b0101_0000]);
+        assert_eq!(decode_planner(&code, &data).unwrap(), (vec![3], vec![(3, 72)]));
+        assert_eq!(decode_planner("2,3.1", &data).unwrap(), (vec![2, 3], vec![(3, 71)]));
+    }
+
+    /// His link against the live planner data: `PLANNER_DATA=<path to data.json> cargo test -p filter-core planner_real -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn planner_real() {
+        let data: Value = serde_json::from_str(&std::fs::read_to_string(std::env::var("PLANNER_DATA").unwrap()).unwrap()).unwrap();
+        let code = std::env::var("PLANNER_CODE").unwrap_or("oYL77Yu0pm3sd8UfPI_8J74326baPkjlfLb2XcTOVftZ".into());
+        // Read off a screenshot: try the look-alike letters too and list codes that give a whole 150-point tree.
+        if std::env::var("PLANNER_SWAPS").is_ok() {
+            let alike = |c: char| -> &'static [char] { match c { 'l' | 'I' | '1' => &['l', 'I', '1'], 'O' | '0' => &['O', '0'], _ => &[] } };
+            let spots: Vec<usize> = code.char_indices().filter(|(_, c)| !alike(*c).is_empty()).map(|(i, _)| i).collect();
+            let mut tries = vec![code.clone()];
+            for &i in &spots {
+                tries = tries.into_iter().flat_map(|t| alike(t.as_bytes()[i] as char).iter().map(move |r| { let mut s = t.clone(); s.replace_range(i..i + 1, &r.to_string()); s }).collect::<Vec<_>>()).collect();
+            }
+            for t in &tries {
+                if let Ok((ids, picks)) = decode_planner(t, &data) { if ids.len() >= 140 { println!("{t}: {} points, {} picks", ids.len(), picks.len()); } }
+            }
+            println!("{} tried", tries.len());
+        }
+        let s = from_planner(&code, &data, "x").unwrap();
+        let v = &s.variants[0];
+        let g = graph();
+        println!("{} points, picks {:?}", v.nodes.len() - 1, v.choices);
+        let mut names: Vec<&str> = v.nodes.iter().filter(|n| matches!(g.kind(**n), 1 | 2)).map(|n| g.name(*n)).collect();
+        names.sort();
+        println!("{}", names.join(", "));
     }
 
     #[test]
