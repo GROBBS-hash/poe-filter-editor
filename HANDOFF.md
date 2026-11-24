@@ -48,6 +48,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **Tier changes on a filter built on another (24 Nov, not released yet).** Blasting's "show Stacks of 6+ Tier 5" didn't stick: `apply_with_extra` applied all rules newest-first (right for your own top rules) so Red-Maps' older "hide Tier 5" came last and won. Now top rules newest-first, tier changes / moved bases oldest-first. Test `newest_tier_change_wins`; dev check `status_real::blasting_tier5`.
 - **Freeze fix (24 Nov, released in 0.2.62).** He reported "app crashed": the installed 0.2.60 was alive but Not Responding, idle CPU (a deadlock). `register_hotkeys_now` held `state.hotkeys` while calling `global_shortcut().register`, which runs on the main thread and waits (plugin: run_on_main_thread + rx.recv); the hotkey handler on the main thread locks `state.hotkeys` → each waits forever. Happens when a hotkey is pressed just as the game comes to the front (start_hotkey_focus_watcher re-registers). Now registers into a local map and swaps it in after. Scans for other lock-order / lock-while-waiting-on-main-thread cases found nothing real (scripts were ad hoc).
 - **Tiers → Threads (24 Nov, released in 0.2.62).** NeverSink has no Threads section (Fragments t3, with the Goddess items; its stacked-fragments rule is off). App page `src/Threads.tsx` (key `__threads` in Tiers.tsx, under Maps): every Thread poe.ninja prices (`prices::thread_prices`, cat "Thread"), "Hide Threads worth under N" = `section_hide["threads"]` (stacks count at total worth, regenerated with prices) and new `section_stack["threads"]` = always show stacks of N+. Command `get_threads`. Test `threads_worth_line`. Section pictures: Charts → Coral Reef Chart, Enshrouded → Karui Enshrouding Crystal (the old pictures 404 / missing).
 - **Jewels with my mods (24 Nov, option C he picked from mock-ups; released in 0.2.62).** One edit "Highlight:/Style: every Jewels with my mods": `Class == "Jewels"`, `Identified True`, `HasExplicitMod [>=N] "Shimmering" …` (regular jewel mod names are unique: 145, craft data dom "jewel"). `MatchOpts.mods/mods_min` + `RuleDetail.mods/mods_min` (kept by edited_rule; same_slot/shadowed_by don't treat it as covering every jewel). `craft::jewel_mods()` / `jewel_mods_in(text)` (mod lines matched by shape); copied jewels get `Item.mod_names` so F2's checker can answer HasExplicitMod. UI: `src/jewelMods.ts` shared; Tiers.tsx `JewelModsCard`; ItemPanel.tsx `JewelModsBox`. Abyss jewels not covered (their names repeat across tiers).
@@ -1043,7 +1044,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
-- [ ] (0.2.62) Tiers → Maps → Threads: tick "Hide Threads worth under" 1c → after F4 a single cheap Thread (Betrayal ~0.3c) is hidden, a stack of 4+ shows; "Always show stacks of 3" → stacks of 3 show. "Change how they look" jumps to Fragments tier 3. Charts and Enshrouded gear have pictures in the Tiers list now.
+- [ ] (next) Blasting (built on Red-Maps): Tiers → Stacks of 6+ → tick Tier 5 → it stays ticked; a stack of 15 Orb of Alchemy shows after F4.
 - [ ] (0.2.62) Jewels with my mods: Tiers → Jewels → type "energy shield" → add it; after F4 an identified Cobalt jewel with % max ES is highlighted purple, others unchanged. F2 on an identified jewel: a "Jewels with my mods" box lists its mods → tick → Save to my jewel list. "2+" needs two of the mods. Change the look from the card.
 - [ ] (0.2.61) F2 on Omen of Return (hidden with "Just this item"): the chip says "Only Omen of Return hidden" and a gold "Just this item" line says the rest of its tier still shows. `Source.only_base` (evaluate.rs) = the one BaseType an edit names.
 - [ ] (0.2.61) Import a poe.ninja atlas tree (poe.ninja → Atlas Trees → open one → copy the link): it comes in whole. Price check on an empty slot / ground label now says "No item was copied: hold the mouse over the item itself…" instead of "That doesn't look like an item".
@@ -1244,6 +1245,7 @@ when the game window isn't found. Check in game: the window's spot, and that it 
    to read on every page? Home page + Ctrl+K search feel easier?
 
 **Batch mode (21 Nov, in 0.2.36)**
+- [x] (Confirmed 24 Nov: "threads worked".) Tiers → Maps → Threads: hide Threads worth under N, stacks count at their total worth.
 - [x] (Confirmed 24 Nov.) F2 → Hide → "Just this item" on Omen of Return: hidden on the ground in Red-Maps (shows only with the filter off). The Ritual favours window keeps an item's old look until it's closed and reopened (game behaviour, he saw it still bright there).
 - [x] (Confirmed 22 Nov, "seems good".) Box was cut off at its fixed 250×64 size; it now fits itself to its text
   (in 0.2.37; check the box shows its close button and whole second line).

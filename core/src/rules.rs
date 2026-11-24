@@ -539,15 +539,22 @@ pub fn apply_with_extra(segs: &mut Vec<Segment>, rules: &[Rule], extra: &str, nl
     crate::filter::enable_commented(segs, &["maps", "implicitmod"]);
     let mut top = format!("{START}{nl}# Edits made with the live editor. Rebuilt automatically; edit in the app.{nl}{nl}");
     // Switched-off edits stay in the list but are left out of the filter.
+    // Your own rules go at the top, newest first (the first match wins in game).
     for rule in rules.iter().rev().filter(|r| !r.is_off()) {
-        match rule {
-            Rule::Override { label, show, conditions, actions, .. } => {
-                top.push_str(&format!("{} # {label}{nl}", if *show { "Show" } else { "Hide" }));
-                for l in conditions.iter().chain(actions) {
-                    top.push_str(&format!("    {l}{nl}"));
-                }
-                top.push_str(nl);
+        if let Rule::Override { label, show, conditions, actions, .. } = rule {
+            top.push_str(&format!("{} # {label}{nl}", if *show { "Show" } else { "Hide" }));
+            for l in conditions.iter().chain(actions) {
+                top.push_str(&format!("    {l}{nl}"));
             }
+            top.push_str(nl);
+        }
+    }
+    // Changes to NeverSink's tiers, oldest first, so the newest change wins: a filter built on another one
+    // (Blasting on Red-Maps) gets its parent's changes first, then its own (24 Nov: showing Tier 5 on Blasting
+    // didn't stick because Red-Maps' older "hide Tier 5" was applied after it).
+    for rule in rules.iter().filter(|r| !r.is_off()) {
+        match rule {
+            Rule::Override { .. } => {}
             Rule::Tier { type_path, tier, show, actions, min_stack, min_item_tier, conds, .. } => {
                 let mut found = false;
                 for seg in segs.iter_mut() {
@@ -591,6 +598,24 @@ pub fn apply_with_extra(segs: &mut Vec<Segment>, rules: &[Rule], extra: &str, nl
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn newest_tier_change_wins() {
+        // 24 Nov: Blasting (built on Red-Maps) showed Tier 5 of Stacks of 6+, Red-Maps hides it; Blasting's must win.
+        use super::*;
+        use crate::filter::parse_filter;
+        let f = "Hide # $type->currency->stackedsix $tier->t5\n\tStackSize >= 6\n\tBaseType == \"Orb of Alchemy\"\n\tSetFontSize 45\n";
+        let tier = |show: bool| Rule::Tier { type_path: vec!["currency".into(), "stackedsix".into()], tier: "t5".into(), show: Some(show),
+            actions: None, min_stack: None, min_item_tier: None, conds: None, off: false, look: None };
+        // resolved_rules order: the parent's first, then this filter's own.
+        let mut segs = parse_filter(f);
+        apply_with_extra(&mut segs, &[tier(false), tier(true)], "", "\n");
+        let out = crate::filter::render_filter(&segs);
+        assert!(out.contains("Show # $type->currency->stackedsix $tier->t5"), "{out}");
+        let mut segs = parse_filter(f);
+        apply_with_extra(&mut segs, &[tier(true), tier(false)], "", "\n");
+        assert!(crate::filter::render_filter(&segs).contains("Hide # $type->currency->stackedsix $tier->t5"));
+    }
+
     #[test]
     fn corrupted_only() {
         let item = Item { item_class: "Jewels".into(), base_type: "Cobalt Jewel".into(), rarity: "Rare".into(), corrupted: true, ..Default::default() };

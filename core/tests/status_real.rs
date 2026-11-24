@@ -222,3 +222,17 @@ fn originator_t16_decided_by_edit() {
     println!("decided by {:?} (user edit: {})", s.verdict.decided_by, s.verdict.by_user_edit);
     assert!(s.verdict.by_user_edit);
 }
+
+/// Dev check (24 Nov): his Blasting filter (built on Red-Maps) shows Stacks of 6+ Tier 5 again.
+/// `cargo test -p filter-core --test status_real blasting_tier5 -- --ignored --nocapture`
+#[test]
+#[ignore]
+fn blasting_tier5() {
+    let appdata = std::env::var("APPDATA").unwrap();
+    let store = filter_core::profiles::Store::load(std::path::Path::new(&format!("{appdata}/com.grobbs.poefiltereditor/profiles.json")));
+    let dir = std::path::PathBuf::from(format!("{}/Documents/My Games/Path of Exile", std::env::var("USERPROFILE").unwrap()));
+    let (text, warnings) = filter_core::profiles::render_profile(&store, "blasting", &dir, None, None).unwrap();
+    let line = text.lines().find(|l| l.contains("$type->currency->stackedsix $tier->t5")).unwrap_or("not found");
+    println!("{line}\nwarnings: {warnings:?}");
+    assert!(line.starts_with("Show"), "{line}");
+}
