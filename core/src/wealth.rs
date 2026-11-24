@@ -14,6 +14,42 @@ pub struct Tab {
     pub kind: String,
     /// "#rrggbb"
     pub colour: String,
+    /// The site's own id: stays the same when the tab is moved or renamed.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub id: String,
+}
+
+/// Where tabs moved to when the tab list changed: old index -> new one. By the site's id; lists saved before it was kept
+/// (24 Nov) go by name and kind (several tabs can share a name: in order), then by a kind there's only one of.
+pub fn moved_tabs(old: &[Tab], new: &[Tab]) -> std::collections::HashMap<usize, usize> {
+    let mut out = std::collections::HashMap::new();
+    let mut taken = std::collections::HashSet::new();
+    let mut go = |o: &Tab, n: Option<&Tab>| if let Some(n) = n { if taken.insert(n.index) { out.insert(o.index, n.index); return true; } false } else { false };
+    let mut left: Vec<&Tab> = vec![];
+    for o in old {
+        if !(!o.id.is_empty() && go(o, new.iter().find(|n| n.id == o.id))) { left.push(o); }
+    }
+    // With ids, one that isn't there any more is gone.
+    left.retain(|o| o.id.is_empty());
+    let mut rest: Vec<&Tab> = vec![];
+    for o in left {
+        let nth = old.iter().filter(|x| x.index < o.index && x.name == o.name && x.kind == o.kind).count();
+        if !go(o, new.iter().filter(|n| n.name == o.name && n.kind == o.kind).nth(nth)) { rest.push(o); }
+    }
+    for o in rest {
+        let mut same = new.iter().filter(|n| n.kind == o.kind);
+        let (one, two) = (same.next(), same.next());
+        if two.is_none() && old.iter().filter(|x| x.kind == o.kind).count() == 1 { go(o, one); }
+    }
+    out
+}
+
+/// Picked tabs (a scan profile, the earnings tabs) after the list changed; ones that are gone drop out.
+pub fn move_picked(picked: &[usize], moved: &std::collections::HashMap<usize, usize>) -> Vec<usize> {
+    let mut v: Vec<usize> = picked.iter().filter_map(|i| moved.get(i).copied()).collect();
+    v.sort_unstable();
+    v.dedup();
+    v
 }
 
 pub fn tabs_from_json(v: &Value) -> Vec<Tab> {
@@ -25,6 +61,7 @@ pub fn tabs_from_json(v: &Value) -> Vec<Tab> {
             name: t["n"].as_str().unwrap_or("").to_string(),
             kind: t["type"].as_str().unwrap_or("").to_string(),
             colour: format!("#{:02x}{:02x}{:02x}", ch("r"), ch("g"), ch("b")),
+            id: t["id"].as_str().unwrap_or("").to_string(),
         }
     }).collect()
 }
@@ -474,6 +511,29 @@ mod guild_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tabs_that_moved() {
+        // His lists (24 Nov): the saved one without ids, and the site's now: one tab more before $$$, Blight and Fossil swapped.
+        let t = |index: usize, name: &str, kind: &str, id: &str| Tab { index, name: name.into(), kind: kind.into(), colour: String::new(), id: id.into() };
+        let old = [t(1, "~price 5 chaos", "QuadStash", ""), t(5, "$$$", "CurrencyStash", ""), t(7, "Frags", "FragmentStash", ""), t(8, "BREACH", "BreachStash", ""),
+            t(11, "Div", "DivinationCardStash", ""), t(12, "Fossil", "DelveStash", ""), t(13, "Blight", "BlightStash", ""), t(26, "~price 5 chaos", "UniqueStash", ""), t(28, "TENDY", "PremiumStash", "")];
+        let new = [t(0, "~price 55 chaos", "QuadStash", "a"), t(1, "~price 55 chaos", "QuadStash", "b"), t(3, "$$$", "CurrencyStash", "c"), t(8, "Frags", "FragmentStash", "d"),
+            t(9, "BREACH", "BreachStash", "e"), t(12, "Div", "DivinationCardStash", "f"), t(13, "Blight", "BlightStash", "g"), t(14, "Fossil", "DelveStash", "h"),
+            t(26, "~price 55 chaos", "UniqueStash", "i"), t(28, "TENDY", "PremiumStash", "j")];
+        let m = moved_tabs(&old, &new);
+        assert_eq!((m[&5], m[&7], m[&8], m[&11], m[&12], m[&13], m[&26], m[&28]), (3, 8, 9, 12, 14, 13, 26, 28));
+        assert!(!m.contains_key(&1), "renamed, and there are two of that kind now: not guessed");
+        assert_eq!(move_picked(&[1, 7, 11, 12], &m), [8, 12, 14]);
+        // With ids: moved and renamed is the same tab, a removed one is gone.
+        let mut later = new.to_vec();
+        later.remove(0);
+        for t in &mut later { t.index += 4; }
+        later[4].name = "Cards".into();
+        let m = moved_tabs(&new, &later);
+        assert_eq!((m.get(&0), m[&12], m[&3]), (None, 16, 7));
+        assert_eq!(m.len(), later.len());
+    }
     use serde_json::json;
 
     fn lookup(name: Option<&str>, base: &str, kind: &str) -> Option<f64> {
@@ -515,7 +575,7 @@ mod tests {
         assert_eq!(m.iter().map(|x| x.name.as_str()).collect::<Vec<_>>(), ["Divine Orb"], "chaos and listed items aren't 'missed'");
         let tabs = tabs_from_json(&json!({ "tabs": [ { "n": "Dump", "i": 0, "type": "PremiumStash", "colour": { "r": 255, "g": 0, "b": 16 } },
             { "n": "Hidden", "i": 1, "type": "MapStash", "hidden": true, "colour": {} } ] }));
-        assert_eq!(tabs, vec![Tab { index: 0, name: "Dump".into(), kind: "PremiumStash".into(), colour: "#ff0010".into() }]);
+        assert_eq!(tabs, vec![Tab { index: 0, name: "Dump".into(), kind: "PremiumStash".into(), colour: "#ff0010".into(), id: String::new() }]);
     }
 
 

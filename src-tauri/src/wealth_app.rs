@@ -46,6 +46,47 @@ fn load_tabs(account: &str, sessid: &str, league: &str, poe2: bool, guild: bool)
     Ok(tabs)
 }
 
+/// Reads the tab list again and keeps everything that points at tabs (scan profiles, earnings tabs, a running session)
+/// on the tabs it meant. Scans do this every time: a saved list goes stale as soon as a tab is added or moved (24 Nov: his
+/// Div cards showed under "Fossil"). Returns where each tab moved to.
+fn refresh_tabs(app: &AppHandle) -> Result<std::collections::HashMap<usize, usize>, String> {
+    let (account, sessid, league, poe2) = who(app)?;
+    let state = app.state::<AppState>();
+    let (guild, old) = with_store(&state, |s| (s.guild, s.tabs.clone()));
+    let tabs = load_tabs(&account, &sessid, &league, poe2, guild)?;
+    if tabs.is_empty() { return Err(format!("Signed in, but no stash tabs in {league}")); }
+    Ok(set_tabs(app, old, tabs))
+}
+
+fn set_tabs(app: &AppHandle, old: Vec<Tab>, mut tabs: Vec<Tab>) -> std::collections::HashMap<usize, usize> {
+    let state = app.state::<AppState>();
+    // The guild's list couldn't be read this time: keep the one we had.
+    if with_store(&state, |s| s.guild) && !tabs.iter().any(|t| wealth::is_guild(t.index)) {
+        tabs.extend(old.iter().filter(|t| wealth::is_guild(t.index)).cloned());
+    }
+    let same: std::collections::HashMap<usize, usize> = tabs.iter().map(|t| (t.index, t.index)).collect();
+    if old.is_empty() || old == tabs { with_store(&state, |s| s.tabs = tabs); return same; }
+    let moved = wealth::moved_tabs(&old, &tabs);
+    let shifted = moved.iter().any(|(a, b)| a != b) || old.iter().any(|t| !moved.contains_key(&t.index));
+    with_store(&state, |s| {
+        if shifted {
+            for p in &mut s.profiles { p.tabs = wealth::move_picked(&p.tabs, &moved); }
+            if let Some(c) = s.current.as_mut() { c.tabs = wealth::move_picked(&c.tabs, &moved); }
+        }
+        s.tabs = tabs.clone();
+    });
+    if shifted {
+        let mut st = state.store.lock().unwrap();
+        st.settings.wealth_tabs = wealth::move_picked(&st.settings.wealth_tabs, &moved);
+        let _ = st.save(&state.store_path);
+        drop(st);
+        // "Find in stash" forgets what it had under a place that's another tab now.
+        with_index(&state, |ix| ix.items.retain(|f| tabs.iter().any(|t| t.index == f.tab_index && t.name == f.tab)));
+        phone_app::tabs_moved(app);
+    }
+    moved
+}
+
 /// One stash tab's items: your own, or the guild's for tabs at GUILD_TAB and up.
 fn read_tab(account: &str, sessid: &str, league: &str, poe2: bool, index: usize) -> Result<serde_json::Value, String> {
     if wealth::is_guild(index) { trade_api::guild_stash_tab(account, sessid, league, poe2, index - wealth::GUILD_TAB, false) }
@@ -91,14 +132,11 @@ fn divine(app: &AppHandle) -> Option<f64> { currency_rates(app).get("divine").co
 fn scan(app: &AppHandle, only: Option<&[usize]>) -> Result<(Vec<Valued>, Vec<Rare>), String> {
     let (account, sessid, league, poe2) = who(app)?;
     let state = app.state::<AppState>();
-    let mut tabs = with_store(&state, |s| s.tabs.clone());
-    if tabs.is_empty() {
-        let guild = with_store(&state, |s| s.guild);
-        tabs = load_tabs(&account, &sessid, &league, poe2, guild)?;
-        let t = tabs.clone();
-        with_store(&state, |s| s.tabs = t);
-    }
-    let pick: Vec<Tab> = tabs.into_iter().filter(|t| only.map(|o| o.contains(&t.index)).unwrap_or(true)).collect();
+    let moved = refresh_tabs(app)?;
+    let only = only.map(|o| wealth::move_picked(o, &moved));
+    if only.as_ref().is_some_and(|o| o.is_empty()) { return Err("The tabs you ticked aren't in your stash any more: tick them again".into()); }
+    let tabs = with_store(&state, |s| s.tabs.clone());
+    let pick: Vec<Tab> = tabs.into_iter().filter(|t| only.as_ref().map(|o| o.contains(&t.index)).unwrap_or(true)).collect();
     let mut out = Vec::new();
     let mut rares = Vec::new();
     let mut found = Vec::new();
@@ -260,10 +298,10 @@ pub async fn wealth_setup(app: AppHandle, account: String, sessid: Option<String
             s.save(&state.store_path).map_err(err)?;
         }
         let (account, sessid, league, poe2) = who(&app)?;
-        let guild = with_store(&state, |s| s.guild);
+        let (guild, old) = with_store(&state, |s| (s.guild, s.tabs.clone()));
         let tabs = load_tabs(&account, &sessid, &league, poe2, guild)?;
         if tabs.is_empty() { return Err(format!("Signed in, but no stash tabs in {league}")); }
-        with_store(&state, |s| s.tabs = tabs);
+        set_tabs(&app, old, tabs);
         Ok(view(&app))
     }).await.map_err(err)?
 }
@@ -524,11 +562,7 @@ pub fn wealth_profile_use(app: AppHandle, name: Option<String>) -> WealthView {
 #[tauri::command]
 pub async fn wealth_tabs_refresh(app: AppHandle) -> Result<WealthView, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let (account, sessid, league, poe2) = who(&app)?;
-        let state = app.state::<AppState>();
-        let guild = with_store(&state, |s| s.guild);
-        let tabs = load_tabs(&account, &sessid, &league, poe2, guild)?;
-        with_store(&state, |s| s.tabs = tabs);
+        refresh_tabs(&app)?;
         Ok(view(&app))
     }).await.map_err(err)?
 }
@@ -567,6 +601,8 @@ pub async fn session_start(app: AppHandle, name: String) -> Result<WealthView, S
         let tabs = state.store.lock().unwrap().settings.wealth_tabs.clone();
         if tabs.is_empty() { return Err("Tick the tabs your loot goes into (your dump tabs) first".into()); }
         let total: f64 = scan(&app, Some(&tabs))?.0.iter().map(|v| v.value).sum();
+        // As they are now: the scan may have found them moved.
+        let tabs = state.store.lock().unwrap().settings.wealth_tabs.clone();
         let (_, league) = trade_league(&app);
         let name = if name.trim().is_empty() { "Unnamed strategy".to_string() } else { name.trim().to_string() };
         with_store(&state, |s| {
@@ -694,6 +730,9 @@ mod tests {
         assert_eq!(s.snapshots[0].total, 140.0);
     }
 }
+
+/// The shop watcher's tab list, read fresh: reading by an old one would call another tab's items sold.
+pub(crate) fn shop_refresh(app: &AppHandle) { let _ = refresh_tabs(app); }
 
 /// Your trade tabs for the shop watcher (phone alerts): tabs named "~price …" / "~b/o …", and tabs where the last scan
 /// found listed items. (index, name).

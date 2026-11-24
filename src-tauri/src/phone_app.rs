@@ -155,6 +155,7 @@ pub fn start_shop_watch(app: AppHandle) {
 }
 
 fn check_shop(app: &AppHandle) -> Result<usize, String> {
+    wealth_app::shop_refresh(app);
     let tabs = wealth_app::shop_tabs(app);
     if tabs.is_empty() { return Err("No trade tabs found: scan your stash on the Wealth page first".into()); }
     let rates = currency_rates(app);
@@ -314,3 +315,6 @@ fn stats_json(app: &AppHandle) -> serde_json::Value {
 }
 
 const PAGE: &str = include_str!("phone_page.html");
+
+/// The stash tabs moved: what was in each before says nothing about it now (no false "Sold").
+pub fn tabs_moved(app: &AppHandle) { with_store(app, |s| s.shop.clear()); save(app); }
