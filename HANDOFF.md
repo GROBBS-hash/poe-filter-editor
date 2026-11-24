@@ -1046,9 +1046,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
-- [ ] (0.2.63) Ctrl+D on a corrupted item with a Vaal implicit (his Darkray Vectors, +2 to Level of Socketed Curse Gems): the implicit shows at the top with a "Corrupted" tag, ticked at your roll, and the listings are boots with that implicit.
-- [ ] (0.2.63) F2 on an item you changed (an edit, or a NeverSink tier you changed, also via Red-Maps on Blasting): a "Reset to NeverSink's" button with "Undoes your change to … Then NeverSink shows/hides it." → click → after reload it looks as NeverSink has it. An edit that lives in the parent filter says to remove it there.
-- [ ] (0.2.63) Blasting (built on Red-Maps): Tiers → Stacks of 6+ → tick Tier 5 → it stays ticked; a stack of 15 Orb of Alchemy shows after F4.
+- [ ] (next) F2 reset button now says "Reset to base filter" and names the filter yours starts from (24 Nov: he may use his own filter, not NeverSink's).
 - [ ] (0.2.62) Jewels with my mods: Tiers → Jewels → type "energy shield" → add it; after F4 an identified Cobalt jewel with % max ES is highlighted purple, others unchanged. F2 on an identified jewel: a "Jewels with my mods" box lists its mods → tick → Save to my jewel list. "2+" needs two of the mods. Change the look from the card.
 - [ ] (0.2.61) F2 on Omen of Return (hidden with "Just this item"): the chip says "Only Omen of Return hidden" and a gold "Just this item" line says the rest of its tier still shows. `Source.only_base` (evaluate.rs) = the one BaseType an edit names.
 - [ ] (0.2.61) Import a poe.ninja atlas tree (poe.ninja → Atlas Trees → open one → copy the link): it comes in whole. Price check on an empty slot / ground label now says "No item was copied: hold the mouse over the item itself…" instead of "That doesn't look like an item".
@@ -1249,6 +1247,7 @@ when the game window isn't found. Check in game: the window's spot, and that it 
    to read on every page? Home page + Ctrl+K search feel easier?
 
 **Batch mode (21 Nov, in 0.2.36)**
+- [x] (Confirmed 24 Nov: "all of them work".) 0.2.63: corruption implicits in Ctrl+D (ticked, Corrupted tag); Stacks of 6+ Tier 5 on Blasting sticks; F2 reset button.
 - [x] (Confirmed 24 Nov: "threads worked".) Tiers → Maps → Threads: hide Threads worth under N, stacks count at their total worth.
 - [x] (Confirmed 24 Nov.) F2 → Hide → "Just this item" on Omen of Return: hidden on the ground in Red-Maps (shows only with the filter off). The Ritual favours window keeps an item's old look until it's closed and reopened (game behaviour, he saw it still bright there).
 - [x] (Confirmed 22 Nov, "seems good".) Box was cut off at its fixed 250×64 size; it now fits itself to its text

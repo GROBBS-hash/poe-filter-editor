@@ -495,7 +495,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
                 <RuleLine src={src} hidden={!shown(v.visibility)} onOpen={canOpen ? change : undefined}
                   action="Modify this rule" scope={scopeText} />
                 {!replacing && <ResetLine item={picked.item} fromScreen={picked.from_screen} stamp={JSON.stringify(v.source) + v.visibility}
-                  onReset={async (call) => { try { await call; await afterChange("Back to NeverSink's."); } catch (e) { setToast(String(e)); } }} />}
+                  onReset={async (call) => { try { await call; await afterChange("Back to the base filter's rule."); } catch (e) { setToast(String(e)); } }} />}
               </>
             );
           })()}
@@ -703,9 +703,9 @@ function JewelModsBox({ names, onSave }: { names: string[]; onSave: (call: Promi
   );
 }
 
-type ResetReply = { what: string[]; note: string | null; after: string };
-/** "Reset to NeverSink's" (24 Nov, he asked for a reset on F2): says what it undoes and how NeverSink alone shows the
- *  item, so nobody's surprised (e.g. NeverSink itself hides small Alchemy stacks at Uber strict). */
+type ResetReply = { what: string[]; note: string | null; after: string; base?: string };
+/** "Reset to base filter" (24 Nov, he asked for a reset on F2; named for the filter yours starts from, which isn't
+ *  always NeverSink's): says what it undoes and whether that base filter shows or hides the item then. */
 function ResetLine({ item, fromScreen, stamp, onReset }: { item: Item; fromScreen: boolean; stamp: string; onReset: (call: Promise<unknown>) => void }) {
   const [r, setR] = useState<ResetReply | null>(null);
   useEffect(() => {
@@ -718,8 +718,8 @@ function ResetLine({ item, fromScreen, stamp, onReset }: { item: Item; fromScree
     <div className="qm-reset">
       {r.what.length > 0 && (
         <>
-          <button className="qm-reset-btn" onClick={() => onReset(invoke("reset_item", { item, fromScreen, apply: true }))}>Reset to NeverSink's</button>
-          <span className="muted small">Undoes {r.what.join(" and ")}. Then <b>{r.after}</b>.</span>
+          <button className="qm-reset-btn" onClick={() => onReset(invoke("reset_item", { item, fromScreen, apply: true }))}>Reset to base filter</button>
+          <span className="muted small">Undoes {r.what.join(" and ")}. Then it's <b>{r.after}</b>, as your base filter{r.base ? <> (<b>{r.base}</b>)</> : ""} has it.</span>
         </>
       )}
       {r.note && <span className="muted small">{r.note}</span>}

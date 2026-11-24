@@ -2311,7 +2311,9 @@ fn item_status(app: AppHandle, item: Item, from_screen: bool) -> Result<StatusRe
 
 /// F2's "Reset to NeverSink's" (24 Nov): what it would undo for this item, and how NeverSink alone shows it.
 #[derive(Serialize)]
-struct ResetReply { what: Vec<String>, note: Option<String>, after: String }
+struct ResetReply { what: Vec<String>, note: Option<String>, after: String,
+    /// The filter this one starts from (NeverSink's, or your own imported one), by its file name: what Reset goes back to.
+    base: String }
 
 /// Undoes the changes that decide how this item looks, so NeverSink's own rule does: your edit for it (or the next
 /// one down), your change to the NeverSink step in charge (and the item moved within that section), and changes
@@ -2382,7 +2384,9 @@ fn reset_item(app: AppHandle, item: Item, from_screen: bool, apply: bool) -> Res
         }
     }
     let after = verdict(&store)?;
-    let after = if after.visibility == "Hide" { "NeverSink hides it".to_string() } else { "NeverSink shows it".to_string() };
+    // Named after the filter it starts from: not always NeverSink's (24 Nov, he may use his own).
+    let base = std::path::Path::new(&store.profiles[&id].base_file).file_stem().map(|x| x.to_string_lossy().to_string()).unwrap_or_default();
+    let after = if after.visibility == "Hide" { "hidden" } else { "shown" }.to_string();
     let new_rules = std::mem::replace(&mut store.profiles.get_mut(&id).unwrap().rules, saved);
     drop(prices);
     if apply && !what.is_empty() {
@@ -2390,7 +2394,7 @@ fn reset_item(app: AppHandle, item: Item, from_screen: bool, apply: bool) -> Res
         store.profiles.get_mut(&id).unwrap().rules = new_rules;
         save_and_build(&state, &store, &id)?;
     }
-    Ok(ResetReply { what, note, after })
+    Ok(ResetReply { what, note, after, base })
 }
 
 #[derive(Serialize)]
