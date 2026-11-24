@@ -63,6 +63,17 @@ fn profiles_fork_and_inherit() {
 
     build(&store, &ls, &dir).unwrap();
     build(&store, &s1, &dir).unwrap();
+    // Freshly built: nothing to do. One an older version built differently is out of date; somebody's own file isn't ours.
+    let old = |id: &str| filter_core::profiles::out_of_date(&store, id, &dir, None);
+    assert!(!old(&ls) && !old(&s1));
+    let file = dir.join("League Start.filter");
+    let good = fs::read_to_string(&file).unwrap();
+    fs::write(&file, good.replace("Highlight: Gold", "Hide # Price: Fragments worth under 4c")).unwrap();
+    assert!(old(&ls));
+    fs::write(&file, "Show
+").unwrap();
+    assert!(!old(&ls));
+    fs::write(&file, good).unwrap();
     let a = fs::read_to_string(dir.join("League Start.filter")).unwrap();
     let b = fs::read_to_string(dir.join("Strict 1.filter")).unwrap();
     assert!(a.contains("Highlight: Gold") && !a.contains("Scroll of Wisdom\"\r\n    DisableDropSound"));

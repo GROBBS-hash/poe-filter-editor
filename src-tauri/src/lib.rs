@@ -235,6 +235,35 @@ fn rebuild_priced(app: &AppHandle, games: &[Game]) {
     }
 }
 
+/// Filters rebuilt because an app update changed how they're built (their names, for the main window's note).
+static REBUILT: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+/// Once, shortly after the start (the first price check is done by then): filters an older version built are rebuilt.
+fn start_rebuild_old(app: AppHandle) {
+    thread::spawn(move || {
+        thread::sleep(Duration::from_secs(12));
+        let state = app.state::<AppState>();
+        let store = (*state.store.lock().unwrap()).clone();
+        let mut names = vec![];
+        for (id, p) in &store.profiles {
+            let prices = state.prices.lock().unwrap().get(&p.game).cloned();
+            if filter_core::profiles::out_of_date(&store, id, &filter_dir(p.game), prices.as_ref())
+                && build_with_prices(&store, id, &filter_dir(p.game), prices.as_ref()).is_ok() { names.push(p.name.clone()); }
+        }
+        if !names.is_empty() {
+            *REBUILT.lock().unwrap() = names.clone();
+            let _ = app.emit("filters-rebuilt", names);
+        }
+    });
+}
+
+#[tauri::command]
+fn rebuilt_filters(seen: bool) -> Vec<String> {
+    let mut r = REBUILT.lock().unwrap();
+    if seen { r.clear(); }
+    r.clone()
+}
+
 /// Hourly price updates, and NeverSink updates every 6 hours, in the background.
 fn start_price_updates(app: AppHandle) {
     thread::spawn(move || {
@@ -3043,6 +3072,7 @@ pub fn run() {
             let _ = APP.set(app.handle().clone());
             let settings = app.state::<AppState>().store.lock().unwrap().settings.clone();
             start_price_updates(app.handle().clone());
+            start_rebuild_old(app.handle().clone());
             if register_hotkeys(app.handle(), &settings).is_err() {
                 // Fall back to the standard keys if saved ones can't be used.
                 let _ = register_hotkeys(app.handle(), &Settings::default());
@@ -3193,6 +3223,7 @@ pub fn run() {
             get_icons, apply_to_tier,
             preview_drops,
             theme_cards,
+            rebuilt_filters,
             farm_app::farm_find,
             go_back
         ])

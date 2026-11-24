@@ -286,3 +286,34 @@ fn threads_show() {
         }
     }
 }
+
+/// Dev check: what a filter file on disk does with an item. `FILTER=<path> ITEM="Map Fragments|Expedition Thread|1" cargo test -p filter-core --test status_real file_item -- --ignored --nocapture`
+#[test]
+#[ignore]
+fn file_item() {
+    let segs = filter_core::filter::parse_filter(&std::fs::read_to_string(std::env::var("FILTER").unwrap()).unwrap());
+    for one in std::env::var("ITEM").unwrap().split(';') {
+        let p: Vec<&str> = one.split('|').collect();
+        let i = filter_core::item::parse_item(&format!("Item Class: {}\nRarity: Normal\n{}\n--------\nStack Size: {}/20\n", p[0], p[1], p[2])).unwrap();
+        let v = filter_core::evaluate::status(&segs, &i, Some(83), false).verdict;
+        println!("{one}: {} by {} {:?} {:?}", v.visibility, v.decided_by, v.source.label, v.uncertain);
+    }
+}
+
+/// Dev check: are his filter files what this version would build? (changed lines listed)
+/// `cargo test -p filter-core --test status_real out_of_date -- --ignored --nocapture`
+#[test]
+#[ignore]
+fn out_of_date() {
+    use filter_core::{prices::PriceFile, profiles::{out_of_date, render_profile, Store}};
+    let appdata = format!("{}/com.grobbs.poefiltereditor", std::env::var("APPDATA").unwrap());
+    let store = Store::load(std::path::Path::new(&format!("{appdata}/profiles.json")));
+    let file: PriceFile = serde_json::from_str(&std::fs::read_to_string(format!("{appdata}/prices_poe1.json")).unwrap()).unwrap();
+    let dir = std::path::PathBuf::from(format!("{}/Documents/My Games/Path of Exile", std::env::var("USERPROFILE").unwrap()));
+    for (id, p) in &store.profiles {
+        println!("== {id}: out of date {}", out_of_date(&store, id, &dir, Some(&file)));
+        let (new, old) = (render_profile(&store, id, &dir, Some(&file), None).unwrap().0, std::fs::read_to_string(dir.join(&p.output_file)).unwrap_or_default());
+        for (a, b) in old.lines().zip(new.lines()).filter(|(a, b)| a != b).take(4) { println!("  old {}\n  new {}", &a[..a.len().min(120)], &b[..b.len().min(120)]); }
+        println!("  {} -> {} lines", old.lines().count(), new.lines().count());
+    }
+}

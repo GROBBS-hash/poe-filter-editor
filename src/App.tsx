@@ -176,6 +176,23 @@ function UpdateBar() {
   );
 }
 
+/** An update changed how filters are built, so yours were rebuilt: the game needs to load them once. */
+function RebuiltBar() {
+  const [names, setNames] = useState<string[]>([]);
+  useEffect(() => {
+    invoke<string[]>("rebuilt_filters", { seen: false }).then((n) => setNames(n ?? [])).catch(() => {});
+    const a = listen<string[]>("filters-rebuilt", (e) => setNames(e.payload));
+    return () => { a.then((f) => f()); };
+  }, []);
+  if (names.length === 0) return null;
+  return (
+    <div className="update-bar">
+      <span><b>{names.length === 1 ? `“${names[0]}” was rebuilt` : "Your filters were rebuilt"} after the update.</b> <span className="muted small">Press F4 in game to load it.</span></span>
+      <button onClick={() => { setNames([]); invoke("rebuilt_filters", { seen: true }).catch(() => {}); }}>OK</button>
+    </div>
+  );
+}
+
 /** Loot isn't being counted because the pathofexile.com login has run out (24 Nov: 17 maps went by without it being noticed). */
 function LoginBar() {
   const [note, setNote] = useState("");
@@ -362,6 +379,7 @@ export default function App() {
       <main className={`content ${tab === "craft" ? "wide" : ""}`}>
         <UpdateBar />
         <LoginBar />
+        <RebuiltBar />
         <ErrorBoundary key={tab + undoN}>
         <div key={tab} className="page-in">
         <div className="content-head">

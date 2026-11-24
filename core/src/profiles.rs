@@ -259,6 +259,16 @@ pub fn build_with_prices(store: &Store, id: &str, filter_dir: &Path, prices: Opt
     Ok(warnings)
 }
 
+/// Is the file the game loads not what the app would build now? After an update that changes how filters are built the
+/// file keeps the old rules until something is saved (24 Nov: the Threads fix was in, his filter still hid them). Only
+/// files the app built: one that's missing, or somebody's own under that name, is left alone.
+pub fn out_of_date(store: &Store, id: &str, filter_dir: &Path, prices: Option<&PriceFile>) -> bool {
+    let Some(p) = store.profiles.get(id) else { return false };
+    let Ok(old) = fs::read_to_string(filter_dir.join(&p.output_file)) else { return false };
+    if !old.contains(crate::rules::START) { return false; }
+    render_profile(store, id, filter_dir, prices, None).is_ok_and(|(new, _)| new != old)
+}
+
 /// The finished filter text for a profile, without saving it. `theme`
 /// overrides the profile's theme (Some(None) = NeverSink's own colours),
 /// which is how a theme is previewed before switching to it.
