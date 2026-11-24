@@ -140,8 +140,11 @@ fn register_hotkeys_now(app: &AppHandle, s: &Settings) -> Result<(), String> {
     let gs = app.global_shortcut();
     let _ = gs.unregister_all();
     let state = app.state::<AppState>();
-    let mut map = state.hotkeys.lock().unwrap();
-    map.clear();
+    // Never hold the hotkey list while registering: `register` hands the job to the window thread and waits for it,
+    // and a key press on that thread reads this list. Holding it froze the editor (24 Nov, "app crashed": a key
+    // pressed while the game came back to the front, so the focus watcher was re-registering).
+    let mut map = std::collections::HashMap::new();
+    let result = (|| {
     for (sc, action) in parsed {
         match gs.register(sc) {
             Ok(()) => { map.insert(sc.id(), action); }
@@ -162,6 +165,9 @@ fn register_hotkeys_now(app: &AppHandle, s: &Settings) -> Result<(), String> {
         }
     }
     Ok(())
+    })();
+    *state.hotkeys.lock().unwrap() = map;
+    result
 }
 
 /// Switches to the next filter for this game and loads it in game.
