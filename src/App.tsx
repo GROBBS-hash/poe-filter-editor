@@ -176,7 +176,7 @@ function UpdateBar() {
   );
 }
 
-/** Loot isn't being counted because the pathofexile.com login has run out (24 Nov: 16 maps went by without it being noticed). */
+/** Loot isn't being counted because the pathofexile.com login has run out (24 Nov: 17 maps went by without it being noticed). */
 function LoginBar() {
   const [note, setNote] = useState("");
   useEffect(() => {
