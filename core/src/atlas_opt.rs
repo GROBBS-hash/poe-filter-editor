@@ -282,6 +282,18 @@ fn grow(v: &HashMap<u32, f32>, budget: usize, lock: &[u32], block: &HashSet<u32>
     (order, locked)
 }
 
+/// How many of these nodes are each mechanic's (its text names it, or it sits in its area), most first.
+pub fn points_in(nodes: &[u32]) -> Vec<(&'static str, usize)> {
+    let d = data();
+    let mut n: HashMap<&'static str, usize> = HashMap::new();
+    for id in nodes {
+        for (m, w) in d.nodes.get(id).into_iter().flat_map(|x| x.tags.iter()) { if *w >= 0.7 { *n.entry(*m).or_default() += 1; } }
+    }
+    let mut v: Vec<(&'static str, usize)> = n.into_iter().collect();
+    v.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
+    v
+}
+
 /// Builds a tree for the strategies asked for.
 pub fn optimise(ask: &Ask) -> Plan {
     let g = graph();

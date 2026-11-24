@@ -56,3 +56,9 @@
 .ff-table td { padding: 5px 8px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
 .ff-table caption { text-align: left; padding-top: 6px; }
 .ff-m { gap: 8px; flex-wrap: nowrap; }
+.ff-own { display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px; }
+.ff-own > div { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.ff-own > div > span { display: flex; flex-direction: column; min-width: 0; }
+.ff-own small { color: var(--muted); }
+.ff-own .ff-own-n { margin-left: auto; white-space: nowrap; }
+.ff-own .item-icon { object-fit: contain; }

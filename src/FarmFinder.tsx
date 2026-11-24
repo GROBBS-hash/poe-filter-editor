@@ -12,10 +12,13 @@ type Thread = { key: string; thread: string; count: number; each: number; change
 type MapTip = { map: string; why: Why[]; yours: [number, number] | null };
 type Farm = { keys: string[]; title: string; score: number; value: number; steady: number; jackpots: number; raw: number; verdict: string;
   estimate: boolean; players: number | null; change: number | null; drops: Drop[]; threads: Thread[]; cost: number; why: Why[];
-  also: [string, string][]; altar: Why | null; maps: MapTip[]; avoid: Why[]; creator: [string, string, string] | null; rolls: string | null; unseen: string[] };
+  also: [string, string][]; altar: Why | null; maps: MapTip[]; avoid: Why[]; creator: [string, string, string] | null; rolls: string | null; unseen: string[]; own: Own | null };
+/** What your own maps made with a tree for it. */
+type Own = { div_hour: number; chaos_map: number; maps: number; few: boolean; trees: string[] };
+type OwnRow = { name: string; keys: string[]; title: string; own: Own };
 type Worth = { key: string; label: string; pic: string; share: number; steady: number; jackpots: number; raw: number; change: number | null;
   drops: Drop[]; unseen: string | null; estimate: boolean; blind: boolean };
-type Finder = { farms: Farm[]; mechanics: Worth[]; trees_from: string; trees: number; prices_from: string; temples_from: string; divine: number };
+type Finder = { farms: Farm[]; mechanics: Worth[]; trees_from: string; trees: number; prices_from: string; temples_from: string; own: OwnRow[]; divine: number };
 type Ask = { count: "all" | "steady"; max_cost: number | null; size: number };
 
 const SRC: Record<string, string> = { maxroll: "maxroll", "poe.ninja": "players' trees", guides: "guide sites", community: "community tree", "patch notes": "patch notes", "trade site": "trade site" };
@@ -33,6 +36,14 @@ const short = (map: string) => map.replace(/ Map$/, "");
 function Change({ v }: { v: number | null }) {
   if (v == null) return null;
   return <span className={v >= 0 ? "ff-up" : "ff-dn"}>{v >= 0 ? "▲" : "▼"} {Math.abs(Math.round(v))}%</span>;
+}
+
+const perHour = (o: Own) => `${o.div_hour >= 10 ? Math.round(o.div_hour) : o.div_hour.toFixed(o.div_hour >= 1 ? 1 : 2)} div an hour`;
+
+function Yours({ o }: { o: Own | null }) {
+  if (!o) return <span className="muted">no maps yet</span>;
+  return <span title={`${Math.round(o.chaos_map)}c a map on ${o.trees.join(", ")}${o.few ? "\nOnly a few maps so far: luck still decides it" : ""}`}>
+    <b className={o.few ? "" : "ff-up"}>{perHour(o)}</b> <span className="muted small">({o.maps} map{o.maps > 1 ? "s" : ""}{o.few ? ", early" : ""})</span></span>;
 }
 
 function Reasons({ list }: { list: Why[] }) {
@@ -92,6 +103,7 @@ function Card({ f, pics, best, div, onBuild }: { f: Farm; pics: Record<string, s
         ))}
       </div>
       <dl>
+        <div><dt>Your own maps</dt><dd><Yours o={f.own} /></dd></div>
         <div><dt>Drop prices, 7 days</dt><dd><Change v={f.change} /></dd></div>
         <div><dt>Threads a map</dt><dd>{f.threads.length === 0 ? "none" : (
           <span className="ff-threads" title={f.threads.map((t) => `${t.count} × ${t.thread} at ${money(t.each, div)}`).join("\n") + "\nBefore the free ones from Shaped Regions"}>
@@ -175,6 +187,16 @@ export default function FarmFinder({ onBuild }: { onBuild: () => void }) {
       {r && <div className="ff-cards">{r.farms.slice(0, 3).map((f, i) => (
         <Card key={f.title} f={f} pics={pics} best={i === 0} div={r.divine} onBuild={() => build(f)} />
       ))}</div>}
+      {r && r.own.length > 0 && <>
+        <div className="ap-step">Your trees so far <span className="ap-step-note">(loot in ordinary maps, hideout time included)</span></div>
+        <div className="ff-own">{r.own.slice(0, 6).map((x) => (
+          <div key={x.name}>
+            {x.keys.map((k) => <ItemIcon key={k} name={pics[k]} size={24} />)}
+            <span><b>{x.name}</b><small>{x.title || "no farm of its own"}</small></span>
+            <span className="ff-own-n"><Yours o={x.own} /></span>
+          </div>
+        ))}</div>
+      </>}
       {r && rest.length > 0 && <>
         <div className="ap-step">More ideas</div>
         <div className="ff-rest">{rest.map((f) => (

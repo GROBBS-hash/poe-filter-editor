@@ -25,7 +25,7 @@ export default function Atlas() {
   const [results, setResults] = useState<TreeResult[]>([]);
 
   useEffect(() => {
-    invoke<TreeResult[]>("atlas_results").then(setResults).catch(() => {});
+    invoke<TreeResult[] | null>("atlas_results").then((r) => setResults(r ?? [])).catch(() => {});
     const load = () => invoke<AtlasStore>("atlas_list").then(setStore).catch((e) => setMsg(String(e)));
     load();
     invoke<{ key_atlas?: string }>("get_settings").then((s) => setKey(s?.key_atlas || "F7")).catch(() => {});

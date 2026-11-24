@@ -200,6 +200,20 @@ pub(crate) fn active_id(app: &AppHandle) -> Option<u64> {
 }
 
 /// What each saved tree earned: loot per map / per hour from the map tracker, and earnings sessions started with it.
+/// Your saved trees with what maps on them made, for the farm finder. Boss fights and other special areas have no place
+/// in a farm's number: only ordinary maps count (the others still end a map's clock).
+pub(crate) fn own_trees(app: &AppHandle) -> Vec<filter_core::farm::OwnTree> {
+    let runs: Vec<(i64, i64, Option<f64>, Option<u64>)> = play_app::maps_history(app.clone()).iter()
+        .map(|r| (r.start, (r.left - r.start).max(r.in_map), (!r.loot_missed).then(|| r.loot.iter().map(|l| l.value).sum::<f64>()), r.atlas.filter(|_| r.area.starts_with("MapWorlds")))).collect();
+    let results = atlas::tree_results(&runs, &[]);
+    with_store(app, false, |s| s.list.iter().filter_map(|x| {
+        let result = results.iter().find(|r| r.id == x.id)?.clone();
+        // The tree itself: the one in game for the active strategy, else its biggest.
+        let v = if s.active == Some(x.id) { x.variants.get(s.variant) } else { None }.or_else(|| x.variants.iter().max_by_key(|v| v.nodes.len()))?;
+        Some(filter_core::farm::OwnTree { name: x.name.clone(), nodes: v.nodes.clone(), result })
+    }).collect()).unwrap_or_default()
+}
+
 #[tauri::command]
 pub fn atlas_results(app: AppHandle) -> Vec<atlas::TreeResult> {
     let runs: Vec<(i64, i64, Option<f64>, Option<u64>)> = play_app::maps_history(app.clone()).iter()

@@ -48,6 +48,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **Farm finder: his own div per hour (24 Nov, not released yet).** Each card's "Your own maps" = loot per hour of maps run on a saved tree that farms exactly those mechanics; "Your trees so far" lists every tree with maps (best first), also ones with no card. `farm::farmed(nodes)` works out what a tree farms (9+ of its points, Delirium 6+; agrees with poe.ninja on 2,129 of 2,141 clear cases, test). Only ordinary maps (`MapWorlds…`) with loot read count, hideout time between maps included; under 10 maps says "early". `atlas_app::own_trees`, `TreeResult.loot/secs`. The ranking itself doesn't use his numbers. Needs runs from 0.2.65 on (older ones have no tree).
 - **Missing map loot (24 Nov, not released yet).** From the saved runs: no loot from 23 Nov 16:50 to 24 Nov 13:41 (17 runs), working again from 24 Nov 19:29 (all 6 since have loot). Most likely the pathofexile.com login had run out (he reported exactly that on 23 Nov 16:50; the stash scan at 24 Nov 13:49 needs a login); nothing is logged, so not proven. The saving itself is fine. So it's noticed next time: `LoginBar` on top of the main window (App.tsx) and the login message on the tracker even when the last map had loot; `MapRun.loot_missed` (bags couldn't be read, or the editor restarted mid-map) shows "loot not read" in the history and is left out of the earnings per tree. Old runs aren't marked.
 - **Kirac's invitations in Ctrl+D (24 Nov, released in 0.2.66; his "Fate Offer" Maven's Invitation).** `maps::runs_like_map` (Misc Map Items with "Invitation"): map check against his can't-run list like a map (flavour text left out), mods never ticked for a price; when the trade site doesn't list the base (`ItemTypes::sells`) the window is only the map check, "can't be sold", no search (`MapInfo.no_sale`). Test `invitations_are_checked_like_maps`.
 - **Temples have prices (24 Nov, released in 0.2.66; he pointed out rooms sell on the trade site).** `core/src/temple.rs` + `core/data/temples.json` (survey of every Tier 3 room, level 75+, `node tools/build_temples.mjs`, ~10 min). 24 Nov: plain 10c, Cradle of Creation 55c, Locus of Corruption and Doryani's Institute ~1 div, Doryani + Cradle (and all three) ~2 div. Farm finder: Incursion counts listed temples over a plain one at 10% like beasts (a temple with two good rooms once) and Why? lists the setups; the app re-reads the good rooms every 12 h when the Atlas page opens (`farm_app::refresh_temples`, one per 20 s, leaves room for his price checks). Ctrl+D on a Chronicle lists its open rooms, good ones ticked, with area level. Obstructed rooms don't count. A few room names on the item differ from the trade site's ("Grand Reactor"): those just aren't listed.
@@ -1094,6 +1095,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
+- [ ] (24 Nov, unreleased) Atlas page → What to farm today: after a few maps with a tree "In game", "Your trees so far" lists it with div an hour, and the card for the same mechanics shows it.
 - [ ] (24 Nov, unreleased) When the pathofexile.com login runs out: a "Log in again" bar on top of the main window and on the tracker; maps meanwhile say "loot not read" in the history.
 - [ ] (0.2.66) Ctrl+D on a Maven's invitation from Kirac: only the map check (Run / Don't run), no price.
 - [ ] (0.2.66) Ctrl+D on a Chronicle of Atzoatl: its open rooms are listed, Locus / Doryani / Cradle ticked, listings found. Atlas page → One mechanic: Incursion shows with temple prices.
@@ -1692,7 +1694,7 @@ when the game window isn't found. Check in game: the window's spot, and that it 
       "Best strategies" ranks runs.
 
 ## Left to do (agreed order)
-- **Farm finder follow-ups (built 24 Nov, see Done):** his own div per hour per farm (loot works again, see Done); "copy for Claude" button.
+- **Farm finder follow-ups (built 24 Nov, see Done):** "copy for Claude" button.
 0. **24 Nov cloud work (see Done): merged and released in 0.2.65.** Phone alerts + stats
    page (8a/8b), chat commands (7d), atlas earnings per tree (5), race splits (instead of a live rank: GGG's ladder is
    OAuth-only), PoE 2 campaign route, Awakener's Orb crafting. Still not built: **PoE 2 crafting** (needs its own data

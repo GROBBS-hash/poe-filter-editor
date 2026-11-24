@@ -12,7 +12,8 @@ pub fn farm_find(app: AppHandle, ask: FarmAsk) -> Result<Finder, String> {
     let temples = temples(&app);
     let divine = prices.items.iter().find(|i| i.name == "Divine Orb").map(|i| i.value).unwrap_or(0.0);
     refresh_temples(&app, &prices.league, divine);
-    Ok(filter_core::farm::find(&prices, &temples, &runs, &ask))
+    let trees = atlas_app::own_trees(&app);
+    Ok(filter_core::farm::find(&prices, &temples, &runs, &trees, &ask))
 }
 
 fn temples_path(app: &AppHandle) -> PathBuf { app.state::<AppState>().data_dir.join("temples.json") }

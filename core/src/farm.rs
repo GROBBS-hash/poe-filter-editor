@@ -208,6 +208,8 @@ pub struct Farm {
     /// What creators roll on the map for it.
     pub rolls: Option<String>,
     pub unseen: Vec<String>,
+    /// Your own maps with a tree for exactly these mechanics.
+    pub own: Option<Own>,
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq)]
@@ -235,11 +237,56 @@ pub struct Finder {
     pub trees: f64,
     pub prices_from: String,
     pub temples_from: String,
+    /// Your trees with maps counted, best per hour first.
+    pub own: Vec<OwnRow>,
     pub divine: f64,
 }
 
 /// Your map runs: (map name, seconds in it).
 pub type Runs<'a> = &'a [(String, i64)];
+
+/// One of your saved atlas trees and what your maps on it made.
+#[derive(Debug, Clone, Default)]
+pub struct OwnTree {
+    pub name: String,
+    pub nodes: Vec<u32>,
+    pub result: crate::atlas::TreeResult,
+}
+
+/// What your own maps made with a tree for a farm.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct Own {
+    /// Divines an hour, from the loot in your maps (hideout time between maps included).
+    pub div_hour: f64,
+    pub chaos_map: f64,
+    pub maps: usize,
+    /// Fewer than OWN_MAPS maps: luck still decides it.
+    pub few: bool,
+    pub trees: Vec<String>,
+}
+
+/// Your results on one saved tree, whatever it farms.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct OwnRow { pub name: String, pub keys: Vec<String>, pub title: String, pub own: Own }
+
+/// This many maps before your own number says much.
+pub const OWN_MAPS: usize = 10;
+/// A saved tree farms a mechanic when it puts this many points into it (or most of a small one).
+const OWN_POINTS: usize = 9;
+
+/// Which of the finder's mechanics a tree farms.
+pub fn farmed(nodes: &[u32]) -> Vec<String> {
+    let have = crate::atlas_opt::points_in(nodes);
+    farms().mechanics.iter().filter(|m| have.iter().any(|(k, n)| *k == m.key && *n >= if m.key == "delirium" { 6 } else { OWN_POINTS }))
+        .map(|m| m.key.clone()).collect()
+}
+
+/// Adds up trees' results by the time they took.
+fn own_of(trees: &[&OwnTree], div: f64) -> Option<Own> {
+    let (mut loot, mut secs, mut maps) = (0.0, 0.0, 0);
+    for t in trees { loot += t.result.loot; secs += t.result.secs; maps += t.result.maps; }
+    (maps > 0 && secs > 0.0 && div > 0.0).then(|| Own { div_hour: loot / div / (secs / 3600.0), chaos_map: loot / maps as f64, maps, few: maps < OWN_MAPS, trees: trees.iter().map(|t| t.name.clone()).collect() })
+}
 
 fn change_of(list: &[(f64, f64)]) -> Option<f64> {
     let w: f64 = list.iter().map(|x| x.0).sum();
@@ -360,7 +407,8 @@ fn combos() -> Vec<Vec<String>> {
 }
 
 /// The finder: cards best first (the mix of mechanics changes from card to card), and every mechanic on its own.
-pub fn find(file: &PriceFile, temples: &Temples, runs: Runs, ask: &FarmAsk) -> Finder {
+pub fn find(file: &PriceFile, temples: &Temples, runs: Runs, trees: &[OwnTree], ask: &FarmAsk) -> Finder {
+    let mine: Vec<(Vec<String>, &OwnTree)> = trees.iter().filter(|t| t.result.maps > 0).map(|t| (farmed(&t.nodes), t)).collect();
     let f = farms();
     let div = file.items.iter().find(|i| i.name == "Divine Orb").map(|i| i.value).filter(|v| *v > 0.0).unwrap_or(1.0);
     let worth = worths(file, temples, div);
@@ -455,6 +503,7 @@ pub fn find(file: &PriceFile, temples: &Temples, runs: Runs, ask: &FarmAsk) -> F
             creator: creator.map(|p| (p.id.clone(), p.name.clone(), p.author.clone())),
             rolls: exact.filter(|p| !p.rolls.is_empty()).map(|p| p.rolls.join(", ")),
             unseen: parts.iter().filter_map(|p| p.1.unseen.clone()).collect(),
+            own: own_of(&mine.iter().filter(|m| m.0 == keys).map(|m| m.1).collect::<Vec<_>>(), div),
             keys,
         })
     }).collect();
@@ -483,9 +532,12 @@ pub fn find(file: &PriceFile, temples: &Temples, runs: Runs, ask: &FarmAsk) -> F
         if !near { farms_out.push(x); }
         if farms_out.len() >= 10 { break; }
     }
+    let label = |keys: &[String]| keys.iter().filter_map(|k| mech(k)).map(|m| m.label.as_str()).collect::<Vec<_>>().join(" + ");
+    let mut own: Vec<OwnRow> = mine.iter().filter_map(|(keys, t)| Some(OwnRow { name: t.name.clone(), title: label(keys), keys: keys.clone(), own: own_of(&[*t], div)? })).collect();
+    own.sort_by(|a, b| b.own.div_hour.total_cmp(&a.own.div_hour));
     let mut mechanics = worth;
     mechanics.sort_by(|a, b| (b.steady + b.jackpots * jack + b.raw).total_cmp(&(a.steady + a.jackpots * jack + a.raw)));
-    Finder { farms: farms_out, mechanics, trees_from: meta().updated.clone(), trees: meta().total, prices_from: file.updated.clone(), temples_from: temples.checked.clone(), divine: div }
+    Finder { farms: farms_out, mechanics, trees_from: meta().updated.clone(), trees: meta().total, prices_from: file.updated.clone(), temples_from: temples.checked.clone(), own, divine: div }
 }
 
 /// Maps that suit these mechanics: each reason counts for how many of them it covers; a map to avoid for one is out
@@ -560,7 +612,7 @@ mod tests {
 
     #[test]
     fn combines_and_explains() {
-        let r = find(&file(), Temples::shipped(), &[("Dunes".into(), 300), ("Dunes".into(), 420), ("Dunes".into(), 20)], &FarmAsk::default());
+        let r = find(&file(), Temples::shipped(), &[("Dunes".into(), 300), ("Dunes".into(), 420), ("Dunes".into(), 20)], &[], &FarmAsk::default());
         let top = |k: &[&str]| r.farms.iter().find(|f| f.keys.iter().map(String::as_str).collect::<Vec<_>>() == k);
         // Legion + Beasts (and Abyss) go together, with Threads, altars, a map and your own time in it.
         let lb = r.farms.iter().find(|f| f.keys.contains(&"legion".to_string()) && f.keys.contains(&"bestiary".to_string())).expect("legion + beasts");
@@ -581,8 +633,37 @@ mod tests {
     }
 
     #[test]
+    fn own_results_go_on_the_right_card() {
+        // The most copied Legion + Beasts + Delirium tree: it farms exactly those, so its maps show on that card.
+        let t = meta().trees["All"].iter().find(|t| t.copies == 297).expect("the most copied tree");
+        assert_eq!(farmed(&t.nodes), ["legion", "bestiary", "delirium"], "{:?}", crate::atlas_opt::points_in(&t.nodes));
+        let mine = OwnTree { name: "My legion".into(), nodes: t.nodes.clone(), result: crate::atlas::TreeResult { id: 1, maps: 12, loot: 2400.0, secs: 7200.0, ..Default::default() } };
+        let r = find(&file(), Temples::shipped(), &[], &[mine, OwnTree::default()], &FarmAsk::default());
+        let card = r.farms.iter().find(|f| f.keys == ["legion", "bestiary", "delirium"]).expect("card");
+        let own = card.own.as_ref().expect("own");
+        assert!((own.div_hour - 6.0).abs() < 0.01 && own.maps == 12 && !own.few && own.chaos_map == 200.0, "{own:?}");
+        assert_eq!(r.farms.iter().filter(|f| f.own.is_some()).count(), 1);
+        assert_eq!((r.own.len(), r.own[0].title.as_str()), (1, "Legion + Beasts + Delirium"));
+    }
+
+    /// How well `farmed` agrees with poe.ninja on the much-copied trees.
+    #[test]
+    fn farmed_agrees_with_poe_ninja() {
+        let (mut same, mut all) = (0, 0);
+        for t in meta().trees.values().flatten() {
+            for m in &farms().mechanics {
+                let p = t.mechs.iter().find(|x| x.0 == m.ninja).map(|x| x.1).unwrap_or(0.0);
+                // Clear cases only: a real investment, or none.
+                if p >= 11.0 || p == 0.0 { all += 1; same += usize::from((p > 0.0) == farmed(&t.nodes).contains(&m.key)); }
+            }
+        }
+        println!("{same} of {all}");
+        assert!(same as f64 / all as f64 > 0.95, "{same} of {all}");
+    }
+
+    #[test]
     fn counts_what_it_should() {
-        let r = find(&file(), Temples::shipped(), &[], &FarmAsk::default());
+        let r = find(&file(), Temples::shipped(), &[], &[], &FarmAsk::default());
         let blight = r.mechanics.iter().find(|m| m.key == "blight").unwrap();
         assert!(blight.drops.iter().all(|d| d.name != "Tainted Oil"), "Tainted Oil isn't Blight's");
         assert!(blight.jackpots > 0.0 && blight.steady > 0.0 && blight.drops[0].jackpot);
@@ -591,11 +672,11 @@ mod tests {
         let temples = r.mechanics.iter().find(|m| m.key == "incursion").unwrap();
         assert!(!temples.blind && temples.estimate && temples.drops.iter().all(|d| d.pic.as_deref() == Some("Chronicle of Atzoatl")), "temples have prices");
         // Steady only: Blight's Prismatic Oils don't count. No Threads: only farms without any.
-        let s = find(&file(), Temples::shipped(), &[], &FarmAsk { count: Count::Steady, ..Default::default() });
+        let s = find(&file(), Temples::shipped(), &[], &[], &FarmAsk { count: Count::Steady, ..Default::default() });
         assert!(s.farms.iter().all(|f| f.jackpots == 0.0 && f.drops.iter().all(|d| !d.jackpot)));
-        let free = find(&file(), Temples::shipped(), &[], &FarmAsk { max_cost: Some(0.0), ..Default::default() });
+        let free = find(&file(), Temples::shipped(), &[], &[], &FarmAsk { max_cost: Some(0.0), ..Default::default() });
         assert!(!free.farms.is_empty() && free.farms.iter().all(|f| f.threads.is_empty()));
-        let one = find(&file(), Temples::shipped(), &[], &FarmAsk { size: 1, ..Default::default() });
+        let one = find(&file(), Temples::shipped(), &[], &[], &FarmAsk { size: 1, ..Default::default() });
         assert!(one.farms.iter().all(|f| f.keys.len() == 1));
     }
 
@@ -609,11 +690,11 @@ mod tests {
         let play: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(data.join("play.json")).unwrap()).unwrap();
         let runs: Vec<(String, i64)> = play["maps"]["history"].as_array().unwrap().iter().map(|r| (r["name"].as_str().unwrap().into(), r["in_map"].as_i64().unwrap())).collect();
         for ask in [FarmAsk::default(), FarmAsk { count: Count::Steady, ..Default::default() }, FarmAsk { size: 2, ..Default::default() }] {
-            let r = find(&prices, Temples::shipped(), &runs, &ask);
+            let r = find(&prices, Temples::shipped(), &runs, &[], &ask);
             println!("== {ask:?}");
             for f in &r.farms { println!("{:5.1} {:40} value {:6.0} steady {:5.0} jack {:5.0} raw {:5.0} cost {:4.0}c {} players {:?} maps {:?} also {:?}", f.score, f.title, f.value, f.steady, f.jackpots, f.raw, f.cost, f.verdict, f.players.map(|p| (p * 1000.0).round() / 10.0), f.maps.iter().map(|m| (&m.map, m.yours)).collect::<Vec<_>>(), f.also.iter().map(|a| &a.0).collect::<Vec<_>>()); }
         }
-        let r = find(&prices, Temples::shipped(), &runs, &FarmAsk::default());
+        let r = find(&prices, Temples::shipped(), &runs, &[], &FarmAsk::default());
         for m in &r.mechanics { println!("{:12} share {:4.1}% steady {:5.0} jack {:5.0} raw {:4.0} blind {} top {:?}", m.key, m.share * 100.0, m.steady, m.jackpots, m.raw, m.blind, m.drops.iter().take(3).map(|d| format!("{} {:.0}div", d.name, d.sold_div)).collect::<Vec<_>>()); }
         for f in r.farms.iter().take(3) { println!("{f:#?}"); }
         if let Ok(o) = std::env::var("FARM_OUT") { std::fs::write(o, serde_json::to_string(&r).unwrap()).unwrap(); }

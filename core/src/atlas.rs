@@ -944,6 +944,9 @@ pub struct TreeResult {
     /// Chaos of loot per map, and per hour (loot / time from each map's start to the next one's).
     pub loot_per_map: Option<f64>,
     pub loot_per_hour: Option<f64>,
+    /// All of it: chaos, and seconds.
+    pub loot: f64,
+    pub secs: f64,
     pub sessions: usize,
     pub session_hours: f64,
     /// Chaos per hour over its earnings sessions.
@@ -969,6 +972,8 @@ pub fn tree_results(runs: &[(i64, i64, Option<f64>, Option<u64>)], sessions: &[(
     for (t, (n, secs, loot)) in by_tree {
         let i = get(&mut out, t);
         out[i].maps = n;
+        out[i].loot = loot;
+        out[i].secs = secs;
         if loot > 0.0 {
             out[i].loot_per_map = Some(loot / n as f64);
             out[i].loot_per_hour = Some(loot / (secs / 3600.0));
