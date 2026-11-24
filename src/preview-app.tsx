@@ -278,6 +278,9 @@ mockIPC((cmd, args) => {
       source: { kind: "neversink", label: "", type_path: ["currency"], tier: "t4chaos", section: "Currency", tier_name: "Tier 4 · about a Chaos Orb", conds: ["stackable currency"] } } } };
   }
   // "Jewels with my mods" on the Jewels page (24 Nov): one saved edit holding the mod names.
+  // Tiers → Threads (24 Nov): poe.ninja's Thread prices, cheapest first.
+  if (cmd === "get_threads") return { unit: "chaos", limit: 1, stack: null, items: [["Expedition Thread", 0.28], ["Betrayal Thread", 0.3], ["Incursion Thread", 0.31],
+    ["Blight Thread", 0.39], ["Ritual Thread", 0.41], ["Breach Thread", 0.46], ["Ultimatum Thread", 1.62], ["Bestiary Thread", 2.62], ["Legion Thread", 5.28], ["Abyss Thread", 5.53]] };
   if (cmd === "jewel_mods") return [
     { name: "Shimmering", text: "(6-8)% increased maximum Energy Shield", prefix: true, tags: [] },
     { name: "Vivid", text: "(5-7)% increased maximum Life", prefix: true, tags: [] },

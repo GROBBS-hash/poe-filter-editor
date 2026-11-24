@@ -121,6 +121,22 @@ pub struct PriceSettings {
     /// "only show corpses worth x chaos". Works with price tiers off, like the groups' hide_below.
     #[serde(default)]
     pub section_hide: BTreeMap<String, f64>,
+    /// With a "hide if worth under" line: always show stacks of at least N, whatever they're worth (24 Nov, Threads:
+    /// "sometimes they drop in stacks").
+    #[serde(default)]
+    pub section_stack: BTreeMap<String, u32>,
+}
+
+/// The Threads page's key in section_hide / section_stack. NeverSink has no Threads section (they sit in Fragments
+/// tier 3 with the Goddess items), so the page lists every item poe.ninja prices as a Thread.
+pub const THREADS_KEY: &str = "threads";
+
+/// Every Thread poe.ninja prices, cheapest first.
+pub fn thread_prices(file: &PriceFile) -> Vec<(String, f64)> {
+    let mut out: Vec<(String, f64)> = file.items.iter().filter(|i| i.cat == "Thread" && i.value > 0.0).map(|i| (i.name.clone(), i.value)).collect();
+    out.sort_by(|a, b| a.1.total_cmp(&b.1));
+    out.dedup_by(|a, b| a.0 == b.0);
+    out
 }
 
 fn look(size: u32, text: [u8; 4], border: [u8; 4], bg: [u8; 4], beam: &str, icon: (u8, &str, &str), sound: Sound) -> CustomStyle {
@@ -154,26 +170,33 @@ pub fn default_settings(unit: &str) -> PriceSettings {
             hide_below: None,
         }).collect(),
         section_hide: BTreeMap::new(),
+        section_stack: BTreeMap::new(),
     }
 }
 
 /// Hide rules for the Tiers page's "hide if worth under" lines: every item listed in that NeverSink section that
 /// poe.ninja prices under the line. A stack counts at its total worth (5 x 1c corpses stay when the line is 4c).
 /// Items poe.ninja doesn't price are left to NeverSink.
-pub fn section_hide_blocks(segs: &[crate::filter::Segment], hides: &BTreeMap<String, f64>, file: &PriceFile, nl: &str) -> String {
+pub fn section_hide_blocks(segs: &[crate::filter::Segment], hides: &BTreeMap<String, f64>, stacks: &BTreeMap<String, u32>, file: &PriceFile, nl: &str) -> String {
     let u = unit_short(&file.unit);
     let mut out = String::new();
     for (key, limit) in hides {
-        let path: Vec<String> = key.split("->").map(String::from).collect();
-        let Some(sec) = crate::tiers::section_at(segs, &path) else { continue };
-        let title = crate::tiers::section_title(&path).unwrap_or_else(|| key.clone());
+        // "Always show stacks of N+": a cheap item's stack shows from N even when it's worth less than the line.
+        let cap = stacks.get(key).copied().filter(|n| *n > 1).unwrap_or(5000);
+        let (title, bases): (String, Vec<String>) = if key == THREADS_KEY {
+            ("Threads".into(), thread_prices(file).into_iter().map(|(n, _)| n).collect())
+        } else {
+            let path: Vec<String> = key.split("->").map(String::from).collect();
+            let Some(sec) = crate::tiers::section_at(segs, &path) else { continue };
+            (crate::tiers::section_title(&path).unwrap_or_else(|| key.clone()), sec.tiers.iter().flat_map(|t| t.bases.iter().cloned()).collect())
+        };
         let mut by_stack: BTreeMap<u32, Vec<String>> = BTreeMap::new();
         let mut seen = std::collections::BTreeSet::new();
-        for b in sec.tiers.iter().flat_map(|t| t.bases.iter()) {
+        for b in &bases {
             if !seen.insert(b.clone()) { continue; }
             let Some(v) = price_of(file, None, b, "Normal").filter(|v| *v > 0.0) else { continue };
             if v >= *limit { continue; }
-            by_stack.entry((limit / v).ceil().min(5000.0) as u32).or_default().push(b.clone());
+            by_stack.entry(((limit / v).ceil().min(5000.0) as u32).min(cap)).or_default().push(b.clone());
         }
         for (need, names) in by_stack {
             let refs: Vec<&String> = names.iter().collect();
@@ -349,6 +372,31 @@ mod tests {
 
     /// Tiers page "hide items here worth under 4c" on corpses: 1c ones hide unless dropped as a stack of 4+.
     #[test]
+    fn threads_worth_line() {
+        // 24 Nov: a Threads page with a price line, stacks counting at their total worth, and "always show stacks of N+".
+        let mut f = file();
+        let it = |name: &str, value: f64| PriceItem { name: name.into(), base: name.into(), cat: "Thread".into(), value, variant: None,
+            listings: Some(10), trend: None, change: None, volume: None };
+        f.items.push(it("Abyss Thread", 5.5));
+        f.items.push(it("Betrayal Thread", 0.3));
+        f.items.push(it("Ultimatum Thread", 1.6));
+        assert_eq!(thread_prices(&f).first().map(|x| x.0.as_str()), Some("Betrayal Thread"));
+        let mut hides = BTreeMap::new();
+        hides.insert(THREADS_KEY.to_string(), 2.0);
+        let blocks = section_hide_blocks(&[], &hides, &BTreeMap::new(), &f, "\n");
+        // 2c line: Betrayal (0.3c) shows from 7, Ultimatum (1.6c) from 2, Abyss always.
+        assert!(blocks.contains("StackSize < 7\n    BaseType == \"Betrayal Thread\""), "{blocks}");
+        assert!(blocks.contains("StackSize < 2\n    BaseType == \"Ultimatum Thread\""), "{blocks}");
+        assert!(!blocks.contains("Abyss"), "{blocks}");
+        // "Always show stacks of 3+": Betrayal shows from 3 instead of 7.
+        let mut stacks = BTreeMap::new();
+        stacks.insert(THREADS_KEY.to_string(), 3);
+        let blocks = section_hide_blocks(&[], &hides, &stacks, &f, "\n");
+        assert!(blocks.contains("StackSize < 3\n    BaseType == \"Betrayal Thread\""), "{blocks}");
+        assert!(blocks.contains("Threads worth under"));
+    }
+
+    #[test]
     fn section_worth_line() {
         let mut f = file();
         let it = |name: &str, value: f64| PriceItem { name: name.into(), base: name.into(), cat: "Corpse".into(), value, variant: None,
@@ -358,7 +406,7 @@ mod tests {
         let mut segs = parse_filter("Show # $type->corpses $tier->t1\n\tClass == \"Corpses\"\n\tBaseType == \"Perfect Forest Tiger\" \"Unpriced Corpse\"\n\tSetFontSize 45\n\nShow # $type->corpses $tier->t3\n\tClass == \"Corpses\"\n\tBaseType == \"Blood Demon\"\n\tSetFontSize 40\n");
         let mut hides = BTreeMap::new();
         hides.insert("corpses".to_string(), 4.0);
-        let blocks = section_hide_blocks(&segs, &hides, &f, "\n");
+        let blocks = section_hide_blocks(&segs, &hides, &BTreeMap::new(), &f, "\n");
         assert!(blocks.contains("StackSize < 4") && blocks.contains("\"Blood Demon\"") && !blocks.contains("Tiger") && !blocks.contains("Unpriced"), "{blocks}");
         apply_with_extra_test(&mut segs, &blocks);
         let corpse = |name: &str, stack: u32| { let mut i = parse_item(&format!("Item Class: Corpses\nRarity: Normal\n{name}\n--------\nStack Size: {stack}/10\n")).unwrap(); i.item_class = "Corpses".into(); i };

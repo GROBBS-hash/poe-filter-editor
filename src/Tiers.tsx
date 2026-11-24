@@ -6,6 +6,7 @@ import { ProfileInfo } from "./types";
 import StyleEditor, { CurrentStyle, CustomStyle, LookButton, Preview, fromCurrent } from "./StyleEditor";
 import { ItemIcon, useIcons } from "./icons";
 import MapTiers, { MapSection } from "./MapTiers";
+import Threads from "./Threads";
 import StepConds, { Cond, Menu } from "./StepConds";
 import { JewelMod, JewelRule, jewelModList, readJewelRule, saveJewelRule } from "./jewelMods";
 
@@ -70,8 +71,8 @@ const SECTION_ICON: Record<string, { item?: string; url?: string; badge?: string
   "Magic items by size": { item: "Orb of Alteration" }, "Animate Weapon bases": { item: "Driftwood Club" },
   "Splinter stacks (high)": { item: "Splinter of Chayula" }, "Splinter stacks (low)": { item: "Splinter of Xoph" },
   "Sulphur": { item: "Sulphur Flask" }, "Corpses": { item: "Perfect Fiend" }, "Viscera": { item: "Ichor-Coated Viscera" },
-  "Heist targets": { item: "Rogue's Marker" }, "Unique contracts and blueprints": { item: "Blueprint: Bunker" }, "Charts": { item: "Kalguuran Delving Chart" },
-  "Enshrouded gear": { item: "Enshrouded Body Armour" }, "Exotic bases": { item: "Simplex Amulet" }, "Rare minion gear": { item: "Bone Ring" }, "Rare 4-links": { item: "Orb of Fusing" }, "Fractured bases": { item: "Fractured Fossil" }, "Veiled items": { item: "Veiled Chaos Orb" },
+  "Heist targets": { item: "Rogue's Marker" }, "Unique contracts and blueprints": { item: "Blueprint: Bunker" }, "Charts": { item: "Coral Reef Chart" },
+  "Enshrouded gear": { item: "Karui Enshrouding Crystal" }, "Exotic bases": { item: "Simplex Amulet" }, "Rare minion gear": { item: "Bone Ring" }, "Rare 4-links": { item: "Orb of Fusing" }, "Fractured bases": { item: "Fractured Fossil" }, "Veiled items": { item: "Veiled Chaos Orb" },
   "Jewels": { item: "Cobalt Jewel" }, "Abyss jewels": { item: "Searching Eye Jewel" }, "Cluster jewels": { item: "Large Cluster Jewel" },
   "Cluster jewels (cheap)": { item: "Small Cluster Jewel" }, "Special jewels": { item: "Timeless Jewel" }, "Jewels while levelling": { item: "Crimson Jewel" },
 };
@@ -93,6 +94,8 @@ function SectionIcon({ title, first }: { title: string; first?: string }) {
 }
 
 const MAPS_KEY = "__maps";
+/** Tiers → Threads (24 Nov): NeverSink has no Threads section, so the page is the app's own. */
+const THREADS_KEY = "__threads";
 
 type TierRow = { tier: string; name: string; visibility: string; style: CurrentStyle; bases: string[]; note: string; min_stack: number | null; min_item_tier?: number | null;
   conds?: Cond[]; changed?: string[] };
@@ -193,7 +196,7 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
 
   const load = () => invoke<Section[]>("get_tiers", { id: profile.id }).then((s) => {
     setSections(s);
-    setSel((cur) => (cur && (cur === extraKey || cur === MAPS_KEY || s.some((x) => x.type_path.join(">") === cur)) ? cur : s[0] ? s[0].type_path.join(">") : ""));
+    setSel((cur) => (cur && (cur === extraKey || cur === MAPS_KEY || cur === THREADS_KEY || s.some((x) => x.type_path.join(">") === cur)) ? cur : s[0] ? s[0].type_path.join(">") : ""));
     if (extra) invoke<Section | null>("get_rule_section", { id: profile.id, typePath: extra.type_path }).then(setExtra).catch(() => {});
   }).catch((e) => setMsg(String(e)));
   useEffect(() => { load(); }, [profile.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -213,6 +216,7 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
   // Typing "map" (or a section's name) offers that page too, not just items.
   const pageHits = needle.length >= 2
     ? [...("maps map tiers".includes(needle) || needle.startsWith("map") ? [{ key: MAPS_KEY, title: "Map tiers", group: "Maps" }] : []),
+      ...("threads".includes(needle) || needle.startsWith("thread") ? [{ key: THREADS_KEY, title: "Threads", group: "Maps" }] : []),
       ...sections.filter((s) => s.title.toLowerCase().includes(needle)).map((s) => ({ key: s.type_path.join(">"), title: s.title, group: s.group }))]
     : [];
 
@@ -281,6 +285,8 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
         <div className="tiers-group">
           <div className="tiers-gname">Maps</div>
           <button className={"tiers-sec " + (sel === MAPS_KEY ? "on" : "")} onClick={() => { setSel(MAPS_KEY); setEditing(null); }}><SectionIcon title="Map tiers" />Map tiers</button>
+          <button className={"tiers-sec " + (sel === THREADS_KEY ? "on" : "")} onClick={() => { setSel(THREADS_KEY); setEditing(null); }}>
+            <span className="tiers-ico"><ItemIcon base="Breach Thread" size={22} /></span>Threads</button>
         </div>
         {groups.map(([g, list]) => (
           <div key={g} className="tiers-group">
@@ -298,6 +304,15 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
         {sel === MAPS_KEY ? (
           <MapTiers profileId={profile.id} onChange={onChange} focus={mapFocus}
             onOpen={(s: MapSection) => { setExtra({ ...s, group: "Opened rule" }); setSel(s.type_path.join(">")); setEditing(null); }} />
+        ) : sel === THREADS_KEY ? (
+          <Threads profileId={profile.id} onChange={onChange} onOpenLook={(() => {
+            // Their look is NeverSink's Fragments tier 3 (the tier listing the Threads).
+            const frag = sections.find((x) => x.tiers.some((t) => t.bases.some((b) => / Thread$/.test(b))));
+            if (!frag) return undefined;
+            const tier = frag.tiers.find((t) => t.bases.some((b) => / Thread$/.test(b)))?.tier ?? null;
+            return () => { setSel(frag.type_path.join(">")); setEditing(null); setFocusTier(tier); window.setTimeout(() => setFocusTier(null), 3500);
+              window.setTimeout(() => { if (tier) document.querySelector(`[data-tier="${CSS.escape(tier)}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" }); }, 80); };
+          })()} />
         ) : !section ? <div className="empty">No tier lists found in this filter.</div> : (
           <div className="card">
             {isExtra && (
