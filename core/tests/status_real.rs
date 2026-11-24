@@ -317,3 +317,34 @@ fn out_of_date() {
         println!("  {} -> {} lines", old.lines().count(), new.lines().count());
     }
 }
+
+/// Dev check (24 Nov): what the cards' worth line does in his filters. CARDS="The Master Artisan|5;…"
+/// `cargo test -p filter-core --test status_real cards_line -- --ignored --nocapture`
+#[test]
+#[ignore]
+fn cards_line() {
+    use filter_core::{filter::parse_filter, prices::PriceFile, profiles::{render_profile, Store}};
+    let appdata = format!("{}/com.grobbs.poefiltereditor", std::env::var("APPDATA").unwrap());
+    let store = Store::load(std::path::Path::new(&format!("{appdata}/profiles.json")));
+    let file: PriceFile = serde_json::from_str(&std::fs::read_to_string(format!("{appdata}/prices_poe1.json")).unwrap()).unwrap();
+    let dir = std::path::PathBuf::from(format!("{}/Documents/My Games/Path of Exile", std::env::var("USERPROFILE").unwrap()));
+    let cards = std::env::var("CARDS").unwrap_or("The Master Artisan|1;The Master Artisan|3;The Master Artisan|4;The Master Artisan|5".into());
+    let (text, warn) = render_profile(&store, "blasting", &dir, Some(&file), None).unwrap();
+    println!("{} 'or more' blocks, warnings {warn:?}", text.matches("or more").count());
+    for b in text.split("Show # Price: Divination cards worth").skip(1) { println!("  {}", b.lines().take(4).map(|l| l.trim().chars().take(150).collect::<String>()).collect::<Vec<_>>().join(" | ")); }
+    let (new, old) = (parse_filter(&text), parse_filter(&std::fs::read_to_string(dir.join("Blasting.filter")).unwrap()));
+    for one in cards.split(';') {
+        let (n, k) = one.split_once('|').unwrap();
+        let i = filter_core::item::parse_item(&format!("Item Class: Divination Cards\nRarity: Normal\n{n}\n--------\nStack Size: {k}/5\n")).unwrap();
+        let v = |s| filter_core::evaluate::status(s, &i, Some(83), false).verdict;
+        println!("{one}: {} -> {} ({})", v(&old).visibility, v(&new).visibility, v(&new).decided_by);
+    }
+    // Single cards that change from hidden to shown.
+    let mut up = vec![];
+    for c in file.items.iter().filter(|i| i.cat == "DivinationCard") {
+        let i = filter_core::item::parse_item(&format!("Item Class: Divination Cards\nRarity: Normal\n{}\n--------\nStack Size: 1/5\n", c.name)).unwrap();
+        let v = |s| filter_core::evaluate::status(s, &i, Some(83), false).verdict.visibility;
+        if v(&old) != v(&new) { up.push(format!("{} {}c {}->{}", c.name, c.value, v(&old), v(&new))); }
+    }
+    println!("{} single cards change: {up:?}", up.len());
+}

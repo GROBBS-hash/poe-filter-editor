@@ -61,7 +61,7 @@ export default function WorthLine({ profileId, group, onChange }: { profileId: s
       {unit === "chaos" ? <CurrencyIcon id="chaos" /> : <span className="muted small">{unit}</span>}
       <span className="muted small">
         {on && count ? <>hides <b>{count[0]}</b> of {count[1]} {many} right now (poe.ninja)
-          {group === "DivinationCards" ? " · a stack counts at its total worth · cards under 50c that hardly anyone trades (under 5 sold) count as worthless" : ""}</>
+          {group === "DivinationCards" ? " · a stack counts at its total worth, and shows at the line or more even when NeverSink's strictness hides the card · cards under 50c that hardly anyone trades (under 5 sold) count as worthless" : ""}</>
           : `Uses poe.ninja prices; any ${one} it doesn't price stays as NeverSink has it.`}
       </span>
       {err && <span className="danger-text small">{err}</span>}

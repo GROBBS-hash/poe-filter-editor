@@ -142,6 +142,7 @@ fn parse_tag(header: &str) -> (Vec<String>, Option<String>) {
     (path, tier)
 }
 
+#[derive(Clone)]
 pub enum Segment {
     Raw(String),
     Block(Block),

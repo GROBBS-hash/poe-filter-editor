@@ -280,14 +280,24 @@ pub fn render_profile(store: &Store, id: &str, filter_dir: &Path, prices: Option
     let nl = if base.contains("\r\n") { "\r\n" } else { "\n" };
     let mut segs = parse_filter(&base);
     let theme_name = match theme { Some(t) => t, None => p.theme.as_deref() };
-    if let Some(theme) = theme_name.and_then(|n| find_theme(n, &store.themes, &builtin_themes()).cloned()) {
-        apply_theme(&mut segs, &theme);
+    let theme = theme_name.and_then(|n| find_theme(n, &store.themes, &builtin_themes()).cloned());
+    if let Some(theme) = &theme {
+        apply_theme(&mut segs, theme);
     }
+    let rules = store.resolved_rules(id);
     let extra = match (&p.prices, prices) {
-        (Some(settings), Some(file)) => price_blocks(settings, file, nl) + &crate::prices::section_hide_blocks(&segs, &settings.section_hide, &settings.section_stack, file, nl),
+        (Some(settings), Some(file)) => {
+            let mut x = price_blocks(settings, file, nl) + &crate::prices::section_hide_blocks(&segs, &settings.section_hide, &settings.section_stack, file, nl);
+            if settings.groups.iter().any(|g| g.group == crate::prices::Group::DivinationCards && g.hide_below.is_some()) {
+                let mut changed = segs.clone();
+                apply_with_extra(&mut changed, &rules, "", nl);
+                x += &crate::prices::card_show_blocks(settings, file, &changed, &rules, &|s| if let Some(t) = &theme { apply_theme(s, t) }, nl);
+            }
+            x
+        }
         _ => String::new(),
     };
-    let warnings = apply_with_extra(&mut segs, &store.resolved_rules(id), &extra, nl);
+    let warnings = apply_with_extra(&mut segs, &rules, &extra, nl);
     Ok((render_filter(&segs), warnings))
 }
 
