@@ -49,7 +49,7 @@ async function load() {
       document.getElementById("worth").textContent = "Now " + money(v[v.length - 1]) + " · " + (v[v.length - 1] >= v[0] ? "+" : "") + money(v[v.length - 1] - v[0]) + " over " + sn.length + " scans";
     } else document.getElementById("worth").textContent = sn.length ? "Now " + money(sn[0].total) : "Scan your stash on the Wealth page to see this.";
     rows("strats", (d.strategies || []), (x) => '<div class="row"><span>' + esc(x[0]) + ' <span class="muted">' + x[1] + " sessions</span></span><span class=\"num\">" + money(x[2] > 0 ? x[3] / x[2] : 0) + "/h</span></div>", "No earnings sessions yet.");
-    rows("maps", d.maps, (m) => '<div class="row"><span>' + esc(m.name) + ' <span class="muted">' + (m.level >= 68 ? "T" + (m.level - 67) : "lvl " + m.level) + " · " + clock(m.in_map) + (m.deaths ? " · " + m.deaths + " deaths" : "") + (m.best ? "<br>best: " + esc(m.best) : "") + '</span></span><span class="num">' + (m.loot ? money(m.loot) : m.made != null ? "≈ " + money(m.made) : "") + "</span></div>", "No maps yet.");
+    rows("maps", d.maps, (m) => '<div class="row"><span>' + esc(m.name) + ' <span class="muted">' + (m.level >= 68 ? "T" + (m.level - 67) : "lvl " + m.level) + " · " + clock(m.in_map) + (m.deaths ? " · " + m.deaths + (m.deaths === 1 ? " death" : " deaths") : "") + (m.best ? "<br>best: " + esc(m.best) : "") + '</span></span><span class="num">' + (m.loot ? money(m.loot) : m.made != null ? "≈ " + money(m.made) : "") + "</span></div>", "No maps yet.");
   } catch (e) { document.getElementById("when").textContent = "Can't reach the editor: is the PC on?"; }
 }
 load(); setInterval(load, 60000);

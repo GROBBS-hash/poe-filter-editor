@@ -754,6 +754,8 @@ export default function PlayTools() {
         </div>
       </div>}
 
+      <ChatCommands />
+
       <ExchangeCheck />
 
       <div className="card">
@@ -840,6 +842,23 @@ function ExchangeCheck() {
           : `${Math.round((1 - ratio) * 100)}% worse than poe.ninja`}
         <span className="muted small"> (poe.ninja: 1 {give.c} ≈ {+(a / b).toFixed(a / b < 10 ? 2 : 0)} {get.c})</span></p>
         : <p className="muted small">No poe.ninja price for one of those yet.</p>}
+    </div>
+  );
+}
+
+/** Chat commands (24 Nov): type them in game, or whisper them to yourself so nobody else sees them. */
+function ChatCommands() {
+  const [v, setV] = useState<[boolean, [string, string][]] | null>(null);
+  useEffect(() => { invoke<[boolean, [string, string][]]>("chat_get").then(setV).catch(() => {}); }, []);
+  if (!v) return null;
+  return (
+    <div className="card">
+      <h2>Chat commands</h2>
+      <p className="muted small">Type these in the game's chat. To keep them private, whisper them to yourself: <code>@YourCharacterName !next</code>.
+        Only your own messages count.</p>
+      <label className="check"><input type="checkbox" checked={v[0]} onChange={(e) => invoke<boolean>("chat_prefs", { on: e.target.checked }).then((on) => setV([on, v[1]]))} />
+        <span>Listen for chat commands</span></label>
+      <table className="pt-table"><tbody>{v[1].map(([c, what]) => <tr key={c}><td><code>{c}</code></td><td>{what}</td></tr>)}</tbody></table>
     </div>
   );
 }

@@ -35,6 +35,8 @@ struct PlayStore {
     alerts: Vec<Alert>,
     /// Hide the levelling, searches, cheat sheet and notes windows while you're in a map (back in town they return).
     keep_in_maps: bool,
+    /// Chat commands ("!next" in game chat) switched off.
+    chat_off: bool,
     /// Don't stop the map timer while the Escape menu or skill tree is open.
     pause_off: bool,
     /// How the game looks with no menu open (and with the Escape menu), from "Set up" on the Play tools page.
@@ -160,6 +162,11 @@ pub fn prime(app: &AppHandle, log: &std::path::Path) {
 
 /// Every new log line goes through here (from the log watcher in lib.rs).
 pub fn on_line(app: &AppHandle, line: &str) {
+    // "!next" and friends typed in game chat (or whispered to yourself).
+    if line.contains(": !") && !with_store(app, |s| s.chat_off) {
+        let me = with_live(|l| l.character.as_ref().map(|c| c.0.clone())).unwrap_or_default();
+        if let Some(cmd) = journey::chat_command(line, &me) { run_chat_command(app, &cmd); return; }
+    }
     let Some(mut ev) = journey::parse_line(line) else { return };
     // The log's clock is your PC's local time; lines arrive as they're written, so stamp them with the real time
     // (the timers compare against it).
@@ -1292,4 +1299,62 @@ pub fn price_names(app: AppHandle, names: Vec<String>) -> HashMap<String, f64> {
         let v = f.items.iter().filter(|i| i.name.eq_ignore_ascii_case(&n) && i.cat != "SkillGem").map(|i| i.value).reduce(f64::max)?;
         Some((n, v))
     }).collect()
+}
+
+// ---------- chat commands ----------
+
+/// What each chat command does (shown on the Play tools page too).
+pub const CHAT_COMMANDS: &[(&str, &str)] = &[
+    ("!next", "switch to your next filter and load it"),
+    ("!filter <name>", "switch to the filter whose name has that word (e.g. !filter strict)"),
+    ("!reload", "load your filter again"),
+    ("!done", "finish the map timer's current map"),
+    ("!start / !stop / !lap / !reset", "the stopwatch"),
+    ("!level / !tracker / !sheet / !notes", "show or hide that window"),
+];
+
+fn run_chat_command(app: &AppHandle, cmd: &str) {
+    let (word, rest) = cmd.split_once(' ').map(|(a, b)| (a, b.trim())).unwrap_or((cmd, ""));
+    let app2 = app.clone();
+    // The game is still closing the chat box: wait a moment before typing our own command.
+    let later = move |f: Box<dyn FnOnce(&AppHandle) + Send>| { thread::spawn(move || { thread::sleep(Duration::from_millis(400)); f(&app2); }); };
+    match word {
+        "next" => later(Box::new(|a| cycle_filter(a))),
+        "reload" => later(Box::new(|a| { let _ = reload_in_game(a, 1000); })),
+        "filter" if !rest.is_empty() => {
+            let want = rest.to_lowercase();
+            let state = app.state::<AppState>();
+            let picked = {
+                let mut store = state.store.lock().unwrap();
+                let game = store.active.as_ref().and_then(|id| store.profiles.get(id)).map(|p| p.game);
+                let hit = store.profiles.values().filter(|p| Some(p.game) == game || game.is_none())
+                    .find(|p| p.name.to_lowercase().contains(&want)).map(|p| p.id.clone());
+                if let Some(id) = &hit { store.active = Some(id.clone()); let _ = store.save(&state.store_path); }
+                hit
+            };
+            match picked {
+                Some(id) => { let _ = app.emit("active-changed", id); later(Box::new(|a| { let _ = reload_in_game(a, 1000); })); }
+                None => { let _ = app.emit("hotkey-warning", format!("No filter called “{rest}”")); }
+            }
+        }
+        "done" => { let _ = maps_done(app.clone()); }
+        "start" | "stop" | "pause" | "lap" | "reset" => {
+            let a = if word == "stop" { "pause" } else { word };
+            let _ = watch_action(app.clone(), a.into());
+        }
+        "level" | "tracker" | "sheet" | "notes" | "searches" => toggle(app, word),
+        _ => {}
+    }
+}
+
+#[tauri::command]
+pub fn chat_prefs(app: AppHandle, on: bool) -> bool {
+    with_store(&app, |s| s.chat_off = !on);
+    save_store(&app);
+    on
+}
+
+#[tauri::command]
+pub fn chat_get(app: AppHandle) -> (bool, Vec<(String, String)>) {
+    (!with_store(&app, |s| s.chat_off), CHAT_COMMANDS.iter().map(|(a, b)| (a.to_string(), b.to_string())).collect())
 }

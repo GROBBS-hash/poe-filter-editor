@@ -858,3 +858,42 @@ mod real_gems {
         assert!(left.is_empty() && s.len() < 80, "{s}");
     }
 }
+
+// ---------- chat commands (24 Nov) ----------
+
+/// A command you typed in game chat: "!next" in local / party / guild chat, or whispered to yourself
+/// ("@YourName !next", which nobody else sees). Only your own lines count (`me` = your character's name).
+/// Returns the command without the "!" ("next", "filter strict").
+pub fn chat_command(line: &str, me: &str) -> Option<String> {
+    if me.is_empty() { return None; }
+    let body = &line.trim_end()[line.find("] ")? + 2..];
+    let (who, msg) = if let Some(rest) = body.strip_prefix("@To ") {
+        rest.split_once(": ")?
+    } else {
+        if body.starts_with(": ") || body.starts_with("@From ") { return None; }
+        let (who, msg) = body.split_once(": ")?;
+        (who.trim_start_matches(['#', '%', '&', '$']), msg)
+    };
+    // "<GUILD> Name" -> "Name".
+    let who = match who.strip_prefix('<') { Some(r) => r.split_once("> ").map(|x| x.1).unwrap_or(r), None => who };
+    if who.trim() != me { return None; }
+    let cmd = msg.trim().strip_prefix('!')?.trim();
+    (!cmd.is_empty()).then(|| cmd.to_lowercase())
+}
+
+#[cfg(test)]
+mod chat_tests {
+    use super::chat_command;
+    const T: &str = "2026/11/24 19:48:01 1 a [INFO Client 9]";
+    #[test]
+    fn own_commands_only() {
+        assert_eq!(chat_command(&format!("{T} Bob_Witch: !next"), "Bob_Witch").as_deref(), Some("next"));
+        assert_eq!(chat_command(&format!("{T} %<GLD> Bob_Witch: !filter Strict"), "Bob_Witch").as_deref(), Some("filter strict"));
+        assert_eq!(chat_command(&format!("{T} @To Bob_Witch: !done"), "Bob_Witch").as_deref(), Some("done"));
+        assert_eq!(chat_command(&format!("{T} @From Bob_Witch: !done"), "Bob_Witch"), None);
+        assert_eq!(chat_command(&format!("{T} Someone: !next"), "Bob_Witch"), None);
+        assert_eq!(chat_command(&format!("{T} Bob_Witch: hello"), "Bob_Witch"), None);
+        assert_eq!(chat_command(&format!("{T} : Bob_Witch has joined the area."), "Bob_Witch"), None);
+        assert_eq!(chat_command(&format!("{T} Bob_Witch: !next"), ""), None);
+    }
+}
