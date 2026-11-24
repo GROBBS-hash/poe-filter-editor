@@ -718,7 +718,7 @@ export function TrackerSettings() {
     <>
       <div className="card">
         <h2>Out of the way of your stash</h2>
-        <label className="check"><input type="checkbox" checked={!v.over_panels} onChange={(e) => overPanels(!e.target.checked)} /><span>Hide the map tracker while the Atlas is open, or the stash or inventory under it</span></label>
+        <label className="check"><input type="checkbox" checked={!v.over_panels} onChange={(e) => overPanels(!e.target.checked)} /><span>Hide the map tracker while the Atlas or Ritual window is open, or the stash or inventory under it</span></label>
         <p className="muted small" style={{ margin: "4px 0 0" }}>It comes back when you close them. Its key brings it back sooner. Where it doesn't cover them, it stays.</p>
       </div>
       <div className="card">

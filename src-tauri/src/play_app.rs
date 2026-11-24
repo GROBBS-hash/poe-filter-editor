@@ -844,7 +844,7 @@ fn panel_back(app: &AppHandle) -> bool {
 /// screen), and reads how many monsters are left from the map info in the game's top right corner.
 fn start_panel_watch(app: AppHandle) {
     let mut closed = 0;
-    let (mut atlas, mut looks) = (false, 0u32);
+    let (mut atlas, mut ritual, mut looks) = (false, false, 0u32);
     let mut info_at = std::time::Instant::now();
     let mut settle = journey::LeftSettle::default();
     let mut area = String::new();
@@ -883,7 +883,14 @@ fn start_panel_watch(app: AppHandle) {
         else if looks % 4 == 0 || !with_store(&app, |s| s.maps.inside) {
             atlas = read(journey::atlas_title_box(rect)).is_ok_and(|l| journey::atlas_open(&l));
         }
-        let open = open || atlas;
+        // The Ritual window (only in maps): item boxes open towards either side of it, so the tracker goes wherever it is.
+        if with_store(&app, |s| s.over_panels || !s.maps.inside) { ritual = false; }
+        else if ritual || looks % 2 == 0 {
+            let [top, low] = journey::ritual_boxes(rect);
+            let now = read(top).is_ok_and(|l| journey::ritual_open(&l, &[], false));
+            ritual = now || (ritual && read(low).is_ok_and(|l| journey::ritual_open(&[], &l, true)));
+        }
+        let open = open || atlas || ritual;
         if open {
             closed = 0;
             if !hid && !PANEL_KEEP.load(Ordering::Relaxed) {

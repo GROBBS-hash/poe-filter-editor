@@ -358,6 +358,21 @@ pub fn atlas_open(lines: &[String]) -> bool {
     })
 }
 
+/// The Ritual window's name and tribute line, and (second box) its buttons at the bottom, for when an item's box covers
+/// the top. It sits in the middle, or in the middle of what the inventory leaves.
+pub fn ritual_boxes(rect: (i32, i32, i32, i32)) -> [(i32, i32, i32, i32); 2] {
+    let (x, y, w, h) = rect;
+    let a = (x + (w - panel_width(h)) / 2 - h * 30 / 100).max(x);
+    let b = (x + w / 2 + h * 30 / 100).min(x + w);
+    [(a, y + h * 100 / 1000, b - a, h * 125 / 1000), (a, y + h * 740 / 1000, b - a, h * 90 / 1000)]
+}
+/// Is the Ritual window open? `was`: it was a moment ago (then its buttons count too).
+pub fn ritual_open(top: &[String], low: &[String], was: bool) -> bool {
+    let plain = |l: &String| l.chars().filter(|c| c.is_ascii_alphabetic()).collect::<String>().to_uppercase();
+    top.iter().map(plain).any(|t| t == "FAVOURS" || t.contains("TRIBUTEREMAINING"))
+        || (was && low.iter().map(plain).any(|t| t.contains("ITEMFILTER") || t.contains("DEFERITEM")))
+}
+
 /// Is that panel open, from what its title reads as?
 pub fn panel_open(lines: &[String], left: bool) -> bool {
     lines.iter().any(|l| {
@@ -912,6 +927,11 @@ mod tests {
         assert!(atlas_open(&l("ATLAS")) && atlas_open(&l("Highlight Maps Type keywords here...")) && !atlas_open(&l("Atlas Thread")) && !atlas_open(&l("Highlight Items")));
         let (x, y, w, h) = atlas_title_box((0, 0, 3840, 2160));
         assert!(x < 1500 && x + w > 2350 && y < 85 && y + h > 205, "{x} {y} {w} {h}");
+        // His Ritual window: name at about (1250, 277), tribute at (1190, 429), "Apply Item Filter" at (1840, 1734).
+        let [t, b] = ritual_boxes((0, 0, 3840, 2160));
+        assert!(t.0 < 900 && t.0 + t.2 > 1650 && t.1 < 240 && t.1 + t.3 > 460 && b.1 < 1630 && b.1 + b.3 > 1760 && b.0 + b.2 > 2000, "{t:?} {b:?}");
+        assert!(ritual_open(&l("FAVOURS*"), &[], false) && ritual_open(&l("27,127 TRIBUTE REMAINING"), &[], false));
+        assert!(ritual_open(&l("The House"), &l("4 ITEM FILTER"), true) && !ritual_open(&[], &l("4 ITEM FILTER"), false) && !ritual_open(&l("Cost: 2,305x Tribute"), &[], true));
         assert!(panel_open(&l("Highlight Items Type keywords here..."), true));
         assert!(panel_open(&l("STASH"), true) && panel_open(&l("Inventory Cosmetics"), false));
         assert!(!panel_open(&l("City Square"), false) && !panel_open(&l("Inventory"), true));
