@@ -151,7 +151,7 @@ const SHOW_ITEMS = 24;
 /** Like FilterBlade: NeverSink's tier lists. Tick to show/hide a tier, click its label to restyle it,
  *  drag items between tiers to re-rank them. */
 export default function Tiers({ profile, onChange, focus }: { profile: ProfileInfo; onChange: () => void;
-  focus?: { type_path: string[]; tier: string | null } | null }) {
+  focus?: { type_path: string[]; tier: string | null; section?: string | null; kind?: string } | null }) {
   const [sections, setSections] = useState<Section[]>([]);
   const [sel, setSel] = useState<string>("");
   const [q, setQ] = useState("");
@@ -168,6 +168,19 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
   // Opened from the quick menu's "Modify rule": show that section and make the tier glow.
   useEffect(() => {
     if (!focus || sections.length === 0) return;
+    // A worth line: its section, with the line glowing.
+    if (focus.kind === "price") {
+      const to = focus.section === "Threads" ? THREADS_KEY : sections.find((s) => s.title === focus.section)?.type_path.join(">");
+      if (!to) return;
+      setSel(to); setQ(""); setEditing(null);
+      window.setTimeout(() => {
+        const line = document.querySelector<HTMLElement>(".worth-line, .thr-line");
+        line?.scrollIntoView({ behavior: "smooth", block: "center" });
+        line?.classList.add("glow");
+        window.setTimeout(() => line?.classList.remove("glow"), 3500);
+      }, 500);
+      return;
+    }
     // NeverSink's plain map tier rule: the Map tiers panel explains it far better than its raw rows.
     // Special maps (blighted, Valdo…) too: the panel's step 4 row glows.
     if (focus.type_path[0] === "maps") {

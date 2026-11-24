@@ -255,6 +255,20 @@ pub fn values_by_base(file: &PriceFile, group: Group) -> BTreeMap<String, f64> {
     m
 }
 
+/// How big a stack of each card it takes to reach the worth line (0 = none does: no price). A card hardly anyone trades
+/// never gets there alone (its price is a guess), but a stack of 2+ does at the price shown (24 Nov: 2 x The Pack Leader
+/// at 4c, "8c" in the price window, hidden by a 4c line).
+fn card_stacks(file: &PriceFile, limit: f64) -> BTreeMap<String, u32> {
+    let mut m: BTreeMap<String, u32> = BTreeMap::new();
+    for it in file.items.iter().filter(|i| Group::of(&i.cat) == Some(Group::DivinationCards)) {
+        let need = if it.value > 0.0 { (limit / it.value).ceil().clamp(1.0, 1000.0) as u32 } else { 0 };
+        let need = if need > 0 && thin_card(it) { need.max(2) } else { need };
+        let e = m.entry(it.name.clone()).or_insert(need);
+        if need > 0 && (*e == 0 || need < *e) { *e = need; }
+    }
+    m
+}
+
 fn base_list(names: &[&String]) -> String {
     names.iter().map(|n| format!("\"{}\"", n.replace('"', ""))).collect::<Vec<_>>().join(" ")
 }
@@ -300,8 +314,9 @@ pub fn price_blocks(settings: &PriceSettings, file: &PriceFile, nl: &str) -> Str
             // Divination cards drop in stacks (Ritual, Harvest...): a stack counts at its total worth, so 3 x 2c
             // cards stay when the line is 5c. Cards are grouped by how big a stack it takes to reach the line.
             let mut by_stack: BTreeMap<u32, Vec<&String>> = BTreeMap::new();
-            for (k, v) in values.iter().filter(|(_, v)| **v < limit) {
-                let need = if g.group == Group::DivinationCards && *v > 0.0 { (limit / v).ceil().min(1000.0) as u32 } else { 0 };
+            let stacks = if g.group == Group::DivinationCards { card_stacks(file, limit) } else { BTreeMap::new() };
+            for (k, _) in values.iter().filter(|(_, v)| **v < limit) {
+                let need = stacks.get(k).copied().unwrap_or(0);
                 by_stack.entry(need).or_default().push(k);
             }
             for (need, names) in by_stack {
@@ -326,6 +341,7 @@ pub fn card_show_blocks(settings: &PriceSettings, file: &PriceFile, segs: &[crat
     let Some(g) = settings.groups.iter().find(|g| g.group == Group::DivinationCards) else { return String::new() };
     let Some(limit) = g.hide_below.filter(|l| *l > 0.0) else { return String::new() };
     let values = values_by_base(file, Group::DivinationCards);
+    let stacks = card_stacks(file, limit);
     // Worth this much the price tiers already show it.
     let tiered = (settings.enabled && g.enabled).then(|| g.tiers.iter().map(|t| t.min).fold(f64::INFINITY, f64::min)).unwrap_or(f64::INFINITY);
     let mut seen = std::collections::BTreeSet::new();
@@ -345,10 +361,10 @@ pub fn card_show_blocks(settings: &PriceSettings, file: &PriceFile, segs: &[crat
         if mine == Some(false) { continue; }
         let mut by_stack: BTreeMap<u32, Vec<String>> = BTreeMap::new();
         for n in names {
-            let Some(v) = values.get(&n).copied().filter(|v| *v > 0.0 && *v < tiered) else { continue };
-            let need = (limit / v).ceil().max(1.0);
+            if values.get(&n).is_some_and(|v| *v >= tiered) { continue; }
+            let Some(need) = stacks.get(&n).copied() else { continue };
             // Past a full set there's no such stack.
-            if need <= 100.0 { by_stack.entry(need as u32).or_default().push(n); }
+            if (1..=100).contains(&need) { by_stack.entry(need).or_default().push(n); }
         }
         if by_stack.is_empty() { continue; }
         let mut look = b.clone();
@@ -464,8 +480,10 @@ mod tests {
             PriceItem { volume: Some(6.7), ..it_card("The Master Artisan", 1.18) }, PriceItem { volume: Some(100.0), ..it_card("Rain of Chaos", 0.02) },
             PriceItem { volume: Some(900.0), ..it_card("Worth It", 4.5) }, PriceItem { volume: Some(9000.0), ..it_card("Shown Already", 4.5) },
             PriceItem { volume: Some(1.2), ..it_card("Hardly Traded", 1.2) },
+            // His, 24 Nov: 4c, under 1 sold.
+            PriceItem { volume: Some(0.67), ..it_card("The Pack Leader", 4.0) }, PriceItem { volume: Some(0.67), ..it_card("Low Guess", 0.1) },
         ], ..file() };
-        let segs = parse_filter("Show # $type->divination $tier->t3\n\tClass == \"Divination Cards\"\n\tBaseType == \"Shown Already\"\n\tSetFontSize 45\n\nHide # %HS3 $type->divination $tier->t4c\n\tClass == \"Divination Cards\"\n\tBaseType == \"The Master Artisan\" \"Rain of Chaos\" \"Worth It\" \"Hardly Traded\"\n\tSetFontSize 40\n\tSetTextColor 0 0 0 255\n");
+        let segs = parse_filter("Show # $type->divination $tier->t3\n\tClass == \"Divination Cards\"\n\tBaseType == \"Shown Already\"\n\tSetFontSize 45\n\nHide # %HS3 $type->divination $tier->t4c\n\tClass == \"Divination Cards\"\n\tBaseType == \"The Master Artisan\" \"Rain of Chaos\" \"Worth It\" \"Hardly Traded\" \"The Pack Leader\" \"Low Guess\"\n\tSetFontSize 40\n\tSetTextColor 0 0 0 255\n");
         let mut s = default_settings("chaos");
         for g in &mut s.groups { if g.group == Group::DivinationCards { g.hide_below = Some(4.0); } }
         let blocks = card_show_blocks(&s, &f, &segs, &[], &|_| {}, "\n");
@@ -478,7 +496,10 @@ mod tests {
         };
         // 5 x 1.18c and 4 x 1.18c are over 4c, 3 x isn't; a card worth 4.5c shows by itself; 5 x 0.02c doesn't.
         assert!(shows("The Master Artisan", 5) && shows("The Master Artisan", 4) && !shows("The Master Artisan", 3), "{blocks}");
-        assert!(shows("Worth It", 1) && shows("Shown Already", 1) && !shows("Rain of Chaos", 5) && !shows("Hardly Traded", 5), "{blocks}");
+        assert!(shows("Worth It", 1) && shows("Shown Already", 1) && !shows("Rain of Chaos", 5), "{blocks}");
+        // Hardly traded: a single one's price is a guess, a stack worth the line shows.
+        assert!(!shows("Hardly Traded", 1) && !shows("Hardly Traded", 3) && shows("Hardly Traded", 4), "{blocks}");
+        assert!(!shows("The Pack Leader", 1) && shows("The Pack Leader", 2) && !shows("Low Guess", 5), "{lists}");
         assert!(blocks.contains("SetFontSize 40") && !blocks.contains("Shown Already"), "its own step's look: {blocks}");
         // A step he unticked himself stays hidden.
         let off = crate::rules::Rule::Tier { type_path: vec!["divination".into()], tier: "t4c".into(), show: Some(false), actions: None, min_stack: None, min_item_tier: None, conds: None, off: false, look: None };

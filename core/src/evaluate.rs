@@ -82,7 +82,9 @@ fn source_of(b: &Block) -> Source {
             else if label.starts_with("Price") { "price" }
             else if ["Hide: ", "Highlight: ", "Louder: ", "Quieter: ", "Style: "].iter().any(|p| label.starts_with(p)) { "edit" }
             else { "none" };
-        return Source { kind: kind.into(), only_base: only_base(b), label, ..Default::default() };
+        // A worth line ("Price: Divination cards worth under 4c") says which section's, so its page can be opened.
+        let section = label.strip_prefix("Price: ").and_then(|l| l.split_once(" worth ")).map(|(s, _)| s.to_string());
+        return Source { kind: kind.into(), only_base: only_base(b), section, label, ..Default::default() };
     }
     Source {
         kind: "neversink".into(),

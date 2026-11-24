@@ -2469,7 +2469,13 @@ fn reset_item(app: AppHandle, item: Item, from_screen: bool, apply: bool) -> Res
                 break;
             }
             _ => {
-                if src.kind == "price" { note = Some("Price tiers decide this one: change it on the Price tiers page.".into()); }
+                if src.kind == "price" {
+                    // A worth line isn't a price tier (24 Nov: he was sent to Price tiers and switched those off).
+                    note = Some(match &src.section {
+                        Some(s) => format!("The worth line on Tiers › {s} decides this one (Modify this rule opens it)."),
+                        None => "Price tiers decide this one: change it on the Price tiers page.".into(),
+                    });
+                }
                 break;
             }
         }

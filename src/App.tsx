@@ -270,7 +270,7 @@ export default function App() {
     const o = listen<string>("open-tab", (e) => setTab(e.payload as Tab));
     const g = listen<Source>("goto-rule", (e) => {
       const src = e.payload;
-      setTab(src.kind === "neversink" ? "tiers" : src.kind === "edit" ? "edits" : src.kind === "preset" ? "presets" : src.kind === "price" ? "prices" : "find");
+      setTab(src.kind === "neversink" ? "tiers" : src.kind === "edit" ? "edits" : src.kind === "preset" ? "presets" : src.kind === "price" ? (src.section ? "tiers" : "prices") : "find");
       setFocus({ ...src });
       refresh();
     });
@@ -402,7 +402,7 @@ export default function App() {
       {tab === "pricecheck" && <PriceCheck keys={keys} />}
       {tab === "play" && <PlayTools />}
       {tab === "craft" && <Craft />}
-      {tab === "tiers" && <Tiers profile={active} onChange={refresh} focus={focus?.kind === "neversink" ? focus : null} />}
+      {tab === "tiers" && <Tiers profile={active} onChange={refresh} focus={focus?.kind === "neversink" || (focus?.kind === "price" && focus.section) ? focus : null} />}
       {tab === "presets" && <Find key="presets" view="presets" onChange={refresh} />}
       {tab === "batch" && <Batch on={ov.batch_on} onChange={refresh} />}
       {tab === "profiles" && <Profiles ov={ov} active={active} onChange={refresh} onNew={() => setAdding(true)} />}
