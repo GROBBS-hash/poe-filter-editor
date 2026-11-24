@@ -602,8 +602,53 @@ function LootList({ loot, prefs, divine }: { loot: LootLine[]; prefs: LootPrefs 
   );
 }
 
-/** The loot block in the tracker window: the total, the colour bar, and the best drops (look C). */
+/** Kept on this PC between starts (window layout, not a setting). */
+const kept = (key: string, or: string) => { try { return localStorage.getItem(key) ?? or; } catch { return or; } };
+const keep = (key: string, val: string | null) => { try { if (val == null) localStorage.removeItem(key); else localStorage.setItem(key, val); } catch { /* not kept */ } };
+
+/** One list of drops: total, colour bar, and the best rows with their icons. The grip under it drags to show more or fewer
+ *  rows (dragged: the cheap ones too, in order of worth); double-click puts it back to the best four. */
+function LootBlock({ id, label, loot, p, divine }: { id: string; label: string; loot: LootLine[]; p: LootPrefs; divine: number | null }) {
+  const [rows, setRows] = useState<number | null>(() => { const n = parseInt(kept(`trk.rows.${id}`, ""), 10); return Number.isFinite(n) ? n : null; });
+  const drag = useRef<{ y: number; n: number } | null>(null);
+  const total = lootTotal(loot);
+  const shown = loot.filter((l) => !p.hide.includes(l.cat)).sort((a, b) => b.value - a.value);
+  const best = rows == null ? shown.filter((l) => l.value >= p.min_chaos).slice(0, 4) : shown.slice(0, rows);
+  const rest = shown.length - best.length;
+  const kinds = LOOT_KINDS.map(([k, name, col]) => ({ k, name, col, v: loot.filter((l) => l.cat === k).reduce((a, b) => a + b.value, 0) }))
+    .filter((x) => x.v > 0 && !p.hide.includes(x.k)).sort((a, b) => b.v - a.v);
+  const move = (e: React.PointerEvent) => {
+    if (!drag.current) return;
+    const n = Math.max(0, Math.min(shown.length, drag.current.n + Math.round((e.screenY - drag.current.y) / 26)));
+    if (n !== (rows ?? best.length)) setRows(n);
+  };
+  const drop = () => { if (drag.current) { drag.current = null; if (rows != null) keep(`trk.rows.${id}`, String(rows)); } };
+  return (
+    <div className="loot-block">
+      <div className="pw-row between"><span className="loot-label" title={label}>{label}</span>
+        <span className="loot-total">{Math.round(total).toLocaleString()}c{divine ? <span className="pw-small"> ≈ {(total / divine).toFixed(1)} div</span> : null}</span></div>
+      <LootBar loot={loot.filter((l) => !p.hide.includes(l.cat))} />
+      <div className="loot-legend">{kinds.map((x) => <span key={x.k}><span className="loot-dot" style={{ background: x.col }} />{x.name} {Math.round(x.v)}c</span>)}</div>
+      <div className="loot-best">{best.map((l, i) => (
+        <div key={l.name + l.cat} className={`loot-row ${i === 0 && (l.tier === 1 || (divine != null && l.value >= divine * 0.5)) ? "hero" : ""}`}>
+          {l.icon ? <img src={l.icon} alt="" /> : <span className="loot-ico"><span className="loot-dot" style={{ background: kindOf(l.cat)[2] }} /></span>}
+          <span className="loot-name"><TierTag t={l.tier} />{l.stack > 1 && <span className="pw-small">{l.stack.toLocaleString()}× </span>}{l.name}</span>
+          <span className="loot-v" title={l.high ? "Unidentified: counted as the cheapest unique on this base" : undefined}>{lootWorth(l, divine)}</span>
+        </div>
+      ))}</div>
+      <div className="loot-grip" title="Drag down for more, up for less. Double-click: back to the best four"
+        onPointerDown={(e) => { drag.current = { y: e.screenY, n: best.length }; e.currentTarget.setPointerCapture(e.pointerId); e.preventDefault(); }}
+        onPointerMove={move} onPointerUp={drop} onPointerCancel={drop}
+        onDoubleClick={() => { setRows(null); keep(`trk.rows.${id}`, null); }}>
+        <span className="loot-grip-bar" /><span className="pw-small">{rest > 0 ? `+ ${rest} more` : "all shown"}</span><span className="loot-grip-bar" />
+      </div>
+    </div>
+  );
+}
+
+/** The loot block in the tracker window: this map, the whole session, or both (look C). */
 function TrackerLoot({ v }: { v: TrackerView }) {
+  const [view, setView] = useState(() => kept("trk.lootview", "map"));
   const p = v.loot_prefs;
   if (!p.on) return null;
   const cur = v.current?.loot ?? [];
@@ -615,32 +660,18 @@ function TrackerLoot({ v }: { v: TrackerView }) {
   const says = needsLogin(v.loot_note) ? "" : v.loot_reading ? "Reading what it dropped…" : v.loot_note ? v.loot_note
     : v.current?.loot_missed ? "Some of this map's loot couldn't be counted." : v.inside && cur.length === 0 ? "This map's loot shows when you leave it."
     : loot.length === 0 ? "Loot per map: run a map and it shows here." : "";
-  const total = lootTotal(loot);
-  const shown = loot.filter((l) => !p.hide.includes(l.cat));
-  const best = shown.filter((l) => l.value >= p.min_chaos).slice(0, 4);
-  const rest = loot.length - best.length;
-  const kinds = LOOT_KINDS.map(([k, name, col]) => ({ k, name, col, v: loot.filter((l) => l.cat === k).reduce((a, b) => a + b.value, 0) }))
-    .filter((x) => x.v > 0 && !p.hide.includes(x.k)).sort((a, b) => b.v - a.v);
   const s = v.session;
+  const hasSession = !!s && s.loot.length > 0;
+  const pick = hasSession ? view : "map";
   return (
     <div className="trk-sec">
       {needsLogin(v.loot_note) && <div className="pw-small"><ErrNote msg={v.loot_note} onRetry={() => {}} /><div>Loot isn't being counted until then.</div></div>}
+      {hasSession && <div className="loot-tabs">{[["map", "Map"], ["session", "Session"], ["both", "Both"]].map(([k, n]) =>
+        <button key={k} className={pick === k ? "on" : ""} onClick={() => { setView(k); keep("trk.lootview", k); }}>{n}</button>)}</div>}
       {/* Always one line, so nothing jumps when it's empty. */}
       <div className="pw-small trk-says" title={says}>{says || "\u00a0"}</div>
-      {loot.length > 0 && <>
-        <div className="pw-row between"><span className="loot-label">{label}</span>
-          <span className="loot-total">{Math.round(total).toLocaleString()}c{v.divine ? <span className="pw-small"> ≈ {(total / v.divine).toFixed(1)} div</span> : null}</span></div>
-        <LootBar loot={loot.filter((l) => !p.hide.includes(l.cat))} />
-        <div className="loot-legend">{kinds.map((x) => <span key={x.k}><span className="loot-dot" style={{ background: x.col }} />{x.name} {Math.round(x.v)}c</span>)}</div>
-        <div className="loot-best">{best.map((l, i) => (
-          <div key={l.name + l.cat} className={`loot-row ${i === 0 && (l.tier === 1 || (v.divine != null && l.value >= v.divine * 0.5)) ? "hero" : ""}`}>
-            {l.icon ? <img src={l.icon} alt="" /> : <span className="loot-ico"><span className="loot-dot" style={{ background: kindOf(l.cat)[2] }} /></span>}
-            <span className="loot-name"><TierTag t={l.tier} />{l.stack > 1 && <span className="pw-small">{l.stack}× </span>}{l.name}</span>
-            <span className="loot-v" title={l.high ? "Unidentified: counted as the cheapest unique on this base" : undefined}>{lootWorth(l, v.divine)}</span>
-          </div>
-        ))}</div>
-        {rest > 0 && <div className="pw-small">+ {rest} smaller drop{rest > 1 ? "s" : ""}</div>}
-      </>}
+      {pick !== "session" && loot.length > 0 && <LootBlock id="map" label={label} loot={loot} p={p} divine={v.divine} />}
+      {pick !== "map" && s && <LootBlock id="session" label={`Session · ${s.loot_maps} map${s.loot_maps > 1 ? "s" : ""}`} loot={s.loot} p={p} divine={v.divine} />}
       {s && s.loot_maps > 0 && <div className="pw-small" style={{ marginTop: 5 }}>This session: <b style={{ color: "var(--text)" }}>{s.loot_maps} map{s.loot_maps > 1 ? "s" : ""} · {Math.round(s.loot_value).toLocaleString()}c</b>
         {v.divine ? ` (≈ ${(s.loot_value / v.divine).toFixed(1)} div)` : ""} · {Math.round(s.loot_value / s.loot_maps)}c a map
         {lootPerHour(s, v.divine) && <> · <b style={{ color: "var(--gold)" }}>{lootPerHour(s, v.divine)}</b></>}</div>}

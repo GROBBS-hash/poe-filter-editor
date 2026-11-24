@@ -56,7 +56,7 @@ export const playView = {
     char_name: "NerfDis", char_level: 91,
     watch_ms: 83_400, watch_running: false, laps: [41_200, 83_400], now,
     session: { start: now - 3600, played: 3600, maps: 4, map_time: 1030, per_hour: 9, deaths: 3, levels: 0, made: null, best: null,
-      loot: parkLoot, loot_value: 2140, loot_maps: 5, loot_secs: 3000 },
+      loot: parkLoot.map((l, i) => ({ ...l, stack: l.stack * (i % 3 + 2), value: l.value * (i % 3 + 2) })), loot_value: 2140, loot_maps: 5, loot_secs: 3000 },
     pause: { on: true, ready: true, esc_ready: false, note: "" },
     loot_prefs: { on: true, hide: ["gear"], min_chaos: 2 },
     loot_note: "",

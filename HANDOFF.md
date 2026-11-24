@@ -48,6 +48,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **Map tracker: the session's loot, and a drag handle (24 Nov, not released yet; his idea).** Map / Session / Both buttons over the loot (`TrackerLoot`, `LootBlock` in Play.tsx; kept in localStorage `trk.lootview`). The grip under each list drags for more or fewer rows (`trk.rows.map`/`.session`; dragged, the ones under the chaos minimum show too), double-click puts back the best four.
 - **Map tracker's loot block stays put (24 Nov, not released yet; he saw it lose its loot when dying or leaving).** It went blank while the bags were being read, when a map's loot was missed, and after an app restart mid-map (his 21:33 City Square; the bags are kept over a restart now, see below). Now the last counted map stays up with one line saying what's going on (`loot_reading`, missed, shows when you leave), and the window only gets shorter after staying shorter 1.5 s (`useFitHeight`).
 - **Escape pause: coming back to an open menu (24 Nov, not released yet; on 0.2.70 "alt-tab pauses, Escape doesn't").** Caught live: the menu is read perfectly and his clock did stop, but (from the code, not seen live) Escape, alt-tab, back with the menu still open set it running and it never stopped again (the check only acted on a change). Now it looks straight away on coming back, keeps the clock stopped while the menu is up, and looks every 1-2 s instead of 2-4. (Dev check: `screen.rs` dev check `pause_watch`, PAUSE_LOG=file: what the check sees each second, pictures of frozen screens.)
 - **Blood-filled Vessels priced by their unique monsters (24 Nov, not released yet; his question).** The trade site can only search how many uniques a vessel holds, not which; its listings name them. `trade::vessel` reads the copied text, `vessel_rows` adds the two counts (uniques ticked), `trade_search` looks through the 30 cheapest and `same_monsters` puts ones with all of yours first; 3+ of them decide the price. Monsters under every row. `previewCheck(check, result)` takes a result now.
@@ -1106,6 +1107,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
+- [ ] (24 Nov, unreleased) Map tracker: Map / Session / Both; drag the grip under a list for more or fewer rows (the window follows), double-click resets it; all still so after a restart.
 - [ ] (24 Nov, unreleased) In a map press Escape: "paused" within 2 s; alt-tab out and back with the menu still open: still paused; close it: the clock goes on within 2 s.
 - [ ] (24 Nov, unreleased) Map tracker: die, leave, open the next map: the loot block keeps the last map and says "Reading what it dropped…", then this map's loot; the window doesn't jump.
 - [ ] (24 Nov, unreleased) Ctrl+D a Blood-filled Vessel with uniques: "Unique monsters" row ticked, the monsters under each listing, green ticks on ones with yours.
