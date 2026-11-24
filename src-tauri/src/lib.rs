@@ -805,7 +805,8 @@ fn show_price(app: &AppHandle, payload: PriceCheck, text: &str, compare: bool) {
         }
     }
     if let Some(it) = payload.setup.as_ref().map(|s| s.item.clone()) {
-        if filter_core::maps::is_map(&it.item_class) && !payload.from_ground {
+        let invitation = filter_core::maps::runs_like_map(&it.item_class, &it.base_type);
+        if (filter_core::maps::is_map(&it.item_class) || invitation) && !payload.from_ground {
             // One list of mods you can't run: the Maps page's ticks (which start from the map check list).
             let (mods, _) = map_mods(&state);
             let s = state.store.lock().unwrap().settings.clone();
@@ -815,6 +816,11 @@ fn show_price(app: &AppHandle, payload: PriceCheck, text: &str, compare: bool) {
                 let bad = s.map_tool.bad.clone().unwrap_or_else(|| filter_core::mapregex::default_bad(&mods, s.map_avoid.as_deref()));
                 filter_core::maps::map_info_bad(&text, &mods, &bad)
             });
+            // Kirac's invitations can't be sold: the trade site doesn't list them.
+            if invitation {
+                let sells = trade_api::item_types(&state.data_dir, poe2).map(|t| t.sells(&it.base_type)).unwrap_or(true);
+                if let Some(m) = payload.map.as_mut() { m.no_sale = !sells; }
+            }
             // The map tracker shows these mods on the next map you open.
             if let Some(m) = payload.map.as_ref() {
                 play_app::note_map_check(it.name.as_deref().unwrap_or(&it.base_type), m.mods.iter().map(|x| x.text.clone()).collect());

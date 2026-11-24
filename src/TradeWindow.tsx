@@ -46,7 +46,7 @@ type Setup = { buyout?: boolean | null; item: Item; filters: StatFilter[]; unkno
   base_item?: { why: string[]; ids: string[]; ilvl_min: number | null; misc: string[] } | null;
   /** Corrupted only (true), not corrupted only (false), or either (null): set for uniques. */
   corrupted?: boolean | null };
-type MapInfo = { mods: { text: string; warn: string | null }[]; unidentified: boolean; tier: number | null; stats: string[] };
+type MapInfo = { mods: { text: string; warn: string | null }[]; unidentified: boolean; tier: number | null; stats: string[]; no_sale?: boolean };
 type Check = { setup: Setup | null; ninja: [number, string] | null; league: string; from_ground: boolean; error: string | null; bulk?: string | null; map?: MapInfo | null; divine?: number | null; compare?: Comparison[]; instant_all?: boolean;
   /** poe.ninja's last 7 days: % change each day from a week ago (oldest first), and the total. */
   trend?: { points: number[]; change: number } | null; sold?: number | null };
@@ -455,7 +455,7 @@ function MapCheck({ map, rarity, corrupted }: { map: MapInfo; rarity: string; co
   const bad = map.mods.filter((m) => m.warn);
   const [copied, setCopied] = useState("");
   // The one-word answer first (22 Nov): run it or not, and what to do if not.
-  const fix = corrupted ? "It's corrupted: put it aside (or sell it)."
+  const fix = map.no_sale ? "" : corrupted ? "It's corrupted: put it aside (or sell it)."
     : rarity === "Rare" ? "Reroll it with a Chaos Orb (or Scour + Alchemy)."
     : rarity === "Magic" ? "Reroll it with an Orb of Alteration."
     : "";
@@ -475,11 +475,11 @@ function MapCheck({ map, rarity, corrupted }: { map: MapInfo; rarity: string; co
           <li key={i} className={m.warn ? "bad" : ""}>{m.text}{m.warn && <span className="tw-map-tag">{m.warn}</span>}</li>
         ))}
       </ul>
-      <div className="row">
+      {!map.no_sale && <div className="row">
         <button className="small" onClick={() => invoke<string>("map_regex_copy").then((r) => setCopied(r ? "Copied: paste it in your map stash search" : "Nothing to copy yet: set it up on the Map mods page")).catch((e) => setCopied(String(e)))}>
           Copy map regex</button>
         {copied && <span className="muted small">{copied}</span>}
-      </div>
+      </div>}
       <div className="muted small">Change which mods you can't run on the Map mods page: this warning and the stash search use the same list.</div>
     </div>
   );
@@ -679,7 +679,7 @@ export default function TradeWindow() {
         const p = c.divine && nin >= c.divine * 0.5 ? "divine" : "chaos";
         setPay(p); runBulk(c.bulk, p);
       }
-      else if (c.setup && needsTrade(c)) run(c.setup);
+      else if (c.setup && needsTrade(c) && !c.map?.no_sale) run(c.setup);
     });
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
     const onBlur = () => close();
@@ -716,6 +716,23 @@ export default function TradeWindow() {
 
   if (!check) return null;
   if (!setup) return <div className="qm tw" ref={box}><div className="qm-fail">{err || "Nothing to price."}</div>{savedBlock}</div>;
+
+  // Kirac's invitations: run, not sold. Just the map check.
+  if (check.map?.no_sale) {
+    const x = setup.item;
+    return (
+      <div className="qm tw" ref={box}>
+        <div className="qm-head with-icon">
+          <ItemIcon name={null} base={x.base_type || null} size={36} />
+          <div className="qm-head-text">
+            <div className="qm-name" style={{ color: RARITY_COLOUR[x.rarity] ?? "#ddd" }}>{itemTitle(x)}</div>
+            <div className="qm-sub">{x.name ? x.base_type : x.item_class}{x.item_level ? ` · ilvl ${x.item_level}` : ""} · can't be sold</div>
+          </div>
+        </div>
+        <MapCheck map={check.map} rarity={x.rarity} corrupted={x.corrupted} />
+      </div>
+    );
+  }
 
   const it = setup.item;
   // Awakened-style side panel: a fragment's set or parts, lifeforce types, what a boss drops (shown when there are any).

@@ -74,6 +74,14 @@ pub struct MapInfo {
     pub tier: Option<u32>,
     /// Item quantity / pack size etc. ("Item Quantity: +80%").
     pub stats: Vec<String>,
+    /// You can run it but not sell it (Kirac's Maven invitations): no price search.
+    #[serde(default)]
+    pub no_sale: bool,
+}
+
+/// Invitations and other map-device items with map mods (Maven's, Screaming, Incandescent…): you run them like a map.
+pub fn runs_like_map(item_class: &str, base: &str) -> bool {
+    item_class == "Misc Map Items" && base.contains("Invitation")
 }
 
 /// Is this item a map (PoE 1 maps, PoE 2 waystones)?
@@ -107,7 +115,10 @@ pub fn map_info(text: &str, avoid: Option<&[String]>) -> MapInfo {
     let text = text.replace('\r', "");
     let sections: Vec<Vec<&str>> = text.split("--------")
         .map(|s| s.lines().map(str::trim).filter(|l| !l.is_empty()).collect()).collect();
-    let mut info = MapInfo { mods: vec![], unidentified: false, tier: None, stats: vec![] };
+    let mut info = MapInfo { mods: vec![], unidentified: false, tier: None, stats: vec![], no_sale: false };
+    // Invitations have flavour text after their mods; in the advanced copy every mod section has a { … } heading.
+    let invitation = sections.first().is_some_and(|s| s.contains(&"Item Class: Misc Map Items"));
+    let headed = text.contains("\n{ ");
     let ilvl_at = sections.iter().position(|s| s.iter().any(|l| l.starts_with("Item Level:")));
     for (i, sec) in sections.iter().enumerate() {
         for l in sec {
@@ -122,6 +133,7 @@ pub fn map_info(text: &str, avoid: Option<&[String]>) -> MapInfo {
         if *sec == ["Unidentified"] || sec.contains(&"Unidentified") { info.unidentified = true; }
         let Some(start) = ilvl_at else { continue };
         if i <= start { continue; }
+        if invitation && headed && !sec.iter().any(|l| l.starts_with('{')) { continue; }
         // Not mods: the "how to use" text, flavour, corrupted/unidentified markers.
         if sec.iter().any(|l| l.starts_with("Travel to") || l.starts_with("Place into") || l.starts_with("Right click")
             || l.starts_with("Note:") || *l == "Corrupted" || *l == "Unidentified" || *l == "Mirrored" || l.starts_with("Can be used")) {
@@ -129,8 +141,8 @@ pub fn map_info(text: &str, avoid: Option<&[String]>) -> MapInfo {
         }
         for l in sec {
             if l.starts_with('{') || l.starts_with('(') || l.starts_with("Monster Level:") || l.starts_with("Area Level:") { continue; }
-            let t = tidy(l);
-            if t.is_empty() { continue; }
+            let t = tidy(&l.replace(" — Unscalable Value", ""));
+            if t.is_empty() || t.starts_with("Modifiers to Item Quantity") { continue; }
             let warn = danger_of(&t).filter(|n| avoid.map(|a| a.iter().any(|x| x == n)).unwrap_or(true)).map(String::from);
             info.mods.push(MapMod { text: t, warn });
         }
@@ -232,6 +244,20 @@ pub fn map_info_bad(text: &str, mods: &[crate::mapregex::MapModEntry], bad: &[i6
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn invitations_are_checked_like_maps() {
+        // 24 Nov, Kirac's "Fate Offer": priced as an item ("None listed"), never checked against the map mods.
+        let t = "Item Class: Misc Map Items\r\nRarity: Rare\r\nFate Offer\r\nMaven's Invitation: The Forgotten\r\n--------\r\nAtlas Drops: +56% (augmented)\r\nItem Rarity: +34% (augmented)\r\nThe Maven must Witness: \r\nTwisted Distant Memory\r\n--------\r\nItem Level: 83\r\n--------\r\n{ Implicit Modifier }\r\nModifiers to Item Quantity will affect the number of encounter rewards dropped — Unscalable Value\r\n--------\r\n{ Prefix Modifier \"Impervious\" (Tier: 1) }\r\nMonsters have a 50% chance to avoid Poison, Impale, and Bleeding\r\n{ Suffix Modifier \"of Impotence\" (Tier: 1) }\r\nPlayers have 25% less Area of Effect\r\n{ Suffix Modifier \"of Toughness\" (Tier: 1) }\r\nMonsters take 36(36-40)% reduced Extra Damage from Critical Strikes\r\n--------\r\nFor those who must not endure it,\r\nthere may be found a perverse joy \r\n--------\r\nOpen portals to The Maven's Crucible by using this item in a personal Map Device.\r\n";
+        assert!(runs_like_map("Misc Map Items", "Maven's Invitation: The Forgotten") && !runs_like_map("Misc Map Items", "Chronicle of Atzoatl"));
+        let i = map_info(t, None);
+        let mods: Vec<&str> = i.mods.iter().map(|m| m.text.as_str()).collect();
+        assert_eq!(mods, ["Monsters have a 50% chance to avoid Poison, Impale, and Bleeding", "Players have 25% less Area of Effect", "Monsters take 36% reduced Extra Damage from Critical Strikes"]);
+        assert_eq!(i.mods[1].warn.as_deref(), Some("Less area of effect"));
+        assert_eq!(i.stats, ["Atlas Drops: +56%", "Item Rarity: +34%"]);
+        let e = crate::mapregex::MapModEntry { id: 7, text: "Players have (15-25)% less Area of Effect".into(), token: String::new(), scary: 0, nightmare: false, trade_id: None, danger: None };
+        assert_eq!(map_info_bad(t, &[e], &[7]).mods.iter().filter(|m| m.warn.is_some()).count(), 1);
+    }
 
     #[test]
     fn warns_from_the_maps_page_list() {

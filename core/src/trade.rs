@@ -560,7 +560,7 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
         let good = if has_tiers { m.tier.map(|t| t <= 2).unwrap_or(false) } else { (flask && !(value < 0.0)) || VALUABLE.iter().any(|k| t.contains(k)) };
         let junk = is_junk(&t);
         // Maps: price by tier and rarity; mods are there to tick, never ticked for you.
-        let mut enabled = !unique && !is_map(&item) && m.kind != "enchant" && good && !junk && !counted.contains(&i);
+        let mut enabled = !unique && !is_map(&item) && !is_invitation(&item) && m.kind != "enchant" && good && !junk && !counted.contains(&i);
         // A mod with no number (or listed word for word, value NaN) is just "has it": no minimum.
         let whole = value.is_nan();
         let value = if whole { 0.0 } else { value };
@@ -617,7 +617,7 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
             });
         }
     }
-    else { filters.extend(crate::trade_rules::open_affixes(text, &item, index)); }
+    else if !is_invitation(&item) { filters.extend(crate::trade_rules::open_affixes(text, &item, index)); }
     // The game's own order: defences / damage first, then totals, enchants, implicits, prefixes, suffixes,
     // and the "open prefix / suffix" rows last. Same-group rows keep the item's order.
     let affix_of = |f: &StatFilter| f.affix.clone();
@@ -705,6 +705,7 @@ fn base_item(text: &str, item: &Item, lines: &[ModLine], filters: &[StatFilter])
 }
 
 fn is_map(it: &Item) -> bool { it.item_class == "Maps" }
+fn is_invitation(it: &Item) -> bool { crate::maps::runs_like_map(&it.item_class, &it.base_type) }
 
 /// The base as the trade site knows it. Magic items only have a full name ("Demon Dagger of Finesse",
 /// "Perpetual Sapphire Flask of Craft"): their base is the longest one inside it.
@@ -1006,6 +1007,9 @@ impl ItemTypes {
 
     /// Rewrites a search's plain type ("Scourge Arrow of Menace") into the form the
     /// trade site wants ({option: "Scourge Arrow", discriminator: "alt_x"}).
+    /// Does the trade site list this base at all? (true when its list hasn't loaded)
+    pub fn sells(&self, base: &str) -> bool { self.bases.is_empty() || self.bases.contains(&base.to_lowercase()) }
+
     pub fn fix_query(&self, q: &mut Value) {
         // A unique with words in front of its name (renamed in PoB): drop words until it's a unique the site knows.
         if let Some(n) = q["query"]["name"].as_str().map(str::to_string) {
