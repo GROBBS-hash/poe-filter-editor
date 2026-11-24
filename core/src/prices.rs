@@ -36,8 +36,18 @@ impl PriceItem {
 /// listings unsold). Rare but valuable cards (Father's Love, The Miracle) keep their price.
 pub const THIN_SOLD: f64 = 5.0;
 pub const THIN_CAP: f64 = 50.0;
-pub fn thin_card(it: &PriceItem) -> bool {
-    it.cat == "DivinationCard" && it.value < THIN_CAP && it.sold().is_some_and(|n| n < THIN_SOLD)
+pub fn thin_card(it: &PriceItem) -> bool { thin_card_at(it, THIN_SOLD) }
+/// The same with his own "really sells" number (Tiers > Divination cards; 0 = every card counts).
+pub fn thin_card_at(it: &PriceItem, min_sold: f64) -> bool {
+    it.cat == "DivinationCard" && it.value < THIN_CAP && it.sold().is_some_and(|n| n < min_sold)
+}
+
+/// Cards that don't count at that number, dearest first: (name, value, sold).
+pub fn thin_cards(file: &PriceFile, min_sold: f64) -> Vec<(String, f64, f64)> {
+    let mut v: Vec<_> = file.items.iter().filter(|i| i.value > 0.0 && thin_card_at(i, min_sold))
+        .map(|i| (i.name.clone(), i.value, i.sold().unwrap_or(0.0))).collect();
+    v.sort_by(|a, b| b.1.total_cmp(&a.1));
+    v
 }
 
 /// An item's price trend for the price window: the week's line and its total % change.
@@ -111,6 +121,12 @@ pub struct GroupSettings {
     /// Hide priced items worth less than this (unpriced items are left to NeverSink).
     #[serde(default)]
     pub hide_below: Option<f64>,
+    /// Cards: only ones with at least this many sold recently count (None = THIN_SOLD, 0 = all of them).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_sold: Option<f64>,
+}
+impl GroupSettings {
+    pub fn really_sells(&self) -> f64 { self.min_sold.unwrap_or(THIN_SOLD) }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -168,6 +184,7 @@ pub fn default_settings(unit: &str) -> PriceSettings {
             // Tier 1 always gets NeverSink's tier 1 sound: the classic Divine Orb drop.
             tiers: tiers("6"),
             hide_below: None,
+            min_sold: None,
         }).collect(),
         section_hide: BTreeMap::new(),
         section_stack: BTreeMap::new(),
@@ -243,26 +260,26 @@ fn cheapest_unique_by_base(file: &PriceFile) -> BTreeMap<String, f64> {
 
 /// Value of each base type in a group. Uniques sharing a base take the most
 /// valuable one, so hiding or downgrading a base never loses a good unique.
-pub fn values_by_base(file: &PriceFile, group: Group) -> BTreeMap<String, f64> {
+pub fn values_by_base(file: &PriceFile, group: Group) -> BTreeMap<String, f64> { values_by_base_at(file, group, THIN_SOLD) }
+pub fn values_by_base_at(file: &PriceFile, group: Group, min_sold: f64) -> BTreeMap<String, f64> {
     let mut m: BTreeMap<String, f64> = BTreeMap::new();
     for it in file.items.iter().filter(|i| Group::of(&i.cat) == Some(group) && (group != Group::Uniques || drops_on_ground(&i.name))) {
         let key = if group == Group::Uniques { it.base.clone() } else { it.name.clone() };
         // A card hardly anyone trades counts as worth nothing (see thin_card).
-        let value = if thin_card(it) { 0.0 } else { it.value };
+        let value = if thin_card_at(it, min_sold) { 0.0 } else { it.value };
         let e = m.entry(key).or_insert(0.0);
         if value > *e { *e = value; }
     }
     m
 }
 
-/// How big a stack of each card it takes to reach the worth line (0 = none does: no price). A card hardly anyone trades
-/// never gets there alone (its price is a guess), but a stack of 2+ does at the price shown (24 Nov: 2 x The Pack Leader
-/// at 4c, "8c" in the price window, hidden by a 4c line).
-fn card_stacks(file: &PriceFile, limit: f64) -> BTreeMap<String, u32> {
+/// How big a stack of each card it takes to reach the worth line (0 = none does: no price, or it doesn't really sell).
+/// (24 Nov: for a few hours stacks of 2+ counted whatever they sold, for 2 x The Pack Leader at "8c"; then 3 x The Lich
+/// showed, 85 sellers and 4 sold, so how much must sell became his setting.)
+fn card_stacks(file: &PriceFile, limit: f64, min_sold: f64) -> BTreeMap<String, u32> {
     let mut m: BTreeMap<String, u32> = BTreeMap::new();
     for it in file.items.iter().filter(|i| Group::of(&i.cat) == Some(Group::DivinationCards)) {
-        let need = if it.value > 0.0 { (limit / it.value).ceil().clamp(1.0, 1000.0) as u32 } else { 0 };
-        let need = if need > 0 && thin_card(it) { need.max(2) } else { need };
+        let need = if it.value > 0.0 && !thin_card_at(it, min_sold) { (limit / it.value).ceil().clamp(1.0, 1000.0) as u32 } else { 0 };
         let e = m.entry(it.name.clone()).or_insert(need);
         if need > 0 && (*e == 0 || need < *e) { *e = need; }
     }
@@ -290,7 +307,7 @@ pub fn price_blocks(settings: &PriceSettings, file: &PriceFile, nl: &str) -> Str
     for g in &settings.groups {
         let tiers_on = settings.enabled && g.enabled;
         if !tiers_on && g.hide_below.is_none() { continue; }
-        let values = values_by_base(file, g.group);
+        let values = values_by_base_at(file, g.group, g.really_sells());
         let mut tiers = g.tiers.clone();
         tiers.sort_by(|a, b| b.min.partial_cmp(&a.min).unwrap_or(std::cmp::Ordering::Equal));
         // Uniques: a base where one unique is worth a lot and another next to nothing (often a boss-only drop
@@ -314,7 +331,7 @@ pub fn price_blocks(settings: &PriceSettings, file: &PriceFile, nl: &str) -> Str
             // Divination cards drop in stacks (Ritual, Harvest...): a stack counts at its total worth, so 3 x 2c
             // cards stay when the line is 5c. Cards are grouped by how big a stack it takes to reach the line.
             let mut by_stack: BTreeMap<u32, Vec<&String>> = BTreeMap::new();
-            let stacks = if g.group == Group::DivinationCards { card_stacks(file, limit) } else { BTreeMap::new() };
+            let stacks = if g.group == Group::DivinationCards { card_stacks(file, limit, g.really_sells()) } else { BTreeMap::new() };
             for (k, _) in values.iter().filter(|(_, v)| **v < limit) {
                 let need = stacks.get(k).copied().unwrap_or(0);
                 by_stack.entry(need).or_default().push(k);
@@ -340,8 +357,8 @@ pub fn card_show_blocks(settings: &PriceSettings, file: &PriceFile, segs: &[crat
     use crate::{filter::Segment, rules::Rule};
     let Some(g) = settings.groups.iter().find(|g| g.group == Group::DivinationCards) else { return String::new() };
     let Some(limit) = g.hide_below.filter(|l| *l > 0.0) else { return String::new() };
-    let values = values_by_base(file, Group::DivinationCards);
-    let stacks = card_stacks(file, limit);
+    let values = values_by_base_at(file, Group::DivinationCards, g.really_sells());
+    let stacks = card_stacks(file, limit, g.really_sells());
     // Worth this much the price tiers already show it.
     let tiered = (settings.enabled && g.enabled).then(|| g.tiers.iter().map(|t| t.min).fold(f64::INFINITY, f64::min)).unwrap_or(f64::INFINITY);
     let mut seen = std::collections::BTreeSet::new();
@@ -497,9 +514,21 @@ mod tests {
         // 5 x 1.18c and 4 x 1.18c are over 4c, 3 x isn't; a card worth 4.5c shows by itself; 5 x 0.02c doesn't.
         assert!(shows("The Master Artisan", 5) && shows("The Master Artisan", 4) && !shows("The Master Artisan", 3), "{blocks}");
         assert!(shows("Worth It", 1) && shows("Shown Already", 1) && !shows("Rain of Chaos", 5), "{blocks}");
-        // Hardly traded: a single one's price is a guess, a stack worth the line shows.
-        assert!(!shows("Hardly Traded", 1) && !shows("Hardly Traded", 3) && shows("Hardly Traded", 4), "{blocks}");
-        assert!(!shows("The Pack Leader", 1) && shows("The Pack Leader", 2) && !shows("Low Guess", 5), "{lists}");
+        // Hardly traded: doesn't count, not in a stack either, unless his number says so.
+        assert!(!shows("Hardly Traded", 4) && !shows("The Pack Leader", 1) && !shows("The Pack Leader", 2), "{lists}");
+        let with = |min: f64| {
+            let mut s = s.clone();
+            for g in &mut s.groups { g.min_sold = Some(min); }
+            let lists = price_blocks(&s, &f, "\n") + &card_show_blocks(&s, &f, &segs, &[], &|_| {}, "\n");
+            let mut segs2 = segs.clone();
+            apply_with_extra_test(&mut segs2, &lists);
+            move |n: &str, stack: u32| status(&segs2, &parse_item(&format!("Item Class: Divination Cards\nRarity: Normal\n{n}\n--------\nStack Size: {stack}/5\n")).unwrap(), Some(83), false).verdict.visibility == "Show"
+        };
+        let all = with(0.0);
+        assert!(all("The Pack Leader", 1) && all("Hardly Traded", 4) && !all("Hardly Traded", 3) && !all("Low Guess", 5));
+        // The Master Artisan sold 5.7: not enough at 10.
+        assert!(!with(10.0)("The Master Artisan", 5) && with(10.0)("Worth It", 1));
+        assert_eq!(thin_cards(&f, 5.0).iter().map(|c| c.0.as_str()).collect::<Vec<_>>(), ["The Pack Leader", "Hardly Traded"].into_iter().filter(|n| f.items.iter().any(|i| i.name == *n)).collect::<Vec<_>>());
         assert!(blocks.contains("SetFontSize 40") && !blocks.contains("Shown Already"), "its own step's look: {blocks}");
         // A step he unticked himself stays hidden.
         let off = crate::rules::Rule::Tier { type_path: vec!["divination".into()], tier: "t4c".into(), show: Some(false), actions: None, min_stack: None, min_item_tier: None, conds: None, off: false, look: None };

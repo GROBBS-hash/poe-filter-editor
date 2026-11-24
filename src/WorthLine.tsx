@@ -1,10 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import { friendly } from "./errors";
-import { CurrencyIcon } from "./icons";
+import { CurrencyIcon, ItemIcon } from "./icons";
 
 type Group = "Uniques" | "DivinationCards";
-type GroupSettings = { group: string; enabled: boolean; tiers: unknown[]; hide_below?: number | null };
+type GroupSettings = { group: string; enabled: boolean; tiers: unknown[]; hide_below?: number | null; min_sold?: number | null };
 type Settings = { enabled: boolean; groups: GroupSettings[] };
 type Page = { settings: Settings; info?: { unit: string } | null };
 
@@ -21,11 +21,13 @@ export default function WorthLine({ profileId, group, onChange }: { profileId: s
   const [count, setCount] = useState<[number, number] | null>(null);
   const [err, setErr] = useState("");
   const timer = useRef(0);
+  const latest = useRef<Page | null>(null);
   const unit = page?.info?.unit ?? "chaos";
 
   useEffect(() => {
     invoke<Page>("get_price_settings", { id: profileId }).then((p) => {
       setPage(p);
+      latest.current = p;
       setLimit(p.settings.groups.find((g) => g.group === group)?.hide_below ?? null);
     }).catch((e) => setErr(friendly(e)));
   }, [profileId, group]);
@@ -39,12 +41,21 @@ export default function WorthLine({ profileId, group, onChange }: { profileId: s
     clearTimeout(timer.current);
     // Typing "15" shouldn't rebuild the filter for "1" first.
     timer.current = window.setTimeout(() => {
-      if (!page) return;
-      const s: Settings = { ...page.settings, groups: page.settings.groups.map((g) => g.group === group ? { ...g, hide_below: next } : g) };
-      invoke("set_price_settings", { id: profileId, settings: s })
-        .then(() => { setPage({ ...page, settings: s }); setErr(""); onChange(); })
-        .catch((e) => setErr(friendly(e)));
+      store({ hide_below: next });
     }, 600);
+  };
+  // Always on top of the latest settings: the line and the "really sells" number are saved apart.
+  const store = (patch: Partial<GroupSettings>) => {
+    const now = latest.current;
+    if (!now) return;
+    const s: Settings = { ...now.settings, groups: now.settings.groups.map((g) => g.group === group ? { ...g, ...patch } : g) };
+    latest.current = { ...now, settings: s };
+    invoke("set_price_settings", { id: profileId, settings: s })
+      .then(() => {
+        setPage((o) => o && { ...o, settings: s }); setErr(""); onChange();
+        if (limit != null) invoke<[number, number]>("price_count_below", { id: profileId, group, limit }).then(setCount).catch(() => {});
+      })
+      .catch((e) => setErr(friendly(e)));
   };
 
   if (!page) return null;
@@ -61,10 +72,45 @@ export default function WorthLine({ profileId, group, onChange }: { profileId: s
       {unit === "chaos" ? <CurrencyIcon id="chaos" /> : <span className="muted small">{unit}</span>}
       <span className="muted small">
         {on && count ? <>hides <b>{count[0]}</b> of {count[1]} {many} right now (poe.ninja)
-          {group === "DivinationCards" ? " · a stack counts at its total worth, and shows at the line or more even when NeverSink's strictness hides the card · cards under 50c that hardly anyone trades (under 5 sold) only count in stacks of 2 or more: the price of one is a guess" : ""}</>
+          {group === "DivinationCards" ? " · a stack counts at its total worth, and shows at the line or more even when NeverSink's strictness hides the card" : ""}</>
           : `Uses poe.ninja prices; any ${one} it doesn't price stays as NeverSink has it.`}
       </span>
       {err && <span className="danger-text small">{err}</span>}
+      {on && group === "DivinationCards" && <ReallySells profileId={profileId} unit={unit}
+        min={page.settings.groups.find((g) => g.group === group)?.min_sold ?? 5} onSave={(n) => store({ min_sold: n })} />}
+    </div>
+  );
+}
+
+/** "Only cards that really sell" (24 Nov: 3 x The Lich, "8.85c", 85 sellers and 4 sold): at least N sold recently, with
+ *  the cards that then don't count. Cards worth 50c or more always count. */
+function ReallySells({ profileId, unit, min, onSave }: { profileId: string; unit: string; min: number; onSave: (n: number) => void }) {
+  const [n, setN] = useState(min);
+  const [list, setList] = useState<[string, number, number][]>([]);
+  const [open, setOpen] = useState(false);
+  const timer = useRef(0);
+  useEffect(() => { invoke<[string, number, number][]>("price_thin_cards", { id: profileId, minSold: n }).then((l) => setList(l ?? [])).catch(() => setList([])); }, [profileId, n]);
+  const pick = (next: number) => {
+    setN(next);
+    clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => onSave(next), 600);
+  };
+  return (
+    <div className="really">
+      <label><input type="checkbox" checked={n > 0} onChange={(e) => pick(e.target.checked ? 5 : 0)} /> Only cards that really sell</label>
+      {n > 0 && <>
+        <span className="muted small">at least</span>
+        <input type="range" min={1} max={50} value={Math.min(n, 50)} onChange={(e) => pick(+e.target.value)} aria-label="Sold recently, at least" />
+        <input className="num" type="number" min={1} step={1} value={n} onChange={(e) => pick(Math.max(1, Math.round(+e.target.value || 1)))} />
+        <span className="muted small">sold recently</span>
+        <button className="link small" onClick={() => setOpen(!open)}>{open ? "Hide the list" : `${list.length} cards don't count · show`}</button>
+      </>}
+      <div className="muted small really-why">{n > 0 ? "The rest are treated as worthless, in stacks too. Cards worth 50c or more always count."
+        : "Every card counts at its poe.ninja price, also when hardly anyone buys it."}</div>
+      {open && n > 0 && <div className="really-list">{list.map(([name, v, sold]) => (
+        <span key={name} className="really-card" title={`${name}: ${worthText(v, unit)} on poe.ninja, about ${sold < 1 ? "under 1" : Math.round(sold)} sold recently`}>
+          <ItemIcon base={name} size={20} />{name}<b>{worthText(v, unit)}</b><span className="muted">{sold < 1 ? "<1" : Math.round(sold)} sold</span></span>
+      ))}</div>}
     </div>
   );
 }

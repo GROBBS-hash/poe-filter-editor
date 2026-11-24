@@ -171,6 +171,7 @@ mockIPC((cmd, args) => {
   if (cmd === "buy_base_item") return { total: 3480, ilvl: 75, notables: [["Doryani's Lesson", 68], ["Inspired Oppression", 75], ["Overshock", 50]] };
   if (cmd === "get_price_settings") return { settings: { enabled: false, groups: [{ group: "DivinationCards", enabled: true, tiers: [], hide_below: null }, { group: "Uniques", enabled: true, tiers: [], hide_below: null }] }, info: { unit: "chaos", league: "Keepers", updated: new Date().toISOString(), count: 18432 } };
   if (cmd === "price_count_below") return [Math.round(Math.min(480, (args as { limit: number }).limit * 60)), 512];
+  if (cmd === "price_thin_cards") { const min = (args as { minSold: number }).minSold; return ([["Nook's Crown", 15, 0.2], ["The Gambler", 8.65, 13], ["The Pack Leader", 4, 0.2], ["The Lich", 2.95, 3.7], ["The Master Artisan", 1.18, 5.7], ["Immortal Resolve", 3.3, 1], ["The Beast", 3.5, 0.7]] as [string, number, number][]).filter((c) => c[2] < min); }
   if (cmd === "set_price_settings") return [];
   if (cmd === "wealth_find") {
     const all = [
