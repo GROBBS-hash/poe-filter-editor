@@ -37,7 +37,9 @@ fn mod_source(head: &str) -> Option<String> {
     let s = |x: &str| Some(x.to_string());
     if head.contains("Eater of Worlds Implicit") { return s("eater"); }
     if head.contains("Searing Exarch Implicit") { return s("exarch"); }
-    if head.contains("Corrupted Implicit") { return s("corrupted"); }
+    // The game writes "{ Corruption Implicit Modifier — … }" (24 Nov: his corrupted Darkray Vectors' "+2 to Level of
+    // Socketed Curse Gems" was taken for a fixed base mod and hidden, as this only looked for "Corrupted Implicit").
+    if head.contains("Corrupted Implicit") || head.contains("Corruption Implicit") { return s("corrupted"); }
     if head.contains("Rare-only") { return s("rareonly"); }
     if head.contains("Synthesised") { return s("synthesised"); }
     let name = head.split('"').nth(1)?;
@@ -573,6 +575,9 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
                 enabled = !junk;
             }
         }
+        // A corruption implicit (Vaal Orb) is a big part of the price: ticked, at least your roll.
+        if m.source.as_deref() == Some("corrupted") && !whole { enabled = true; min = Some(value); }
+        if m.source.as_deref() == Some("corrupted") && whole { enabled = true; }
         // Anointed amulets and rings: the oil's notable sets the price as much as the item does.
         if m.kind == "enchant" && m.text.starts_with("Allocates ") && matches!(item.item_class.as_str(), "Amulets" | "Rings") { enabled = true; }
         // Cluster jewels (Awakened's rule): the passive count exactly (8 passives is a better large jewel than 10) and
@@ -1258,6 +1263,20 @@ Item Level: 75
             ]},
             { "label": "Implicit", "entries": [ { "id": "implicit.stat_cold", "text": "+#% to Cold Resistance", "type": "implicit" } ]},
         ]}))
+    }
+
+    #[test]
+    fn corruption_implicit_counts() {
+        // 24 Nov, his corrupted Darkray Vectors: the Vaal implicit must be shown and ticked.
+        let text = "Item Class: Boots\nRarity: Unique\nDarkray Vectors\nDragonscale Boots\n--------\nItem Level: 85\n--------\n{ Corruption Implicit Modifier — Caster, Gem, Curse }\n+2 to Level of Socketed Curse Gems\n--------\n{ Unique Modifier — Elemental, Lightning, Resistance }\n+39(20-40)% to Lightning Resistance\n--------\nCorrupted\n";
+        let idx = StatIndex::from_json(&json!({ "result": [
+            { "label": "Explicit", "entries": [ { "id": "explicit.stat_light", "text": "+#% to Lightning Resistance", "type": "explicit" } ]},
+            { "label": "Implicit", "entries": [ { "id": "implicit.stat_curse", "text": "+# to Level of Socketed Curse Gems", "type": "implicit" } ]},
+        ]}));
+        let s = setup(text, &idx).unwrap();
+        let f = s.filters.iter().find(|f| f.id == "implicit.stat_curse").expect("corruption implicit row");
+        assert_eq!(f.source.as_deref(), Some("corrupted"));
+        assert!(f.enabled && f.min == Some(2.0), "{f:?}");
     }
 
     #[test]
