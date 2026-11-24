@@ -161,3 +161,7 @@
 .loot-grip { display: flex; align-items: center; gap: 8px; margin-top: 2px; padding: 4px 0; cursor: ns-resize; user-select: none; touch-action: none; }
 .loot-grip-bar { flex: 1; height: 3px; border-radius: 2px; background: var(--line); }
 .loot-grip:hover .loot-grip-bar, .loot-grip:active .loot-grip-bar { background: var(--gold); }
+.trk-left { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; margin-right: 9px; font-size: 16px; font-weight: 650; color: var(--muted); font-variant-numeric: tabular-nums; }
+.trk-left.few { color: var(--gold); }
+.trk-left.done { color: var(--green); }
+.trk-left.old { opacity: .5; }

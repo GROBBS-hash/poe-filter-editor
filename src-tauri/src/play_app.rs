@@ -43,6 +43,8 @@ struct PlayStore {
     pause_off: bool,
     /// How the game looks with no menu open (and with the Escape menu), from "Set up" on the Play tools page.
     menu: MenuLook,
+    /// Keep the tracker up while the stash or inventory is open under it.
+    over_panels: bool,
     /// The loot breakdown per map (Settings).
     loot: LootPrefs,
 }
@@ -209,6 +211,8 @@ struct Live {
     loot_note: String,
     /// Bag reads still to come after leaving a map (its loot shows when they're done).
     loot_reading: u32,
+    /// Monsters left in this zone, and when the game last said so.
+    left: Option<(journey::MonstersLeft, i64)>,
     /// Stopwatch: running since (unix ms), time banked (ms), laps (ms).
     watch_since: Option<i64>,
     watch_acc: i64,
@@ -290,6 +294,14 @@ pub fn prime(app: &AppHandle, log: &std::path::Path) {
     });
     if let Some((name, ..)) = with_live(|l| l.character.clone()) { with_store(app, |s| s.maps.character = Some(name)); }
     catch_up(app, &text);
+    // Started while you're inside a map (an update, a restart) without its bags: the site still has them as you went in.
+    if let Some(run) = with_store(app, |s| s.maps.current.as_ref().filter(|_| s.maps.inside).map(run_key)) {
+        let at = with_live(|l| {
+            let have = l.loot_base.as_ref().is_some_and(|(k, _)| *k == run);
+            l.zone.as_ref().filter(|z| !have && z.0 == run.0).map(|z| z.2 - utc_offset())
+        });
+        if let Some(at) = at { queue_loot(app, LootJob::Enter(run, at)); }
+    }
     // A session still going shows straight away, not only from the next zone.
     if with_live(|l| l.sess_start == 0) {
         if let Some((start, deaths)) = with_store(app, |s| journey::session_start(&s.maps.history, s.maps.current.as_ref(), unix(), 30 * 60)) {
@@ -305,6 +317,10 @@ pub fn on_line(app: &AppHandle, line: &str) {
     if line.contains(": !") && !with_store(app, |s| s.chat_off) {
         let me = with_live(|l| l.character.as_ref().map(|c| c.0.clone())).unwrap_or_default();
         if let Some(cmd) = journey::chat_command(line, &me) { run_chat_command(app, &cmd); return; }
+    }
+    // /remaining's answer (whoever typed it): ": 7 monsters remain."
+    if line.contains("] : ") && line.contains("remain") {
+        if let Some(m) = journey::monsters_left(line) { set_left(app, Some(m)); return; }
     }
     let Some(mut ev) = journey::parse_line(line) else { return };
     // The log's clock is your PC's local time; lines arrive as they're written, so stamp them with the real time
@@ -374,7 +390,7 @@ pub fn on_line(app: &AppHandle, line: &str) {
     });
     match &ev {
         PlayEvent::Area { id, level, time, .. } => {
-            with_live(|l| { l.zone = Some((id.clone(), *level, *time)); l.zone_name.clear(); });
+            with_live(|l| { l.zone = Some((id.clone(), *level, *time)); l.zone_name.clear(); l.left = None; });
             follow_route(app, id);
             // Race splits: the first time this character enters each act (maps count as act 11).
             let poe2 = is_poe2(app);
@@ -636,11 +652,19 @@ pub struct TrackerView {
     pub loot_note: String,
     /// Your bags are being read after leaving a map: its loot is on the way.
     pub loot_reading: bool,
+    /// Monsters left in the map, when the game says.
+    pub left: Option<LeftView>,
+    /// The tracker stays up over an open stash or inventory.
+    pub over_panels: bool,
     /// The divine's price (chaos), to show totals in divines.
     pub divine: Option<f64>,
     /// Logged in to pathofexile.com (account + POESESSID saved).
     pub has_account: bool,
 }
+
+/// Monsters left: the number, "more than" it, and whether the game said so just now.
+#[derive(Serialize, Clone, PartialEq)]
+pub struct LeftView { pub n: u32, pub more: bool, pub fresh: bool }
 
 /// The menu check, for the Play tools page.
 #[derive(Serialize, Clone)]
@@ -683,8 +707,11 @@ pub struct PlayView { pub tracker: TrackerView }
 #[tauri::command]
 pub fn play_view(app: AppHandle) -> PlayView { PlayView { tracker: tracker_view(&app) } }
 
+fn left_view(l: &Live) -> Option<LeftView> { l.left.map(|(m, at)| LeftView { n: m.n, more: m.more, fresh: unix() - at < 10 }) }
+
 fn tracker_view(app: &AppHandle) -> TrackerView {
     let now = unix();
+    let over_panels = with_store(app, |s| s.over_panels);
     let (current, inside, paused, current_inside, recent, today, all, all_runs, prefs, menu, pause_off) = with_store(app, |s| {
         let h = &s.maps.history;
         (s.maps.current.clone(), s.maps.inside, s.maps.paused_since.is_some(), s.maps.current_inside(now),
@@ -728,7 +755,7 @@ fn tracker_view(app: &AppHandle) -> TrackerView {
             current, inside, current_inside, paused, recent, today, all,
             char_name: l.site_char.as_ref().map(|c| c.0.clone()), char_level: l.site_char.as_ref().map(|c| c.1),
             watch_ms, watch_running: l.watch_since.is_some(), laps: l.laps.clone(), now, session,
-            pause, loot_prefs: prefs, loot_note: l.loot_note.clone(), loot_reading: l.loot_reading > 0, divine, has_account,
+            pause, loot_prefs: prefs, loot_note: l.loot_note.clone(), loot_reading: l.loot_reading > 0, left: if inside { left_view(l) } else { None }, over_panels, divine, has_account,
         }
     })
 }
@@ -773,9 +800,118 @@ pub fn watch_action(app: AppHandle, action: String) -> PlayView {
 /// Starts the tracker's background helpers: your level from pathofexile.com, the menu check, and the loot reader.
 pub fn start_watchers(app: AppHandle) {
     load_kept(&app);
+    start_panel_watch(app.clone());
     start_level_watch(app.clone());
     start_pause_watch(app.clone());
     start_loot_worker(app);
+}
+
+fn set_left(app: &AppHandle, m: Option<journey::MonstersLeft>) {
+    let before = with_live(|l| { let b = left_view(l); l.left = m.map(|m| (m, unix())); b });
+    send_left(app, before);
+}
+/// Tells the tracker when what it shows changed.
+fn send_left(app: &AppHandle, before: Option<LeftView>) {
+    let now = with_live(|l| left_view(l));
+    if now != before { if let Some(w) = app.get_webview_window("tracker") { let _ = w.emit("left-update", now); } }
+}
+
+/// The tracker is put away because the stash or inventory is open under it; and he asked for it back meanwhile.
+static PANEL_HID: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static PANEL_KEEP: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Put away under a panel (it still counts as open).
+pub fn under_panel() -> bool { PANEL_HID.load(Ordering::Relaxed) }
+
+/// Shows or hides the tracker without touching which window has the keyboard.
+#[cfg(windows)]
+fn raw_show(w: &tauri::WebviewWindow, on: bool) {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_HIDE, SW_SHOWNOACTIVATE};
+    if let Ok(h) = w.hwnd() { unsafe { let _ = ShowWindow(HWND(h.0 as _), if on { SW_SHOWNOACTIVATE } else { SW_HIDE }); } }
+}
+#[cfg(not(windows))]
+fn raw_show(_w: &tauri::WebviewWindow, _on: bool) {}
+
+/// Back from under a panel (closed, switched off, or he pressed its key).
+fn panel_back(app: &AppHandle) -> bool {
+    if !PANEL_HID.swap(false, Ordering::Relaxed) { return false; }
+    if let Some(w) = app.get_webview_window("tracker") { raw_show(&w, true); }
+    true
+}
+
+/// The map tracker gets out of the way while the stash or inventory is open under it (reads the panel's name off the
+/// screen), and reads how many monsters are left from the map info in the game's top right corner.
+fn start_panel_watch(app: AppHandle) {
+    let mut closed = 0;
+    let mut info_at = std::time::Instant::now();
+    let mut settle = journey::LeftSettle::default();
+    let mut area = String::new();
+    thread::spawn(move || loop {
+        thread::sleep(Duration::from_millis(350));
+        let Some(w) = app.get_webview_window("tracker") else { continue };
+        let hid = under_panel();
+        if !hid && !w.is_visible().unwrap_or(false) { continue; }
+        if !game_in_front() {
+            // Another program in front: back where it was. One of ours: leave things as they are.
+            if !ours_in_front() { panel_back(&app); }
+            continue;
+        }
+        let Some(rect) = game_client_rect() else { continue };
+        let read = |b: (i32, i32, i32, i32)| screen::read_lines_in(b.0, b.1, b.2, b.3);
+        let mut open = false;
+        if !with_store(&app, |s| s.over_panels) {
+            if let (Ok(p), Ok(size)) = (w.outer_position(), w.outer_size()) {
+                let pw = journey::panel_width(rect.3);
+                let on = |a: i32, b: i32| p.x < b && p.x + size.width as i32 > a;
+                for (left, a, b) in [(true, rect.0, rect.0 + pw), (false, rect.0 + rect.2 - pw, rect.0 + rect.2)] {
+                    if !open && on(a, b) { 
+                        open = read(journey::panel_title_box(rect, left)).is_ok_and(|l| journey::panel_open(&l, left));
+                        // The tracker may sit right on the stash's name.
+                        let mid = rect.0 + pw / 2;
+                        if left && !open && p.y < rect.1 + rect.3 * 75 / 1000 && p.x < mid + pw / 7 && p.x + size.width as i32 > mid - pw / 7 {
+                            open = read(journey::stash_search_box(rect)).is_ok_and(|l| journey::panel_open(&l, true));
+                        }
+                    }
+                }
+            }
+        }
+        if open {
+            closed = 0;
+            if !hid && !PANEL_KEEP.load(Ordering::Relaxed) {
+                PANEL_HID.store(true, Ordering::Relaxed);
+                raw_show(&w, false);
+            }
+        } else {
+            // Two looks in a row, so one misread doesn't make it flicker.
+            closed += 1;
+            if closed >= 2 { PANEL_KEEP.store(false, Ordering::Relaxed); panel_back(&app); }
+        }
+        // Monsters left, every 1.2 s inside a map.
+        if info_at.elapsed() < Duration::from_millis(1200) { continue; }
+        info_at = std::time::Instant::now();
+        if !with_store(&app, |s| s.maps.inside) { continue; }
+        let said = read(journey::info_box(rect)).ok().and_then(|l| l.iter().find_map(|x| journey::monsters_left(x)));
+        let here = with_store(&app, |s| s.maps.current.as_ref().map(|c| format!("{}{}{}", c.area, c.seed, c.last_enter))).unwrap_or_default();
+        if here != area { area = here; settle.reset(); }
+        match said.map(|m| settle.feed(m)) {
+            Some(Some(m)) => set_left(&app, Some(m)),
+            Some(None) => {}
+            None => {
+                // Not on screen now: the last number stays, marked as not fresh.
+                let went = with_live(|l| l.left.is_some_and(|(_, at)| { let age = unix() - at; (10..14).contains(&age) }));
+                if went { let v = with_live(|l| left_view(l)); let _ = w.emit("left-update", v); }
+            }
+        }
+    });
+}
+
+#[tauri::command]
+pub fn tracker_over_panels(app: AppHandle, on: bool) -> PlayView {
+    with_store(&app, |s| s.over_panels = on);
+    save_store(&app);
+    emit_all(&app);
+    play_view(app)
 }
 
 /// Your account name and POESESSID from the Wealth page (None when either is missing), and PoE 2 or not.
@@ -1246,6 +1382,12 @@ pub fn notes_save(app: AppHandle, text: String) -> Result<(), String> { std::fs:
 /// Show or hide one of the play windows (its hotkey, or the Play tools page's buttons).
 pub fn toggle(app: &AppHandle, label: &str) {
     let Some(w) = app.get_webview_window(label) else { return };
+    // Put away under the stash: its key brings it back, until the stash closes.
+    if label == "tracker" && under_panel() {
+        PANEL_KEEP.store(true, Ordering::Relaxed);
+        panel_back(app);
+        return;
+    }
     if w.is_visible().unwrap_or(false) { let _ = w.hide(); return; }
     let _ = w.emit("play-shown", ());
     if label == "searches" || label == "notes" {
@@ -1267,6 +1409,7 @@ pub fn play_toggle(app: AppHandle, label: String) {
 
 #[tauri::command]
 pub fn play_hide(app: AppHandle, label: String) {
+    if label == "tracker" { panel_back(&app); }
     if let Some(w) = app.get_webview_window(&label) { let _ = w.hide(); }
     if label == "notes" || label == "searches" || label == "sheet" { focus_game(); }
 }

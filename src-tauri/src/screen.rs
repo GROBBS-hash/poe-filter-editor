@@ -617,6 +617,35 @@ fn grey(raw: &[u8], invert: bool) -> Vec<u8> {
 
 #[cfg(test)]
 mod tests {
+    /// Dev check (PANEL_LOG=file, PANEL_SECS): what the panel headers and the map info in the top right read as, live.
+    #[cfg(windows)]
+    #[test]
+    #[ignore]
+    fn panel_watch() {
+        use std::io::Write;
+        #[link(name = "user32")]
+        extern "system" { fn SetProcessDpiAwarenessContext(v: isize) -> i32; }
+        unsafe { SetProcessDpiAwarenessContext(-4); }
+        let Ok(path) = std::env::var("PANEL_LOG") else { return };
+        let secs = std::env::var("PANEL_SECS").ok().and_then(|s| s.parse().ok()).unwrap_or(600);
+        let mut f = std::fs::File::create(&path).unwrap();
+        let start = std::time::Instant::now();
+        while start.elapsed().as_secs() < secs {
+            std::thread::sleep(std::time::Duration::from_millis(500));
+            if !crate::game_in_front() { continue; }
+            let Some((x, y, w, h)) = crate::game_client_rect() else { continue };
+            let panel = (h as f64 * 370.0 / 600.0) as i32;
+            let (top, tall) = (y + h * 25 / 1000, h * 50 / 1000);
+            let t0 = std::time::Instant::now();
+            let left = super::read_lines_in(x, top, panel, tall);
+            let right = super::read_lines_in(x + w - panel, top, panel, tall);
+            let took = t0.elapsed();
+            let info = super::read_lines_in(x + w * 3 / 4, y, w / 4, h / 3);
+            let low = super::read_lines_in(x, y + h * 795 / 1000, panel, h * 5 / 100);
+            let _ = writeln!(f, "{} took {took:?} L {left:?} R {right:?} low {low:?} info {info:?}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs());
+        }
+    }
+
     /// Dev check (run by hand with PAUSE_LOG set to a file): what the pause check sees while the game is in front.
     #[cfg(windows)]
     #[test]

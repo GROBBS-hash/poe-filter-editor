@@ -141,7 +141,7 @@ fn open_path(app: &AppHandle) -> PathBuf { app.state::<AppState>().data_dir.join
 /// Remembers which windows are open now.
 fn keep_open(app: &AppHandle) {
     if !REOPENED.load(Ordering::Relaxed) { return; }
-    let open = REOPEN.iter().filter(|l| app.get_webview_window(l).is_some_and(|w| w.is_visible().unwrap_or(false))).map(|l| l.to_string()).collect();
+    let open = REOPEN.iter().filter(|l| app.get_webview_window(l).is_some_and(|w| w.is_visible().unwrap_or(false)) || (**l == "tracker" && play_app::under_panel())).map(|l| l.to_string()).collect();
     if let Ok(t) = serde_json::to_string(&Open { at: unix_now(), open }) { let _ = std::fs::write(open_path(app), t); }
 }
 

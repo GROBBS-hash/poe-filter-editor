@@ -33,7 +33,7 @@ type MapStats = { runs: number; avg_inside: number; avg_cycle: number; per_hour:
 type TrackerView = {
   current: MapRun | null; inside: boolean; current_inside: number; paused: boolean; recent: MapRun[]; today: MapStats; all: MapStats;
   char_name: string | null; char_level: number | null; watch_ms: number; watch_running: boolean; laps: number[]; now: number;
-  session: SessionSummary | null; pause: PauseInfo; loot_prefs: LootPrefs; loot_note: string; loot_reading?: boolean; divine: number | null; has_account?: boolean;
+  session: SessionSummary | null; pause: PauseInfo; loot_prefs: LootPrefs; loot_note: string; loot_reading?: boolean; left?: Left | null; over_panels?: boolean; divine: number | null; has_account?: boolean;
 };
 type SessionSummary = { start: number; played: number; maps: number; map_time: number; per_hour: number; deaths: number; levels: number;
   made: number | null; best: MapRun | null; loot: LootLine[]; loot_value: number; loot_maps: number; loot_secs: number };
@@ -73,6 +73,8 @@ function SessionCard({ s, compact, divine }: { s: SessionSummary; compact?: bool
     </div>
   );
 }
+/** Monsters left in the map, as the game says it (fresh: said just now). */
+type Left = { n: number; more: boolean; fresh: boolean };
 type PlayView = { tracker: TrackerView };
 export type SearchString = { name: string; text: string };
 type SearchView = { saved: SearchString[]; made: SearchString[] };
@@ -229,6 +231,17 @@ function RaceCard() {
 
 // ---------- map tracker ----------
 
+/** Monsters left: "50+", then the number, then "clear". */
+function LeftChip({ l }: { l: Left }) {
+  return (
+    <span className={`trk-left ${l.more ? "" : l.n === 0 ? "done" : "few"} ${l.fresh ? "" : "old"}`}
+      title="Monsters left, read from the map info in the game's top right corner (it stops when that's covered or closed). Typing /remaining in chat updates it too.">
+      <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden><path fill="currentColor" d="M12 2a8.5 8.5 0 0 0-8.5 8.5c0 3 1.5 5.4 3.8 6.9v2.1c0 .8.7 1.5 1.5 1.5h6.4c.8 0 1.5-.7 1.5-1.5v-2.1a8.2 8.2 0 0 0 3.8-6.9A8.5 8.5 0 0 0 12 2ZM8.6 13.6a2.1 2.1 0 1 1 0-4.2 2.1 2.1 0 0 1 0 4.2Zm3.4 3-1.2-2.2h2.4L12 16.6Zm3.4-3a2.1 2.1 0 1 1 0-4.2 2.1 2.1 0 0 1 0 4.2Z" /></svg>
+      {l.more ? `${l.n}+` : l.n === 0 ? "clear" : l.n}
+    </span>
+  );
+}
+
 /** The map tracker (F9): this map's time (stops in menus), maps per hour, deaths, loot per map, a stopwatch. */
 export function TrackerWindow() {
   const [v, setV] = useState<TrackerView | null>(null);
@@ -241,8 +254,9 @@ export function TrackerWindow() {
     const load = () => invoke<PlayView>("play_view").then((p) => setV(p.tracker)).catch(() => {});
     load();
     const un = listen<PlayView>("play-update", (e) => setV(e.payload.tracker));
+    const ul = listen<Left | null>("left-update", (e) => setV((o) => o && { ...o, left: e.payload }));
     const t = setInterval(() => setNow(Date.now()), 500);
-    return () => { un.then((f) => f()); clearInterval(t); };
+    return () => { un.then((f) => f()); ul.then((f) => f()); clearInterval(t); };
   }, []);
   if (!v) return <div className="bo pw" />;
   // Tick the clocks locally between updates.
@@ -261,6 +275,7 @@ export function TrackerWindow() {
               title={v.paused ? "The timer stops while the Escape menu or the skill tree is open" : undefined}>{v.paused ? "paused" : v.inside ? "in map" : "out"}</span></div>
           <div className="pw-row between">
             <span className="trk-big">{mmss(inside)}</span>
+            {v.inside && v.left && <LeftChip l={v.left} />}
             <button className="pw-btn" title="Finished with this map (otherwise it ends when you open the next one)" onClick={() => invoke<PlayView>("maps_done").then((p) => setV(p.tracker))}>Done</button>
           </div>
           {(c.deaths > 0 || c.portals > 0) && <div className="pw-small">{c.deaths > 0 ? `${c.deaths} death${c.deaths > 1 ? "s" : ""}` : ""}{c.deaths > 0 && c.portals > 0 ? " · " : ""}{c.portals > 0 ? `${c.portals} portal${c.portals > 1 ? "s" : ""} back in` : ""}</div>}
@@ -697,9 +712,15 @@ export function TrackerSettings() {
     invoke<string>("pause_setup", { kind }).then(setMsg).catch((e) => setMsg(String(e))).finally(() => setBusy(""));
   };
   const pause = (on: boolean, forget = false) => invoke<PlayView>("pause_prefs", { on, forget }).then((x) => setV(x.tracker));
+  const overPanels = (on: boolean) => invoke<PlayView>("tracker_over_panels", { on }).then((x) => setV(x.tracker));
   const loot = (patch: Partial<LootPrefs>) => invoke<PlayView>("loot_prefs_save", { prefs: { ...lp, ...patch } }).then((x) => setV(x.tracker));
   return (
     <>
+      <div className="card">
+        <h2>Out of the way of your stash</h2>
+        <label className="check"><input type="checkbox" checked={!v.over_panels} onChange={(e) => overPanels(!e.target.checked)} /><span>Hide the map tracker while the stash or inventory is open under it</span></label>
+        <p className="muted small" style={{ margin: "4px 0 0" }}>It comes back when you close them. Its key brings it back sooner. Where it doesn't cover them, it stays.</p>
+      </div>
       <div className="card">
         <h2>Stop the map timer when you're not playing</h2>
         <p className="muted small">The map timer (F9) stands still while you're in another program (alt-tab), and while the Escape menu or the

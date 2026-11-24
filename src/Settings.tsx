@@ -14,7 +14,7 @@ type Settings = {
   price_compare?: boolean; price_rolls?: boolean; price_instant_all?: boolean; price_buyout_only?: boolean; build_with_tree?: boolean; key_tree?: string;
   key_level?: string; key_tracker?: string; key_searches?: string; key_sheet?: string; key_notes?: string; key_wiki?: string; key_read?: string;
 };
-const CHAT_IDEAS = ["/hideout", "/kingsmarch", "/menagerie", "/delve", "/exit", "/invite", "/kick", "/afk"];
+const CHAT_IDEAS = ["/hideout", "/kingsmarch", "/menagerie", "/delve", "/exit", "/invite", "/kick", "/afk", "/remaining"];
 
 /** Map mods you can't run are one list on the Map mods page: Ctrl+D shows them in red and the map stash search hides them. */
 function MapCheckLink() {

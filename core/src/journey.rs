@@ -287,6 +287,71 @@ pub fn centre_points(rect: (i32, i32, i32, i32)) -> Vec<(i32, i32)> {
     out
 }
 
+/// How many monsters are left, as the game says it: "More than 50 monsters remain", "12 monsters remain", "1 monster
+/// remains" (the map info in the top right, or /remaining's answer in the log). `more` = more than `n`.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct MonstersLeft { pub n: u32, pub more: bool }
+pub fn monsters_left(line: &str) -> Option<MonstersLeft> {
+    let l = line.to_lowercase();
+    let i = l.find("monster")?;
+    if !l[i..].contains("remain") { return None; }
+    // The number right before "monster". Text reading swaps O/0 and l/1, and over a busy background it glues and garbles
+    // ("ihansozmonsters"): letters only count as digits when the whole word could be a number.
+    let word = l[..i].split_whitespace().last()?.trim_matches(|c: char| !c.is_ascii_alphanumeric());
+    let word = if word.chars().all(|c| c.is_ascii_digit() || "oli".contains(c)) { word.replace('o', "0").replace(['l', 'i'], "1") }
+        else { word.chars().rev().take_while(|c| c.is_ascii_digit()).collect::<String>().chars().rev().collect() };
+    let n: u32 = word.parse().ok()?;
+    // It only counts up to 50, so "50 monsters remain" is "More than 50" with its start lost.
+    let more = n == 50 || l[..i].contains("than");
+    (n <= 50).then_some(MonstersLeft { n: if more { 50 } else { n }, more })
+}
+
+/// Reads off the screen settle before they show: "more than 50" at once while nothing lower was seen, a number (or the
+/// count going up) after two looks in a row that fit together.
+#[derive(Default, Debug, Clone)]
+pub struct LeftSettle { last: Option<MonstersLeft>, shown: Option<MonstersLeft> }
+impl LeftSettle {
+    pub fn reset(&mut self) { *self = Self::default(); }
+    /// One look; what to show now, if it says anything.
+    pub fn feed(&mut self, m: MonstersLeft) -> Option<MonstersLeft> {
+        let before = self.last.replace(m);
+        let fits = match before {
+            Some(b) => b.more == m.more && m.n <= b.n,
+            None => false,
+        };
+        if fits || (m.more && self.shown.is_none_or(|s| s.more)) || self.shown == Some(m) { self.shown = Some(m); }
+        self.shown.filter(|s| *s == m)
+    }
+}
+
+/// The map info in the top right of the game (area, level, league, monsters left): x, y, w, h.
+pub fn info_box(rect: (i32, i32, i32, i32)) -> (i32, i32, i32, i32) {
+    let (x, y, w, h) = rect;
+    let bw = ((h as f64 * 0.45) as i32).min(w / 2);
+    (x + w - bw, y, bw, (h as f64 * 0.24) as i32)
+}
+
+/// The game's side panels (stash on the left, inventory on the right) are 370 wide at 600 tall.
+pub fn panel_width(h: i32) -> i32 { (h as f64 * 370.0 / 600.0).round() as i32 }
+
+/// Where a side panel's name ("Stash", "Inventory") is: x, y, w, h.
+pub fn panel_title_box(rect: (i32, i32, i32, i32), left: bool) -> (i32, i32, i32, i32) {
+    let (x, y, w, h) = rect;
+    let pw = panel_width(h);
+    (if left { x } else { x + w - pw }, y + h * 25 / 1000, pw, h * 50 / 1000)
+}
+
+/// The stash's "Highlight Items" search row, for when the tracker itself covers the stash's name.
+pub fn stash_search_box(rect: (i32, i32, i32, i32)) -> (i32, i32, i32, i32) { (rect.0, rect.1 + rect.3 * 795 / 1000, panel_width(rect.3), rect.3 * 50 / 1000) }
+
+/// Is that panel open, from what its title reads as?
+pub fn panel_open(lines: &[String], left: bool) -> bool {
+    lines.iter().any(|l| {
+        let t: String = l.chars().filter(|c| c.is_ascii_alphabetic()).collect::<String>().to_uppercase();
+        if left { t.contains("STASH") || t.contains("HIGHLIGHTITEMS") } else { t.contains("INVENTORY") || t.contains("COSMETICS") }
+    })
+}
+
 /// Where the Escape menu sits: its "GAME PAUSED" banner and buttons, in the middle of the upper half. The menu keeps its
 /// size by the window's height (his 3840x2160: panel 676 wide, banner at 0.20 of the height, last button at 0.47).
 pub fn pause_box(rect: (i32, i32, i32, i32)) -> (i32, i32, i32, i32) {
@@ -804,6 +869,40 @@ mod tests {
         let changes: Vec<MapChange> = late.iter().flat_map(|e| m.on_event(e)).collect();
         assert!(changes.contains(&MapChange::Left) && !m.inside);
         assert_eq!(m.current.as_ref().unwrap().in_map, 360, "09:55 to 10:01");
+    }
+
+    #[test]
+    fn monsters_left_and_panels() {
+        let m = |n, more| Some(MonstersLeft { n, more });
+        assert_eq!(monsters_left("More than 50 monsters remain"), m(50, true));
+        assert_eq!(monsters_left("12 monsters remain."), m(12, false));
+        assert_eq!(monsters_left("2026/11/14 14:27:12 219327109 cffb06be [INFO Client 29760] : 1 monster remains."), m(1, false));
+        assert_eq!(monsters_left("O monsters remain"), m(0, false));
+        // As read live over his map (24 Nov).
+        for t in ["50 monsters remain", "than 50 monsters remain", "More ihan 50 monsters remain", "vlovthan50 monsters remain", "o than 50'monsters remain", "coze than-50 monsters remain"] {
+            assert_eq!(monsters_left(t), m(50, true), "{t}");
+        }
+        assert_eq!((monsters_left("More ihansozmonsters remain"), monsters_left("monsters remain")), (None, None));
+        // One misread number doesn't show; two looks that fit do.
+        let mut s = LeftSettle::default();
+        let one = |n, more| MonstersLeft { n, more };
+        assert_eq!(s.feed(one(50, true)), m(50, true));
+        assert_eq!(s.feed(one(5, false)), None);
+        assert_eq!(s.feed(one(50, true)), m(50, true));
+        assert_eq!((s.feed(one(41, false)), s.feed(one(38, false))), (None, m(38, false)));
+        assert_eq!((s.feed(one(0, false)), s.feed(one(37, false))), (m(0, false), None), "going up needs a second look");
+        assert_eq!(s.feed(one(37, false)), m(37, false));
+        assert_eq!(monsters_left("Monster Level: 83"), None);
+        assert_eq!(monsters_left("3472 additional monsters remain"), None);
+        let l = |s: &str| vec![s.to_string()];
+        assert!(panel_open(&l("Highlight Items Type keywords here..."), true));
+        assert!(panel_open(&l("STASH"), true) && panel_open(&l("Inventory Cosmetics"), false));
+        assert!(!panel_open(&l("City Square"), false) && !panel_open(&l("Inventory"), true));
+        // His 3840x2160: the names sit at about (653, 109) and (3177, 109).
+        for (left, px) in [(true, 653), (false, 3177)] {
+            let (x, y, w, h) = panel_title_box((0, 0, 3840, 2160), left);
+            assert!(x < px - 200 && px + 200 < x + w && y < 85 && y + h > 135);
+        }
     }
 
     #[test]
