@@ -689,7 +689,8 @@ fn text_payload(app: &AppHandle, text: &str) -> PriceCheck {
     match trade_api::stats(&state.data_dir, poe2) {
         Ok(index) => match filter_core::trade::setup(text, &index) {
             Some(s) => PriceCheck { ninja: ninja_price(app, &s.item), setup: Some(s), league, from_ground: false, error: None, bulk: None, map: None, divine: None, compare: vec![], instant_all: false, trend: None, sold: None },
-            None => none(league, "That doesn't look like an item".into()),
+            // The game copied no item (the pointer was on an empty slot, a ground label or a window): say what to do.
+            None => none(league, "No item was copied: hold the mouse over the item itself (in your stash or inventory) and press the key again".into()),
         },
         Err(e) => match filter_core::trade::setup(text, &Default::default()) {
             Some(s) => PriceCheck { ninja: ninja_price(app, &s.item), setup: Some(s), league, from_ground: false,

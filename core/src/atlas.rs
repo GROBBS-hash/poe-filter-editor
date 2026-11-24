@@ -383,7 +383,10 @@ pub fn parse_link(text: &str) -> Result<Link, String> {
         return Err("mobalytics pages can't be read directly (they block apps). Their PoE 1 guides link each atlas tree on poeplanner.com: right-click that link, copy it, and paste it here".into());
     }
     if lower.contains("poe.ninja") {
-        return Err("poe.ninja links aren't supported yet: use their \"Export to pathofexile.com\" link, or maxroll".into());
+        // poe.ninja's atlas trees (24 Nov): ".../poe1/atlas-trees/<league>/tree/<pathofexile.com code>#i=0".
+        if lower.contains("/atlas-trees/") && lower.contains("/tree/") && !last.is_empty() { return Ok(Link::Official(last)); }
+        if lower.contains("/poe2/") { return Err("That's a Path of Exile 2 link".into()); }
+        return Err("That poe.ninja link isn't to one atlas tree: open a tree on poe.ninja's Atlas Trees page and copy that page's link".into());
     }
     if !t.contains('/') && !t.contains(' ') && (4..=16).contains(&t.len()) && t.chars().all(|c| c.is_ascii_alphanumeric()) {
         return Ok(Link::Maxroll(t.to_string()));
@@ -767,6 +770,16 @@ mod tests {
         let mut names: Vec<&str> = v.nodes.iter().filter(|n| matches!(g.kind(**n), 1 | 2)).map(|n| g.name(*n)).collect();
         names.sort();
         println!("{}", names.join(", "));
+    }
+
+    #[test]
+    fn poe_ninja_links() {
+        // A Covens tree from poe.ninja's Atlas Trees page (24 Nov): the code is pathofexile.com's.
+        let code = "AAAABgAAlwDOAlkCyAMJA2IHwwg_CLcKGQqqCwoLcQzgDO8O0w7mD2MQ4RFXFNoXFBfLGMQZdhmCHXQeWx9mJucovyjQKsArzivXMDUz5DYJNhI4IThvO9w8Sj4xPlk-Xz-qP9VAakFfQmhC_0RUR89M21b-WptazltLW8tb81zZXeheKl_rYrljtWWXZ-loQGp9bz1wyXErcXVzGHOlc7V1_3Y6dkV5w3oIewp7In0TgPCC4oQchEyGWYbGh2aIIojkiWiOapIslBmUxJZBlySY65nUnbGeKqBdoYei3qSspm2ngqgsqkevda_Bsfu0hrX9twK3EbvrvLy9FcC6xU_F_sYzxtDHL8dGyXTPydEk0vzV_tq93T_eHN8j4N7hi-Kn4zfjcOTM9Uz35Ph4-rL62vxhAAA";
+        assert_eq!(parse_link(&format!("https://poe.ninja/poe1/atlas-trees/covens/tree/{code}#i=0")).unwrap(), Link::Official(code.into()));
+        assert!(parse_link("https://poe.ninja/poe1/atlas-trees/covens").is_err());
+        let s = from_official(code, "x").unwrap();
+        assert!(s.variants[0].nodes.len() > 140, "{}", s.variants[0].nodes.len());
     }
 
     #[test]

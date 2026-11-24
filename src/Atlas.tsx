@@ -50,8 +50,8 @@ export default function Atlas() {
         onImported={(s, m) => { setStore(s); setSel(s.active); setMsg(`${m} (${key})`); }} />
       <div className="card">
         <h2>Add a strategy from a link <Tip>A <b>maxroll farming strategy</b> link (maxroll.gg/poe/farming-strategy-planner/…) or a
-          <b> pathofexile.com atlas tree</b> link, an <b>Atlas Tree Planner</b> link (atlas-blush-beta.vercel.app/#…), or a <b>poeplanner</b> atlas link (poeplanner.com/a/… — mobalytics guides link their trees there). maxroll strategies bring their notes, map device and threads too.</Tip></h2>
-        <p className="muted small">Paste a maxroll strategy, pathofexile.com, Atlas Tree Planner or poeplanner (mobalytics) atlas tree link.</p>
+          <b> pathofexile.com atlas tree</b> link, an <b>Atlas Tree Planner</b> link (atlas-blush-beta.vercel.app/#…), a <b>poeplanner</b> atlas link (poeplanner.com/a/… — mobalytics guides link their trees there), or a <b>poe.ninja</b> atlas tree (open one on its Atlas Trees page and copy the link). maxroll strategies bring their notes, map device and threads too.</Tip></h2>
+        <p className="muted small">Paste a maxroll strategy, or a pathofexile.com, poe.ninja, Atlas Tree Planner or poeplanner (mobalytics) atlas tree link.</p>
         <div className="row">
           <input className="text grow" placeholder="https://maxroll.gg/poe/farming-strategy-planner/…" value={link}
             onChange={(e) => setLink(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && link.trim() && !busy) doImport(); }} />
