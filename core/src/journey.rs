@@ -344,6 +344,20 @@ pub fn panel_title_box(rect: (i32, i32, i32, i32), left: bool) -> (i32, i32, i32
 /// The stash's "Highlight Items" search row, for when the tracker itself covers the stash's name.
 pub fn stash_search_box(rect: (i32, i32, i32, i32)) -> (i32, i32, i32, i32) { (rect.0, rect.1 + rect.3 * 795 / 1000, panel_width(rect.3), rect.3 * 50 / 1000) }
 
+/// The Atlas / map device screen's name and "Highlight Maps" row, top middle.
+pub fn atlas_title_box(rect: (i32, i32, i32, i32)) -> (i32, i32, i32, i32) {
+    let (x, y, w, h) = rect;
+    let bw = (h * 67 / 100).min(w);
+    (x + (w - bw) / 2, y + h * 25 / 1000, bw, h * 80 / 1000)
+}
+/// Is the Atlas screen open, from what's read there?
+pub fn atlas_open(lines: &[String]) -> bool {
+    lines.iter().any(|l| {
+        let t: String = l.chars().filter(|c| c.is_ascii_alphabetic()).collect::<String>().to_uppercase();
+        t == "ATLAS" || t.contains("HIGHLIGHTMAPS")
+    })
+}
+
 /// Is that panel open, from what its title reads as?
 pub fn panel_open(lines: &[String], left: bool) -> bool {
     lines.iter().any(|l| {
@@ -895,6 +909,9 @@ mod tests {
         assert_eq!(monsters_left("Monster Level: 83"), None);
         assert_eq!(monsters_left("3472 additional monsters remain"), None);
         let l = |s: &str| vec![s.to_string()];
+        assert!(atlas_open(&l("ATLAS")) && atlas_open(&l("Highlight Maps Type keywords here...")) && !atlas_open(&l("Atlas Thread")) && !atlas_open(&l("Highlight Items")));
+        let (x, y, w, h) = atlas_title_box((0, 0, 3840, 2160));
+        assert!(x < 1500 && x + w > 2350 && y < 85 && y + h > 205, "{x} {y} {w} {h}");
         assert!(panel_open(&l("Highlight Items Type keywords here..."), true));
         assert!(panel_open(&l("STASH"), true) && panel_open(&l("Inventory Cosmetics"), false));
         assert!(!panel_open(&l("City Square"), false) && !panel_open(&l("Inventory"), true));
