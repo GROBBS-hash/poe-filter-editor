@@ -81,6 +81,12 @@ pub fn read_lines_near_mouse(w: i32, h: i32) -> Result<Vec<String>, String> {
     imp::read_lines(w, h).map_err(|e| e.to_string())
 }
 
+/// Every line of text in this box of the screen, top to bottom (the map tracker's "GAME PAUSED" check).
+#[cfg(windows)]
+pub fn read_lines_in(x: i32, y: i32, w: i32, h: i32) -> Result<Vec<String>, String> { imp::read_lines_at(x + w / 2, y + h / 2, w, h).map_err(|e| e.to_string()) }
+#[cfg(not(windows))]
+pub fn read_lines_in(_x: i32, _y: i32, _w: i32, _h: i32) -> Result<Vec<String>, String> { Err("Reading the screen only works on Windows".into()) }
+
 #[cfg_attr(not(windows), allow(dead_code))]
 /// (text colour, background colour): background is the most common colour,
 /// text the most common one that clearly stands out from it.
@@ -474,11 +480,18 @@ mod imp {
     pub fn read_lines(w: i32, h: i32) -> windows::core::Result<Vec<String>> {
         let mut p = POINT::default();
         unsafe { GetCursorPos(&mut p)? };
+        read_around(p.x, p.y, w, h, true)
+    }
+
+    /// The text in a box round a point (big menu text: no need to enlarge it, unless the screen is small).
+    pub fn read_lines_at(cx: i32, cy: i32, w: i32, h: i32) -> windows::core::Result<Vec<String>> { read_around(cx, cy, w, h, h < 500) }
+
+    fn read_around(cx: i32, cy: i32, w: i32, h: i32, enlarge: bool) -> windows::core::Result<Vec<String>> {
         let max = OcrEngine::MaxImageDimension().unwrap_or(2600) as i32;
         let engine = OcrEngine::TryCreateFromUserProfileLanguages()?;
-        let (pic, _, _) = capture(p.x, p.y, w.min(max), h.min(max))?;
+        let (pic, _, _) = capture(cx, cy, w.min(max), h.min(max))?;
         // Small game text reads better enlarged, when it still fits the engine's limit.
-        let scale = if pic.w * 2 <= max && pic.h * 2 <= max { 2 } else { 1 };
+        let scale = if enlarge && pic.w * 2 <= max && pic.h * 2 <= max { 2 } else { 1 };
         let enlarged = upscale(&pic, 0, pic.w, scale);
         let buffer = CryptographicBuffer::CreateFromByteArray(&enlarged)?;
         let bitmap = SoftwareBitmap::CreateCopyWithAlphaFromBuffer(

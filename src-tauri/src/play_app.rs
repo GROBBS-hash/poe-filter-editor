@@ -685,6 +685,9 @@ fn start_pause_watch(app: AppHandle) {
     let mut away_streak = 0u32;
     // The bar a second ago: a menu holds still, play doesn't (MenuLook::covered_still).
     let mut prev: Vec<[u8; 3]> = vec![];
+    // The Escape menu, read off the screen ("GAME PAUSED"): paused by it now, and when it was last looked for.
+    let mut menu_up = false;
+    let mut looked = 0i64;
     thread::spawn(move || loop {
         thread::sleep(Duration::from_secs(1));
         let (on, look, inside, in_for) = with_store(&app, |s| {
@@ -701,6 +704,7 @@ fn start_pause_watch(app: AppHandle) {
             learn.clear();
             prev.clear();
             away_streak = 0;
+            menu_up = false;
             continue;
         }
         // Alt-tabbed to another program: stop the clock (after 2 seconds, so a quick look doesn't count).
@@ -720,8 +724,29 @@ fn start_pause_watch(app: AppHandle) {
         away_streak = 0;
         let Some(rect) = game_client_rect() else { continue };
         let Ok(hud) = screen::sample_points(&journey::hud_points(rect)) else { continue };
+        // The Escape menu says so itself: look every 2 s while it's up or the screen looks dimmed or still, else every 4.
+        let known = !look.hud.is_empty() && (rect.2, rect.3) == look.size;
+        let likely = menu_up || (known && journey::brightness(&look.hud, &hud) < 0.85) || (!prev.is_empty() && journey::changed_share(&prev, &hud) < 0.03);
+        if unix() - looked >= if likely { 2 } else { 4 } {
+            looked = unix();
+            let (x, y, w, h) = journey::pause_box(rect);
+            if let Ok(lines) = screen::read_lines_in(x, y, w, h) {
+                let up = journey::is_pause_menu(&lines);
+                if up != menu_up {
+                    menu_up = up;
+                    // It opened or closed some time since the last look.
+                    set(up, unix() - if likely { 1 } else { 2 });
+                    with_live(|l| l.steady.reset());
+                    prev = hud.clone();
+                    learn.clear();
+                }
+            }
+        }
+        // While it's up nothing else decides (and its dimmed bar isn't learnt as the normal look).
+        if menu_up { prev = hud; continue; }
         // No normal look yet, or the game changed size: learn it now.
         if look.hud.is_empty() || (rect.2, rect.3) != look.size {
+            prev = hud.clone();
             if in_for < 4 { continue; }
             learn.push(hud);
             if learn.len() > 3 { learn.remove(0); }

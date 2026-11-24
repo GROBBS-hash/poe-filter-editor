@@ -287,6 +287,31 @@ pub fn centre_points(rect: (i32, i32, i32, i32)) -> Vec<(i32, i32)> {
     out
 }
 
+/// Where the Escape menu sits: its "GAME PAUSED" banner and buttons, in the middle of the upper half. The menu keeps its
+/// size by the window's height (his 3840x2160: panel 676 wide, banner at 0.20 of the height, last button at 0.47).
+pub fn pause_box(rect: (i32, i32, i32, i32)) -> (i32, i32, i32, i32) {
+    let (x, y, w, h) = rect;
+    let bw = ((h as f64 * 0.40) as i32).min(w);
+    (x + (w - bw) / 2, y + (h as f64 * 0.14) as i32, bw, (h as f64 * 0.42) as i32)
+}
+
+/// Is this the Escape menu, as read off the screen? The banner, or two of its buttons (text reading slips a letter now
+/// and then, and the banner may be missing where the game can't pause).
+pub fn is_pause_menu(lines: &[String]) -> bool {
+    let plain = |s: &str| s.chars().filter(|c| c.is_ascii_alphabetic()).collect::<String>().to_uppercase();
+    let got: Vec<String> = lines.iter().map(|l| plain(l)).collect();
+    let has = |t: &str| got.iter().any(|l| l.contains(t));
+    has("GAMEPAUSED") || ["RESUMEGAME", "MICROTRANSACTIONSHOP", "EXITTOLOGIN", "EXITTOCHARACTER", "EXITPATHOFEXILE"].iter().filter(|t| has(t)).count() >= 2
+}
+
+/// How bright the bar is next to normal (1 = the same): the Escape menu dims everything, and on a bar that's mostly
+/// dark already that changes too few points for `covered` (his: 0.51 of them at half brightness, 24 Nov).
+pub fn brightness(normal: &[[u8; 3]], now: &[[u8; 3]]) -> f64 {
+    let sum = |v: &[[u8; 3]]| v.iter().flatten().map(|c| *c as f64).sum::<f64>();
+    let n = sum(normal);
+    if n <= 0.0 || now.is_empty() { 1.0 } else { sum(now) / n }
+}
+
 /// Share (0..1) of points whose colour changed clearly between two samples.
 pub fn changed_share(a: &[[u8; 3]], b: &[[u8; 3]]) -> f64 {
     let n = a.len().min(b.len());
@@ -748,6 +773,25 @@ mod tests {
         assert!(pause_look_suspect(12, 159));
         assert!(!pause_look_suspect(150, 30));
         assert!(!pause_look_suspect(10, 40));
+    }
+
+    #[test]
+    fn reads_the_escape_menu() {
+        let l = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        // As Windows read his own screenshot, 24 Nov.
+        assert!(is_pause_menu(&l(&["GAME PAUSED", "RESUME GAME", "OPTIONS", "MICROTRANSACTION SHOP", "EXIT TO LOG IN SCREEN"])));
+        assert!(is_pause_menu(&l(&["GANE PAUSFD", "RESUME GAME", "0PTIONS", "EXIT TO LOG IN SCREEN"])), "a misread banner");
+        assert!(!is_pause_menu(&l(&["2x Incursion Thread", "Resume Game of Life", "Options"])));
+        assert!(!is_pause_menu(&[]));
+        // 4K and ultrawide: the box is in the middle and takes in the banner and the buttons.
+        let (x, y, w, h) = pause_box((0, 0, 3840, 2160));
+        assert!(x < 1569 && x + w > 2245 && y < 400 && y + h > 1030, "{x} {y} {w} {h}");
+        let (x, _, w, _) = pause_box((0, 0, 3440, 1440));
+        assert_eq!(x + w / 2, 1720);
+        // A dark bar at half brightness: too few points change for the old check, the brightness shows it.
+        let bar = vec![[60, 60, 60]; 60].into_iter().chain(vec![[200, 180, 160]; 50]).collect::<Vec<[u8; 3]>>();
+        let dim: Vec<[u8; 3]> = bar.iter().map(|c| c.map(|v| v / 2)).collect();
+        assert!(changed_share(&bar, &dim) < 0.55 && brightness(&bar, &dim) < 0.6 && brightness(&bar, &bar) == 1.0);
     }
 
     #[test]
