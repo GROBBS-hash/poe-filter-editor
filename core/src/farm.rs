@@ -210,6 +210,10 @@ pub struct Farm {
     pub unseen: Vec<String>,
     /// Your own maps with a tree for exactly these mechanics.
     pub own: Option<Own>,
+    /// Things to know before running these together.
+    pub warn: Vec<Why>,
+    /// Exactly what was asked for.
+    pub picked: bool,
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq)]
@@ -226,6 +230,9 @@ pub struct FarmAsk {
     pub max_cost: Option<f64>,
     /// 0 = any number of mechanics, 1 = one on its own, 2 = two or more together.
     pub size: usize,
+    /// Mechanics you want to run (he asked 24 Nov: look up any strategy or mix): the first card is exactly these, the
+    /// rest add to them. Empty = the best of everything.
+    pub want: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -363,7 +370,7 @@ fn depth(m: &Mech, keys: &[String]) -> f64 {
         sum += points(t, &m.ninja) * t.copies as f64;
         n += t.copies as f64;
     }
-    if n > 0.0 { (sum / n / most).clamp(0.3, 1.0) } else if keys.len() == 2 { 0.7 } else { 0.55 }
+    if n > 0.0 { (sum / n / most).clamp(0.3, 1.0) } else { match keys.len() { 2 => 0.7, 3 => 0.55, n => 1.65 / n as f64 } }
 }
 
 /// How much more often than chance players who go for `a` also go for `b`, and their share.
@@ -383,14 +390,35 @@ fn copied(keys: &[String]) -> u32 {
         .filter(|t| seen.insert(&t.nodes)).map(|t| t.copies).sum()
 }
 
+/// The finder's mechanics among these keys, in its own order.
+fn in_order(keys: &BTreeSet<&str>) -> Vec<String> {
+    farms().mechanics.iter().filter(|m| keys.contains(m.key.as_str())).map(|m| m.key.clone()).collect()
+}
+
+/// How many kinds of Thread these need.
+fn thread_kinds(keys: &[String]) -> usize { keys.iter().filter_map(|k| mech(k)).filter(|m| m.thread.is_some()).count() }
+
+/// Mixes with everything in `want` and more: ones with evidence, and each other mechanic added to it (ones people rarely
+/// pair say so on the card, and come after the rest).
+fn with_wanted(want: &[String]) -> Vec<Vec<String>> {
+    let mut out: BTreeSet<Vec<String>> = combos().into_iter().filter(|c| c.len() > want.len() && want.iter().all(|w| c.contains(w))).collect();
+    for m in &farms().mechanics {
+        if want.contains(&m.key) { continue; }
+        let mut keys: BTreeSet<&str> = want.iter().map(String::as_str).collect();
+        keys.insert(&m.key);
+        let keys = in_order(&keys);
+        if keys.len() <= 5 && thread_kinds(&keys) <= MAX_THREAD_KINDS { out.insert(keys); }
+    }
+    out.into_iter().collect()
+}
+
 /// Combinations with evidence that they work in one tree: players' trees, creators' trees, or a known pairing.
 fn combos() -> Vec<Vec<String>> {
     let f = farms();
-    let order = |keys: BTreeSet<&str>| -> Vec<String> { f.mechanics.iter().filter(|m| keys.contains(m.key.as_str())).map(|m| m.key.clone()).collect() };
+    let order = |keys: BTreeSet<&str>| in_order(&keys);
     let mut out: BTreeSet<Vec<String>> = BTreeSet::new();
     let mut add = |keys: Vec<String>| {
-        let kinds = keys.iter().filter_map(|k| mech(k)).filter(|m| m.thread.is_some()).count();
-        if !keys.is_empty() && keys.len() <= 5 && kinds <= MAX_THREAD_KINDS { out.insert(keys); }
+        if !keys.is_empty() && keys.len() <= 5 && thread_kinds(&keys) <= MAX_THREAD_KINDS { out.insert(keys); }
     };
     for m in &f.mechanics { add(vec![m.key.clone()]); }
     for t in meta().trees.values().flatten().filter(|t| t.copies >= COPIES) {
@@ -414,10 +442,10 @@ pub fn find(file: &PriceFile, temples: &Temples, runs: Runs, trees: &[OwnTree], 
     let worth = worths(file, temples, div);
     let w = |k: &str| worth.iter().find(|x| x.key == k);
     let jack = if ask.count == Count::Steady { 0.0 } else { 1.0 };
-    let mut list: Vec<Farm> = combos().into_iter().filter_map(|keys| {
+    // `asked`: exactly what he picked, shown whatever it's worth.
+    let card = |keys: Vec<String>, asked: bool| -> Option<Farm> {
         let parts: Vec<(&Mech, &Worth, f64)> = keys.iter().filter_map(|k| Some((mech(k)?, w(k)?))).map(|(m, x)| (m, x, depth(m, &keys))).collect();
-        if parts.iter().all(|p| p.1.blind) || parts.iter().filter(|p| p.1.blind).count() * 2 > parts.len() { return None; }
-        match ask.size { 1 if keys.len() != 1 => return None, 2 if keys.len() < 2 => return None, _ => {} }
+        if parts.is_empty() || !asked && (parts.iter().all(|p| p.1.blind) || parts.iter().filter(|p| p.1.blind).count() * 2 > parts.len()) { return None; }
         // A creator's tree for exactly these (else one with all of these) says how many Threads.
         let creator = picks().picks.iter().filter(|p| keys.iter().all(|k| p.mechanics.contains(k)))
             .min_by_key(|p| (p.mechanics.iter().filter(|m| mech(m).is_some()).count(), p.group != "maxroll"));
@@ -429,8 +457,19 @@ pub fn find(file: &PriceFile, temples: &Temples, runs: Runs, trees: &[OwnTree], 
             Some(ThreadCost { key: m.key.clone(), thread: t.clone(), count, each: item.map(|i| i.value).unwrap_or(0.0), change: item.and_then(|i| i.change) })
         }).collect();
         let cost: f64 = threads.iter().map(|t| t.each * t.count as f64).sum();
-        if ask.max_cost.is_some_and(|c| cost > c) || (ask.max_cost == Some(0.0) && !threads.is_empty()) { return None; }
 
+        let mut warn: Vec<Why> = vec![];
+        if threads.len() > MAX_THREAD_KINDS {
+            warn.push(Why { text: format!("A map takes {MAX_THREAD_KINDS} kinds of Thread and these are {}: you'd run them in turns", threads.len()), src: "guides".into() });
+        }
+        for (i, a) in parts.iter().enumerate() {
+            for b in &parts[i + 1..] {
+                if let Some((x, s)) = lift(&a.0.key, &b.0.key).filter(|(x, _)| *x < 0.7) {
+                    warn.push(Why { text: format!("Players rarely take {} and {} together ({:.0}% of {} trees, {x:.1}× chance)", a.0.label, b.0.label, s * 100.0, a.0.label), src: "poe.ninja".into() });
+                }
+            }
+        }
+        warn.truncate(3);
         let mut why: Vec<Why> = vec![];
         for s in f.synergies.iter().filter(|s| s.with.iter().all(|k| keys.contains(k))) { why.push(Why { text: s.why.clone(), src: s.src.clone() }); }
         let helps = why.len();
@@ -489,7 +528,10 @@ pub fn find(file: &PriceFile, temples: &Temples, runs: Runs, trees: &[OwnTree], 
             Some((a @ (1 | 2), g)) => Some(Why { text: format!("{}: what the creator's setup runs", if a == 2 { "Eater of Worlds" } else { "Searing Exarch" }), src: if g == "maxroll" { "maxroll" } else { "community" }.into() }),
             _ => pays,
         };
-        let maps = map_tips(&keys, exact.or(creator), runs);
+        // Any creator's tree with all of these that names its maps, the closest first.
+        let mapped = picks().picks.iter().filter(|p| !p.maps.is_empty() && keys.iter().all(|k| p.mechanics.contains(k)))
+            .min_by_key(|p| (p.group != "maxroll", p.mechanics.iter().filter(|m| mech(m).is_some()).count()));
+        let maps = map_tips(&keys, exact.filter(|p| !p.maps.is_empty()).or(mapped), runs);
         let avoid = f.avoid.iter().filter(|a| keys.contains(&a.mech) && !maps.iter().any(|m| m.map == a.map))
             .map(|a| Why { text: format!("{}: {}", a.map.trim_end_matches(" Map"), a.why), src: a.src.clone() }).collect();
         Some(Farm {
@@ -504,15 +546,25 @@ pub fn find(file: &PriceFile, temples: &Temples, runs: Runs, trees: &[OwnTree], 
             rolls: exact.filter(|p| !p.rolls.is_empty()).map(|p| p.rolls.join(", ")),
             unseen: parts.iter().filter_map(|p| p.1.unseen.clone()).collect(),
             own: own_of(&mine.iter().filter(|m| m.0 == keys).map(|m| m.1).collect::<Vec<_>>(), div),
+            warn, picked: asked,
             keys,
         })
-    }).collect();
+    };
+    let every: Vec<Farm> = combos().into_iter().filter_map(|k| card(k, false)).collect();
+    // Every score is against the best mix there is, whatever is being looked at.
+    let best = every.iter().map(|x| x.value).fold(0.0, f64::max).max(1e-9);
+    let want = in_order(&ask.want.iter().map(String::as_str).collect());
+    let fits = |x: &Farm| !(ask.max_cost.is_some_and(|c| x.cost > c) || (ask.max_cost == Some(0.0) && !x.threads.is_empty()))
+        && match ask.size { 1 => x.keys.len() == 1, 2 => x.keys.len() >= 2, _ => true };
+    let mut list: Vec<Farm> = if want.is_empty() { every } else { with_wanted(&want).into_iter().filter_map(|k| card(k, false)).collect() };
+    list.retain(fits);
     list.sort_by(|a, b| b.value.total_cmp(&a.value));
+    if !want.is_empty() { list.sort_by_key(|x| !x.warn.is_empty()); }
+    if !want.is_empty() { if let Some(x) = card(want.clone(), true) { list.insert(0, x); } }
     // Next to a typical mechanic on its own: plenty sold per farmer, or not much.
     let mut alone: Vec<f64> = worth.iter().filter(|x| !x.blind).map(|x| x.steady + x.jackpots * jack + x.raw).collect();
     alone.sort_by(f64::total_cmp);
     let middle = alone.get(alone.len() / 2).copied().unwrap_or(0.0);
-    let best = list.first().map(|x| x.value).unwrap_or(1.0).max(1e-9);
     for x in &mut list {
         x.score = x.value / best * 100.0;
         // Per mechanic: a mix of three has to sell more than one on its own would.
@@ -523,9 +575,11 @@ pub fn find(file: &PriceFile, temples: &Temples, runs: Runs, trees: &[OwnTree], 
     // Cards that differ: one that only adds to or drops from a better card, or shares most of it, isn't a new idea.
     let mut farms_out: Vec<Farm> = vec![];
     for x in list {
-        let a: BTreeSet<&String> = x.keys.iter().collect();
-        let near = farms_out.iter().any(|y| {
-            let b: BTreeSet<&String> = y.keys.iter().collect();
+        // With something picked, only what's added to it has to differ.
+        let added = |k: &&String| !want.contains(k);
+        let a: BTreeSet<&String> = x.keys.iter().filter(added).collect();
+        let near = !x.picked && farms_out.iter().filter(|y| !y.picked).any(|y| {
+            let b: BTreeSet<&String> = y.keys.iter().filter(added).collect();
             let both = a.intersection(&b).count();
             both == a.len() || both == b.len() || both * 2 > a.union(&b).count()
         });
@@ -633,6 +687,27 @@ mod tests {
     }
 
     #[test]
+    fn any_mix_can_be_looked_up() {
+        let ask = |want: &[&str]| FarmAsk { want: want.iter().map(|s| s.to_string()).collect(), ..Default::default() };
+        // Ritual: its own card first, then mixes with it, each adding something else.
+        let r = find(&file(), Temples::shipped(), &[], &[], &ask(&["ritual"]));
+        assert!(r.farms[0].picked && r.farms[0].keys == ["ritual"]);
+        assert!(r.farms.len() > 3 && r.farms[1..].iter().all(|f| f.keys.len() > 1 && f.keys.contains(&"ritual".to_string()) && !f.picked), "{:?}", r.farms.iter().map(|f| &f.keys).collect::<Vec<_>>());
+        // Any order, odd mixes and too many Threads still get a card, with what to know about it.
+        let r = find(&file(), Temples::shipped(), &[], &[], &ask(&["harvest", "ritual"]));
+        assert_eq!(r.farms[0].keys, ["ritual", "harvest"]);
+        let r = find(&file(), Temples::shipped(), &[], &[], &ask(&["blight", "legion", "breach", "ritual"]));
+        assert!(r.farms[0].keys.len() == 4 && r.farms[0].warn[0].text.contains("kinds of Thread"), "{:?}", r.farms[0].warn);
+        // Even with a cost limit or a size that doesn't fit, what was asked for shows; unknown names are dropped.
+        let r = find(&file(), Temples::shipped(), &[], &[], &FarmAsk { max_cost: Some(0.0), size: 2, ..ask(&["legion", "nonsense"]) });
+        assert_eq!(r.farms[0].keys, ["legion"]);
+        // The score is on one scale: alone or picked, the same.
+        let alone = find(&file(), Temples::shipped(), &[], &[], &FarmAsk { size: 1, ..Default::default() });
+        let e = alone.farms.iter().find(|f| f.keys == ["essence"]).unwrap().score;
+        assert_eq!(find(&file(), Temples::shipped(), &[], &[], &ask(&["essence"])).farms[0].score, e);
+    }
+
+    #[test]
     fn own_results_go_on_the_right_card() {
         // The most copied Legion + Beasts + Delirium tree: it farms exactly those, so its maps show on that card.
         let t = meta().trees["All"].iter().find(|t| t.copies == 297).expect("the most copied tree");
@@ -693,6 +768,12 @@ mod tests {
             let r = find(&prices, Temples::shipped(), &runs, &[], &ask);
             println!("== {ask:?}");
             for f in &r.farms { println!("{:5.1} {:40} value {:6.0} steady {:5.0} jack {:5.0} raw {:5.0} cost {:4.0}c {} players {:?} maps {:?} also {:?}", f.score, f.title, f.value, f.steady, f.jackpots, f.raw, f.cost, f.verdict, f.players.map(|p| (p * 1000.0).round() / 10.0), f.maps.iter().map(|m| (&m.map, m.yours)).collect::<Vec<_>>(), f.also.iter().map(|a| &a.0).collect::<Vec<_>>()); }
+        }
+        for want in [vec!["ritual"], vec!["ritual", "harvest"], vec!["ultimatum"], vec!["abyss"], vec!["blight", "expedition"]] {
+            let r = find(&prices, Temples::shipped(), &runs, &[], &FarmAsk { want: want.iter().map(|s| s.to_string()).collect(), ..Default::default() });
+            println!("== want {want:?}");
+            if let Ok(o) = std::env::var("FARM_OUT") { std::fs::write(o.replace(".json", &format!("-{}.json", want.join("+"))), serde_json::to_string(&r).unwrap()).unwrap(); }
+            for f in &r.farms { println!("{:5.1} {:40} {} cost {:3.0}c maps {:?} warn {:?}", f.score, f.title, f.verdict, f.cost, f.maps.iter().map(|m| &m.map).collect::<Vec<_>>(), f.warn.iter().map(|w| &w.text).collect::<Vec<_>>()); }
         }
         let r = find(&prices, Temples::shipped(), &runs, &[], &FarmAsk::default());
         for m in &r.mechanics { println!("{:12} share {:4.1}% steady {:5.0} jack {:5.0} raw {:4.0} blind {} top {:?}", m.key, m.share * 100.0, m.steady, m.jackpots, m.raw, m.blind, m.drops.iter().take(3).map(|d| format!("{} {:.0}div", d.name, d.sold_div)).collect::<Vec<_>>()); }

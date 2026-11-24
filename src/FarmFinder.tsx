@@ -12,14 +12,14 @@ type Thread = { key: string; thread: string; count: number; each: number; change
 type MapTip = { map: string; why: Why[]; yours: [number, number] | null };
 type Farm = { keys: string[]; title: string; score: number; value: number; steady: number; jackpots: number; raw: number; verdict: string;
   estimate: boolean; players: number | null; change: number | null; drops: Drop[]; threads: Thread[]; cost: number; why: Why[];
-  also: [string, string][]; altar: Why | null; maps: MapTip[]; avoid: Why[]; creator: [string, string, string] | null; rolls: string | null; unseen: string[]; own: Own | null };
+  also: [string, string][]; altar: Why | null; maps: MapTip[]; avoid: Why[]; creator: [string, string, string] | null; rolls: string | null; unseen: string[]; own: Own | null; warn: Why[]; picked: boolean };
 /** What your own maps made with a tree for it. */
 type Own = { div_hour: number; chaos_map: number; maps: number; few: boolean; trees: string[] };
 type OwnRow = { name: string; keys: string[]; title: string; own: Own };
 type Worth = { key: string; label: string; pic: string; share: number; steady: number; jackpots: number; raw: number; change: number | null;
   drops: Drop[]; unseen: string | null; estimate: boolean; blind: boolean };
 type Finder = { farms: Farm[]; mechanics: Worth[]; trees_from: string; trees: number; prices_from: string; temples_from: string; own: OwnRow[]; divine: number };
-type Ask = { count: "all" | "steady"; max_cost: number | null; size: number };
+type Ask = { count: "all" | "steady"; max_cost: number | null; size: number; want: string[] };
 
 const SRC: Record<string, string> = { maxroll: "maxroll", "poe.ninja": "players' trees", guides: "guide sites", community: "community tree", "patch notes": "patch notes", "trade site": "trade site" };
 const VERDICT: Record<string, string> = { "Under-farmed": "good", Strong: "good", Solid: "ok", Crowded: "warn" };
@@ -91,8 +91,8 @@ function Card({ f, pics, best, div, onBuild }: { f: Farm; pics: Record<string, s
     <article className={`ff-card ${best ? "best" : ""}`}>
       <header>
         <span className="ff-pics">{f.keys.map((k) => <ItemIcon key={k} name={pics[k]} size={38} />)}</span>
-        <div><h3>{f.title}</h3><span className={`ff-tag ${VERDICT[f.verdict] ?? "ok"}`} title={HINT[f.verdict]}>{f.verdict}</span></div>
-        <div className="ff-score" title="Against the best one today"><b>{Math.round(f.score)}</b><span>/100</span></div>
+        <div>{f.picked && <div className="ff-picked">Your pick</div>}<h3>{f.title}</h3><span className={`ff-tag ${VERDICT[f.verdict] ?? "ok"}`} title={HINT[f.verdict]}>{f.verdict}</span></div>
+        <div className="ff-score" title="Against the best mix there is today"><b>{Math.round(f.score)}</b><span>/100</span></div>
       </header>
       <Split f={f} />
       <div className="ff-drops">
@@ -111,6 +111,7 @@ function Card({ f, pics, best, div, onBuild }: { f: Farm; pics: Record<string, s
           </span>)}</dd></div>
         {f.players != null && <div><dt>Players running {f.keys.length > 1 ? "both" : "it"}</dt><dd>{(f.players * 100).toFixed(f.players < 0.02 ? 1 : 0)}%</dd></div>}
       </dl>
+      {f.warn.slice(0, open ? 3 : 1).map((w, i) => <div key={i} className="small ff-warn">{w.text} <span className="ff-src">{SRC[w.src] ?? w.src}</span></div>)}
       <div className="ff-h">Best maps</div>
       <Maps f={f} />
       {f.also.length > 0 && <div className="small"><span className="muted" title="Tick these under Build my own if you have points left">Also worth points: </span>{f.also.map((a) => a[1]).join(", ")}</div>}
@@ -135,7 +136,7 @@ function Card({ f, pics, best, div, onBuild }: { f: Farm; pics: Record<string, s
 }
 
 function readAsk(): Ask {
-  const plain: Ask = { count: "all", max_cost: null, size: 0 };
+  const plain: Ask = { count: "all", max_cost: null, size: 0, want: [] };
   try { return { ...plain, ...JSON.parse(localStorage.getItem("farm-ask") ?? "{}") }; } catch { return plain; }
 }
 
@@ -151,7 +152,7 @@ export default function FarmFinder({ onBuild }: { onBuild: () => void }) {
   const [table, setTable] = useState(false);
   useEffect(() => {
     let on = true;
-    const load = () => invoke<Finder>("farm_find", { ask }).then((x) => { if (on) { setR(x); setErr(""); } }).catch((e) => { if (on) setErr(friendly(e)); });
+    const load = () => invoke<Finder>("farm_find", { ask: ask.want.length ? { ...ask, size: 0 } : ask }).then((x) => { if (on) { setR(x); setErr(""); } }).catch((e) => { if (on) setErr(friendly(e)); });
     load();
     try { localStorage.setItem("farm-ask", JSON.stringify(ask)); } catch { /* fine */ }
     const un = [listen("prices-updated", load), listen("temples-updated", load)];
@@ -169,6 +170,14 @@ export default function FarmFinder({ onBuild }: { onBuild: () => void }) {
   };
   const pics: Record<string, string> = Object.fromEntries((r?.mechanics ?? []).map((m) => [m.key, m.pic]));
   const rest = r?.farms.slice(3) ?? [];
+  // Every mechanic by name, so each is always in the same place.
+  const all = [...(r?.mechanics ?? [])].sort((a, b) => a.label.localeCompare(b.label));
+  const want = ask.want;
+  const pick = (keys: string[]) => {
+    setAsk({ ...ask, want: keys });
+    document.querySelector(".ff")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  const toggle = (k: string) => setAsk({ ...ask, want: want.includes(k) ? want.filter((x) => x !== k) : [...want, k] });
 
   return (
     <div className="card ff">
@@ -176,14 +185,24 @@ export default function FarmFinder({ onBuild }: { onBuild: () => void }) {
         going for them. It can't see drops per map, so treat it as a good starting point: your own maps are the proof. Raw currency, beasts
         and temples are estimates.</Tip></h2>
       {r && <p className="muted small">Prices from {day(r.prices_from)} (poe.ninja) · {r.trees.toLocaleString()} players' trees from {day(r.trees_from)} · creator trees from maxroll · temples from {day(r.temples_from)} (trade site)</p>}
+      {all.length > 0 && <>
+        <div className="ap-step">I want to run <span className="ap-step-note">{want.length === 0 ? "(pick one or more, or leave empty for the best of everything)" : ""}</span>
+          {want.length > 0 && <button className="link small" onClick={() => setAsk({ ...ask, want: [] })}>Clear</button>}</div>
+        <div className="ap-tiles ff-tiles">{all.map((m) => (
+          <button key={m.key} className={`ap-tile ${want.includes(m.key) ? "on" : ""}`} aria-pressed={want.includes(m.key)} onClick={() => toggle(m.key)} title={m.label}>
+            <ItemIcon name={m.pic} size={34} /><span>{m.label}</span>
+          </button>
+        ))}</div>
+      </>}
       <div className="row ff-opts">
         <Seg opts={[["All drops", "all"], ["Regular drops only", "steady"]] as [string, Ask["count"]][]} now={ask.count} set={(count) => setAsk({ ...ask, count })} />
         <Seg opts={COSTS} now={ask.max_cost} set={(max_cost) => setAsk({ ...ask, max_cost })} />
-        <Seg opts={[["Any mix", 0], ["One mechanic", 1], ["Two or more", 2]] as [string, number][]} now={ask.size} set={(size) => setAsk({ ...ask, size })} />
+        {want.length === 0 && <Seg opts={[["Any mix", 0], ["One mechanic", 1], ["Two or more", 2]] as [string, number][]} now={ask.size} set={(size) => setAsk({ ...ask, size })} />}
       </div>
       {err && <div className="small at-msg">{err}</div>}
       {!r && !err && <div className="muted small">Comparing prices and trees…</div>}
       {r && r.farms.length === 0 && <div className="muted small">Nothing fits those choices.</div>}
+      {r && want.length > 0 && <div className="ap-step">Your pick, and what goes with it</div>}
       {r && <div className="ff-cards">{r.farms.slice(0, 3).map((f, i) => (
         <Card key={f.title} f={f} pics={pics} best={i === 0} div={r.divine} onBuild={() => build(f)} />
       ))}</div>}
@@ -198,9 +217,9 @@ export default function FarmFinder({ onBuild }: { onBuild: () => void }) {
         ))}</div>
       </>}
       {r && rest.length > 0 && <>
-        <div className="ap-step">More ideas</div>
+        <div className="ap-step">{want.length ? "More mixes with it" : "More ideas"} <span className="ap-step-note">(click one to see it)</span></div>
         <div className="ff-rest">{rest.map((f) => (
-          <button key={f.title} onClick={() => build(f)} title={["Build this tree", ...f.why.map((w) => "• " + w.text)].join("\n")}>
+          <button key={f.title} onClick={() => pick(f.keys)} title={["Show this one", ...f.why.map((w) => "• " + w.text), ...f.warn.map((w) => "• " + w.text)].join("\n")}>
             {f.keys.map((k) => <ItemIcon key={k} name={pics[k]} size={24} />)}
             <span><b>{f.title}</b><small>{Math.round(f.score)}/100{f.maps[0] ? ` · ${short(f.maps[0].map)}` : ""}{f.cost > 0 ? ` · ${money(f.cost, r.divine)} of Threads` : ""}</small></span>
           </button>
@@ -212,7 +231,7 @@ export default function FarmFinder({ onBuild }: { onBuild: () => void }) {
           <caption className="muted small">Divines of drops sold for each 1% of players going for it. ~ is an estimate.</caption>
           <thead><tr><th>Mechanic</th><th>Regular drops</th><th>Big drops</th><th>Raw currency</th><th>Players</th><th>7 days</th><th>Sells most</th></tr></thead>
           <tbody>{r.mechanics.map((m) => (
-            <tr key={m.key}>
+            <tr key={m.key} className="ff-row" onClick={() => pick([m.key])} title={`Show ${m.label}`}>
               <td><span className="row ff-m"><ItemIcon name={m.pic} size={26} /><b>{m.label}</b></span></td>
               {m.blind
                 ? <td colSpan={3} className="muted small">can't be ranked: {m.unseen ?? "its drops"} have no price list</td>

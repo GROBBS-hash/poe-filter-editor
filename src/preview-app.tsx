@@ -324,7 +324,8 @@ mockIPC((cmd, args) => {
   // Its cards: real drops per theme (dev: dump his with THEME_CARDS_OUT=.claude/theme-cards.json, see preview.rs).
   if (cmd === "theme_cards") return fetch("/.claude/theme-cards.json").then((r) => r.json());
   // The farm finder (dev: FARM_OUT=.claude/farm.json, see core farm.rs).
-  if (cmd === "farm_find") return fetch("/.claude/farm.json").then((r) => r.json());
+  if (cmd === "farm_find") { const want = (args as { ask: { want: string[] } }).ask.want ?? [];
+    return fetch(want.length ? `/.claude/farm-${want.join("+")}.json` : "/.claude/farm.json").then((r) => r.json()); }
   // Levelling gear page: a level 50 Elementalist and a few levelling uniques.
   if (cmd === "gear_setup") return { character: ["Witch", "Elementalist", 50], league: "Keepers", gems: { Body: ["Arc", "Spell Echo"] },
     stats: [{ id: "life", name: "Life" }, { id: "resistances", name: "Resistances" }, { id: "movement_speed", name: "Movement speed" }, { id: "spell_damage", name: "Spell damage" }] };

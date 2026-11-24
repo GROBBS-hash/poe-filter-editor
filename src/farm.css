@@ -62,3 +62,9 @@
 .ff-own small { color: var(--muted); }
 .ff-own .ff-own-n { margin-left: auto; white-space: nowrap; }
 .ff-own .item-icon { object-fit: contain; }
+.ff-tiles { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); margin-bottom: 10px; }
+.ff-tiles .ap-tile { padding: 8px 4px 6px; }
+.ff-picked { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--gold); margin-bottom: 1px; }
+.ff-warn { color: var(--gold); }
+.ff-row { cursor: pointer; }
+.ff-row:hover td { background: var(--raised); }
