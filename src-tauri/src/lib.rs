@@ -5,6 +5,7 @@ mod wealth_app;
 mod bulk_app;
 mod atlas_app;
 mod play_app;
+mod phone_app;
 mod win_place;
 mod updates;
 
@@ -1328,8 +1329,10 @@ fn start_whisper_watcher(app: AppHandle) {
             let lines = std::mem::replace(&mut partial, keep);
             for line in lines.lines() {
                 play_app::on_line(&app, line);
-                if !trades_on { continue; }
                 let Some(ev) = filter_core::whispers::parse_line(line) else { continue };
+                // Phone alerts work whether or not the trade pop-up is on.
+                phone_app::on_log_event(&app, &ev);
+                if !trades_on { continue; }
                 let is_trade = matches!(&ev, filter_core::whispers::LogEvent::Whisper(w) if w.item.is_some());
                 let Some(w) = app.get_webview_window("trades") else { continue };
                 let _ = w.emit("trade-event", &ev);
@@ -3002,6 +3005,8 @@ pub fn run() {
             start_hotkey_focus_watcher(app.handle().clone());
             start_whisper_watcher(app.handle().clone());
             play_app::start_watchers(app.handle().clone());
+            phone_app::start_shop_watch(app.handle().clone());
+            phone_app::start_page(app.handle());
             start_tree_watcher(app.handle().clone());
             start_live_searches(app.handle().clone());
             wealth_app::start_session_timer(app.handle().clone());
@@ -3128,7 +3133,8 @@ pub fn run() {
             play_app::maps_done, play_app::maps_history, play_app::maps_clear, play_app::watch_action, play_app::searches_get,
             play_app::searches_save, play_app::search_type, play_app::stash_highlight, play_app::sheets_list, play_app::sheets_add,
             play_app::sheets_remove, play_app::notes_get, play_app::notes_save, play_app::play_toggle, play_app::play_hide,
-            play_app::trade_price_check, play_app::show_stash_spot, play_app::hide_stash_spot, play_app::alerts_get, play_app::alerts_save, play_app::play_prefs, play_app::play_prefs_get, play_app::price_names, play_app::pause_setup, play_app::pause_prefs, play_app::loot_prefs_save, wealth_app::poe_login,
+            play_app::trade_price_check, play_app::show_stash_spot, play_app::hide_stash_spot, play_app::alerts_get, play_app::alerts_save, play_app::play_prefs, play_app::play_prefs_get, play_app::price_names,
+            phone_app::phone_get, phone_app::phone_save, phone_app::phone_test, phone_app::phone_check_shop, phone_app::phone_new_key, play_app::pause_setup, play_app::pause_prefs, play_app::loot_prefs_save, wealth_app::poe_login,
             open_rule,
             gear_picks,
             open_url,
