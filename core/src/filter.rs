@@ -100,9 +100,7 @@ impl Block {
 
     /// Replaces the block's look and sound lines with `actions`.
     pub fn replace_style(&mut self, actions: &[String]) {
-        const STYLE: [&str; 14] = ["SetFontSize", "SetTextColor", "SetBorderColor", "SetBackgroundColor", "PlayAlertSound",
-            "PlayAlertSoundPositional", "CustomAlertSound", "CustomAlertSoundOptional", "DisableDropSound", "EnableDropSound",
-            "DisableDropSoundIfAlertSound", "EnableDropSoundIfAlertSound", "PlayEffect", "MinimapIcon"];
+        const STYLE: [&str; 14] = STYLE_KEYS;
         let key = |l: &str| l.trim_start().split_whitespace().next().unwrap_or("").to_string();
         let indent: String = self.lines.first().map(|l| l.chars().take_while(|c| *c == ' ' || *c == '\t').collect()).unwrap_or_else(|| "\t".into());
         self.lines.retain(|l| !STYLE.contains(&key(l).as_str()));
@@ -111,10 +109,21 @@ impl Block {
         self.lines.splice(at..at, new);
     }
 
+    /// The block's look and sound lines (trimmed), as replace_style takes them.
+    pub fn style_lines(&self) -> Vec<String> {
+        self.lines.iter().map(|l| l.trim().to_string())
+            .filter(|l| STYLE_KEYS.contains(&l.split_whitespace().next().unwrap_or(""))).collect()
+    }
+
     fn disabled_empty(&self) -> bool {
         self.lines.iter().any(|l| l.contains("(emptied by editor)"))
     }
 }
+
+/// Filter keywords for a block's look and sound.
+const STYLE_KEYS: [&str; 14] = ["SetFontSize", "SetTextColor", "SetBorderColor", "SetBackgroundColor", "PlayAlertSound",
+    "PlayAlertSoundPositional", "CustomAlertSound", "CustomAlertSoundOptional", "DisableDropSound", "EnableDropSound",
+    "DisableDropSoundIfAlertSound", "EnableDropSoundIfAlertSound", "PlayEffect", "MinimapIcon"];
 
 fn quoted_values(line: &str) -> Vec<String> {
     line.split('"').skip(1).step_by(2).map(str::to_string).collect()

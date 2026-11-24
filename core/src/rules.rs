@@ -617,6 +617,31 @@ mod tests {
     }
 
     #[test]
+    fn reset_puts_neversink_back() {
+        // 24 Nov: F2 "Reset to NeverSink's". The parent (Red-Maps) restyled and hid a step and moved Portal Scroll in.
+        use super::*;
+        use crate::filter::parse_filter;
+        let text = "Show # $type->currency->stackedsix $tier->t4\n\tStackSize >= 6\n\tBaseType == \"Portal Scroll\" \"Scroll of Wisdom\"\n\tSetFontSize 40\n\nShow # $type->currency->stackedsix $tier->t5\n\tStackSize >= 6\n\tBaseType == \"Orb of Alchemy\"\n\tSetFontSize 45\n\tSetTextColor 1 2 3 255\n";
+        let orig = parse_filter(text);
+        let tp = vec!["currency".to_string(), "stackedsix".to_string()];
+        let parent = vec![
+            Rule::Tier { type_path: tp.clone(), tier: "t5".into(), show: Some(false), actions: Some(vec!["SetFontSize 20".into()]), min_stack: Some(10), min_item_tier: None, conds: None, off: false, look: None },
+            Rule::MoveBase { type_path: tp.clone(), base: "Portal Scroll".into(), to_tier: "t5".into(), off: false },
+        ];
+        assert_eq!(touching(&parent, &tp, "t5", "Portal Scroll"), vec![0, 1]);
+        let back = restore(&orig, &parent, &tp, "t5", "Portal Scroll");
+        let mut segs = parse_filter(text);
+        let all: Vec<Rule> = parent.iter().cloned().chain(back).collect();
+        apply_with_extra(&mut segs, &all, "", "\n");
+        let out = crate::filter::render_filter(&segs);
+        assert!(out.contains("Show # $type->currency->stackedsix $tier->t5"), "{out}");
+        assert!(out.contains("SetTextColor 1 2 3 255") && out.contains("StackSize >= 6\n\tBaseType == \"Orb of Alchemy\""), "{out}");
+        // Portal Scroll is back in tier 4, not tier 5.
+        let t4 = out.split("$tier->t5").next().unwrap();
+        assert!(t4.contains("Portal Scroll"), "{out}");
+    }
+
+    #[test]
     fn corrupted_only() {
         let item = Item { item_class: "Jewels".into(), base_type: "Cobalt Jewel".into(), rarity: "Rare".into(), corrupted: true, ..Default::default() };
         let opts = MatchOpts { corrupted: true, ..Default::default() };
@@ -797,4 +822,54 @@ mod tests {
             beam: None, minimap: None, sound: Sound::Custom { file: "gold.wav\"\nHide".into(), volume: 900 }, label_hidden: false };
         assert!(style_actions(&style).contains(&"CustomAlertSound \"gold.wavHide\" 300".to_string()));
     }
+}
+
+// ---------- "Reset to NeverSink's" for one item (F2, 24 Nov) ----------
+
+/// This filter's rules that change NeverSink's step `tier` of `type_path`, or move `base` within that section.
+pub fn touching(rules: &[Rule], type_path: &[String], tier: &str, base: &str) -> Vec<usize> {
+    rules.iter().enumerate().filter(|(_, r)| match r {
+        Rule::Tier { type_path: tp, tier: t, .. } => tp.as_slice() == type_path && t == tier,
+        Rule::MoveBase { type_path: tp, base: b, .. } => tp.as_slice() == type_path && b == base,
+        _ => false,
+    }).map(|(i, _)| i).collect()
+}
+
+/// Rules that put that step back to how `orig` (NeverSink's own file, no edits) has it, undoing `inherited` changes
+/// (from the filter this one is built on): its show/hide, look, stack and item-tier limits and changed conditions,
+/// and the item's place in the section.
+pub fn restore(orig: &[Segment], inherited: &[Rule], type_path: &[String], tier: &str, base: &str) -> Vec<Rule> {
+    let mut out = vec![];
+    let block = orig.iter().find_map(|s| match s {
+        Segment::Block(b) if b.type_path == type_path && b.tier.as_deref() == Some(tier) => Some(b),
+        _ => None,
+    });
+    let changed: Vec<&Rule> = touching(inherited, type_path, tier, base).into_iter().map(|i| &inherited[i]).collect();
+    if let Some(b) = block {
+        if changed.iter().any(|r| matches!(r, Rule::Tier { .. })) {
+            let min = |key: &str| b.lines.iter().map(|l| l.trim()).find(|l| l.starts_with(key))
+                .and_then(|l| l.split(">=").nth(1)).and_then(|n| n.trim().parse::<u32>().ok());
+            let orig_conds: std::collections::BTreeMap<String, String> = crate::conds::conds_of(&b.lines).into_iter().map(|c| (c.key, c.value)).collect();
+            let mut conds = crate::conds::CondEdits::new();
+            for r in &changed {
+                if let Rule::Tier { conds: Some(c), .. } = r {
+                    for k in c.keys() { conds.insert(k.clone(), orig_conds.get(k).cloned().unwrap_or_default()); }
+                }
+            }
+            out.push(Rule::Tier {
+                type_path: type_path.to_vec(), tier: tier.to_string(), show: Some(b.visibility != "Hide"),
+                actions: Some(b.style_lines()), min_stack: min("StackSize"), min_item_tier: min("UnidentifiedItemTier"),
+                conds: (!conds.is_empty()).then_some(conds), off: false, look: None,
+            });
+        }
+    }
+    if changed.iter().any(|r| matches!(r, Rule::MoveBase { .. })) {
+        // Back to the step NeverSink lists it in, or out of the section if it isn't there.
+        let home = orig.iter().find_map(|s| match s {
+            Segment::Block(b) if b.type_path == type_path && b.base_types().iter().any(|x| x == base) => b.tier.clone(),
+            _ => None,
+        });
+        out.push(Rule::MoveBase { type_path: type_path.to_vec(), base: base.to_string(), to_tier: home.unwrap_or_default(), off: false });
+    }
+    out
 }

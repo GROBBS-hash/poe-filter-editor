@@ -2370,3 +2370,7 @@ button.qm-rule:hover, .qm-rule.can-open:hover { border-color: var(--gold); backg
 .thr-when { font-size: 12.5px; text-align: right; }
 .thr-when.ok { color: var(--green, #7bd46a); }
 .thr-row.thr-stack b { color: var(--text-2); font-weight: 500; }
+/* F2: Reset to NeverSink's (24 Nov) */
+.qm-reset { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 6px 0 2px; }
+.qm-reset-btn { background: none; border: 1px solid var(--line); color: var(--text); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 12.5px; }
+.qm-reset-btn:hover { border-color: var(--gold); color: var(--gold); }

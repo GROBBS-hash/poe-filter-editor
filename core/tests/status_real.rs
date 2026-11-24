@@ -236,3 +236,33 @@ fn blasting_tier5() {
     println!("{line}\nwarnings: {warnings:?}");
     assert!(line.starts_with("Show"), "{line}");
 }
+
+/// Dev check (24 Nov): what F2's "Reset to NeverSink's" finds for 15 Orb of Alchemy on Blasting.
+#[test]
+#[ignore]
+fn blasting_reset_alchemy() {
+    use filter_core::{filter::parse_filter, profiles::{render_profile, Store}, rules::{restore, touching}};
+    let appdata = std::env::var("APPDATA").unwrap();
+    let mut store = Store::load(std::path::Path::new(&format!("{appdata}/com.grobbs.poefiltereditor/profiles.json")));
+    let dir = std::path::PathBuf::from(format!("{}/Documents/My Games/Path of Exile", std::env::var("USERPROFILE").unwrap()));
+    let item = filter_core::item::parse_item("Item Class: Stackable Currency\nRarity: Currency\nOrb of Alchemy\n--------\nStack Size: 15/40\n").unwrap();
+    let verdict = |s: &Store| filter_core::evaluate::status(&parse_filter(&render_profile(s, "blasting", &dir, None, None).unwrap().0), &item, Some(83), false).verdict;
+    let v = verdict(&store);
+    println!("now: {} by {:?} {:?}", v.visibility, v.source.type_path, v.source.tier);
+    let inherited = store.resolved_rules("red-maps");
+    let orig = {
+        let p = store.profiles.get_mut("blasting").unwrap();
+        let (r, par) = (std::mem::take(&mut p.rules), p.parent.take());
+        let o = parse_filter(&render_profile(&store, "blasting", &dir, None, None).unwrap().0);
+        let p = store.profiles.get_mut("blasting").unwrap(); p.rules = r; p.parent = par; o
+    };
+    let tier = v.source.tier.clone().unwrap();
+    let own = &mut store.profiles.get_mut("blasting").unwrap().rules;
+    let mine = touching(own, &v.source.type_path, &tier, "Orb of Alchemy");
+    for i in mine.iter().rev() { own.remove(*i); }
+    let back = restore(&orig, &inherited, &v.source.type_path, &tier, "Orb of Alchemy");
+    println!("removes {} of Blasting's, adds {:?}", mine.len(), back.iter().map(|r| format!("{r:?}").chars().take(90).collect::<String>()).collect::<Vec<_>>());
+    own.extend(back);
+    let after = verdict(&store);
+    println!("after reset: {} by {:?} {:?}", after.visibility, after.source.type_path, after.source.tier);
+}

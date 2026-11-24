@@ -2309,6 +2309,90 @@ fn item_status(app: AppHandle, item: Item, from_screen: bool) -> Result<StatusRe
     Ok(StatusReply { status: st, area_level: level, game_filter: game_filter(&app), stackable })
 }
 
+/// F2's "Reset to NeverSink's" (24 Nov): what it would undo for this item, and how NeverSink alone shows it.
+#[derive(Serialize)]
+struct ResetReply { what: Vec<String>, note: Option<String>, after: String }
+
+/// Undoes the changes that decide how this item looks, so NeverSink's own rule does: your edit for it (or the next
+/// one down), your change to the NeverSink step in charge (and the item moved within that section), and changes
+/// inherited from the filter this one is built on (by adding a change here that puts NeverSink's step back).
+/// `apply: false` only says what it would do.
+#[tauri::command(async)]
+fn reset_item(app: AppHandle, item: Item, from_screen: bool, apply: bool) -> Result<ResetReply, String> {
+    let state = app.state::<AppState>();
+    let level = area_level(&app);
+    let fallback = fallback_area_level(&app);
+    let mut store = state.store.lock().unwrap();
+    let id = store.active.clone().ok_or("Set up a filter first")?;
+    let game = store.profiles.get(&id).ok_or("Profile not found")?.game;
+    let dir = filter_dir(game);
+    let prices = state.prices.lock().unwrap();
+    let file = prices.get(&game);
+    let saved = store.profiles[&id].rules.clone();
+    let parent = store.profiles[&id].parent.clone();
+    let inherited = parent.as_deref().map(|pid| store.resolved_rules(pid)).unwrap_or_default();
+    let verdict = |store: &Store| -> Result<filter_core::evaluate::Verdict, String> {
+        let (text, _) = render_profile(store, &id, &dir, file, None).map_err(err)?;
+        Ok(status_with_fallback(&parse_filter(&text), &item, level, fallback, from_screen).verdict)
+    };
+    // NeverSink's own steps (theme applied, no edits at all), for putting a step back.
+    let orig = {
+        let p = store.profiles.get_mut(&id).unwrap();
+        let (rules, par) = (std::mem::take(&mut p.rules), p.parent.take());
+        let r = render_profile(&store, &id, &dir, None, None).map(|(t, _)| parse_filter(&t));
+        let p = store.profiles.get_mut(&id).unwrap();
+        p.rules = rules; p.parent = par;
+        r.map_err(err)?
+    };
+    let mut what = vec![];
+    let mut note = None;
+    for _ in 0..6 {
+        let v = verdict(&store)?;
+        let src = v.source.clone();
+        let own = &mut store.profiles.get_mut(&id).unwrap().rules;
+        match src.kind.as_str() {
+            "edit" | "preset" => {
+                let name = src.label.split_once(": ").map(|x| x.1).unwrap_or(&src.label).to_string();
+                if let Some(i) = own.iter().position(|r| matches!(r, Rule::Override { label, .. } if *label == src.label)) {
+                    own.remove(i);
+                    what.push(format!("your edit “{name}”"));
+                    continue;
+                }
+                if inherited.iter().any(|r| matches!(r, Rule::Override { label, .. } if *label == src.label)) {
+                    let pname = parent.as_deref().and_then(|p| store.profiles.get(p)).map(|p| p.name.clone()).unwrap_or_default();
+                    note = Some(format!("“{name}” is an edit in {pname}, the filter this one is built on: remove it there (My edits)."));
+                }
+                break;
+            }
+            "neversink" => {
+                let tier = src.tier.clone().unwrap_or_default();
+                let step = format!("{} › {}", filter_core::tiers::section_title(&src.type_path).unwrap_or_else(|| src.type_path.join(" › ")),
+                    filter_core::tiers::step_name(&src.type_path.join("->"), &tier));
+                let mine = filter_core::rules::touching(own, &src.type_path, &tier, &item.base_type);
+                for i in mine.iter().rev() { own.remove(*i); }
+                let back = filter_core::rules::restore(&orig, &inherited, &src.type_path, &tier, &item.base_type);
+                if !mine.is_empty() || !back.is_empty() { what.push(format!("your change to {step}")); }
+                own.extend(back);
+                break;
+            }
+            _ => {
+                if src.kind == "price" { note = Some("Price tiers decide this one: change it on the Price tiers page.".into()); }
+                break;
+            }
+        }
+    }
+    let after = verdict(&store)?;
+    let after = if after.visibility == "Hide" { "NeverSink hides it".to_string() } else { "NeverSink shows it".to_string() };
+    let new_rules = std::mem::replace(&mut store.profiles.get_mut(&id).unwrap().rules, saved);
+    drop(prices);
+    if apply && !what.is_empty() {
+        remember(&state, &store, &id, &format!("Reset {} to NeverSink's", item.base_type));
+        store.profiles.get_mut(&id).unwrap().rules = new_rules;
+        save_and_build(&state, &store, &id)?;
+    }
+    Ok(ResetReply { what, note, after })
+}
+
 #[derive(Serialize)]
 struct StatusReply { status: Status, area_level: Option<u32>, game_filter: Option<GameFilter>, stackable: bool }
 
@@ -3023,7 +3107,7 @@ pub fn run() {
             list_farm_presets,
             apply_farm_preset,
             list_level_presets,
-            get_tiers, get_threads, get_rule_section, get_map_tiers, set_tiers, build_tree_opt, set_build_tree, trade_search, trade_bulk, map_dangers, map_suggest, map_tool_get, map_tool_save, map_tool_regex, map_regex_copy, map_tool_trade, trade_action, hide_trades_window, wealth_app::wealth_get, bulk_app::bulk_get, bulk_app::bulk_basket, bulk_app::bulk_live, wealth_app::wealth_setup, wealth_app::wealth_prefs, wealth_app::wealth_scan, wealth_app::wealth_profile_save, wealth_app::wealth_profile_delete, wealth_app::wealth_profile_use, wealth_app::wealth_tabs_refresh, wealth_app::wealth_price_rares, wealth_app::wealth_find, wealth_app::wealth_count_rares, wealth_app::wealth_guild, updates::update_status, open_editor, price_count_below, updates::update_install, wealth_app::session_start, wealth_app::session_check, wealth_app::session_pause, wealth_app::session_stop, wealth_app::session_delete, wealth_app::earnings_overlay, saved_list, saved_add, saved_delete, saved_live, report_problem, send_whisper, copy_text, hide_trade_window, keep_on_screen,
+            get_tiers, get_threads, reset_item, get_rule_section, get_map_tiers, set_tiers, build_tree_opt, set_build_tree, trade_search, trade_bulk, map_dangers, map_suggest, map_tool_get, map_tool_save, map_tool_regex, map_regex_copy, map_tool_trade, trade_action, hide_trades_window, wealth_app::wealth_get, bulk_app::bulk_get, bulk_app::bulk_basket, bulk_app::bulk_live, wealth_app::wealth_setup, wealth_app::wealth_prefs, wealth_app::wealth_scan, wealth_app::wealth_profile_save, wealth_app::wealth_profile_delete, wealth_app::wealth_profile_use, wealth_app::wealth_tabs_refresh, wealth_app::wealth_price_rares, wealth_app::wealth_find, wealth_app::wealth_count_rares, wealth_app::wealth_guild, updates::update_status, open_editor, price_count_below, updates::update_install, wealth_app::session_start, wealth_app::session_check, wealth_app::session_pause, wealth_app::session_stop, wealth_app::session_delete, wealth_app::earnings_overlay, saved_list, saved_add, saved_delete, saved_live, report_problem, send_whisper, copy_text, hide_trade_window, keep_on_screen,
             move_tier_item,
             stack_choices,
             gear_setup,

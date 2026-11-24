@@ -494,6 +494,8 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
                 <div className="qm-chips">{chips.filter(Boolean).map((c) => <span key={c} className="qm-chip">{c}</span>)}</div>
                 <RuleLine src={src} hidden={!shown(v.visibility)} onOpen={canOpen ? change : undefined}
                   action="Modify this rule" scope={scopeText} />
+                {!replacing && <ResetLine item={picked.item} fromScreen={picked.from_screen} stamp={JSON.stringify(v.source) + v.visibility}
+                  onReset={async (call) => { try { await call; await afterChange("Back to NeverSink's."); } catch (e) { setToast(String(e)); } }} />}
               </>
             );
           })()}
@@ -697,6 +699,30 @@ function JewelModsBox({ names, onSave }: { names: string[]; onSave: (call: Promi
           Save to my jewel list
         </button>
       )}
+    </div>
+  );
+}
+
+type ResetReply = { what: string[]; note: string | null; after: string };
+/** "Reset to NeverSink's" (24 Nov, he asked for a reset on F2): says what it undoes and how NeverSink alone shows the
+ *  item, so nobody's surprised (e.g. NeverSink itself hides small Alchemy stacks at Uber strict). */
+function ResetLine({ item, fromScreen, stamp, onReset }: { item: Item; fromScreen: boolean; stamp: string; onReset: (call: Promise<unknown>) => void }) {
+  const [r, setR] = useState<ResetReply | null>(null);
+  useEffect(() => {
+    let live = true;
+    invoke<ResetReply>("reset_item", { item, fromScreen, apply: false }).then((x) => { if (live) setR(x); }).catch(() => { if (live) setR(null); });
+    return () => { live = false; };
+  }, [stamp]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!r || (r.what.length === 0 && !r.note)) return null;
+  return (
+    <div className="qm-reset">
+      {r.what.length > 0 && (
+        <>
+          <button className="qm-reset-btn" onClick={() => onReset(invoke("reset_item", { item, fromScreen, apply: true }))}>Reset to NeverSink's</button>
+          <span className="muted small">Undoes {r.what.join(" and ")}. Then <b>{r.after}</b>.</span>
+        </>
+      )}
+      {r.note && <span className="muted small">{r.note}</span>}
     </div>
   );
 }

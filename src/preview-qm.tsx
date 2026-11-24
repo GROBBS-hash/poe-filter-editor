@@ -30,6 +30,8 @@ mockIPC((cmd, args) => {
     if (String((args as { label?: string }).label).startsWith("Style")) throw "none";
     return ["p", 0, { mods: ["Vivid"], mods_min: 0, style: { font_size: 42, text: [170, 60, 255, 255], border: [170, 60, 255, 255], background: [20, 20, 20, 240] } }];
   }
+  // F2 "Reset to NeverSink's" (24 Nov).
+  if (cmd === "reset_item") return { what: ["your change to Stacks of 6+ › Tier 5"], note: null, after: "NeverSink shows it" };
   if (cmd === "item_price") return [0.82, "chaos"];
   if (cmd === "stack_choices") return [];
   if (cmd === "get_icons") return {};
