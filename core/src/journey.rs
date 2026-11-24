@@ -900,3 +900,72 @@ mod chat_tests {
         assert_eq!(chat_command(&format!("{T} Bob_Witch: !next"), ""), None);
     }
 }
+
+// ---------- race splits (24 Nov) ----------
+
+/// One character's run through the campaign: when it reached each act and level, from level 2 on.
+/// (A live ladder rank would need GGG's ladder, which is only open to approved OAuth apps, and pathofexile.com no longer
+/// sends experience; so this races you against your own earlier characters.)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct Race {
+    pub class: String,
+    /// When it reached level 2 (unix seconds): the race clock starts there.
+    pub start: i64,
+    /// (act, seconds since start) the first time you entered it; act 11 = maps.
+    pub acts: Vec<(u32, i64)>,
+    /// (level, seconds since start).
+    pub levels: Vec<(u32, i64)>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct Races { pub chars: std::collections::BTreeMap<String, Race> }
+
+impl Races {
+    /// A level-up line. Level 2 starts (or restarts) the character's race.
+    pub fn level(&mut self, name: &str, class: &str, level: u32, time: i64) {
+        if level == 2 { self.chars.insert(name.to_string(), Race { class: class.to_string(), start: time, ..Default::default() }); }
+        if let Some(r) = self.chars.get_mut(name) {
+            if !r.levels.iter().any(|l| l.0 == level) { r.levels.push((level, time - r.start)); }
+        }
+    }
+    /// Entering a zone of `act` (11 = a map).
+    pub fn act(&mut self, name: &str, act: u32, time: i64) {
+        if let Some(r) = self.chars.get_mut(name) {
+            if !r.acts.iter().any(|a| a.0 >= act) { r.acts.push((act, time - r.start)); }
+        }
+    }
+    /// Your fastest time to each act and level over your other characters.
+    pub fn best_except(&self, name: &str) -> (Vec<(u32, i64)>, Vec<(u32, i64)>) {
+        let mut acts: Vec<(u32, i64)> = vec![];
+        let mut levels: Vec<(u32, i64)> = vec![];
+        for (n, r) in &self.chars {
+            if n == name { continue; }
+            for &(a, t) in &r.acts { match acts.iter_mut().find(|x| x.0 == a) { Some(x) => x.1 = x.1.min(t), None => acts.push((a, t)) } }
+            for &(l, t) in &r.levels { match levels.iter_mut().find(|x| x.0 == l) { Some(x) => x.1 = x.1.min(t), None => levels.push((l, t)) } }
+        }
+        acts.sort(); levels.sort();
+        (acts, levels)
+    }
+}
+
+#[cfg(test)]
+mod race_tests {
+    use super::Races;
+    #[test]
+    fn splits_against_your_best() {
+        let mut r = Races::default();
+        r.level("Old", "Witch", 2, 0);
+        r.act("Old", 2, 1200);
+        r.act("Old", 2, 1300); // only the first entry counts
+        r.level("Old", "Witch", 10, 900);
+        r.level("New", "Ranger", 2, 5000);
+        r.act("New", 2, 5000 + 1000);
+        r.act("New", 1, 5000 + 1100); // going back doesn't add an earlier act
+        let (acts, levels) = r.best_except("New");
+        assert_eq!(acts, vec![(2, 1200)]);
+        assert_eq!(levels, vec![(2, 0), (10, 900)]);
+        assert_eq!(r.chars["New"].acts, vec![(2, 1000)]);
+        r.level("New", "Ranger", 2, 9000); // a new character with the same name starts over
+        assert!(r.chars["New"].acts.is_empty());
+    }
+}
