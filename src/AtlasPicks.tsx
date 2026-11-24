@@ -18,10 +18,10 @@ const MECHS: [string, string, string][] = [
   ["delirium", "Delirium", "Simulacrum Splinter"], ["shrines", "Shrines", "Shrine Map"], ["bosses", "Bosses", "Fragment of the Minotaur"],
   ["rare monsters", "Rare monsters", "Orb of Chance"], ["magic monsters", "Magic monsters", "Orb of Augmentation"],
   ["memories", "Memories", "Alva's Memory"], ["settlers", "Settlers", "Kalguuran Scarab"], ["mercenaries", "Mercenaries", "Gold"],
-  ["divination cards", "Div cards", "Stacked Deck"],
+  ["divination cards", "Div cards", "Stacked Deck"], ["mirage", "Mirage", "Coin of Restoration"],
 ];
 /** Only on "Build my own" (no creator tree for them, but the optimiser knows their nodes). */
-const OWN_ONLY = ["divination cards"];
+const OWN_ONLY = ["divination cards", "mirage"];
 /** "Also spend points on": all-round travel nodes for Build my own (he asked 23 Nov), keys as in core atlas_opt TRAVEL. */
 const TRAVEL: [string, string, string][] = [
   ["pack size", "Pack size", "Cartographer's Chisel"], ["explicit effect", "Map mod effect", "Orb of Alchemy"],

@@ -8,6 +8,7 @@ pub mod choices;
 pub mod craft;
 pub mod ask;
 pub mod evaluate;
+pub mod farm;
 pub mod explain;
 pub mod filter;
 pub mod gear;

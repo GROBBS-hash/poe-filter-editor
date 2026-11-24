@@ -4,6 +4,7 @@ mod trade_api;
 mod wealth_app;
 mod bulk_app;
 mod atlas_app;
+mod farm_app;
 mod play_app;
 mod win_place;
 mod updates;
@@ -3154,6 +3155,7 @@ pub fn run() {
             get_icons, apply_to_tier,
             preview_drops,
             theme_cards,
+            farm_app::farm_find,
             go_back
         ])
         .run(tauri::generate_context!())

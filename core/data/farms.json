@@ -1,0 +1,64 @@
+{
+  "league": "3.30 Covens of Umbra",
+  "checked": "2026-11-24",
+  "mechanics": [
+    { "key": "legion", "label": "Legion", "ninja": "Legion", "thread": "Legion Thread", "pic": "Legion Thread", "names": ["Timeless Karui Splinter", "Timeless Maraketh Splinter", "Timeless Templar Splinter", "Timeless Vaal Splinter", "Timeless Eternal Empire Splinter", "Timeless Karui Emblem", "Timeless Maraketh Emblem", "Timeless Templar Emblem", "Timeless Vaal Emblem", "Timeless Eternal Emblem"], "raw": 1.0 },
+    { "key": "bestiary", "label": "Beasts", "ninja": "Bestiary", "thread": "Bestiary Thread", "pic": "Bestiary Thread", "cats": ["Beast"], "raw": 0.8 },
+    { "key": "abyss", "label": "Abyss", "ninja": "Abyss", "thread": "Abyss Thread", "pic": "Abyss Thread", "raw": 0.5, "unseen": "Abyss jewels" },
+    { "key": "breach", "label": "Breach", "ninja": "Breach", "thread": "Breach Thread", "pic": "Breach Thread", "names": ["Hivebrain Gland"], "unseen": "Wombgifts and Hiveblood" },
+    { "key": "ritual", "label": "Ritual", "ninja": "Ritual", "thread": "Ritual Thread", "pic": "Ritual Thread", "cats": ["Omen"], "names": ["Ritual Vessel", "Ritual Splinter", "An Audience With The King"] },
+    { "key": "blight", "label": "Blight", "ninja": "Blight", "thread": "Blight Thread", "pic": "Blight Thread", "cats": ["Oil"], "not": ["Tainted Oil"], "unseen": "Blighted maps and anointed uniques" },
+    { "key": "betrayal", "label": "Betrayal", "ninja": "Betrayal", "thread": "Betrayal Thread", "pic": "Betrayal Thread", "names": ["Veiled Exalted Orb", "Veiled Chaos Orb", "Syndicate Medallion"], "unseen": "veiled items" },
+    { "key": "ultimatum", "label": "Ultimatum", "ninja": "Ultimatum", "thread": "Ultimatum Thread", "pic": "Ultimatum Thread", "ends": ["Catalyst"], "not": ["Tainted Catalyst"], "unseen": "Inscribed Ultimatums" },
+    { "key": "expedition", "label": "Expedition", "ninja": "Expedition", "thread": "Expedition Thread", "pic": "Expedition Thread", "cats": ["Artifact"], "unseen": "Logbooks and vendor rerolls" },
+    { "key": "incursion", "label": "Incursion", "ninja": "Incursion", "thread": "Incursion Thread", "pic": "Incursion Thread", "unseen": "temples (Chronicles)" },
+    { "key": "harvest", "label": "Harvest", "ninja": "Wildwood", "pic": "Wild Crystallised Lifeforce", "names": ["Wild Crystallised Lifeforce", "Vivid Crystallised Lifeforce", "Primal Crystallised Lifeforce", "Sacred Crystallised Lifeforce", "Sacred Blossom"] },
+    { "key": "essence", "label": "Essence", "ninja": "Essence", "pic": "Deafening Essence of Greed", "cats": ["Essence"] },
+    { "key": "delirium", "label": "Delirium", "ninja": "Delirium", "pic": "Simulacrum Splinter", "cats": ["DeliriumOrb"], "names": ["Simulacrum", "Simulacrum Splinter"], "unseen": "cluster jewels" }
+  ],
+  "boosters": [
+    { "key": "shrines", "label": "Shrines", "ninja": "Shrines" },
+    { "key": "mirage", "label": "Mirage", "ninja": "Mirage" },
+    { "key": "settlers", "label": "Settlers", "ninja": "Settlers of Kalguur" },
+    { "key": "mercenaries", "label": "Mercenaries", "ninja": "Mercenaries" },
+    { "key": "rare monsters", "label": "Rare monsters", "ninja": "Map Monsters" },
+    { "key": "divination cards", "label": "Div cards", "ninja": "Divination Cards" },
+    { "key": "threads", "label": "Threads found", "ninja": "Threads" }
+  ],
+  "raw": { "names": ["Stacked Deck", "Valdo's Puzzle Box", "Foulborn Exalted Orb", "Ancient Orb", "Orb of Annulment"], "everyone": 0.25, "src": "maxroll" },
+  "altars": {
+    "Eater of Worlds": ["breach", "legion", "blight", "ritual", "incursion"],
+    "Searing Exarch": ["abyss", "expedition", "betrayal", "bestiary", "ultimatum"]
+  },
+  "synergies": [
+    { "with": ["abyss", "bestiary"], "why": "Beasts killed on an Abyss can revive, so you kill and catch them twice", "src": "maxroll" },
+    { "with": ["legion", "bestiary"], "why": "Each beast is worth more than the last (Beasts of Prey), and both flood the map with rares", "src": "maxroll" },
+    { "with": ["legion", "delirium"], "why": "Delirium boosts what Legion drops", "src": "maxroll" },
+    { "with": ["bestiary", "delirium"], "why": "Delirium boosts what beasts drop", "src": "maxroll" },
+    { "with": ["abyss", "delirium"], "why": "Delirium boosts what Abyss rares drop", "src": "maxroll" }
+  ],
+  "maps": [
+    { "map": "Dunes Map", "for": ["legion"], "why": "wide open, so Legions don't get stuck behind walls", "src": "guides" },
+    { "map": "Dunes Map", "for": ["legion", "abyss", "bestiary"], "why": "maxroll's pick for stacking rare monsters", "src": "maxroll" },
+    { "map": "Dunes Map", "for": ["breach"], "why": "open ground for the Breach to spread", "src": "guides" },
+    { "map": "Dunes Map", "for": ["harvest"], "why": "open and quick to search for Sacred Flora", "src": "guides" },
+    { "map": "Dunes Map", "for": ["incursion"], "why": "one of maxroll's Incursion maps", "src": "maxroll" },
+    { "map": "Jungle Valley Map", "for": ["legion"], "why": "open with few dead ends", "src": "guides" },
+    { "map": "Jungle Valley Map", "for": ["ritual"], "why": "the boss is in its own arena, so altars roll rewards for you instead of for the boss", "src": "guides" },
+    { "map": "Jungle Valley Map", "for": ["delirium"], "why": "one straight path, so the fog doesn't run out", "src": "guides" },
+    { "map": "Jungle Valley Map", "for": ["breach"], "why": "straight path and easy clearing", "src": "guides" },
+    { "map": "City Square Map", "for": ["abyss", "breach", "bestiary"], "why": "maxroll's pick for Abyss with a little Breach and Beasts", "src": "maxroll" },
+    { "map": "City Square Map", "for": ["harvest", "essence"], "why": "maxroll's pick for Harvest and Essences together", "src": "maxroll" },
+    { "map": "Strand Map", "for": ["delirium"], "why": "one straight path, so the fog doesn't run out", "src": "guides" },
+    { "map": "Strand Map", "for": ["incursion"], "why": "maxroll's first pick for Incursion", "src": "maxroll" },
+    { "map": "Waste Pool Map", "for": ["blight"], "why": "maxroll's easy-to-get Blight map", "src": "maxroll" },
+    { "map": "Dungeon Map", "for": ["blight"], "why": "tight corridors keep the lanes together", "src": "guides" },
+    { "map": "Pit Map", "for": ["blight", "harvest"], "why": "maxroll's low-tier pick for Blight with Harvest", "src": "maxroll" },
+    { "map": "Desert Spring Map", "for": ["breach", "harvest"], "why": "a community pick for Breach with Harvest", "src": "community" },
+    { "map": "Fields Map", "for": ["legion"], "why": "a good second choice for Legion", "src": "guides" }
+  ],
+  "avoid": [
+    { "map": "Ancient City Map", "for": "legion", "why": "Legions get trapped behind walls", "src": "guides" },
+    { "map": "Dunes Map", "for": "blight", "why": "too open for towers (unless you took Mycelial Swarm and Sprawling Veins)", "src": "maxroll" }
+  ]
+}

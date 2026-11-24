@@ -1,0 +1,207 @@
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { useEffect, useState } from "react";
+import { friendly } from "./errors";
+import { ItemIcon } from "./icons";
+import { Tip } from "./Help";
+import "./farm.css";
+
+type Drop = { name: string; chaos: number; sold_div: number; change: number | null; jackpot: boolean };
+type Why = { text: string; src: string };
+type Thread = { key: string; thread: string; count: number; each: number; change: number | null };
+type MapTip = { map: string; why: Why[]; yours: [number, number] | null };
+type Farm = { keys: string[]; title: string; score: number; value: number; steady: number; jackpots: number; raw: number; verdict: string;
+  estimate: boolean; players: number | null; change: number | null; drops: Drop[]; threads: Thread[]; cost: number; why: Why[];
+  also: [string, string][]; altar: Why | null; maps: MapTip[]; avoid: Why[]; creator: [string, string, string] | null; rolls: string | null; unseen: string[] };
+type Worth = { key: string; label: string; pic: string; share: number; steady: number; jackpots: number; raw: number; change: number | null;
+  drops: Drop[]; unseen: string | null; estimate: boolean; blind: boolean };
+type Finder = { farms: Farm[]; mechanics: Worth[]; trees_from: string; trees: number; prices_from: string; divine: number };
+type Ask = { count: "all" | "steady"; max_cost: number | null; size: number };
+
+const SRC: Record<string, string> = { maxroll: "maxroll", "poe.ninja": "players' trees", guides: "guide sites", community: "community tree", "patch notes": "patch notes" };
+const VERDICT: Record<string, string> = { "Under-farmed": "good", Strong: "good", Solid: "ok", Crowded: "warn" };
+const HINT: Record<string, string> = {
+  "Under-farmed": "Its drops sell well and few players go for it", Strong: "Its drops sell well for how many players go for it",
+  Solid: "About what a typical mechanic sells for each farmer", Crowded: "Many players go for it for what its drops sell",
+};
+const COSTS: [string, number | null][] = [["Any cost", null], ["Cheap Threads (≤ 30c)", 30], ["No Threads", 0]];
+
+const money = (c: number, div: number) => c >= div ? `${(c / div).toFixed(c / div >= 10 ? 0 : 1)} div` : c >= 10 ? `${Math.round(c)}c` : `${c.toFixed(c >= 1 ? 1 : 2)}c`;
+const day = (iso: string) => { const d = new Date(iso); return isNaN(d.getTime()) ? iso : d.toLocaleDateString(undefined, { day: "numeric", month: "short" }); };
+const short = (map: string) => map.replace(/ Map$/, "");
+
+function Change({ v }: { v: number | null }) {
+  if (v == null) return null;
+  return <span className={v >= 0 ? "ff-up" : "ff-dn"}>{v >= 0 ? "▲" : "▼"} {Math.abs(Math.round(v))}%</span>;
+}
+
+function Reasons({ list }: { list: Why[] }) {
+  return <ul className="ff-why">{list.map((w, i) => <li key={i}>{w.text} <span className="ff-src">{SRC[w.src] ?? w.src}</span></li>)}</ul>;
+}
+
+/** Where a farm's value comes from: regular drops, big drops, raw currency (estimate). */
+function Split({ f }: { f: Pick<Farm, "steady" | "jackpots" | "raw"> }) {
+  const total = f.steady + f.jackpots + f.raw || 1;
+  const part = (v: number, c: string, t: string) => v / total > 0.01 && <i className={c} style={{ width: `${v / total * 100}%` }} title={`${t}: ${Math.round(v / total * 100)}%`} />;
+  return (
+    <div className="ff-split">
+      <div className="ff-bar">{part(f.steady, "steady", "Regular drops")}{part(f.raw, "raw", "Raw currency (estimate)")}{part(f.jackpots, "jack", "Rare big drops (worth a div or more)")}</div>
+      <div className="ff-legend">
+        {f.steady > 0 && <span><i className="steady" />regular drops {Math.round(f.steady / total * 100)}%</span>}
+        {f.raw > 0 && <span><i className="raw" />raw currency ~{Math.round(f.raw / total * 100)}%</span>}
+        {f.jackpots > 0 && <span><i className="jack" />big drops {Math.round(f.jackpots / total * 100)}%</span>}
+      </div>
+    </div>
+  );
+}
+
+function Maps({ f }: { f: Farm }) {
+  return (
+    <div className="ff-maps">
+      {f.maps.length === 0 && <div className="small muted">No map stands out for this one.</div>}
+      {f.maps.map((m) => (
+        <div key={m.map} className="ff-map">
+          <ItemIcon name={m.map} size={30} />
+          <div>
+            <b>{short(m.map)}</b>
+            {m.yours && <span className="muted small"> · yours: {m.yours[0].toFixed(0)} min a map ({m.yours[1]})</span>}
+            {m.why[0] && <div className="small">{m.why[0].text} <span className="ff-src">{SRC[m.why[0].src] ?? m.why[0].src}</span></div>}
+          </div>
+        </div>
+      ))}
+      {f.avoid.map((a, i) => <div key={i} className="small ff-avoid">Skip {a.text} <span className="ff-src">{SRC[a.src] ?? a.src}</span></div>)}
+    </div>
+  );
+}
+
+function Card({ f, pics, best, div, onBuild }: { f: Farm; pics: Record<string, string>; best: boolean; div: number; onBuild: () => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <article className={`ff-card ${best ? "best" : ""}`}>
+      <header>
+        <span className="ff-pics">{f.keys.map((k) => <ItemIcon key={k} name={pics[k]} size={38} />)}</span>
+        <div><h3>{f.title}</h3><span className={`ff-tag ${VERDICT[f.verdict] ?? "ok"}`} title={HINT[f.verdict]}>{f.verdict}</span></div>
+        <div className="ff-score" title="Against the best one today"><b>{Math.round(f.score)}</b><span>/100</span></div>
+      </header>
+      <Split f={f} />
+      <div className="ff-drops">
+        {f.drops.slice(0, 6).map((d) => (
+          <span key={d.name} title={`${d.name}: ${money(d.chaos, div)} each`}>
+            <ItemIcon name={d.name} base={d.name} size={30} /><small>{money(d.chaos, div)}</small>
+          </span>
+        ))}
+      </div>
+      <dl>
+        <div><dt>Drop prices, 7 days</dt><dd><Change v={f.change} /></dd></div>
+        <div><dt>Threads a map</dt><dd>{f.threads.length === 0 ? "none" : (
+          <span className="ff-threads" title={f.threads.map((t) => `${t.count} × ${t.thread} at ${money(t.each, div)}`).join("\n") + "\nBefore the free ones from Shaped Regions"}>
+            {f.threads.map((t) => <span key={t.key}>{t.count}<ItemIcon name={t.thread} size={20} /></span>)} {money(f.cost, div)}
+          </span>)}</dd></div>
+        {f.players != null && <div><dt>Players running {f.keys.length > 1 ? "both" : "it"}</dt><dd>{(f.players * 100).toFixed(f.players < 0.02 ? 1 : 0)}%</dd></div>}
+      </dl>
+      <div className="ff-h">Best maps</div>
+      <Maps f={f} />
+      {f.also.length > 0 && <div className="small"><span className="muted" title="Tick these under Build my own if you have points left">Also worth points: </span>{f.also.map((a) => a[1]).join(", ")}</div>}
+      {open && (
+        <div className="ff-more">
+          {f.why.length > 0 && <><div className="ff-h">Why together</div><Reasons list={f.why} /></>}
+          {f.altar && <><div className="ff-h">Altars</div><Reasons list={[f.altar]} /></>}
+          {f.rolls && <><div className="ff-h">Roll your maps for</div><p className="small">{f.rolls} <span className="ff-src">maxroll</span></p></>}
+          {f.maps.some((m) => m.why.length > 1) && <><div className="ff-h">More on the maps</div>
+            <Reasons list={f.maps.flatMap((m) => m.why.slice(1).map((w) => ({ ...w, text: `${short(m.map)} · ${w.text}` })))} /></>}
+          {f.unseen.length > 0 && <p className="muted small">Not counted (no price list): {f.unseen.join(", ")}.</p>}
+          {f.creator && <button className="link small" onClick={() => invoke("open_url", { url: `https://maxroll.gg/poe/farming-strategy-planner/${f.creator![0]}` })}>
+            See “{f.creator[1].replace(/^"[^"]*":\s*/, "")}” by {f.creator[2] || "a creator"} on maxroll</button>}
+        </div>
+      )}
+      <footer>
+        <button className="primary" onClick={onBuild}>Build this tree</button>
+        <button onClick={() => setOpen(!open)} aria-expanded={open}>{open ? "Less" : "Why?"}</button>
+      </footer>
+    </article>
+  );
+}
+
+function readAsk(): Ask {
+  const plain: Ask = { count: "all", max_cost: null, size: 0 };
+  try { return { ...plain, ...JSON.parse(localStorage.getItem("farm-ask") ?? "{}") }; } catch { return plain; }
+}
+
+function Seg<T>({ opts, now, set }: { opts: [string, T][]; now: T; set: (v: T) => void }) {
+  return <span className="ap-seg">{opts.map(([l, v]) => <button key={l} className={v === now ? "on" : ""} onClick={() => set(v)}>{l}</button>)}</span>;
+}
+
+/** Atlas page, top: what to farm today. Cross-checks prices and sales, players' trees, creators' trees and maps (core farm.rs). */
+export default function FarmFinder({ onBuild }: { onBuild: () => void }) {
+  const [ask, setAsk] = useState<Ask>(readAsk);
+  const [r, setR] = useState<Finder | null>(null);
+  const [err, setErr] = useState("");
+  const [table, setTable] = useState(false);
+  useEffect(() => {
+    let on = true;
+    const load = () => invoke<Finder>("farm_find", { ask }).then((x) => { if (on) { setR(x); setErr(""); } }).catch((e) => { if (on) setErr(friendly(e)); });
+    load();
+    try { localStorage.setItem("farm-ask", JSON.stringify(ask)); } catch { /* fine */ }
+    const un = listen("prices-updated", load);
+    return () => { on = false; un.then((f) => f()); };
+  }, [ask]);
+
+  const build = (f: Farm) => {
+    try {
+      // Only the farm itself: the optimiser treats every ticked tile alike, so "also worth points" would crowd it out.
+      localStorage.setItem("atlas-picks-sel", JSON.stringify(f.keys));
+      localStorage.setItem("atlas-picks-tab", "own");
+      localStorage.setItem("atlas-opt-prio", "profit");
+    } catch { /* fine */ }
+    onBuild();
+  };
+  const pics: Record<string, string> = Object.fromEntries((r?.mechanics ?? []).map((m) => [m.key, m.pic]));
+  const rest = r?.farms.slice(3) ?? [];
+
+  return (
+    <div className="card ff">
+      <h2>What to farm today <Tip>Ranks mechanics, and mixes of them people really run together, by how much their drops sell for each player
+        going for them. It can't see drops per map, so treat it as a good starting point: your own maps are the proof. Raw currency and beasts
+        are estimates.</Tip></h2>
+      {r && <p className="muted small">Prices from {day(r.prices_from)} (poe.ninja) · {r.trees.toLocaleString()} players' trees from {day(r.trees_from)} · creator trees from maxroll</p>}
+      <div className="row ff-opts">
+        <Seg opts={[["All drops", "all"], ["Regular drops only", "steady"]] as [string, Ask["count"]][]} now={ask.count} set={(count) => setAsk({ ...ask, count })} />
+        <Seg opts={COSTS} now={ask.max_cost} set={(max_cost) => setAsk({ ...ask, max_cost })} />
+        <Seg opts={[["Any mix", 0], ["One mechanic", 1], ["Two or more", 2]] as [string, number][]} now={ask.size} set={(size) => setAsk({ ...ask, size })} />
+      </div>
+      {err && <div className="small at-msg">{err}</div>}
+      {!r && !err && <div className="muted small">Comparing prices and trees…</div>}
+      {r && r.farms.length === 0 && <div className="muted small">Nothing fits those choices.</div>}
+      {r && <div className="ff-cards">{r.farms.slice(0, 3).map((f, i) => (
+        <Card key={f.title} f={f} pics={pics} best={i === 0} div={r.divine} onBuild={() => build(f)} />
+      ))}</div>}
+      {r && rest.length > 0 && <>
+        <div className="ap-step">More ideas</div>
+        <div className="ff-rest">{rest.map((f) => (
+          <button key={f.title} onClick={() => build(f)} title={["Build this tree", ...f.why.map((w) => "• " + w.text)].join("\n")}>
+            {f.keys.map((k) => <ItemIcon key={k} name={pics[k]} size={24} />)}
+            <span><b>{f.title}</b><small>{Math.round(f.score)}/100{f.maps[0] ? ` · ${short(f.maps[0].map)}` : ""}{f.cost > 0 ? ` · ${money(f.cost, r.divine)} of Threads` : ""}</small></span>
+          </button>
+        ))}</div>
+      </>}
+      {r && <button className="link small" onClick={() => setTable(!table)}>{table ? "Hide" : "Show"} every mechanic on its own</button>}
+      {r && table && (
+        <table className="ff-table">
+          <caption className="muted small">Divines of drops sold for each 1% of players going for it. ~ is an estimate.</caption>
+          <thead><tr><th>Mechanic</th><th>Regular drops</th><th>Big drops</th><th>Raw currency</th><th>Players</th><th>7 days</th><th>Sells most</th></tr></thead>
+          <tbody>{r.mechanics.map((m) => (
+            <tr key={m.key}>
+              <td><span className="row ff-m"><ItemIcon name={m.pic} size={26} /><b>{m.label}</b></span></td>
+              {m.blind
+                ? <td colSpan={3} className="muted small">can't be ranked: {m.unseen ?? "its drops"} have no price list</td>
+                : <><td>{Math.round(m.steady)}</td><td>{Math.round(m.jackpots)}</td><td>{m.raw > 0 ? `~${Math.round(m.raw)}` : "–"}</td></>}
+              <td>{(m.share * 100).toFixed(0)}%</td>
+              <td><Change v={m.change} /></td>
+              <td><span className="ff-drops tiny">{m.drops.slice(0, 5).map((d) => <span key={d.name} title={`${d.name}: ${money(d.chaos, r.divine)}`}><ItemIcon name={d.name} base={d.name} size={22} /></span>)}</span></td>
+            </tr>
+          ))}</tbody>
+        </table>
+      )}
+    </div>
+  );
+}

@@ -7,6 +7,7 @@ import AtlasTotals from "./AtlasTotals";
 import TreeEditor from "./AtlasEditor";
 import { PageLoading } from "./Loading";
 import AtlasPicks from "./AtlasPicks";
+import FarmFinder from "./FarmFinder";
 
 const SITE: Record<string, string> = { maxroll: "maxroll", official: "pathofexile.com", optimiser: "built by the optimiser", planner: "Atlas Tree Planner", poeplanner: "poeplanner" };
 
@@ -19,6 +20,8 @@ export default function Atlas() {
   const [msg, setMsg] = useState("");
   const [sel, setSel] = useState<number | null>(null);
   const [key, setKey] = useState("F7");
+  /** Bumped by the farm finder's "Build this tree", so Build my own opens with those mechanics. */
+  const [build, setBuild] = useState(0);
 
   useEffect(() => {
     const load = () => invoke<AtlasStore>("atlas_list").then(setStore).catch((e) => setMsg(String(e)));
@@ -46,7 +49,8 @@ export default function Atlas() {
 
   return (
     <div className="atlas-page">
-      <AtlasPicks store={store} onShow={(id) => setSel(id)}
+      <FarmFinder onBuild={() => { setBuild((n) => n + 1); window.setTimeout(() => document.querySelector(".ap")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }} />
+      <AtlasPicks key={build} store={store} onShow={(id) => setSel(id)}
         onImported={(s, m) => { setStore(s); setSel(s.active); setMsg(`${m} (${key})`); }} />
       <div className="card">
         <h2>Add a strategy from a link <Tip>A <b>maxroll farming strategy</b> link (maxroll.gg/poe/farming-strategy-planner/…) or a

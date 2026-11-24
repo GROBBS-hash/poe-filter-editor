@@ -48,6 +48,13 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **Farm finder: "What to farm today" on the Atlas page (24 Nov, not released yet; he picked layout B and asked for regular drops, 2-5 mechanics together, and maps).**
+  - Core `core/src/farm.rs` (tests; dev look `farm::tests::real`, FARM_OUT=.claude/farm.json feeds preview-app.html), command `farm_find` (`src-tauri/src/farm_app.rs`), `src/FarmFinder.tsx`, `src/farm.css`. Yardstick = divines of a mechanic's drops traded (poe.ninja volume) per 1% of players' trees going for it: regular drops (under a div), big drops, raw currency (estimate: Stacked Deck, Valdo's Box, Foulborn Exalted, Ancient, Annulment shared out by maxroll's ranking Legion 1 / Beasts 0.8 / Abyss 0.5, everyone 0.25), beasts = 10% of listings (estimate). Abyss jewels, temples, logbooks etc. have no price list: shown as "not counted"; Incursion alone can't be ranked.
+  - Mixes: only ones with evidence (much-copied player trees, creator trees, pairs taken 1.3x+ more than chance, known pairings); each mechanic counts by how many points real mixed trees give it; helping pairs +15% each up to 30%. Max 3 kinds of Thread. Cards differ from each other.
+  - Maps: `core/data/farms.json` (hand-kept facts with source: maxroll, guide sites, patch notes; also pairings, altar → Thread drops, maps to skip), plus creators' maps; his own average minutes from the map tracker. Toxic Sewer left out: sources disagree whether it's on the 3.30 atlas.
+  - Players' trees: `core/data/atlas_meta.json`, by hand with `node tools/build_atlas_meta.mjs <snapshot>` (poe.ninja's 100,000 trees; Harvest = its "Wildwood"). poe.ninja answers scripts 403 on its pages, so the snapshot number has to come from a browser and it can't run in the price job; don't work round it. The app itself never asks poe.ninja. Refresh before releases.
+  - `public/atlas_picks.json` now has threads / altar / rolls (build_atlas_picks.mjs). "Build this tree" opens Build my own with the farm's mechanics; Mirage tile added there.
+  - Next: his own div per hour per farm (needs the cloud branch's `MapRun.atlas` + loot working again), AI part = "copy for Claude" button.
 - **Price check: Wickerman body parts (24 Nov, not released yet).** 3.30's "Item Class: Viscera" items are copied with no Rarity line, so `parse_item` gave up ("No item was copied"). Now Rarity defaults to Normal when there's an Item Class; their unmarked mod is an implicit (`trade::mods`) and ticked at your roll. Test `wickerman_body_part` (text from the trade site's own copy of Blackened Lungs; search checked live: 1,050 for 25%+).
 - **Themes page: cards show real drops (24 Nov, not released yet; he asked: Divine is red on white in his filter, the card showed orange).** Cards used a fixed item per value level. Now command `theme_cards` (`core/src/preview.rs`): 8 sample drops this filter shows, each with its own look (Divine first; ones the theme colours first, found by comparing with a Classic PoE render), run through the whole filter with each theme (~33 in parallel). A gold dot = your own look, same in every theme. Theme editor examples come from the filter too (`level_examples`). Dev: `theme_cards_real` with THEME_CARDS_OUT=.claude/theme-cards.json feeds preview-app.html.
 - **Corruption implicits in price check (24 Nov, released in 0.2.63).** The advanced copy says `{ Corruption Implicit Modifier … }`; `trade::mod_source` only looked for "Corrupted Implicit", so the line had no source, looked like a fixed base mod (no range) and TradeWindow tucked it away unticked. Now source "corrupted" and ticked at least your roll. Test `corruption_implicit_counts` (from his saved sample).
@@ -1048,6 +1055,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
+- [ ] (24 Nov, unreleased) Atlas tree page → What to farm today: three cards with pictures, best maps, Threads cost; Why? explains; Build this tree opens Build my own with those mechanics; the choices (regular drops only, cheap Threads, one / two or more) change the cards.
 - [ ] (24 Nov, unreleased) Ctrl+D on Wickerman body parts (Blackened Lungs etc.): price window opens, the mod ticked, listings found.
 - [ ] (24 Nov, unreleased) Themes: each card's Divine Orb etc. looks like it does in game with that theme (NeverSink's own = red on white); gold dots on your own looks.
 - [ ] (0.2.64) F2 reset button now says "Reset to base filter" and names the filter yours starts from (24 Nov: he may use his own filter, not NeverSink's).
@@ -1632,7 +1640,7 @@ when the game window isn't found. Check in game: the window's spot, and that it 
       "Best strategies" ranks runs.
 
 ## Left to do (agreed order)
-- **Farm finder (idea 24 Nov, waiting on his layout pick).** Rank mechanics by poe.ninja sales + price trend, share of players' trees (poe.ninja atlas trees: `/poe1/api/data/atlas-tree-index-page-state` JSON top 10; full list is protobuf `/poe1/api/atlas-trees/<snapshot>/search?overview=covens&mechanics=Legion`), Thread prices, creator trees, his own loot per tree; "Build tree" → Build my own. Mock-ups A ranking / B top 3 cards / C ask the AI: `.claude/mock-farm-finder.html` (not committed). First: why his last 16 map runs have no loot (since 23 Nov).
+- **Farm finder follow-ups (built 24 Nov, see Done):** why his last 16 map runs have no loot (since 23 Nov); his own div per hour per farm; "copy for Claude" button.
 0. **Play tools (22 Nov) released in 0.2.39.** Bulk-selling helper done 23 Nov (Sell in bulk, see Done). Not built yet: live rank/race tracker (PoeRank-style), PoE 2's campaign route, crafting methods still unmodelled (veiled, conqueror exalts, awakener,
    recombinators, beastcraft), PoE 2 crafting.
 1. **GROBBS to work through "Still to check in game" above**; fix what he reports.

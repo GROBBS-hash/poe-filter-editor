@@ -54,6 +54,10 @@ for (const [group, ids] of [["maxroll", MAXROLL], ["community", COMMUNITY]]) {
       updated: (v.date ?? "").slice(0, 10),
       maps: v.search_metadata?.items ?? [],
       points, targets, exclude,
+      // What goes in the map device: Threads per map, and which Eldritch altars (1 = Exarch, 2 = Eater).
+      threads: (meta.strategy?.threads ?? []).filter((t) => t.mechanic).map((t) => [t.mechanic, t.count ?? 1]),
+      altar: meta.strategy?.altar ?? 0,
+      rolls: meta.strategy?.mapRolls ?? [],
     });
     console.log(`${group} ${id} ${v.name} · ${points} pts · ${mechanics.join(", ")} · ${v.season} · ${v.date}`);
     await sleep(1000);

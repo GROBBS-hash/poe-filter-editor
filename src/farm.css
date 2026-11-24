@@ -1,0 +1,58 @@
+/* Farm finder (Atlas page, FarmFinder.tsx). */
+.ff-opts { flex-wrap: wrap; gap: 8px; margin: 4px 0 12px; }
+.ff-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 12px; align-items: start; }
+.ff-card { display: flex; flex-direction: column; gap: 9px; background: var(--raised); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+.ff-card.best { border-color: var(--gold); box-shadow: 0 0 0 1px color-mix(in srgb, var(--gold) 35%, transparent) inset; }
+.ff-card header { display: flex; gap: 10px; align-items: flex-start; }
+.ff-card header > div:nth-child(2) { flex: 1; min-width: 0; }
+.ff-card h3 { margin: 0 0 4px; font-size: 15.5px; line-height: 1.25; }
+.ff-pics { display: flex; }
+.ff-pics .item-icon { object-fit: contain; }
+.ff-pics .item-icon + .item-icon { margin-left: -12px; }
+.ff-score { text-align: right; line-height: 1; }
+.ff-score b { font-size: 24px; color: var(--gold); font-variant-numeric: tabular-nums; }
+.ff-score span { font-size: 11px; color: var(--muted); }
+.ff-tag { display: inline-block; font-size: 11.5px; border-radius: 99px; padding: 1px 9px; border: 1px solid currentColor; }
+.ff-tag.good, .ff-up { color: var(--green); }
+.ff-tag.ok { color: var(--gold); }
+.ff-tag.warn, .ff-dn { color: var(--red); }
+.ff-bar { display: flex; gap: 2px; height: 8px; border-radius: 4px; overflow: hidden; background: var(--line); }
+.ff-bar i { display: block; height: 100%; }
+.ff i.steady { background: var(--green); }
+.ff i.raw { background: var(--gold); }
+.ff i.jack { background: #b58cff; }
+.ff-legend { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 4px; font-size: 11.5px; color: var(--muted); }
+.ff-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
+.ff-drops { display: flex; flex-wrap: wrap; gap: 5px; }
+.ff-drops > span { display: flex; flex-direction: column; align-items: center; min-width: 42px; background: var(--input); border-radius: 6px; padding: 4px 4px 2px; }
+.ff-drops .item-icon { object-fit: contain; }
+.ff-drops small { font-size: 10.5px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.ff-drops.tiny > span { min-width: 0; padding: 2px; }
+.ff-card dl { margin: 0; font-size: 13px; }
+.ff-card dl > div { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
+.ff-card dt { color: var(--muted); }
+.ff-card dd { margin: 0; text-align: right; }
+.ff-threads { display: inline-flex; align-items: center; gap: 6px; }
+.ff-threads span { display: inline-flex; align-items: center; gap: 2px; }
+.ff-threads .item-icon { object-fit: contain; }
+.ff-h { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.ff-maps { display: flex; flex-direction: column; gap: 7px; margin-top: -3px; }
+.ff-map { display: grid; grid-template-columns: 30px 1fr; gap: 9px; align-items: start; }
+.ff-map .item-icon { object-fit: contain; }
+.ff-avoid { color: var(--red); }
+.ff-src { display: inline-block; font-size: 10.5px; color: var(--muted); border: 1px solid var(--line-2); border-radius: 4px; padding: 0 5px; white-space: nowrap; }
+.ff-why { margin: 3px 0 0; padding-left: 16px; font-size: 12.5px; }
+.ff-why li { margin: 2px 0; }
+.ff-more { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--line); padding-top: 9px; }
+.ff-more p { margin: 0; }
+.ff-card footer { display: flex; gap: 8px; margin-top: 2px; }
+.ff-rest { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 8px; margin-bottom: 8px; }
+.ff-rest button { display: flex; align-items: center; gap: 6px; text-align: left; padding: 8px 10px; }
+.ff-rest button span { display: flex; flex-direction: column; min-width: 0; }
+.ff-rest small { color: var(--muted); }
+.ff-rest .item-icon { object-fit: contain; }
+.ff-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; caption-side: bottom; }
+.ff-table th { text-align: left; font-weight: 500; font-size: 11.5px; color: var(--muted); padding: 5px 8px; border-bottom: 1px solid var(--line); }
+.ff-table td { padding: 5px 8px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.ff-table caption { text-align: left; padding-top: 6px; }
+.ff-m { gap: 8px; flex-wrap: nowrap; }
