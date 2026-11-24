@@ -61,6 +61,18 @@ fn add_missing_steps(app: &AppHandle) {
 fn fetch(link: &str) -> Result<Strategy, String> {
     Ok(match atlas::parse_link(link)? {
         Link::Official(code) => atlas::from_official(&code, link.trim())?,
+        Link::PoePlanner(code) => atlas::from_poeplanner(&code, link)?,
+        Link::PoePlannerShort(id) => {
+            let resp = ureq::get(&atlas::poeplanner_short_url(&id)).set("User-Agent", UA).timeout(Duration::from_secs(20)).call();
+            let code = match resp {
+                Ok(r) => r.into_string().map_err(|_| "poeplanner sent something unexpected".to_string())?,
+                Err(ureq::Error::Status(404, _)) => return Err("poeplanner doesn't know that link (check it)".into()),
+                Err(ureq::Error::Status(code, _)) => return Err(format!("poeplanner said no (error {code}); try again in a minute")),
+                Err(_) => return Err("Couldn't reach poeplanner (is the internet on?)".into()),
+            };
+            let code = code.trim().trim_matches('"').to_string();
+            atlas::from_poeplanner(&code, &format!("https://poeplanner.com/atlas-tree/{code}"))?
+        }
         Link::Planner { data_url, hash } => {
             let resp = ureq::get(&data_url).set("User-Agent", UA).set("Accept", "application/json")
                 .timeout(Duration::from_secs(30)).call();

@@ -300,6 +300,49 @@ pub enum Link {
     /// "Atlas Tree Planner" (atlas-blush-beta.vercel.app and copies): the tree is in the part after '#', read
     /// against the planner's own data.json (its link format walks that file's graph).
     Planner { data_url: String, hash: String },
+    /// poeplanner.com atlas tree code (`/atlas-tree/<code>`).
+    PoePlanner(String),
+    /// poeplanner.com short link id (`/a/<id>`): `api.poeplanner.com/api/b/<id>` gives the code.
+    PoePlannerShort(String),
+}
+
+pub fn poeplanner_short_url(id: &str) -> String { format!("https://api.poeplanner.com/api/b/{id}") }
+
+/// poeplanner's atlas tree code: little-endian u16 format version, u16 tree version, (version 5+) a "PoE 2" byte,
+/// u16 count and that many u16 node ids, then gzipped notes. It keeps no option picks.
+pub fn decode_poeplanner(code: &str) -> Result<Vec<u32>, String> {
+    let code = code.trim().trim_end_matches('=');
+    let cfg = base64::engine::GeneralPurposeConfig::new()
+        .with_decode_padding_mode(base64::engine::DecodePaddingMode::Indifferent)
+        .with_decode_allow_trailing_bits(true);
+    let bytes = base64::engine::GeneralPurpose::new(&base64::alphabet::URL_SAFE, cfg).decode(code)
+        .or_else(|_| base64::engine::GeneralPurpose::new(&base64::alphabet::STANDARD, cfg).decode(code))
+        .map_err(|_| "That poeplanner link looks broken (can't read its code)".to_string())?;
+    let u16_at = |i: usize| -> Option<u16> { Some(u16::from_le_bytes([*bytes.get(i)?, *bytes.get(i + 1)?])) };
+    let version = u16_at(0).ok_or("That poeplanner link is too short")?;
+    if version > 5 { return Err("That poeplanner link is newer than this app understands".into()); }
+    let mut i = 4;
+    if version >= 5 {
+        if bytes.get(i).copied().unwrap_or(0) != 0 { return Err("That's a Path of Exile 2 atlas tree".into()); }
+        i += 1;
+    }
+    let count = u16_at(i).ok_or("That poeplanner link is too short")? as usize;
+    i += 2;
+    let ids: Vec<u32> = (0..count).filter_map(|k| u16_at(i + 2 * k)).map(u32::from).collect();
+    if ids.is_empty() { return Err("That atlas tree link has no points in it".into()); }
+    Ok(ids)
+}
+
+/// A strategy from a poeplanner atlas tree code.
+pub fn from_poeplanner(code: &str, link: &str) -> Result<Strategy, String> {
+    let nodes = decode_poeplanner(code)?;
+    let g = graph();
+    let known = nodes.iter().filter(|n| g.has(**n)).count();
+    if known * 2 < nodes.len() { return Err("That atlas tree is from a different version of the game (most of its points aren't on today's atlas)".into()); }
+    let nodes: Vec<u32> = nodes.into_iter().filter(|n| g.has(*n)).collect();
+    let all = g.fill_paths(&nodes, &HashSet::new());
+    Ok(Strategy { site: "poeplanner".into(), link: link.trim().to_string(), name: String::new(),
+        variants: vec![Variant { name: "Atlas tree".into(), steps: g.steps(&all), nodes: all, choices: vec![], notes: vec![] }], ..Default::default() })
 }
 
 /// Works out what a pasted link is. A bare maxroll id ("vg1ga30g") also works.
@@ -328,8 +371,19 @@ pub fn parse_link(text: &str) -> Result<Link, String> {
             return Ok(Link::Planner { data_url: format!("{dir}data.json"), hash: hash.trim().to_string() });
         }
     }
-    if lower.contains("poe.ninja") || lower.contains("poeplanner") {
-        return Err("poe.ninja / poeplanner links aren't supported yet: use their \"Export to pathofexile.com\" link, or maxroll".into());
+    // poeplanner (24 Nov): mobalytics' PoE 1 guides link their atlas trees there. "/atlas-tree/<code>" has the
+    // tree; "/a/<id>" is a short link poeplanner's API turns into that code.
+    if lower.contains("poeplanner.com") {
+        if lower.contains("/poe2") { return Err("That's a Path of Exile 2 atlas tree".into()); }
+        if lower.contains("/atlas-tree/") && !last.is_empty() { return Ok(Link::PoePlanner(last)); }
+        if lower.contains("/a/") && !last.is_empty() { return Ok(Link::PoePlannerShort(last)); }
+        return Err("That poeplanner link isn't to an atlas tree (it should have /atlas-tree/ or /a/ in it)".into());
+    }
+    if lower.contains("mobalytics.gg") {
+        return Err("mobalytics pages can't be read directly (they block apps). Their PoE 1 guides link each atlas tree on poeplanner.com: right-click that link, copy it, and paste it here".into());
+    }
+    if lower.contains("poe.ninja") {
+        return Err("poe.ninja links aren't supported yet: use their \"Export to pathofexile.com\" link, or maxroll".into());
     }
     if !t.contains('/') && !t.contains(' ') && (4..=16).contains(&t.len()) && t.chars().all(|c| c.is_ascii_alphanumeric()) {
         return Ok(Link::Maxroll(t.to_string()));
@@ -713,6 +767,21 @@ mod tests {
         let mut names: Vec<&str> = v.nodes.iter().filter(|n| matches!(g.kind(**n), 1 | 2)).map(|n| g.name(*n)).collect();
         names.sort();
         println!("{}", names.join(", "));
+    }
+
+    #[test]
+    fn poeplanner_links() {
+        // From a mobalytics guide (bigducks, 3.30 early atlas): poeplanner.com/a/6Rtl → this code.
+        let code = "BQAeAAAlAGEfIWAo58aGtWZ9WiKIT_cdfXQdt12L4X2RDkre_p7Ye2B_q9U_WnkF8d2D4RAZCszkfbWCiOtfxIVOG3M-ru8Yiwtx2VypQ4fUFAAfiwgAAAAAAAADAwAAAAAAAAAAAA==";
+        assert_eq!(parse_link(&format!("https://poeplanner.com/atlas-tree/{code}")).unwrap(), Link::PoePlanner(code.into()));
+        assert_eq!(parse_link("https://poeplanner.com/a/6Rtl").unwrap(), Link::PoePlannerShort("6Rtl".into()));
+        assert!(parse_link("https://mobalytics.gg/poe/profile/bigducks/guides/3-30-early-atlas-progression").unwrap_err().contains("poeplanner"));
+        let ids = decode_poeplanner(code).unwrap();
+        assert_eq!(ids.len(), 37);
+        let s = from_poeplanner(code, "x").unwrap();
+        let g = graph();
+        assert!(s.variants[0].nodes.iter().any(|n| g.name(*n) == "Shaping the World"));
+        assert!(s.variants[0].nodes.len() >= 38);
     }
 
     #[test]

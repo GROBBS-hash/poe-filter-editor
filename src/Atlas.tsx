@@ -8,7 +8,7 @@ import TreeEditor from "./AtlasEditor";
 import { PageLoading } from "./Loading";
 import AtlasPicks from "./AtlasPicks";
 
-const SITE: Record<string, string> = { maxroll: "maxroll", official: "pathofexile.com", optimiser: "built by the optimiser", planner: "Atlas Tree Planner" };
+const SITE: Record<string, string> = { maxroll: "maxroll", official: "pathofexile.com", optimiser: "built by the optimiser", planner: "Atlas Tree Planner", poeplanner: "poeplanner" };
 
 /** Endgame → Atlas: import atlas strategies from a link, keep them by name, pick the one shown in game. */
 export default function Atlas() {
@@ -50,8 +50,8 @@ export default function Atlas() {
         onImported={(s, m) => { setStore(s); setSel(s.active); setMsg(`${m} (${key})`); }} />
       <div className="card">
         <h2>Add a strategy from a link <Tip>A <b>maxroll farming strategy</b> link (maxroll.gg/poe/farming-strategy-planner/…) or a
-          <b> pathofexile.com atlas tree</b> link, or an <b>Atlas Tree Planner</b> link (atlas-blush-beta.vercel.app/#…). maxroll strategies bring their notes, map device and threads too.</Tip></h2>
-        <p className="muted small">Paste a maxroll strategy, pathofexile.com atlas tree or Atlas Tree Planner link.</p>
+          <b> pathofexile.com atlas tree</b> link, an <b>Atlas Tree Planner</b> link (atlas-blush-beta.vercel.app/#…), or a <b>poeplanner</b> atlas link (poeplanner.com/a/… — mobalytics guides link their trees there). maxroll strategies bring their notes, map device and threads too.</Tip></h2>
+        <p className="muted small">Paste a maxroll strategy, pathofexile.com, Atlas Tree Planner or poeplanner (mobalytics) atlas tree link.</p>
         <div className="row">
           <input className="text grow" placeholder="https://maxroll.gg/poe/farming-strategy-planner/…" value={link}
             onChange={(e) => setLink(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && link.trim() && !busy) doImport(); }} />
@@ -136,6 +136,7 @@ function Preview({ s, store, run, onSel }: { s: AtlasStrategy; store: AtlasStore
           <h2>{s.name}</h2>
           <div className="row" style={{ margin: 0 }}>
             {s.link && s.site === "maxroll" && <button className="link small" onClick={() => invoke("open_url", { url: s.link })}>Open on maxroll</button>}
+            {s.link && s.site === "poeplanner" && <button className="link small" onClick={() => invoke("open_url", { url: s.link })}>Open on poeplanner</button>}
             {s.link && s.site === "planner" && <button className="link small" onClick={() => invoke("open_url", { url: s.link })}>Open on Atlas Tree Planner</button>}
             <button className="link small" onClick={openOfficial} title="Opens this tree on pathofexile.com">Open on pathofexile.com</button>
             {v && !editing && <button className="primary at-edit-btn" onClick={() => setEditing(true)}>Edit this tree</button>}
