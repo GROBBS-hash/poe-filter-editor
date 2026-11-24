@@ -1046,7 +1046,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
-- [ ] (next) F2 reset button now says "Reset to base filter" and names the filter yours starts from (24 Nov: he may use his own filter, not NeverSink's).
+- [ ] (0.2.64) F2 reset button now says "Reset to base filter" and names the filter yours starts from (24 Nov: he may use his own filter, not NeverSink's).
 - [ ] (0.2.62) Jewels with my mods: Tiers → Jewels → type "energy shield" → add it; after F4 an identified Cobalt jewel with % max ES is highlighted purple, others unchanged. F2 on an identified jewel: a "Jewels with my mods" box lists its mods → tick → Save to my jewel list. "2+" needs two of the mods. Change the look from the card.
 - [ ] (0.2.61) F2 on Omen of Return (hidden with "Just this item"): the chip says "Only Omen of Return hidden" and a gold "Just this item" line says the rest of its tier still shows. `Source.only_base` (evaluate.rs) = the one BaseType an edit names.
 - [ ] (0.2.61) Import a poe.ninja atlas tree (poe.ninja → Atlas Trees → open one → copy the link): it comes in whole. Price check on an empty slot / ground label now says "No item was copied: hold the mouse over the item itself…" instead of "That doesn't look like an item".
