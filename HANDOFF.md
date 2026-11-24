@@ -1657,6 +1657,16 @@ when the game window isn't found. Check in game: the window's spot, and that it 
      theme + price settings as a file / short code, import onto your own NeverSink base. Matters once friends use it.
    - 7d. Low priority: **chat commands** (on their "investigating" list): read typed commands like "!strict" from
      Client.txt (journey.rs already tails it) to switch filters or change a rule. F5 already cycles filters.
+8. **Shop sales and stats on his phone (he asked 24 Nov; rough plan, refine with him before building; 8a first).**
+   PoE has no "sold" event, so a sale is a buyer whisper / buyer arriving (whispers.rs, game must be running) or an item
+   gone from a premium trade tab between stash reads (wealth tracker, works with the game closed). PC + editor must be on.
+   Alerts and stats only: no answering or finishing trades from the phone (against GGG's rules).
+   - 8a. **Phone alerts:** send a push when a buyer whispers ("wants X for Y", with the poe.ninja Fair/Underpriced check),
+     arrives in the hideout, or an item vanishes from a trade tab. Options: ntfy (ntfy.sh, free app, just a topic name)
+     or a Discord webhook to his own channel. Settings: on/off per kind, only while away from the PC (idle/game unfocused).
+   - 8b. **Stats page on his phone:** the editor serves a small read-only web page on the home network (sales log, stash
+     worth over time, chaos/div per hour per strategy, recent maps). Away from home via Tailscale (private, nothing
+     open to the internet). A hosted site with logins only later, if it goes public.
 
 ## Known caveats
 - This cloud workspace can't reach pathofexile.com / poe.ninja / poeprices.info, so network code is only tested by
