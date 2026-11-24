@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Item, RARITY_COLOUR, itemSub, itemTitle } from "./types";
 import { LookChips, looksChanged, useLooks } from "./Looks";
 import StyleEditor, { CurrentStyle, CustomStyle, GAME_COLOURS, LookButton, fromCurrent } from "./StyleEditor";
+import { JewelMod, JewelRule, jewelModList, readJewelRule, saveJewelRule } from "./jewelMods";
 import { ItemIcon } from "./icons";
 import { mapItemIcon } from "./mapIcons";
 import BaseUniques from "./BaseUniques";
@@ -496,6 +497,12 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
               </>
             );
           })()}
+          {item.item_class === "Jewels" && (item.mod_names?.length ?? 0) > 0 && !replacing && (
+            <JewelModsBox names={item.mod_names!} onSave={async (call, msg) => {
+              try { const r = await call; await afterChange(msg, r?.warnings.filter((w) => !w.includes("is gone in this version"))[0]); }
+              catch (e) { setToast(String(e)); }
+            }} />
+          )}
           {group && (
             <div className="qm-scope-box">
               <div className="qm-scope" role="radiogroup" aria-label="What the buttons below change">
@@ -653,6 +660,43 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
         <button className="qm-link" onClick={onClose}>{inGame ? "Close (Esc)" : "Done"}</button>
       </div>
       {toast && <div className="qm-toast">{toast}</div>}
+    </div>
+  );
+}
+
+/** F2 on an identified jewel: tick its mods to add them to "Jewels with my mods" (the list on Tiers → Jewels).
+ *  One Save, since saving reloads the filter and closes F2. */
+function JewelModsBox({ names, onSave }: { names: string[]; onSave: (call: Promise<{ label: string; warnings: string[] } | null>, msg: string) => void }) {
+  const [rule, setRule] = useState<JewelRule | null | undefined>(undefined);
+  const [all, setAll] = useState<JewelMod[]>([]);
+  const [ticked, setTicked] = useState<string[]>([]);
+  useEffect(() => {
+    readJewelRule().then((r) => { setRule(r); setTicked(names.filter((n) => r?.mods.includes(n))); });
+    jewelModList().then(setAll);
+  }, [names.join("|")]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (rule === undefined) return null;
+  const have = rule?.mods ?? [];
+  const textOf = (n: string) => all.find((m) => m.name === n)?.text.replace(/\n/g, " · ") ?? n;
+  const next = [...have.filter((n) => !names.includes(n)), ...ticked];
+  const changed = next.length !== have.length || next.some((n) => !have.includes(n));
+  const others = have.filter((n) => !names.includes(n)).length;
+  const keep = rule?.styled && rule.look ? fromCurrent(rule.look, "Rare") : null;
+  return (
+    <div className="qm-jm">
+      <div className="qm-jm-h"><b>Jewels with my mods</b>
+        <span className="muted small">{have.length === 0 ? "Tick mods to highlight jewels that have them" : `${have.length} in your list${others ? ` (${others} from other jewels)` : ""}`}</span></div>
+      {names.map((n) => (
+        <label key={n} className="qm-check">
+          <input type="checkbox" checked={ticked.includes(n)} onChange={(e) => setTicked(e.target.checked ? [...ticked, n] : ticked.filter((x) => x !== n))} />
+          <span>{textOf(n)} <span className="muted small">{n}</span></span>
+        </label>
+      ))}
+      {changed && (
+        <button className="qm-change" onClick={() => onSave(saveJewelRule(next, rule?.min ?? 0, null, keep),
+          next.length ? `Jewels with my mods: ${next.length} mod${next.length > 1 ? "s" : ""}.` : "Jewels with my mods removed.")}>
+          Save to my jewel list
+        </button>
+      )}
     </div>
   );
 }

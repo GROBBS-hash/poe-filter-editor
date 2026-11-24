@@ -1,4 +1,6 @@
 export type Item = {
+  /** Jewels copied from the game: their mods by name ("Shimmering"), for Jewels with my mods. */
+  mod_names?: string[] | null;
   item_class: string;
   rarity: string;
   name?: string | null;

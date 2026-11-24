@@ -7,6 +7,7 @@ import StyleEditor, { CurrentStyle, CustomStyle, LookButton, Preview, fromCurren
 import { ItemIcon, useIcons } from "./icons";
 import MapTiers, { MapSection } from "./MapTiers";
 import StepConds, { Cond, Menu } from "./StepConds";
+import { JewelMod, JewelRule, jewelModList, readJewelRule, saveJewelRule } from "./jewelMods";
 
 /** Which "+ Add a condition" choices a section gets. */
 function menuFor(s: { group: string; title: string }): Menu {
@@ -308,7 +309,10 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
                 item tier boxes, ticks and looks instead. Top bases are the most valuable to pick up.</div>
             )}
             {section.group === "Jewels" && section.title === "Jewels" && (
-              <CorruptedJewels onDone={(p, m) => done(p, m)} />
+              <>
+                <CorruptedJewels onDone={(p, m) => done(p, m)} />
+                <JewelModsCard onDone={(p, m) => done(p, m)} />
+              </>
             )}
             {section.group === "Gear" && !isExtra && (
               <div className="note">An item takes the <b>first step it fits</b>, from the top. <b>Click a condition</b> (gold edge) to change it,
@@ -460,6 +464,78 @@ function CorruptedJewels({ onDone }: { onDone: (p: Promise<unknown>, msg: string
       {editing && look && (
         <div className="qm tier-edit cj-edit">
           <StyleEditor start={fromCurrent(look, "Rare")} label="Cobalt Jewel" onCancel={() => setEditing(false)} onSave={restyle} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** "Jewels with my mods" (24 Nov, option C): identified Cobalt / Crimson / Viridian / Prismatic jewels with the picked
+ *  mods get highlighted. F2 on a jewel adds to the same list (jewelMods.ts). */
+function JewelModsCard({ onDone }: { onDone: (p: Promise<unknown>, msg: string) => Promise<void> }) {
+  const [rule, setRule] = useState<JewelRule | null>(null);
+  const [all, setAll] = useState<JewelMod[]>([]);
+  const [q, setQ] = useState("");
+  const [editing, setEditing] = useState(false);
+  const check = () => { readJewelRule().then(setRule); };
+  useEffect(() => { check(); jewelModList().then(setAll); }, []);
+  const mods = rule?.mods ?? [];
+  const min = rule?.min ?? 0;
+  const keep = rule?.styled && rule.look ? fromCurrent(rule.look, "Rare") : null;
+  const textOf = (n: string) => all.find((m) => m.name === n)?.text.replace(/\n/g, " · ") ?? "";
+  const save = (next: string[], nextMin: number, msg: string, style?: CustomStyle) =>
+    onDone(saveJewelRule(next, nextMin, style ?? null, keep).finally(check), msg);
+  const needle = q.trim().toLowerCase();
+  const found = needle.length < 2 ? [] : all.filter((m) => !mods.includes(m.name)
+    && (m.text.toLowerCase().includes(needle) || m.name.toLowerCase().includes(needle))).slice(0, 12);
+  return (
+    <div className="note jm-card">
+      <span className="with-icon"><ItemIcon base="Crimson Jewel" size={22} /><b>Jewels with my mods</b></span>
+      <span className="muted small">Identified jewels with these mods get highlighted. F2 on a jewel in game adds its mods here.</span>
+      {mods.length > 0 && (
+        <div className="jm-chosen">
+          {mods.map((n) => (
+            <span key={n} className="jm-chip" title={n}>
+              {textOf(n) || n}
+              <button className="link small" aria-label={`Remove ${n}`} onClick={() => save(mods.filter((x) => x !== n), min, `Removed ${textOf(n) || n}.`)}>✕</button>
+            </span>
+          ))}
+        </div>
+      )}
+      {mods.length > 1 && (
+        <span className="jm-min">
+          <span className="muted small">Highlight a jewel with</span>
+          {[1, 2, 3].filter((n) => n <= mods.length).map((n) => (
+            <button key={n} className={(min || 1) === n ? "primary" : ""} onClick={() => save(mods, n, n === 1 ? "Any one of the mods is enough." : `Needs ${n} of the mods.`)}>
+              {n === 1 ? "any 1" : `${n}+`}
+            </button>
+          ))}
+        </span>
+      )}
+      <input className="text jm-find" placeholder="Add a mod: energy shield, life, attack speed…" value={q} onChange={(e) => setQ(e.target.value)} />
+      {found.length > 0 && (
+        <div className="jm-found">
+          {found.map((m) => (
+            <button key={m.name} className="jm-add" onClick={() => { setQ(""); save([...mods, m.name], min, `Added ${m.text.replace(/\n/g, " · ")}.`); }}>
+              <span>+ {m.text.replace(/\n/g, " · ")}</span><span className="muted small">{m.name} · {m.prefix ? "prefix" : "suffix"}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {needle.length >= 2 && found.length === 0 && <span className="muted small">No jewel mod matches that.</span>}
+      {mods.length > 0 && rule?.look && (
+        <span className="cj-look">
+          <span className="muted small">How they look (click to change):</span>
+          <LookButton className="tier-look" onClick={() => setEditing(!editing)}>
+            <Preview s={fromCurrent(rule.look, "Rare")} text="Cobalt Jewel" />
+          </LookButton>
+          <button className="link small" onClick={() => save([], 0, "Jewels with my mods removed: jewels back to NeverSink's.")}>Remove all</button>
+        </span>
+      )}
+      {editing && rule?.look && (
+        <div className="qm tier-edit cj-edit">
+          <StyleEditor start={fromCurrent(rule.look, "Rare")} label="Cobalt Jewel" onCancel={() => setEditing(false)}
+            onSave={(st) => { setEditing(false); save(mods, min, "Jewels with my mods restyled.", st); }} />
         </div>
       )}
     </div>

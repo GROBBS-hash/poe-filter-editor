@@ -40,6 +40,7 @@ let batchItems = [
   { item_class: "Body Armours", rarity: "Unique", name: "Tabula Rasa", base_type: "Simple Robe", item_level: 68, corrupted: false, mirrored: false, unidentified: false },
 ];
 let cjRule: { kind: string; style: Record<string, unknown> } | null = null;
+let jmRule: { kind: string; mods: string[]; min: number } | null = { kind: "Highlight:", mods: ["Shimmering"], min: 0 };
 let tiersCache: unknown = null;
 const mapStyle = (b: string) => ({ font_size: 45, muted: false, text: b === "d" ? [255, 255, 255, 255] : [0, 0, 0, 255],
   background: b === "d" ? [20, 20, 0, 255] : b === "c" ? [235, 235, 120, 255] : [235, 235, 235, 255], border: b === "a" ? [255, 0, 0, 255] : null,
@@ -275,6 +276,24 @@ mockIPC((cmd, args) => {
     return { area_level: 83, stackable: false, status: { assumptions: [], by_stack: [], verdict: { visibility: hidden ? "Hide" : "Show", reason: "", by_user_edit: false, uncertain: [], decided_by: "",
       style: { font_size: 40, text: [255, 255, 255, 255], border: null, background: [0, 0, 0, 200] },
       source: { kind: "neversink", label: "", type_path: ["currency"], tier: "t4chaos", section: "Currency", tier_name: "Tier 4 · about a Chaos Orb", conds: ["stackable currency"] } } } };
+  }
+  // "Jewels with my mods" on the Jewels page (24 Nov): one saved edit holding the mod names.
+  if (cmd === "jewel_mods") return [
+    { name: "Shimmering", text: "(6-8)% increased maximum Energy Shield", prefix: true, tags: [] },
+    { name: "Vivid", text: "(5-7)% increased maximum Life", prefix: true, tags: [] },
+    { name: "of Haste", text: "(3-5)% increased Attack Speed", prefix: false, tags: [] },
+    { name: "of Berserking", text: "(2-4)% increased Attack and Cast Speed", prefix: false, tags: [] }];
+  if (cmd === "get_rule" && String((args as { label?: string }).label ?? "").includes("Jewels with my mods")) {
+    const label = String((args as { label: string }).label);
+    if (!jmRule || !label.startsWith(jmRule.kind)) throw "not there";
+    return ["preview", 1, { label, show: true, item_class: "Jewels", base_type: "", mods: jmRule.mods, mods_min: jmRule.min,
+      style: { text: [255, 255, 255, 255], border: [175, 96, 255, 255], background: [60, 20, 90, 255], font_size: 40, muted: false } }];
+  }
+  if (cmd === "delete_rule" && (args as { index: number }).index === 1) { jmRule = null; return null; }
+  if ((cmd === "apply_quick_action" || cmd === "apply_custom_style") && ((args as { opts?: { mods?: string[] } }).opts?.mods?.length ?? 0) > 0) {
+    const o = (args as { opts: { mods: string[]; mods_min: number } }).opts;
+    jmRule = { kind: cmd === "apply_custom_style" ? "Style:" : "Highlight:", mods: o.mods, min: o.mods_min };
+    return { label: "ok", warnings: [] };
   }
   // The "Corrupted rare jewels" switch on the Jewels page: one saved edit, highlighted or restyled.
   if (cmd === "get_rule" && String((args as { label?: string }).label ?? "").includes("Corrupted Rare every Jewels")) {

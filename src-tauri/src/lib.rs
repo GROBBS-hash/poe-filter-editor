@@ -330,6 +330,10 @@ fn err<E: ToString>(e: E) -> String {
 /// active profile's base filter.
 fn read_item(app: &AppHandle, text: &str) -> Option<Item> {
     let mut item = parse_item(text)?;
+    // Jewels: their mods by name, for "Jewels with my mods" (F2 ticks them; HasExplicitMod checks them).
+    if item.item_class == "Jewels" && !item.unidentified {
+        item.mod_names = Some(filter_core::craft::jewel_mods_in(text));
+    }
     let state = app.state::<AppState>();
     let store = state.store.lock().unwrap();
     if let Some(p) = store.active.as_ref().and_then(|id| store.profiles.get(id)) {
@@ -2388,6 +2392,12 @@ async fn craft_search(state: State<'_, AppState>, base: String, ilvl: u32, influ
         .map(|p| filter_core::craft::search::craft_search(&p, &targets, all))).await.map_err(|e| e.to_string())
 }
 
+/// Every mod a regular jewel can roll (Tiers → Jewels → "Jewels with my mods").
+#[tauri::command]
+fn jewel_mods() -> Vec<filter_core::craft::JewelMod> {
+    filter_core::craft::jewel_mods()
+}
+
 /// Crafting page: what an item like the copied one costs on the trade site (the same search as Ctrl+D), to compare
 /// with crafting it. One search, only when you click.
 #[tauri::command(async)]
@@ -2945,7 +2955,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             price_build_item, buy_build_item, buy_base_item, trade_untick_one, trade_hidden, overview,
-            craft_bases, craft_start, craft_pool, craft_ways, craft_plan, craft_routes, craft_buy, craft_search, craft_buy_plan,
+            craft_bases, craft_start, craft_pool, craft_ways, craft_plan, craft_routes, craft_buy, craft_search, craft_buy_plan, jewel_mods,
             create_profile,
             list_filters,
             set_active,

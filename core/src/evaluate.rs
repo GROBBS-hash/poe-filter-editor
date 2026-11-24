@@ -238,6 +238,17 @@ fn check(key: &str, op: &str, vals: &[String], c: &Ctx) -> Tri {
         | "ElderMap" | "ShapedMap" | "BlightedMap" | "UberBlightedMap"
         | "TransfiguredGem" | "ZanaMemory" | "Imbued" =>
             if c.from_screen { Tri::Unknown } else { cmp_bool(Some(false), vals) },
+        // Jewels copied from the game: their mod names are known ("HasExplicitMod >=2 \"Shimmering\" \"Vivid\"").
+        "HasExplicitMod" if it.mod_names.is_some() && !c.from_screen => {
+            let have = it.mod_names.as_deref().unwrap_or(&[]);
+            let (need, names) = match vals.first().and_then(|v| v.parse::<u32>().ok()) {
+                Some(n) => (n, &vals[1..]),
+                None => (1, vals),
+            };
+            let count = names.iter().filter(|n| have.iter().any(|h| h.eq_ignore_ascii_case(n))).count() as u32;
+            let op = if op.is_empty() || op == "=" || op == "==" { if vals.first().is_some_and(|v| v.parse::<u32>().is_ok()) { op } else { ">=" } } else { op };
+            cmp_num(Some(count), if op.is_empty() { "==" } else { op }, &[need.to_string()])
+        }
         "UnidentifiedItemTier" if it.item_tier.is_some() => cmp_num(it.item_tier, op, vals),
         "MemoryStrands" if !c.from_screen => cmp_num(Some(it.memory_strands.unwrap_or(0)), op, vals),
         // Things only gear can have: rule them out for currency, gems, cards...
@@ -478,6 +489,30 @@ mod tests {
         assert_eq!(s.verdict.style.text, Some([255, 0, 0, 255]));
         assert_eq!(s.verdict.style.sound.as_deref(), Some("Sound 1"));
         assert_eq!(s.verdict.decided_by, "currency › t1");
+    }
+
+    #[test]
+    fn jewels_with_my_mods() {
+        // 24 Nov: "highlight jewels if they have certain mods". Rule from the app, then NeverSink hiding magic jewels.
+        let one = crate::rules::quick_rule(&Item { item_class: "Jewels".into(), rarity: "Magic".into(), ..Default::default() }, crate::rules::Action::Highlight, None,
+            &crate::rules::MatchOpts { same_rarity: false, mods: vec!["Shimmering".into(), "Vivid".into()], ..Default::default() });
+        let crate::rules::Rule::Override { label, conditions, .. } = &one else { panic!() };
+        assert_eq!(label, "Highlight: every Jewels with my mods");
+        assert!(conditions.contains(&"HasExplicitMod \"Shimmering\" \"Vivid\"".to_string()), "{conditions:?}");
+        let two = crate::rules::quick_rule(&Item { item_class: "Jewels".into(), ..Default::default() }, crate::rules::Action::Highlight, None,
+            &crate::rules::MatchOpts { same_rarity: false, mods: vec!["Shimmering".into(), "Vivid".into()], mods_min: 2, ..Default::default() });
+        let crate::rules::Rule::Override { conditions: c2, .. } = &two else { panic!() };
+        assert!(c2.contains(&"HasExplicitMod >=2 \"Shimmering\" \"Vivid\"".to_string()));
+        let filter = |conds: &[String]| format!("Show # Highlight: x\n    {}\n    SetFontSize 42\n\nHide # $type->jewels $tier->rest\n    Class == \"Jewels\"\n", conds.join("\n    "));
+        let jewel = |mods: &[&str]| { let mut i = item("Item Class: Jewels\nRarity: Magic\nShimmering Cobalt Jewel\n"); i.mod_names = Some(mods.iter().map(|s| s.to_string()).collect()); i };
+        let vis = |f: &str, it: &Item| status(&parse_filter(f), it, Some(83), false).verdict.visibility;
+        assert_eq!(vis(&filter(conditions), &jewel(&["Shimmering"])), "Show");
+        assert_eq!(vis(&filter(conditions), &jewel(&["of Haste"])), "Hide");
+        assert_eq!(vis(&filter(c2), &jewel(&["Shimmering"])), "Hide");
+        assert_eq!(vis(&filter(c2), &jewel(&["Shimmering", "Vivid"])), "Show");
+        // Kept when the edit's look changes; its detail lists them.
+        let d = crate::rules::rule_detail(&two).unwrap();
+        assert_eq!((d.mods.len(), d.mods_min), (2, 2));
     }
 
     #[test]

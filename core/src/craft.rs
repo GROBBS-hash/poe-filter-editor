@@ -1032,3 +1032,67 @@ mod tests {
         price("Orb of Alteration + Orb of Augmentation");
     }
 }
+
+// ---------- jewel mods for the loot filter (24 Nov) ----------
+
+/// A regular jewel mod (Cobalt, Crimson, Viridian…): its name is what the loot filter matches
+/// (`HasExplicitMod "Shimmering"`), and on jewels every name is used by one mod only.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct JewelMod { pub name: String, pub text: String, pub prefix: bool, pub tags: Vec<String> }
+
+/// Every mod a regular jewel can roll, by name.
+pub fn jewel_mods() -> Vec<JewelMod> {
+    let mut seen = HashSet::new();
+    let mut out: Vec<JewelMod> = data().mods.iter()
+        .filter(|m| m.dom == "jewel" && (m.gen == "p" || m.gen == "s") && m.sw.iter().any(|(_, w)| *w > 0.0))
+        .filter(|m| seen.insert(m.name.clone()))
+        .map(|m| JewelMod { name: m.name.clone(), text: m.text.clone(), prefix: m.gen == "p", tags: m.tags.clone() })
+        .collect();
+    out.sort_by(|a, b| a.text.cmp(&b.text));
+    out
+}
+
+/// A mod line with its numbers taken out: "(6-8)% increased…" and "8% increased…" both become "#% increased…".
+fn mod_shape(s: &str) -> String {
+    let c: Vec<char> = s.trim().chars().collect();
+    let mut out = String::new();
+    let mut i = 0;
+    while i < c.len() {
+        if c[i] == '(' {
+            if let Some(end) = c[i..].iter().position(|x| *x == ')') {
+                let inner: String = c[i + 1..i + end].iter().collect();
+                if !inner.is_empty() && inner.chars().all(|x| x.is_ascii_digit() || x == '-' || x == '.') { out.push('#'); i += end + 1; continue; }
+            }
+        }
+        if c[i].is_ascii_digit() {
+            while i < c.len() && (c[i].is_ascii_digit() || c[i] == '.') { i += 1; }
+            out.push('#');
+            continue;
+        }
+        out.push(c[i]);
+        i += 1;
+    }
+    out.to_lowercase()
+}
+
+/// The jewel mods on a copied jewel (its mod lines matched against every jewel mod).
+pub fn jewel_mods_in(text: &str) -> Vec<String> {
+    let lines: HashSet<String> = text.lines().map(|l| mod_shape(l.trim_end_matches(" (crafted)").trim_end_matches(" (fractured)"))).collect();
+    jewel_mods().into_iter()
+        .filter(|m| m.text.split('\n').all(|l| lines.contains(&mod_shape(l))))
+        .map(|m| m.name)
+        .collect()
+}
+
+#[cfg(test)]
+mod jewel_mod_tests {
+    use super::*;
+    #[test]
+    fn jewel_mods_read() {
+        let all = jewel_mods();
+        assert!(all.len() > 100);
+        assert!(all.iter().any(|m| m.name == "Shimmering" && m.prefix));
+        let text = "Item Class: Jewels\nRarity: Magic\nShimmering Cobalt Jewel\n--------\nItem Level: 83\n--------\n8% increased maximum Energy Shield\n--------\nPlace into an allocated Jewel Socket on the Passive Skill Tree. Right click to remove from the Socket.\n";
+        assert_eq!(jewel_mods_in(text), vec!["Shimmering".to_string()]);
+    }
+}

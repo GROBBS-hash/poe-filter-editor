@@ -42,6 +42,10 @@ pub struct Item {
     /// Maps: the conqueror ("Drox") or Elder guardian ("The Enslaver") the map belongs to, for its picture.
     #[serde(default)]
     pub occupied_by: Option<String>,
+    /// Its explicit mods by the game's names (jewels, from the copied text), for the filter's `HasExplicitMod`.
+    /// None = not known (e.g. read off the ground).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mod_names: Option<Vec<String>>,
 }
 
 /// "Map contains Drox's Citadel" → "Drox"; "Map is occupied by The Enslaver" → "The Enslaver";

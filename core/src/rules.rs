@@ -114,9 +114,21 @@ pub struct MatchOpts {
     /// Only corrupted items (e.g. show corrupted rare jewels while the rest stay hidden).
     #[serde(default)]
     pub corrupted: bool,
+    /// Only identified items with these mods (by the game's mod names, e.g. "Shimmering"): "jewels with my mods"
+    /// (24 Nov). `mods_min` of them at least (0 or 1 = any one).
+    #[serde(default)]
+    pub mods: Vec<String>,
+    #[serde(default)]
+    pub mods_min: u32,
 }
 impl Default for MatchOpts {
-    fn default() -> Self { Self { same_rarity: true, max_item_level: None, min_stack: None, below_stack: None, when: When::Always, corrupted: false } }
+    fn default() -> Self { Self { same_rarity: true, max_item_level: None, min_stack: None, below_stack: None, when: When::Always, corrupted: false, mods: vec![], mods_min: 0 } }
+}
+
+/// The filter line for "has these mods": `HasExplicitMod "A" "B"` or `HasExplicitMod >=2 "A" "B"`.
+fn mods_line(mods: &[String], min: u32) -> String {
+    let names: Vec<String> = mods.iter().map(|m| format!("\"{}\"", m.replace('"', ""))).collect();
+    if min > 1 { format!("HasExplicitMod >={min} {}", names.join(" ")) } else { format!("HasExplicitMod {}", names.join(" ")) }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Default)]
@@ -182,6 +194,10 @@ pub fn quick_rule(item: &Item, action: Action, colour_name: Option<&str>, opts: 
         conditions.push(c.to_string());
     }
     if opts.corrupted { conditions.push("Corrupted True".into()); }
+    if !opts.mods.is_empty() {
+        conditions.push("Identified True".into());
+        conditions.push(mods_line(&opts.mods, opts.mods_min));
+    }
     let what = if item.base_type.is_empty() { format!("every {}", item.item_class) } else { item.base_type.clone() };
     let what = if item.uber_blighted { format!("Blight-ravaged {what}") } else if item.blighted { format!("Blighted {what}") } else { what };
     let mut who = match RARITIES.contains(&item.rarity.as_str()) && opts.same_rarity {
@@ -196,6 +212,7 @@ pub fn quick_rule(item: &Item, action: Action, colour_name: Option<&str>, opts: 
         _ => {}
     }
     who.push_str(opts.when.words());
+    if !opts.mods.is_empty() { who.push_str(" with my mods"); }
 
     let (show, actions, verb) = match action {
         Action::Hide => (false, vec!["DisableDropSound True".into()], "Hide"),
@@ -338,6 +355,11 @@ pub struct RuleDetail {
     pub look: Option<String>,
     /// Switched off.
     pub off: bool,
+    /// Only identified items with these mods (see `MatchOpts::mods`).
+    #[serde(default)]
+    pub mods: Vec<String>,
+    #[serde(default)]
+    pub mods_min: u32,
 }
 
 /// Changes to apply to a saved edit.
@@ -370,7 +392,7 @@ pub fn rule_detail(rule: &Rule) -> Option<RuleDetail> {
     let mut d = RuleDetail {
         label: label.clone(), show: *show, item_class: String::new(), base_type: String::new(),
         rarity: None, min_stack: None, below_stack: None, when: When::Always, corrupted: false, style: crate::evaluate::style_of(actions),
-        look: look.clone(), off: *off,
+        look: look.clone(), off: *off, mods: vec![], mods_min: 0,
     };
     for c in conditions {
         let c = c.trim();
@@ -382,6 +404,11 @@ pub fn rule_detail(rule: &Rule) -> Option<RuleDetail> {
         else if c == "AreaLevel < 68" { d.when = When::Levelling; }
         else if c == "AreaLevel >= 68" { d.when = When::Maps; }
         else if c == "Corrupted True" { d.corrupted = true; }
+        else if let Some(rest) = c.strip_prefix("HasExplicitMod") {
+            let rest = rest.trim();
+            if let Some(n) = rest.strip_prefix(">=") { d.mods_min = n.trim().split_whitespace().next().and_then(|x| x.parse().ok()).unwrap_or(0); }
+            d.mods = rest.split('"').skip(1).step_by(2).map(str::to_string).collect();
+        }
     }
     Some(d)
 }
@@ -395,6 +422,7 @@ pub fn same_slot(a: &Rule, b: &Rule) -> bool {
         && x.min_stack.is_some() == y.min_stack.is_some()
         && x.below_stack.is_some() == y.below_stack.is_some()
         && x.when == y.when && x.corrupted == y.corrupted
+        && x.mods.is_empty() == y.mods.is_empty()
 }
 
 /// For each edit, the newer edit that always wins over it (so it never
@@ -413,7 +441,9 @@ pub fn shadowed_by(rules: &[Rule]) -> Vec<Option<usize>> {
             let covers_when = new.when == When::Always || new.when == old.when;
             // A corrupted-only edit doesn't cover the rest.
             let covers_corrupt = !new.corrupted || old.corrupted;
-            same_item && covers_rarity && covers_stacks && covers_when && covers_corrupt
+            // A "with my mods" edit only covers some of them.
+            let covers_mods = new.mods.is_empty() || (new.mods == old.mods && new.mods_min <= old.mods_min);
+            same_item && covers_rarity && covers_stacks && covers_when && covers_corrupt && covers_mods
         })
     }).collect()
 }
@@ -440,6 +470,9 @@ pub fn edited_rule(rule: &Rule, edit: &RuleEdit) -> Option<Rule> {
         below_stack: edit.below_stack,
         when: edit.when,
         corrupted: edit.corrupted,
+        // A "with my mods" edit keeps its mods when its look or limits change.
+        mods: d.mods.clone(),
+        mods_min: d.mods_min,
     };
     Some(match (edit.show, &edit.style) {
         (true, Some(style)) => custom_rule(&item, style, &opts),

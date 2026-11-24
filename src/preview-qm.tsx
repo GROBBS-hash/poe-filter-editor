@@ -23,6 +23,13 @@ const reply = {
 mockWindows("overlay");
 mockIPC((cmd, args) => {
   if (cmd === "check_item" || cmd === "item_status") return reply;
+  // ?jewel=1: a Shimmering Cobalt Jewel; its mod is already in "Jewels with my mods" with one other.
+  if (cmd === "jewel_mods") return [{ name: "Shimmering", text: "(6-8)% increased maximum Energy Shield", prefix: true, tags: [] },
+    { name: "of Haste", text: "(3-5)% increased Attack Speed", prefix: false, tags: [] }, { name: "Vivid", text: "(5-7)% increased maximum Life", prefix: true, tags: [] }];
+  if (cmd === "get_rule" && String((args as { label?: string }).label).includes("Jewels with my mods")) {
+    if (String((args as { label?: string }).label).startsWith("Style")) throw "none";
+    return ["p", 0, { mods: ["Vivid"], mods_min: 0, style: { font_size: 42, text: [170, 60, 255, 255], border: [170, 60, 255, 255], background: [20, 20, 20, 240] } }];
+  }
   if (cmd === "item_price") return [0.82, "chaos"];
   if (cmd === "stack_choices") return [];
   if (cmd === "get_icons") return {};
@@ -36,7 +43,8 @@ mockIPC((cmd, args) => {
   return null;
 }, { shouldMockEvents: true });
 document.body.className = "overlay";
-const item = { item_class: "Stackable Currency", rarity: "Normal", name: null, base_type: "Orb of Unmaking", stack_size: 3, corrupted: false, mirrored: false, unidentified: false };
+const item = params.get("jewel") ? { item_class: "Jewels", rarity: "Magic", name: null, base_type: "Cobalt Jewel", corrupted: false, mirrored: false, unidentified: false, mod_names: ["Shimmering", "of Haste"] }
+  : { item_class: "Stackable Currency", rarity: "Normal", name: null, base_type: "Orb of Unmaking", stack_size: 3, corrupted: false, mirrored: false, unidentified: false };
 createRoot(document.getElementById("root")!).render(
   <div style={{ width: editor ? 900 : 400, margin: 16 }} className={editor ? "" : "qm"}><ItemPanel start={{ item: item as never, from_screen: !editor, screen_text: "ORB OF UNMAKING", confidence: 1 }} inGame={!editor} onClose={() => {}} /></div>,
 );
