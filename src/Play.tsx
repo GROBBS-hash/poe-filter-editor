@@ -21,7 +21,7 @@ export type LevelView = {
 };
 export type MapRun = {
   name: string; area: string; level: number; seed: number; start: number; last_enter: number; in_map: number; left: number;
-  deaths: number; portals: number; mods: string[]; made: number | null; paused?: number; loot?: LootLine[];
+  deaths: number; portals: number; mods: string[]; made: number | null; paused?: number; loot?: LootLine[]; loot_missed?: boolean;
 };
 /** One thing a map gave you (loot.rs). cat: currency, cards, uniques, maps, scarabs, fragments, gems, gear, other. */
 export type LootLine = { name: string; cat: string; stack: number; value: number; icon: string; tier?: number | null; high?: number | null };
@@ -619,7 +619,8 @@ function TrackerLoot({ v }: { v: TrackerView }) {
   const s = v.session;
   return (
     <div className="trk-sec">
-      {loot.length === 0 ? <div className="pw-small">{needsLogin(v.loot_note) ? <ErrNote msg={v.loot_note} onRetry={() => {}} /> : v.loot_note || (v.inside ? "Loot shows when you leave the map (your bags are read as you go in and out)." : "Loot per map: run a map and it shows here.")}</div> : <>
+      {needsLogin(v.loot_note) && <div className="pw-small"><ErrNote msg={v.loot_note} onRetry={() => {}} /><div>Loot isn't being counted until then.</div></div>}
+      {loot.length === 0 ? <div className="pw-small">{needsLogin(v.loot_note) ? null : v.loot_note || (v.inside ? "Loot shows when you leave the map (your bags are read as you go in and out)." : "Loot per map: run a map and it shows here.")}</div> : <>
         <div className="pw-row between"><span className="loot-label">{label}</span>
           <span className="loot-total">{Math.round(total).toLocaleString()}c{v.divine ? <span className="pw-small"> ≈ {(total / v.divine).toFixed(1)} div</span> : null}</span></div>
         <LootBar loot={loot.filter((l) => !p.hide.includes(l.cat))} />
@@ -838,7 +839,7 @@ export default function PlayTools() {
                   <td>{r.name}</td><td>{tier(r)}</td>
                   <td>{mmss(r.in_map)}{r.paused ? <span className="muted small" title="Time with the Escape menu or skill tree open, not counted"> (+{mmss(r.paused)} paused)</span> : null}</td>
                   <td>{r.deaths || ""}</td>
-                  <td>{loot.length ? <LootBar loot={loot} thin /> : r.made != null ? <span className="muted small">earnings ≈ {Math.round(r.made)}c</span> : ""}</td>
+                  <td>{loot.length ? <LootBar loot={loot} thin /> : r.loot_missed ? <span className="muted small" title="Your bags couldn't be read (usually the pathofexile.com login had run out), so this map isn't counted in the averages">loot not read</span> : r.made != null ? <span className="muted small">earnings ≈ {Math.round(r.made)}c</span> : ""}</td>
                   <td className="n">{loot.length ? <b>{chaosOrDiv(lootTotal(loot), divine)}</b> : ""}</td>
                   <td>{best ? <span className="loot-name"><TierTag t={best.tier} />{best.stack > 1 ? `${best.stack}× ` : ""}{best.name}</span> : ""}</td>
                   <td className="muted">{new Date(r.start * 1000).toISOString().slice(5, 16).replace("T", " ")}</td></tr>

@@ -950,9 +950,9 @@ pub struct TreeResult {
     pub session_per_hour: Option<f64>,
 }
 
-/// Results per atlas tree, best per hour first. `runs`: map runs (start, loot chaos, tree); `sessions`: (hours, profit
+/// Results per atlas tree, best per hour first. `runs`: map runs (start, seconds, loot chaos or None when it couldn't be read, tree); `sessions`: (hours, profit
 /// chaos, tree) of finished earnings sessions.
-pub fn tree_results(runs: &[(i64, i64, f64, Option<u64>)], sessions: &[(f64, f64, Option<u64>)]) -> Vec<TreeResult> {
+pub fn tree_results(runs: &[(i64, i64, Option<f64>, Option<u64>)], sessions: &[(f64, f64, Option<u64>)]) -> Vec<TreeResult> {
     let mut out: Vec<TreeResult> = vec![];
     let get = |out: &mut Vec<TreeResult>, id: u64| -> usize {
         match out.iter().position(|r| r.id == id) { Some(i) => i, None => { out.push(TreeResult { id, ..Default::default() }); out.len() - 1 } }
@@ -960,7 +960,8 @@ pub fn tree_results(runs: &[(i64, i64, f64, Option<u64>)], sessions: &[(f64, f64
     // Maps: (start, seconds until the next map's start or its own end, loot).
     let mut by_tree: std::collections::HashMap<u64, (usize, f64, f64)> = Default::default();
     for (i, (start, own, loot, tree)) in runs.iter().enumerate() {
-        let Some(t) = tree else { continue };
+        // Loot that couldn't be read (login run out) isn't "no loot": the map doesn't count.
+        let (Some(t), Some(loot)) = (tree, loot) else { continue };
         let next = runs.get(i + 1).map(|r| r.0 - start).filter(|g| *g > 0 && *g < 3600).unwrap_or(*own);
         let e = by_tree.entry(*t).or_default();
         e.0 += 1; e.1 += next.max(60) as f64; e.2 += loot;
@@ -991,11 +992,11 @@ mod result_tests {
     #[test]
     fn per_tree() {
         // Tree 1: two 5-minute map cycles with 100c each = 1200c/h. Tree 2: one session, 2 hours, 600c profit.
-        let runs = vec![(0, 280, 100.0, Some(1)), (300, 280, 100.0, Some(1)), (5000, 290, 0.0, None)];
+        let runs = vec![(0, 280, Some(100.0), Some(1)), (300, 280, Some(100.0), Some(1)), (600, 280, None, Some(1)), (5000, 290, Some(0.0), None)];
         let r = super::tree_results(&runs, &[(2.0, 600.0, Some(2)), (1.0, 50.0, None)]);
         let t1 = r.iter().find(|x| x.id == 1).unwrap();
         assert_eq!(t1.maps, 2);
-        assert!((t1.loot_per_hour.unwrap() - 1241.4).abs() < 1.0, "{t1:?}");
+        assert!((t1.loot_per_hour.unwrap() - 1200.0).abs() < 1.0, "{t1:?}");
         let t2 = r.iter().find(|x| x.id == 2).unwrap();
         assert_eq!(t2.session_per_hour, Some(300.0));
         assert_eq!(r[0].id, 1);

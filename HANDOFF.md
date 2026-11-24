@@ -48,6 +48,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **Missing map loot (24 Nov, not released yet).** From the saved runs: no loot from 23 Nov 16:50 to 24 Nov 13:41 (19 runs), working again from 24 Nov 19:29 (all 6 since have loot). Most likely the pathofexile.com login had run out (he reported exactly that on 23 Nov 16:50; the stash scan at 24 Nov 13:49 needs a login); nothing is logged, so not proven. The saving itself is fine. So it's noticed next time: `LoginBar` on top of the main window (App.tsx) and the login message on the tracker even when the last map had loot; `MapRun.loot_missed` (bags couldn't be read, or the editor restarted mid-map) shows "loot not read" in the history and is left out of the earnings per tree. Old runs aren't marked.
 - **Kirac's invitations in Ctrl+D (24 Nov, released in 0.2.66; his "Fate Offer" Maven's Invitation).** `maps::runs_like_map` (Misc Map Items with "Invitation"): map check against his can't-run list like a map (flavour text left out), mods never ticked for a price; when the trade site doesn't list the base (`ItemTypes::sells`) the window is only the map check, "can't be sold", no search (`MapInfo.no_sale`). Test `invitations_are_checked_like_maps`.
 - **Temples have prices (24 Nov, released in 0.2.66; he pointed out rooms sell on the trade site).** `core/src/temple.rs` + `core/data/temples.json` (survey of every Tier 3 room, level 75+, `node tools/build_temples.mjs`, ~10 min). 24 Nov: plain 10c, Cradle of Creation 55c, Locus of Corruption and Doryani's Institute ~1 div, Doryani + Cradle (and all three) ~2 div. Farm finder: Incursion counts listed temples over a plain one at 10% like beasts (a temple with two good rooms once) and Why? lists the setups; the app re-reads the good rooms every 12 h when the Atlas page opens (`farm_app::refresh_temples`, one per 20 s, leaves room for his price checks). Ctrl+D on a Chronicle lists its open rooms, good ones ticked, with area level. Obstructed rooms don't count. A few room names on the item differ from the trade site's ("Grand Reactor"): those just aren't listed.
 - **Farm finder: "What to farm today" on the Atlas page (24 Nov, released in 0.2.65; he picked layout B and asked for regular drops, 2-5 mechanics together, and maps).**
@@ -56,7 +57,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   - Maps: `core/data/farms.json` (hand-kept facts with source: maxroll, guide sites, patch notes; also pairings, altar → Thread drops, maps to skip), plus creators' maps; his own average minutes from the map tracker. Toxic Sewer left out: sources disagree whether it's on the 3.30 atlas.
   - Players' trees: `core/data/atlas_meta.json`, by hand with `node tools/build_atlas_meta.mjs <snapshot>` (poe.ninja's 100,000 trees; Harvest = its "Wildwood"). poe.ninja answers scripts 403 on its pages, so the snapshot number has to come from a browser and it can't run in the price job; don't work round it. The app itself never asks poe.ninja. Refresh before releases.
   - `public/atlas_picks.json` now has threads / altar / rolls (build_atlas_picks.mjs). "Build this tree" opens Build my own with the farm's mechanics; Mirage tile added there.
-  - Next: his own div per hour per farm (needs the cloud branch's `MapRun.atlas` + loot working again), AI part = "copy for Claude" button.
+  - Next: his own div per hour per farm (`MapRun.atlas` is in since 0.2.65), AI part = "copy for Claude" button.
 - **Price check: Wickerman body parts (24 Nov, released in 0.2.65).** 3.30's "Item Class: Viscera" items are copied with no Rarity line, so `parse_item` gave up ("No item was copied"). Now Rarity defaults to Normal when there's an Item Class; their unmarked mod is an implicit (`trade::mods`) and ticked at your roll. Test `wickerman_body_part` (text from the trade site's own copy of Blackened Lungs; search checked live: 1,050 for 25%+).
 - **Themes page: cards show real drops (24 Nov, released in 0.2.65; he asked: Divine is red on white in his filter, the card showed orange).** Cards used a fixed item per value level. Now command `theme_cards` (`core/src/preview.rs`): 8 sample drops this filter shows, each with its own look (Divine first; ones the theme colours first, found by comparing with a Classic PoE render), run through the whole filter with each theme (~33 in parallel). A gold dot = your own look, same in every theme. Theme editor examples come from the filter too (`level_examples`). Dev: `theme_cards_real` with THEME_CARDS_OUT=.claude/theme-cards.json feeds preview-app.html.
 - **24 Nov, cloud session while he was out (merged and released in 0.2.65).** "Build everything else" on the Left to do list:
@@ -1093,6 +1094,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
+- [ ] (24 Nov, unreleased) When the pathofexile.com login runs out: a "Log in again" bar on top of the main window and on the tracker; maps meanwhile say "loot not read" in the history.
 - [ ] (0.2.66) Ctrl+D on a Maven's invitation from Kirac: only the map check (Run / Don't run), no price.
 - [ ] (0.2.66) Ctrl+D on a Chronicle of Atzoatl: its open rooms are listed, Locus / Doryani / Cradle ticked, listings found. Atlas page → One mechanic: Incursion shows with temple prices.
 - [ ] (0.2.65) Atlas tree page → What to farm today: three cards with pictures, best maps, Threads cost; Why? explains; Build this tree opens Build my own with those mechanics; the choices (regular drops only, cheap Threads, one / two or more) change the cards.
@@ -1690,7 +1692,7 @@ when the game window isn't found. Check in game: the window's spot, and that it 
       "Best strategies" ranks runs.
 
 ## Left to do (agreed order)
-- **Farm finder follow-ups (built 24 Nov, see Done):** why his last 16 map runs have no loot (since 23 Nov); his own div per hour per farm; "copy for Claude" button.
+- **Farm finder follow-ups (built 24 Nov, see Done):** his own div per hour per farm (loot works again, see Done); "copy for Claude" button.
 0. **24 Nov cloud work (see Done): merged and released in 0.2.65.** Phone alerts + stats
    page (8a/8b), chat commands (7d), atlas earnings per tree (5), race splits (instead of a live rank: GGG's ladder is
    OAuth-only), PoE 2 campaign route, Awakener's Orb crafting. Still not built: **PoE 2 crafting** (needs its own data

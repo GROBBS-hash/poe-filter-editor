@@ -1,4 +1,5 @@
 import { friendly } from "./errors";
+import { PoeLogin, needsLogin } from "./LoginNeeded";
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import Help from "./Help";
 import ErrorBoundary from "./ErrorBoundary";
@@ -175,6 +176,25 @@ function UpdateBar() {
   );
 }
 
+/** Loot isn't being counted because the pathofexile.com login has run out (24 Nov: 16 maps went by without it being noticed). */
+function LoginBar() {
+  const [note, setNote] = useState("");
+  useEffect(() => {
+    const take = (v: { tracker: { loot_note: string } } | null) => setNote(v?.tracker?.loot_note ?? "");
+    invoke<{ tracker: { loot_note: string } }>("play_view").then(take).catch(() => {});
+    const a = listen<{ tracker: { loot_note: string } }>("play-update", (e) => take(e.payload));
+    const b = listen<{ ok: boolean }>("poe-login", (e) => { if (e.payload.ok) setNote(""); });
+    return () => { a.then((f) => f()); b.then((f) => f()); };
+  }, []);
+  if (!needsLogin(note)) return null;
+  return (
+    <div className="update-bar login-bar">
+      <span><b>Your pathofexile.com login has run out</b> <span className="muted small">Map loot isn't being counted until you log in again.</span></span>
+      <PoeLogin big label="Log in again" onDone={() => setNote("")} />
+    </div>
+  );
+}
+
 export default function App() {
   const [ov, setOv] = useState<Overview | null>(null);
   // The editor always opens on Home; Alt+← takes you back to the page you were on last time.
@@ -341,6 +361,7 @@ export default function App() {
 
       <main className={`content ${tab === "craft" ? "wide" : ""}`}>
         <UpdateBar />
+        <LoginBar />
         <ErrorBoundary key={tab + undoN}>
         <div key={tab} className="page-in">
         <div className="content-head">

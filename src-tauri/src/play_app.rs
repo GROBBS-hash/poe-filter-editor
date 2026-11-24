@@ -806,10 +806,24 @@ static LOOT_TX: Mutex<Option<std::sync::mpsc::Sender<LootJob>>> = Mutex::new(Non
 fn queue_loot(app: &AppHandle, job: LootJob) {
     if !with_store(app, |s| s.loot.on) { return; }
     if account(app).is_none() {
+        let (LootJob::Enter(k, _) | LootJob::Leave(k, _)) = &job;
+        loot_missed(app, k);
         with_live(|l| l.loot_note = "Loot per map needs you logged in: press \"Log in with pathofexile.com\" in Settings → Map tracker".into());
         return;
     }
     if let Some(tx) = LOOT_TX.lock().unwrap().as_ref() { let _ = tx.send(job); }
+}
+
+/// This map's loot couldn't be read: say so in the history instead of "0c", and leave it out of the averages.
+fn loot_missed(app: &AppHandle, key: &RunKey) {
+    with_store(app, |s| {
+        let run = match s.maps.current.as_mut() {
+            Some(c) if run_key(c) == *key => Some(c),
+            _ => s.maps.history.iter_mut().rev().take(5).find(|r| run_key(r) == *key),
+        };
+        if let Some(r) = run { r.loot_missed = true; }
+    });
+    save_store(app);
 }
 
 /// Reads your bags from pathofexile.com, one job at a time in order.
@@ -821,16 +835,17 @@ fn start_loot_worker(app: AppHandle) {
             let (key, at) = match &job { LootJob::Enter(k, t) | LootJob::Leave(k, t) => (k.clone(), *t) };
             let bags = match read_bags(&app, at) {
                 Ok(b) => b,
-                Err(e) => { with_live(|l| l.loot_note = format!("Couldn't read your bags: {e}")); emit_all(&app); continue; }
+                Err(e) => { loot_missed(&app, &key); with_live(|l| l.loot_note = format!("Couldn't read your bags: {e}")); emit_all(&app); continue; }
             };
             match job {
                 LootJob::Enter(..) => with_live(|l| { l.loot_base = Some((key, bags)); l.loot_note.clear(); }),
                 LootJob::Leave(..) => {
                     let base = with_live(|l| match &l.loot_base { Some((k, b)) if *k == key => { let b = b.clone(); l.loot_base = None; Some(b) } _ => None });
-                    let Some(before) = base else { continue };
+                    let Some(before) = base else { loot_missed(&app, &key); emit_all(&app); continue };
                     let new = loot::gained(&before, &bags);
                     let divine = currency_rates(&app).get("divine").copied().unwrap_or(0.0);
                     let Some(lines) = wealth_app::with_lookup(&app, |look| loot::lines(&new, look, divine)) else {
+                        loot_missed(&app, &key);
                         with_live(|l| l.loot_note = "Prices haven't loaded yet: loot not counted for that visit".into());
                         continue;
                     };

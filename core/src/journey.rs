@@ -124,6 +124,9 @@ pub struct MapRun {
     /// What you picked up in it (from your inventory before and after each visit), priced.
     #[serde(default)]
     pub loot: Vec<crate::loot::LootLine>,
+    /// Your bags couldn't be read for (part of) it, so its loot is unknown, not nothing.
+    #[serde(default)]
+    pub loot_missed: bool,
     /// The atlas tree in use when it started (Atlas page id), so loot can be compared per tree.
     #[serde(default)]
     pub atlas: Option<u64>,
