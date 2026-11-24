@@ -1,3 +1,4 @@
+import { AREAS, groupFor } from "./atlasGroups";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 // Saved atlas strategies (core/src/atlas.rs).
@@ -173,11 +174,30 @@ export default function AtlasTreeView({ nodes, choices = [], steps, step, height
   const now = useMemo(() => new Set(stepping ? steps![step!].nodes.map(String) : []), [steps, step, stepping]);
   const picked = useMemo(() => new Map(choices.map(([n, e]) => [String(n), String(e)])), [choices]);
   const needle = q.trim().toLowerCase();
+  // The area each node sits in (nearest area name, like the optimiser's atlas_opt.rs).
+  const areaOf = useMemo(() => {
+    const m: Record<string, string> = {};
+    if (!tree) return m;
+    for (const [id, n] of Object.entries(tree.nodes)) {
+      let best = 800 * 800, name = "";
+      for (const [x, y, l] of tree.labels) { const d = (x - n[0]) ** 2 + (y - n[1]) ** 2; if (d < best) { best = d; name = l; } }
+      if (name) m[id] = name;
+    }
+    return m;
+  }, [tree]);
+  // A node matches on its name, what it does, its area, or (for a mechanic's name, e.g. "harvest") anything to do
+  // with that mechanic: the same words Totals groups by, and its areas (he asked 24 Nov: "harvest" found 1 node).
   // Notables and keystones first, so Enter visits the big ones before the small path points.
   const matches = useMemo(() => {
     if (!tree || needle.length < 3) return [] as string[];
-    const out = Object.entries(tree.nodes).filter(([id, n]) =>
-      [n[3], ...(n[4] ?? []), ...Object.values(tree.choices[id] ?? {})].join(" ").toLowerCase().includes(needle));
+    const grp = groupFor(needle);
+    const areas = grp ? [grp[1], ...(AREAS[grp[0]] ?? [])].map((a) => a.toLowerCase()) : [];
+    const out = Object.entries(tree.nodes).filter(([id, n]) => {
+      const text = [n[3], ...(n[4] ?? []), ...Object.values(tree.choices[id] ?? {})].join(" ");
+      const area = (areaOf[id] ?? "").toLowerCase();
+      return text.toLowerCase().includes(needle) || area.includes(needle)
+        || (!!grp && (grp[3].test(text) || areas.includes(area)));
+    });
     out.sort((a, b) => Number(b[1][2] === 1 || b[1][2] === 2) - Number(a[1][2] === 1 || a[1][2] === 2));
     return out.map(([id]) => id);
   }, [tree, needle]);
@@ -342,7 +362,7 @@ export default function AtlasTreeView({ nodes, choices = [], steps, step, height
             const cls = `k${n[2]} ${taken ? (now.has(id) ? "now" : "on") : ""} ${hAdd.has(id) ? "add" : ""} ${hCut.has(id) ? "cut" : ""} ${(find && String(find.id) === id) || matchSet.has(id) ? "found" : ""} ${hit >= 0 && matches[hit] === id ? "found-now" : ""}`;
             return (
               <g key={id}>
-                <circle cx={n[0]} cy={n[1]} r={Math.max(r, taken || hAdd.has(id) ? (n[2] === 1 || n[2] === 2 ? 5 : 3) * upp : 0)} className={cls} />
+                <circle cx={n[0]} cy={n[1]} r={Math.max(r, taken || hAdd.has(id) || matchSet.has(id) ? (n[2] === 1 || n[2] === 2 ? 5 : 3) * upp : 0)} className={cls} />
                 <circle cx={n[0]} cy={n[1]} r={Math.max(r, 7 * upp)} className="hit"
                   onMouseEnter={(e) => { setHover({ id, x: e.clientX, y: e.clientY }); onHoverNode?.(Number(id)); }}
                   onMouseLeave={() => { setHover(null); onHoverNode?.(null); }}

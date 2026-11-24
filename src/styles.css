@@ -2341,3 +2341,5 @@ button.qm-rule:hover, .qm-rule.can-open:hover { border-color: var(--gold); backg
 .ap-notes { color: var(--gold); }
 .atlas-tv .tv-tools { flex-wrap: wrap; }
 .atv-find-n { white-space: nowrap; }
+/* Search matches stand out even when not taken (24 Nov) */
+.atv-nodes circle.found:not(.on):not(.now) { fill: rgba(89, 208, 255, .55); }

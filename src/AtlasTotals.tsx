@@ -1,38 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { type AtlasData, loadAtlas } from "./AtlasTreeView";
 import { ItemIcon } from "./icons";
-
-/** Which group a stat line goes in (first match wins), its title and the game item pictured. Threads before the
- *  mechanics that have threads, so "Threads found" lands in Threads; "chance to be Abyss" lands in Abyss. */
-const GROUPS: [string, string, string, RegExp][] = [
-  ["shrines", "Shrines", "Shrine Map", /Shrine/],
-  ["harvest", "Harvest", "Wild Crystallised Lifeforce", /Sacred Flora|Sacred Fauna|Lifeforce|Harvest|Wildwood|Crops|Sacred Grove/],
-  ["breach", "Breach", "Breach Thread", /Breach|Hiveblood|Wombgift|Grasping Coffer/],
-  ["abyss", "Abyss", "Abyss Thread", /Abyss/],
-  ["legion", "Legion", "Legion Thread", /Legion/],
-  ["ritual", "Ritual", "Ritual Thread", /Ritual/],
-  ["blight", "Blight", "Blight Thread", /Blight|Oils?\b/],
-  ["essence", "Essence", "Deafening Essence of Greed", /Essence/],
-  ["betrayal", "Betrayal", "Betrayal Thread", /Syndicate|Betrayal/],
-  ["incursion", "Incursion", "Incursion Thread", /Incursion|Alva|Temple/],
-  ["expedition", "Expedition", "Expedition Thread", /Expedition|Logbook|Remnant|Artifact/],
-  ["bestiary", "Bestiary", "Bestiary Thread", /Beast|Einhar/],
-  ["ultimatum", "Ultimatum", "Ultimatum Thread", /Ultimatum/],
-  ["delirium", "Delirium", "Simulacrum Splinter", /Delirium|Simulacrum/],
-  ["bosses", "Bosses", "Fragment of the Minotaur", /Map Boss|Unique Boss|Conqueror|Maven|Eater of Worlds|Searing Exarch|Shaper|Elder/],
-  ["memories", "Memories", "Alva's Memory", /Memor/],
-  ["settlers", "Settlers", "Kalguuran Scarab", /Kalguur|Settler/],
-  ["mercenaries", "Mercenaries", "Gold", /Mercenar/],
-  ["divination cards", "Div cards", "Stacked Deck", /Divination/],
-  ["strongboxes", "Strongboxes", "", /Strongbox/],
-  ["rogue exiles", "Rogue exiles", "", /Rogue Exile/],
-  ["torment", "Torment", "", /Torment|Possess/],
-  ["mirage", "Mirage", "", /Mirage/],
-  ["threads", "Threads", "Frayed Thread", /Thread/],
-  ["rare monsters", "Rare monsters", "Orb of Chance", /Rare Monster/],
-  ["magic monsters", "Magic monsters", "Orb of Augmentation", /Magic Monster/],
-  ["maps", "Maps and loot", "Orb of Horizons", /./],
-];
+import { GROUPS } from "./atlasGroups";
 
 const NUM = /\d+(?:\.\d+)?/g;
 type Total = { key: string; count: number; values: number[] };
