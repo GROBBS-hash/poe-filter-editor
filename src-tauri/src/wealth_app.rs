@@ -27,7 +27,7 @@ fn with_store<T>(state: &AppState, f: impl FnOnce(&mut WealthStore) -> T) -> T {
 }
 
 /// (account, POESESSID, league, PoE 2?)
-fn who(app: &AppHandle) -> Result<(String, String, String, bool), String> {
+pub(crate) fn who(app: &AppHandle) -> Result<(String, String, String, bool), String> {
     let state = app.state::<AppState>();
     let s = state.store.lock().unwrap().settings.clone();
     if s.poe_account.trim().is_empty() || s.poesessid.trim().is_empty() {
@@ -571,7 +571,8 @@ pub async fn session_start(app: AppHandle, name: String) -> Result<WealthView, S
         let name = if name.trim().is_empty() { "Unnamed strategy".to_string() } else { name.trim().to_string() };
         with_store(&state, |s| {
             if let Some(mut old) = s.current.take() { old.end = Some(now()); s.sessions.push(old); }
-            s.current = Some(Session { name, league, tabs, start: now(), end: None, start_value: total, last_value: total, paused: 0, paused_at: None });
+            let atlas = atlas_app::active_id(&app);
+            s.current = Some(Session { name, league, tabs, start: now(), end: None, start_value: total, last_value: total, paused: 0, paused_at: None, atlas });
         });
         show_overlay(&app);
         notify(&app);
@@ -692,4 +693,28 @@ mod tests {
         add_rares(&mut s, 10.0);
         assert_eq!(s.snapshots[0].total, 140.0);
     }
+}
+
+/// Your trade tabs for the shop watcher (phone alerts): tabs named "~price …" / "~b/o …", and tabs where the last scan
+/// found listed items. (index, name).
+pub(crate) fn shop_tabs(app: &AppHandle) -> Vec<(usize, String)> {
+    let state = app.state::<AppState>();
+    with_store(&state, |w| {
+        let listed: std::collections::HashSet<String> = w.last_items.iter().filter(|v| v.listed).map(|v| v.tab.clone()).collect();
+        w.tabs.iter().filter(|t| t.name.starts_with("~price") || t.name.starts_with("~b/o") || listed.contains(&t.name))
+            .map(|t| (t.index, t.name.clone())).collect()
+    })
+}
+
+/// Reads one stash tab's items (own or guild), for the shop watcher.
+pub(crate) fn read_tab_items(app: &AppHandle, index: usize) -> Result<serde_json::Value, String> {
+    let (account, sessid, league, poe2) = who(app)?;
+    let v = read_tab(&account, &sessid, &league, poe2, index)?;
+    Ok(v["items"].clone())
+}
+
+/// Finished earnings sessions (for the Atlas page's "what each tree earned").
+pub(crate) fn finished_sessions(app: &AppHandle) -> Vec<Session> {
+    let state = app.state::<AppState>();
+    with_store(&state, |w| w.sessions.clone())
 }

@@ -933,3 +933,71 @@ fn sample() {
         println!("  steps: {}", x.steps.iter().map(|s| format!("{} {}/{}", s.name, s.nodes.len(), s.total)).collect::<Vec<_>>().join(", "));
     }
 }
+
+// ---------- what each tree earned (24 Nov, plan step 4 option 3) ----------
+
+/// One saved tree's results: from map runs (loot the map tracker counted) and earnings sessions started with it.
+#[derive(Debug, Clone, Serialize, PartialEq, Default)]
+pub struct TreeResult {
+    pub id: u64,
+    pub maps: usize,
+    /// Chaos of loot per map, and per hour (loot / time from each map's start to the next one's).
+    pub loot_per_map: Option<f64>,
+    pub loot_per_hour: Option<f64>,
+    pub sessions: usize,
+    pub session_hours: f64,
+    /// Chaos per hour over its earnings sessions.
+    pub session_per_hour: Option<f64>,
+}
+
+/// Results per atlas tree, best per hour first. `runs`: map runs (start, loot chaos, tree); `sessions`: (hours, profit
+/// chaos, tree) of finished earnings sessions.
+pub fn tree_results(runs: &[(i64, i64, f64, Option<u64>)], sessions: &[(f64, f64, Option<u64>)]) -> Vec<TreeResult> {
+    let mut out: Vec<TreeResult> = vec![];
+    let get = |out: &mut Vec<TreeResult>, id: u64| -> usize {
+        match out.iter().position(|r| r.id == id) { Some(i) => i, None => { out.push(TreeResult { id, ..Default::default() }); out.len() - 1 } }
+    };
+    // Maps: (start, seconds until the next map's start or its own end, loot).
+    let mut by_tree: std::collections::HashMap<u64, (usize, f64, f64)> = Default::default();
+    for (i, (start, own, loot, tree)) in runs.iter().enumerate() {
+        let Some(t) = tree else { continue };
+        let next = runs.get(i + 1).map(|r| r.0 - start).filter(|g| *g > 0 && *g < 3600).unwrap_or(*own);
+        let e = by_tree.entry(*t).or_default();
+        e.0 += 1; e.1 += next.max(60) as f64; e.2 += loot;
+    }
+    for (t, (n, secs, loot)) in by_tree {
+        let i = get(&mut out, t);
+        out[i].maps = n;
+        if loot > 0.0 {
+            out[i].loot_per_map = Some(loot / n as f64);
+            out[i].loot_per_hour = Some(loot / (secs / 3600.0));
+        }
+    }
+    for (hours, profit, tree) in sessions {
+        let Some(t) = tree else { continue };
+        let i = get(&mut out, *t);
+        out[i].sessions += 1;
+        out[i].session_hours += hours;
+        let total = out[i].session_per_hour.unwrap_or(0.0) * (out[i].session_hours - hours) + profit;
+        out[i].session_per_hour = (out[i].session_hours > 0.0).then(|| total / out[i].session_hours);
+    }
+    let rate = |r: &TreeResult| r.session_per_hour.or(r.loot_per_hour).unwrap_or(0.0);
+    out.sort_by(|a, b| rate(b).total_cmp(&rate(a)));
+    out
+}
+
+#[cfg(test)]
+mod result_tests {
+    #[test]
+    fn per_tree() {
+        // Tree 1: two 5-minute map cycles with 100c each = 1200c/h. Tree 2: one session, 2 hours, 600c profit.
+        let runs = vec![(0, 280, 100.0, Some(1)), (300, 280, 100.0, Some(1)), (5000, 290, 0.0, None)];
+        let r = super::tree_results(&runs, &[(2.0, 600.0, Some(2)), (1.0, 50.0, None)]);
+        let t1 = r.iter().find(|x| x.id == 1).unwrap();
+        assert_eq!(t1.maps, 2);
+        assert!((t1.loot_per_hour.unwrap() - 1241.4).abs() < 1.0, "{t1:?}");
+        let t2 = r.iter().find(|x| x.id == 2).unwrap();
+        assert_eq!(t2.session_per_hour, Some(300.0));
+        assert_eq!(r[0].id, 1);
+    }
+}

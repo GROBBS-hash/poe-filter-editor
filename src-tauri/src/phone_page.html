@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PoE Lodestone</title>
+<style>
+  :root { --bg:#15171c; --panel:#1b1e25; --line:#2b303a; --text:#e6e8ed; --muted:#8b92a1; --gold:#dcb25a; --green:#62cf80; --red:#f0857c; color-scheme: dark; }
+  * { box-sizing: border-box; } body { margin:0; background:var(--bg); color:var(--text); font:15px/1.45 "Segoe UI",system-ui,sans-serif; padding:14px 16px 40px; }
+  h1 { font-size:18px; margin:0 0 2px; color:var(--gold); } .muted { color:var(--muted); font-size:12.5px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-top:12px; }
+  h2 { font-size:14px; margin:0 0 8px; letter-spacing:.02em; }
+  .tiles { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; } .tile b { display:block; font-size:20px; font-variant-numeric:tabular-nums; }
+  .row { display:flex; justify-content:space-between; gap:10px; padding:6px 0; border-top:1px solid var(--line); font-size:14px; }
+  .row:first-of-type { border-top:0; } .num { font-variant-numeric:tabular-nums; white-space:nowrap; } .good { color:var(--green); }
+  svg { width:100%; height:80px; display:block; }
+</style></head>
+<body>
+<h1>PoE Lodestone</h1><div class="muted" id="when">Loading…</div>
+<div class="card"><h2>Tonight</h2><div class="tiles" id="tiles"></div></div>
+<div class="card"><h2>Sales <span class="muted">(items gone from your trade tabs)</span></h2><div id="sales"></div></div>
+<div class="card"><h2>Stash worth</h2><svg id="chart" viewBox="0 0 300 80" preserveAspectRatio="none"></svg><div class="muted" id="worth"></div></div>
+<div class="card"><h2>Earnings per strategy</h2><div id="strats"></div></div>
+<div class="card"><h2>Recent maps</h2><div id="maps"></div></div>
+<p class="muted">Read only. Refreshes every minute. Buyers still need you at the PC: nothing here trades for you.</p>
+<script>
+const k = new URLSearchParams(location.search).get("k");
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+let div = null;
+const money = (c) => c == null ? "" : div && Math.abs(c) >= div ? (c / div).toFixed(1) + " div" : Math.round(c) + "c";
+const ago = (t, now) => { const m = Math.round((now - t) / 60); return m < 60 ? m + "m ago" : m < 1440 ? Math.round(m / 60) + "h ago" : Math.round(m / 1440) + "d ago"; };
+const clock = (s) => { s = Math.max(0, Math.round(s)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return h ? h + "h " + m + "m" : m + "m " + (s % 60) + "s"; };
+const rows = (el, list, f, empty) => document.getElementById(el).innerHTML = list.length ? list.map(f).join("") : '<div class="muted">' + empty + '</div>';
+async function load() {
+  try {
+    const d = await (await fetch("/data.json?k=" + encodeURIComponent(k))).json();
+    div = d.divine;
+    document.getElementById("when").textContent = (d.league || "") + " · updated " + new Date(d.now * 1000).toLocaleTimeString();
+    const s = d.session, cur = d.current;
+    const tiles = [];
+    if (s) { tiles.push(["Played", clock(s.played)], ["Maps", s.maps]); if (s.loot_value) tiles.push(["Loot", money(s.loot_value)]); tiles.push(["Deaths", s.deaths]); }
+    if (cur) tiles.push(["Session " + esc(cur.name), money(cur.last_value - cur.start_value)]);
+    const sold = d.sales.filter((x) => d.now - x.time < 86400).reduce((a, x) => a + (x.chaos || 0), 0);
+    tiles.push(["Sold (24h)", money(sold)]);
+    document.getElementById("tiles").innerHTML = tiles.map(([a, b]) => '<div class="tile"><span class="muted">' + a + "</span><b>" + b + "</b></div>").join("");
+    rows("sales", d.sales.slice(0, 20), (x) => '<div class="row"><span>' + (x.count > 1 ? x.count + " × " : "") + esc(x.name) + '<br><span class="muted">' + esc(x.tab) + " · " + ago(x.time, d.now) + '</span></span><span class="num good">' + money(x.chaos) + "</span></div>", "No sales seen yet (switch on “Watch my trade tabs” in the editor).");
+    const sn = (d.snapshots || []).slice().reverse();
+    if (sn.length > 1) {
+      const v = sn.map((x) => x.total), lo = Math.min(...v), hi = Math.max(...v) || 1;
+      const pts = v.map((y, i) => (i / (v.length - 1) * 300).toFixed(1) + "," + (75 - (y - lo) / ((hi - lo) || 1) * 70).toFixed(1)).join(" ");
+      document.getElementById("chart").innerHTML = '<polyline fill="none" stroke="#dcb25a" stroke-width="2" points="' + pts + '"/>';
+      document.getElementById("worth").textContent = "Now " + money(v[v.length - 1]) + " · " + (v[v.length - 1] >= v[0] ? "+" : "") + money(v[v.length - 1] - v[0]) + " over " + sn.length + " scans";
+    } else document.getElementById("worth").textContent = sn.length ? "Now " + money(sn[0].total) : "Scan your stash on the Wealth page to see this.";
+    rows("strats", (d.strategies || []), (x) => '<div class="row"><span>' + esc(x[0]) + ' <span class="muted">' + x[1] + " sessions</span></span><span class=\"num\">" + money(x[2] > 0 ? x[3] / x[2] : 0) + "/h</span></div>", "No earnings sessions yet.");
+    rows("maps", d.maps, (m) => '<div class="row"><span>' + esc(m.name) + ' <span class="muted">' + (m.level >= 68 ? "T" + (m.level - 67) : "lvl " + m.level) + " · " + clock(m.in_map) + (m.deaths ? " · " + m.deaths + (m.deaths === 1 ? " death" : " deaths") : "") + (m.best ? "<br>best: " + esc(m.best) : "") + '</span></span><span class="num">' + (m.loot ? money(m.loot) : m.made != null ? "≈ " + money(m.made) : "") + "</span></div>", "No maps yet.");
+  } catch (e) { document.getElementById("when").textContent = "Can't reach the editor: is the PC on?"; }
+}
+load(); setInterval(load, 60000);
+</script>
+</body></html>

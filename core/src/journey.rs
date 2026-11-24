@@ -124,6 +124,9 @@ pub struct MapRun {
     /// What you picked up in it (from your inventory before and after each visit), priced.
     #[serde(default)]
     pub loot: Vec<crate::loot::LootLine>,
+    /// The atlas tree in use when it started (Atlas page id), so loot can be compared per tree.
+    #[serde(default)]
+    pub atlas: Option<u64>,
 }
 
 impl MapRun {
@@ -499,6 +502,18 @@ pub fn route() -> &'static Route {
     R.get_or_init(|| serde_json::from_str(include_str!("../data/levelling.json")).expect("levelling.json"))
 }
 
+/// PoE 2's campaign route (from Exile UI's leveling guide, MIT; `node tools/build_levelling_poe2.mjs`). Its area ids are
+/// lower case ("g1_4"); the game logs "G1_4", so look them up with `area_key`.
+pub fn route_poe2() -> &'static Route {
+    static R: OnceLock<Route> = OnceLock::new();
+    R.get_or_init(|| serde_json::from_str(include_str!("../data/levelling_poe2.json")).expect("levelling_poe2.json"))
+}
+
+pub fn route_for(poe2: bool) -> &'static Route { if poe2 { route_poe2() } else { route() } }
+
+/// The id a route knows an area by (PoE 2's are lower case).
+pub fn area_key(poe2: bool, id: &str) -> String { if poe2 { id.to_lowercase() } else { id.to_string() } }
+
 /// Your levelling choices that change the route.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
@@ -826,6 +841,16 @@ mod tests {
     }
 
     #[test]
+    fn poe2_route_follows_zones() {
+        let r = route_poe2();
+        assert!(r.steps.len() > 200);
+        let vis = steps_for(r, &RouteOptions::default());
+        let p = advance(r, &vis, 0, &area_key(true, "G1_2")).expect("Clearfell");
+        assert!(p > 0);
+        assert!(r.areas.contains_key("g1_town"));
+    }
+
+    #[test]
     fn quest_rewards_for_your_build() {
         let q = &route().quests["a1q1"];
         let got = build_rewards(q, "Witch", &["Freezing Pulse".into(), "Cleave".into()]);
@@ -856,5 +881,113 @@ mod real_gems {
         let want: Vec<String> = ["Frostblink", "Arcane Surge Support", "Ball Lightning", "Flame Dash", "Fireball", "Added Lightning Damage Support", "Orb of Storms", "Clarity"].iter().map(|s| s.to_string()).collect();
         let (s, left) = super::gem_search(&want, &super::route().gems);
         assert!(left.is_empty() && s.len() < 80, "{s}");
+    }
+}
+
+// ---------- chat commands (24 Nov) ----------
+
+/// A command you typed in game chat: "!next" in local / party / guild chat, or whispered to yourself
+/// ("@YourName !next", which nobody else sees). Only your own lines count (`me` = your character's name).
+/// Returns the command without the "!" ("next", "filter strict").
+pub fn chat_command(line: &str, me: &str) -> Option<String> {
+    if me.is_empty() { return None; }
+    let body = &line.trim_end()[line.find("] ")? + 2..];
+    let (who, msg) = if let Some(rest) = body.strip_prefix("@To ") {
+        rest.split_once(": ")?
+    } else {
+        if body.starts_with(": ") || body.starts_with("@From ") { return None; }
+        let (who, msg) = body.split_once(": ")?;
+        (who.trim_start_matches(['#', '%', '&', '$']), msg)
+    };
+    // "<GUILD> Name" -> "Name".
+    let who = match who.strip_prefix('<') { Some(r) => r.split_once("> ").map(|x| x.1).unwrap_or(r), None => who };
+    if who.trim() != me { return None; }
+    let cmd = msg.trim().strip_prefix('!')?.trim();
+    (!cmd.is_empty()).then(|| cmd.to_lowercase())
+}
+
+#[cfg(test)]
+mod chat_tests {
+    use super::chat_command;
+    const T: &str = "2026/11/24 19:48:01 1 a [INFO Client 9]";
+    #[test]
+    fn own_commands_only() {
+        assert_eq!(chat_command(&format!("{T} Bob_Witch: !next"), "Bob_Witch").as_deref(), Some("next"));
+        assert_eq!(chat_command(&format!("{T} %<GLD> Bob_Witch: !filter Strict"), "Bob_Witch").as_deref(), Some("filter strict"));
+        assert_eq!(chat_command(&format!("{T} @To Bob_Witch: !done"), "Bob_Witch").as_deref(), Some("done"));
+        assert_eq!(chat_command(&format!("{T} @From Bob_Witch: !done"), "Bob_Witch"), None);
+        assert_eq!(chat_command(&format!("{T} Someone: !next"), "Bob_Witch"), None);
+        assert_eq!(chat_command(&format!("{T} Bob_Witch: hello"), "Bob_Witch"), None);
+        assert_eq!(chat_command(&format!("{T} : Bob_Witch has joined the area."), "Bob_Witch"), None);
+        assert_eq!(chat_command(&format!("{T} Bob_Witch: !next"), ""), None);
+    }
+}
+
+// ---------- race splits (24 Nov) ----------
+
+/// One character's run through the campaign: when it reached each act and level, from level 2 on.
+/// (A live ladder rank would need GGG's ladder, which is only open to approved OAuth apps, and pathofexile.com no longer
+/// sends experience; so this races you against your own earlier characters.)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct Race {
+    pub class: String,
+    /// When it reached level 2 (unix seconds): the race clock starts there.
+    pub start: i64,
+    /// (act, seconds since start) the first time you entered it; act 11 = maps.
+    pub acts: Vec<(u32, i64)>,
+    /// (level, seconds since start).
+    pub levels: Vec<(u32, i64)>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct Races { pub chars: std::collections::BTreeMap<String, Race> }
+
+impl Races {
+    /// A level-up line. Level 2 starts (or restarts) the character's race.
+    pub fn level(&mut self, name: &str, class: &str, level: u32, time: i64) {
+        if level == 2 { self.chars.insert(name.to_string(), Race { class: class.to_string(), start: time, ..Default::default() }); }
+        if let Some(r) = self.chars.get_mut(name) {
+            if !r.levels.iter().any(|l| l.0 == level) { r.levels.push((level, time - r.start)); }
+        }
+    }
+    /// Entering a zone of `act` (11 = a map).
+    pub fn act(&mut self, name: &str, act: u32, time: i64) {
+        if let Some(r) = self.chars.get_mut(name) {
+            if !r.acts.iter().any(|a| a.0 >= act) { r.acts.push((act, time - r.start)); }
+        }
+    }
+    /// Your fastest time to each act and level over your other characters.
+    pub fn best_except(&self, name: &str) -> (Vec<(u32, i64)>, Vec<(u32, i64)>) {
+        let mut acts: Vec<(u32, i64)> = vec![];
+        let mut levels: Vec<(u32, i64)> = vec![];
+        for (n, r) in &self.chars {
+            if n == name { continue; }
+            for &(a, t) in &r.acts { match acts.iter_mut().find(|x| x.0 == a) { Some(x) => x.1 = x.1.min(t), None => acts.push((a, t)) } }
+            for &(l, t) in &r.levels { match levels.iter_mut().find(|x| x.0 == l) { Some(x) => x.1 = x.1.min(t), None => levels.push((l, t)) } }
+        }
+        acts.sort(); levels.sort();
+        (acts, levels)
+    }
+}
+
+#[cfg(test)]
+mod race_tests {
+    use super::Races;
+    #[test]
+    fn splits_against_your_best() {
+        let mut r = Races::default();
+        r.level("Old", "Witch", 2, 0);
+        r.act("Old", 2, 1200);
+        r.act("Old", 2, 1300); // only the first entry counts
+        r.level("Old", "Witch", 10, 900);
+        r.level("New", "Ranger", 2, 5000);
+        r.act("New", 2, 5000 + 1000);
+        r.act("New", 1, 5000 + 1100); // going back doesn't add an earlier act
+        let (acts, levels) = r.best_except("New");
+        assert_eq!(acts, vec![(2, 1200)]);
+        assert_eq!(levels, vec![(2, 0), (10, 900)]);
+        assert_eq!(r.chars["New"].acts, vec![(2, 1000)]);
+        r.level("New", "Ranger", 2, 9000); // a new character with the same name starts over
+        assert!(r.chars["New"].acts.is_empty());
     }
 }

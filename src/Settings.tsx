@@ -2,6 +2,7 @@ import { Tip } from "./Help";
 import { PageLoading } from "./Loading";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import PhoneSettings from "./Phone";
 import { TW_LAYOUTS, TW_LAYOUT_KEY, TW_STYLES, TW_STYLE_KEY } from "./TradeWindow";
 import { TrackerSettings } from "./Play";
 import { hotkey } from "./hotkeys";
@@ -68,6 +69,7 @@ const SECTIONS: [string, string, string][] = [
   ["trade", "Trading", "M4 8h13l-3-3M20 16H7l3 3"],
   ["maps", "Maps and area", "M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14"],
   ["tracker", "Map tracker", "M12 7v5l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z"],
+  ["phone", "Phone", "M8 3h8a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM11 18h2"],
   ["looks", "Looks", "M12 3a9 9 0 1 0 0 18c1 0 1.5-.8 1.2-1.6-.4-1 .3-2 1.4-2H17a4 4 0 0 0 4-4c0-5.5-4-10.4-9-10.4zM7.5 11h.01M10 7h.01M15 7h.01"],
   ["ai", "AI (optional)", "M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"],
 ];
@@ -99,6 +101,7 @@ export default function SettingsPage() {
       </nav>
       <div className="set-body">
       {sec === "tracker" && <TrackerSettings />}
+      {sec === "phone" && <PhoneSettings />}
       {sec === "looks" && <><MainLook /><div className="card"><PriceLook /></div></>}
       {sec === "keys" && <div className="card">
         <h2>Hotkeys</h2>
@@ -190,11 +193,11 @@ export default function SettingsPage() {
           onChange={(e) => set({ claude_api_key: e.target.value.trim() })} />
       </div>}
 
-      {sec !== "looks" && <div className="save-bar">
+      {sec !== "looks" && sec !== "phone" && <div className="save-bar">
         {msg && <span className="note">{msg}</span>}
         <button className="primary" disabled={!dirty} onClick={save}>{dirty ? "Save settings" : "Saved"}</button>
       </div>}
-      {sec === "looks" && <p className="muted small">Looks change straight away; nothing to save.</p>}
+      {(sec === "looks" || sec === "phone") && <p className="muted small">{sec === "phone" ? "Phone settings save as you change them." : "Looks change straight away; nothing to save."}</p>}
       </div>
     </div>
   );

@@ -680,6 +680,13 @@ pub fn ways(base: &str, ilvl: u32, influences: &[String], key: &str, min_tier: u
         out.push(way("Add a mod", orb.clone(), x, cost(&orb), format!("Makes a non-influenced rare {n} and adds one {n} mod (needs a free {} slot)", fam.affix)));
         let c = hit(&simulate(&ipool, TRIALS, jewel));
         out.push(way("Reroll", format!("Chaos Orb on a {n} item"), c, cost("Chaos Orb"), format!("Once the item is {n}, Chaos Orbs can roll it too")));
+        // Awakener's Orb (24 Nov): buy or make a cheap {n} item of the same kind that has this mod, and merge. The result
+        // keeps one influence mod from each item, so a donor with this as its only {n} mod passes it on for sure; the
+        // rest of your item is rerolled. The donor's price isn't known here, so it isn't ranked.
+        let awk = cost("Awakener's Orb").map(|c| format!(" Awakener's Orb ≈ {}c.", c.round())).unwrap_or_default();
+        out.push(Way { group: "Guaranteed".into(), method: format!("Awakener's Orb + a {n} item with this mod"), chance: 1.0, cost_each: None, average: None,
+            note: format!("Destroys the {n} item and gives yours both influences, keeping one influence mod from each (guaranteed when it's the donor's only {n} mod); your other mods are rerolled. Plus the cost of that donor item.{awk}"),
+            ..Default::default() });
         out.sort_by(|a, b| a.average.unwrap_or(f64::MAX).partial_cmp(&b.average.unwrap_or(f64::MAX)).unwrap_or(std::cmp::Ordering::Equal));
         return out;
     }

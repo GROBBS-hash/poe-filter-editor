@@ -35,6 +35,10 @@ struct PlayStore {
     alerts: Vec<Alert>,
     /// Hide the levelling, searches, cheat sheet and notes windows while you're in a map (back in town they return).
     keep_in_maps: bool,
+    /// Chat commands ("!next" in game chat) switched off.
+    chat_off: bool,
+    /// Race splits per character (when each act and level was reached).
+    races: journey::Races,
     /// Don't stop the map timer while the Escape menu or skill tree is open.
     pause_off: bool,
     /// How the game looks with no menu open (and with the Escape menu), from "Set up" on the Play tools page.
@@ -160,6 +164,11 @@ pub fn prime(app: &AppHandle, log: &std::path::Path) {
 
 /// Every new log line goes through here (from the log watcher in lib.rs).
 pub fn on_line(app: &AppHandle, line: &str) {
+    // "!next" and friends typed in game chat (or whispered to yourself).
+    if line.contains(": !") && !with_store(app, |s| s.chat_off) {
+        let me = with_live(|l| l.character.as_ref().map(|c| c.0.clone())).unwrap_or_default();
+        if let Some(cmd) = journey::chat_command(line, &me) { run_chat_command(app, &cmd); return; }
+    }
     let Some(mut ev) = journey::parse_line(line) else { return };
     // The log's clock is your PC's local time; lines arrive as they're written, so stamp them with the real time
     // (the timers compare against it).
@@ -182,9 +191,11 @@ pub fn on_line(app: &AppHandle, line: &str) {
                 // A Ctrl+D map check in the last 10 minutes: that's the map you just opened.
                 let check = with_live(|l| l.map_check.take()).filter(|(t, ..)| unix() - t < 600);
                 let value = session_value(app);
+                let atlas = atlas_app::active_id(app);
                 with_store(app, |s| if let Some(cur) = s.maps.current.as_mut() {
                     if let Some((_, _, mods)) = &check { cur.mods = mods.clone(); }
                     cur.value_at_start = value;
+                    cur.atlas = atlas;
                 });
                 save = true;
             }
@@ -228,9 +239,21 @@ pub fn on_line(app: &AppHandle, line: &str) {
         PlayEvent::Area { id, level, time, .. } => {
             with_live(|l| { l.zone = Some((id.clone(), *level, *time)); l.zone_name.clear(); });
             follow_route(app, id);
+            // Race splits: the first time this character enters each act (maps count as act 11).
+            let poe2 = is_poe2(app);
+            let act = journey::route_for(poe2).areas.get(&journey::area_key(poe2, id)).map(|a| a.a)
+                .filter(|a| !poe2 || *a <= 6).or_else(|| journey::is_map_area(id).then_some(11));
+            if let (Some(act), Some(me)) = (act, with_live(|l| l.character.as_ref().map(|c| c.0.clone()))) {
+                with_store(app, |s| s.races.act(&me, act, *time));
+                save = true;
+            }
         }
         PlayEvent::Entered { name, .. } => with_live(|l| l.zone_name = name.clone()),
-        PlayEvent::Level { name, class, level, .. } => with_live(|l| l.character = Some((name.clone(), class.clone(), *level))),
+        PlayEvent::Level { name, class, level, time } => {
+            with_live(|l| l.character = Some((name.clone(), class.clone(), *level)));
+            with_store(app, |s| s.races.level(name, class, *level, *time));
+            save = true;
+        }
         _ => {}
     }
     if save { save_store(app); }
@@ -259,8 +282,13 @@ fn emit_all(app: &AppHandle) {
 
 fn char_key() -> String { with_live(|l| l.character.as_ref().map(|c| c.0.clone())).unwrap_or_else(|| "_".into()) }
 
+/// Is the active filter for PoE 2 (the levelling route follows the game)?
+fn is_poe2(app: &AppHandle) -> bool { active_game(&app.state::<AppState>()) == Game::Poe2 }
+
 fn follow_route(app: &AppHandle, area: &str) {
-    let r = journey::route();
+    let poe2 = is_poe2(app);
+    let r = journey::route_for(poe2);
+    let area = &journey::area_key(poe2, area);
     let key = char_key();
     let moved = with_store(app, |s| {
         if s.level_manual { return false; }
@@ -352,7 +380,8 @@ fn step_view(r: &journey::Route, s: &journey::Step, class: &str, gems: &[String]
 
 #[tauri::command]
 pub fn level_view(app: AppHandle) -> LevelView {
-    let r = journey::route();
+    let poe2 = is_poe2(&app);
+    let r = journey::route_for(poe2);
     let key = char_key();
     let (opts, pos, manual) = with_store(&app, |s| (s.route.clone(), *s.level_pos.get(&key).unwrap_or(&0), s.level_manual));
     let vis = journey::steps_for(r, &opts);
@@ -366,9 +395,9 @@ pub fn level_view(app: AppHandle) -> LevelView {
     let (gem_search, left) = journey::gem_search(&gems, &r.gems);
     let zone_level = zone.as_ref().map(|z| z.1);
     let char_level = character.as_ref().map(|c| c.2);
-    let zone_label = zone.as_ref().map(|z| if !zone_name.is_empty() { zone_name.clone() } else { r.areas.get(&z.0).map(|a| a.n.clone()).unwrap_or_else(|| journey::map_name(&z.0)) });
+    let zone_label = zone.as_ref().map(|z| if !zone_name.is_empty() { zone_name.clone() } else { r.areas.get(&journey::area_key(poe2, &z.0)).map(|a| a.n.clone()).unwrap_or_else(|| journey::map_name(&z.0)) });
     // Trials: the route's "Complete the trial" steps, done once the route is past them.
-    let zone_id = zone.as_ref().map(|z| z.0.clone()).unwrap_or_default();
+    let zone_id = zone.as_ref().map(|z| journey::area_key(poe2, &z.0)).unwrap_or_default();
     let mut trials = vec![];
     let mut last_zone = String::new();
     for (p, &i) in vis.iter().enumerate() {
@@ -380,7 +409,8 @@ pub fn level_view(app: AppHandle) -> LevelView {
         }
     }
     let act_now = vis.get(pos).map(|&i| r.steps[i].act).unwrap_or(1);
-    let res_penalty = if pos + 1 >= vis.len() { -60 } else if act_now >= 6 { -30 } else { 0 };
+    // PoE 1 only: PoE 2's penalties differ (and change between patches), so it shows none rather than a wrong one.
+    let res_penalty = if poe2 { 0 } else if pos + 1 >= vis.len() { -60 } else if act_now >= 6 { -30 } else { 0 };
     LevelView {
         trials, res_penalty, poe2: active_game(&app.state::<AppState>()) == Game::Poe2,
         pos, total: vis.len(), current: pos - from, steps,
@@ -393,7 +423,7 @@ pub fn level_view(app: AppHandle) -> LevelView {
 /// The arrows: one step back or forward.
 #[tauri::command]
 pub fn level_move(app: AppHandle, by: i64) -> LevelView {
-    let r = journey::route();
+    let r = journey::route_for(is_poe2(&app));
     let key = char_key();
     with_store(&app, |s| {
         let n = journey::steps_for(r, &s.route).len() as i64;
@@ -409,7 +439,7 @@ pub fn level_move(app: AppHandle, by: i64) -> LevelView {
 /// Jump to the first step of an act (the act picker), or to a step number.
 #[tauri::command]
 pub fn level_jump_act(app: AppHandle, act: u32) -> LevelView {
-    let r = journey::route();
+    let r = journey::route_for(is_poe2(&app));
     let key = char_key();
     with_store(&app, |s| {
         let vis = journey::steps_for(r, &s.route);
@@ -423,7 +453,7 @@ pub fn level_jump_act(app: AppHandle, act: u32) -> LevelView {
 #[tauri::command]
 pub fn level_options(app: AppHandle, options: RouteOptions, manual: bool) -> LevelView {
     // Keep your place: find the same step in the new list.
-    let r = journey::route();
+    let r = journey::route_for(is_poe2(&app));
     let key = char_key();
     with_store(&app, |s| {
         let old = journey::steps_for(r, &s.route);
@@ -1292,4 +1322,96 @@ pub fn price_names(app: AppHandle, names: Vec<String>) -> HashMap<String, f64> {
         let v = f.items.iter().filter(|i| i.name.eq_ignore_ascii_case(&n) && i.cat != "SkillGem").map(|i| i.value).reduce(f64::max)?;
         Some((n, v))
     }).collect()
+}
+
+// ---------- chat commands ----------
+
+/// What each chat command does (shown on the Play tools page too).
+pub const CHAT_COMMANDS: &[(&str, &str)] = &[
+    ("!next", "switch to your next filter and load it"),
+    ("!filter <name>", "switch to the filter whose name has that word (e.g. !filter strict)"),
+    ("!reload", "load your filter again"),
+    ("!done", "finish the map timer's current map"),
+    ("!start / !stop / !lap / !reset", "the stopwatch"),
+    ("!level / !tracker / !sheet / !notes", "show or hide that window"),
+];
+
+fn run_chat_command(app: &AppHandle, cmd: &str) {
+    let (word, rest) = cmd.split_once(' ').map(|(a, b)| (a, b.trim())).unwrap_or((cmd, ""));
+    let app2 = app.clone();
+    // The game is still closing the chat box: wait a moment before typing our own command.
+    let later = move |f: Box<dyn FnOnce(&AppHandle) + Send>| { thread::spawn(move || { thread::sleep(Duration::from_millis(400)); f(&app2); }); };
+    match word {
+        "next" => later(Box::new(|a| cycle_filter(a))),
+        "reload" => later(Box::new(|a| { let _ = reload_in_game(a, 1000); })),
+        "filter" if !rest.is_empty() => {
+            let want = rest.to_lowercase();
+            let state = app.state::<AppState>();
+            let picked = {
+                let mut store = state.store.lock().unwrap();
+                let game = store.active.as_ref().and_then(|id| store.profiles.get(id)).map(|p| p.game);
+                let hit = store.profiles.values().filter(|p| Some(p.game) == game || game.is_none())
+                    .find(|p| p.name.to_lowercase().contains(&want)).map(|p| p.id.clone());
+                if let Some(id) = &hit { store.active = Some(id.clone()); let _ = store.save(&state.store_path); }
+                hit
+            };
+            match picked {
+                Some(id) => { let _ = app.emit("active-changed", id); later(Box::new(|a| { let _ = reload_in_game(a, 1000); })); }
+                None => { let _ = app.emit("hotkey-warning", format!("No filter called “{rest}”")); }
+            }
+        }
+        "done" => { let _ = maps_done(app.clone()); }
+        "start" | "stop" | "pause" | "lap" | "reset" => {
+            let a = if word == "stop" { "pause" } else { word };
+            let _ = watch_action(app.clone(), a.into());
+        }
+        "level" | "tracker" | "sheet" | "notes" | "searches" => toggle(app, word),
+        _ => {}
+    }
+}
+
+#[tauri::command]
+pub fn chat_prefs(app: AppHandle, on: bool) -> bool {
+    with_store(&app, |s| s.chat_off = !on);
+    save_store(&app);
+    on
+}
+
+#[tauri::command]
+pub fn chat_get(app: AppHandle) -> (bool, Vec<(String, String)>) {
+    (!with_store(&app, |s| s.chat_off), CHAT_COMMANDS.iter().map(|(a, b)| (a.to_string(), b.to_string())).collect())
+}
+
+// ---------- race splits ----------
+
+#[derive(Serialize, Clone)]
+pub struct RaceView {
+    pub name: String,
+    pub class: String,
+    /// Seconds since level 2.
+    pub elapsed: i64,
+    pub level: u32,
+    /// (act, your time, your best time on another character).
+    pub acts: Vec<(u32, i64, Option<i64>)>,
+    /// Your best time to the act you're in now (to beat), and to the next act.
+    pub best_next: Option<(u32, i64)>,
+    pub others: usize,
+}
+
+/// Your current character's race against your earlier ones.
+#[tauri::command]
+pub fn race_get(app: AppHandle) -> Option<RaceView> {
+    let me = with_live(|l| l.character.clone())?;
+    with_store(&app, |s| {
+        let r = s.races.chars.get(&me.0)?;
+        let (best_acts, _) = s.races.best_except(&me.0);
+        let best = |a: u32| best_acts.iter().find(|x| x.0 == a).map(|x| x.1);
+        let reached = r.acts.iter().map(|a| a.0).max().unwrap_or(1);
+        Some(RaceView {
+            name: me.0.clone(), class: r.class.clone(), elapsed: unix() - r.start, level: me.2,
+            acts: r.acts.iter().map(|&(a, t)| (a, t, best(a))).collect(),
+            best_next: best(reached + 1).map(|t| (reached + 1, t)),
+            others: s.races.chars.len().saturating_sub(1),
+        })
+    })
 }

@@ -124,9 +124,10 @@ function Step({ s, cls }: { s: StepView; cls: string }) {
 export function LevelWindow() {
   const [v, setV] = useState<LevelView | null>(null);
   const [copied, setCopied] = useState(false);
+  const [race, setRace] = useState<RaceView | null>(null);
   const keys = useKeys();
   useEsc("level");
-  const load = () => invoke<LevelView>("level_view").then(setV).catch(() => {});
+  const load = () => { invoke<LevelView>("level_view").then(setV).catch(() => {}); invoke<RaceView | null>("race_get").then(setRace).catch(() => {}); };
   useEffect(() => {
     load();
     const un = listen("play-update", load);
@@ -154,8 +155,8 @@ export function LevelWindow() {
               you {v.char_level}{keep != null && keep < 0.99 ? ` · ${Math.round(keep * 100)}% XP` : ""}</span>}
           </span>
         </div>
-        {v.poe2 && <div className="pw-tag warn" style={{ marginTop: 5 }}>This route is PoE 1's campaign (PoE 2's isn't in yet)</div>}
         <LevelChips v={v} />
+        {race && <RaceLine r={race} />}
         {v.steps.map((s, i) => <Step key={`${v.pos}-${i}`} s={s} cls={i < v.current ? "done" : i === v.current ? "now" : "next"} />)}
         {v.gem_search && <div className="lv-search">
           <div className="pw-row between"><span className="pw-small">Your build's gems at a vendor</span>
@@ -186,6 +187,42 @@ function LevelChips({ v }: { v: LevelView }) {
       {["Normal", "Cruel", "Merciless"].some(labReady) && normal.length > 0 &&
         <button className="pw-btn link" title="Today's lab layouts and where the treasure keys are (poelab.com)" onClick={() => invoke("open_url", { url: "https://www.poelab.com/" })}>Today's lab ↗</button>}
       {v.res_penalty < 0 && <span className="pw-tag bad" title="Every resistance is lowered after Kitava: check your gear still reaches 75%">res {v.res_penalty}% since {v.res_penalty === -30 ? "act 5" : "act 10"}</span>}
+    </div>
+  );
+}
+
+type RaceView = { name: string; class: string; elapsed: number; level: number; acts: [number, number, number | null][]; best_next: [number, number] | null; others: number };
+const actName = (a: number) => a >= 11 ? "maps" : `act ${a}`;
+const diff = (mine: number, best: number) => `${mine <= best ? "−" : "+"}${mmss(Math.abs(mine - best))}`;
+
+/** Race splits: your time since level 2, and how this act went against your best character. */
+function RaceLine({ r }: { r: RaceView }) {
+  const last = r.acts[r.acts.length - 1];
+  return (
+    <div className="pw-row" style={{ flexWrap: "wrap", gap: 5, marginTop: 5 }}>
+      <span className="pw-tag" title="Race clock: from reaching level 2">⏱ {mmss(r.elapsed)}</span>
+      {last && last[2] != null && <span className={`pw-tag ${last[1] <= last[2] ? "good" : "warn"}`} title={`Your best character reached ${actName(last[0])} at ${mmss(last[2])}`}>
+        {actName(last[0])} {diff(last[1], last[2])}</span>}
+      {r.best_next && <span className="pw-tag" title="Your best character's time to the next act">{actName(r.best_next[0])} by {mmss(r.best_next[1])} to beat</span>}
+    </div>
+  );
+}
+
+/** The Play tools page's race table: each act's time, against your best. */
+function RaceCard() {
+  const [r, setR] = useState<RaceView | null>(null);
+  useEffect(() => { invoke<RaceView | null>("race_get").then(setR).catch(() => {}); }, []);
+  if (!r || r.acts.length === 0) return null;
+  return (
+    <div className="card">
+      <h2>Race splits: {r.name}</h2>
+      <p className="muted small">From reaching level 2, against your fastest other character{r.others ? "" : " (none yet: this run becomes the one to beat)"}.
+        A live ladder rank isn't possible: GGG only opens the ladder to approved apps.</p>
+      <table className="pt-table"><thead><tr><th>Reached</th><th>Time</th><th>Your best</th><th></th></tr></thead>
+        <tbody>{r.acts.map(([a, t, b]) => (
+          <tr key={a}><td>{actName(a)}</td><td>{mmss(t)}</td><td className="muted">{b != null ? mmss(b) : ""}</td>
+            <td className={b == null ? "" : t <= b ? "w-full" : "w-low"}>{b != null ? diff(t, b) : ""}</td></tr>
+        ))}</tbody></table>
     </div>
   );
 }
@@ -754,6 +791,10 @@ export default function PlayTools() {
         </div>
       </div>}
 
+      <RaceCard />
+
+      <ChatCommands />
+
       <ExchangeCheck />
 
       <div className="card">
@@ -840,6 +881,23 @@ function ExchangeCheck() {
           : `${Math.round((1 - ratio) * 100)}% worse than poe.ninja`}
         <span className="muted small"> (poe.ninja: 1 {give.c} ≈ {+(a / b).toFixed(a / b < 10 ? 2 : 0)} {get.c})</span></p>
         : <p className="muted small">No poe.ninja price for one of those yet.</p>}
+    </div>
+  );
+}
+
+/** Chat commands (24 Nov): type them in game, or whisper them to yourself so nobody else sees them. */
+function ChatCommands() {
+  const [v, setV] = useState<[boolean, [string, string][]] | null>(null);
+  useEffect(() => { invoke<[boolean, [string, string][]]>("chat_get").then(setV).catch(() => {}); }, []);
+  if (!v) return null;
+  return (
+    <div className="card">
+      <h2>Chat commands</h2>
+      <p className="muted small">Type these in the game's chat. To keep them private, whisper them to yourself: <code>@YourCharacterName !next</code>.
+        Only your own messages count.</p>
+      <label className="check"><input type="checkbox" checked={v[0]} onChange={(e) => invoke<boolean>("chat_prefs", { on: e.target.checked }).then((on) => setV([on, v[1]]))} />
+        <span>Listen for chat commands</span></label>
+      <table className="pt-table"><tbody>{v[1].map(([c, what]) => <tr key={c}><td><code>{c}</code></td><td>{what}</td></tr>)}</tbody></table>
     </div>
   );
 }

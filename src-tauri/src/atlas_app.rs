@@ -193,3 +193,18 @@ pub fn atlas_save_tree(app: AppHandle, id: u64, variant: usize, nodes: Vec<u32>,
     let name = as_new.trim().to_string();
     with_store(&app, true, |s| s.set_tree(id, variant, &nodes, &choices, (!name.is_empty()).then_some(name.as_str()), now()).map(|_| s.clone()))?
 }
+
+/// The atlas tree in use now (the one F7 shows), for tagging map runs and earnings sessions.
+pub(crate) fn active_id(app: &AppHandle) -> Option<u64> {
+    with_store(app, false, |s| s.active).ok().flatten()
+}
+
+/// What each saved tree earned: loot per map / per hour from the map tracker, and earnings sessions started with it.
+#[tauri::command]
+pub fn atlas_results(app: AppHandle) -> Vec<atlas::TreeResult> {
+    let runs: Vec<(i64, i64, f64, Option<u64>)> = play_app::maps_history(app.clone()).iter()
+        .map(|r| (r.start, (r.left - r.start).max(r.in_map), r.loot.iter().map(|l| l.value).sum::<f64>(), r.atlas)).collect();
+    let sessions: Vec<(f64, f64, Option<u64>)> = wealth_app::finished_sessions(&app).iter()
+        .filter(|s| s.end.is_some()).map(|s| (s.seconds(0) as f64 / 3600.0, s.profit(), s.atlas)).collect();
+    atlas::tree_results(&runs, &sessions)
+}

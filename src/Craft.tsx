@@ -434,9 +434,9 @@ function Detail({ fam, base, ilvl, infl, have, rarity, inPlan, onPlan }: { fam: 
         <summary>More ways (not worked out here)</summary>
         <ul className="small">
           <li><b>Veiled Chaos Orb / Aisling</b>: adds a veiled mod you unveil from Jun (a choice of 3); "veiled" bench mods like "of the Order" come only from this.</li>
-          <li><b>Awakener's Orb</b>: merges two influenced items, keeping one influence mod from each.</li>
+          <li><b>Awakener's Orb</b>: merges two influenced items, keeping one influence mod from each (listed above for influence mods).</li>
           <li><b>Eldritch Ember / Ichor</b> and <b>Eldritch Exalted / Annulment / Chaos</b>: Exarch and Eater implicits, and changing a mod while the item keeps them.</li>
-          <li><b>Recombinator</b>: combines two items of the same kind, keeping a random mix of their mods.</li>
+          <li><b>Recombinator</b> (only in leagues that have them): combines two items of the same kind, keeping a random mix of their mods.</li>
           <li><b>Fracturing Orb</b>: locks one mod on a rare with 4+ mods, so you can reroll the rest freely.</li>
           <li><b>Metamods on the bench</b>: "Prefixes Cannot Be Changed" + Orb of Scouring removes only the suffixes (or the other way round); "Cannot roll Attack/Caster Modifiers" blocks those for Exalts.</li>
           <li><b>Orb of Annulment</b> removes one random mod; <b>Divine Orb</b> rerolls the numbers; <b>Blessed Orb</b> rerolls the implicit.</li>

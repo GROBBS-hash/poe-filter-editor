@@ -374,6 +374,9 @@ pub struct Session {
     pub paused: u64,
     #[serde(default)]
     pub paused_at: Option<u64>,
+    /// The atlas tree in use when it started (Atlas page id), so earnings can be compared per tree.
+    #[serde(default)]
+    pub atlas: Option<u64>,
 }
 
 impl Session {
@@ -593,7 +596,7 @@ Eater of Worlds Item"), "{t}");
     }
     #[test]
     fn sessions_per_hour() {
-        let mut s = Session { name: "Strand alch & go".into(), league: "Covens".into(), tabs: vec![0], start: 1000, end: None,
+        let mut s = Session { atlas: None, name: "Strand alch & go".into(), league: "Covens".into(), tabs: vec![0], start: 1000, end: None,
             start_value: 500.0, last_value: 500.0, paused: 0, paused_at: None };
         assert_eq!(s.per_hour(1030), 0.0);
         s.last_value = 800.0; // +300 in 30 minutes

@@ -48,15 +48,51 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
-- **Farm finder: "What to farm today" on the Atlas page (24 Nov, not released yet; he picked layout B and asked for regular drops, 2-5 mechanics together, and maps).**
+- **Farm finder: "What to farm today" on the Atlas page (24 Nov, released in 0.2.65; he picked layout B and asked for regular drops, 2-5 mechanics together, and maps).**
   - Core `core/src/farm.rs` (tests; dev look `farm::tests::real`, FARM_OUT=.claude/farm.json feeds preview-app.html), command `farm_find` (`src-tauri/src/farm_app.rs`), `src/FarmFinder.tsx`, `src/farm.css`. Yardstick = divines of a mechanic's drops traded (poe.ninja volume) per 1% of players' trees going for it: regular drops (under a div), big drops, raw currency (estimate: Stacked Deck, Valdo's Box, Foulborn Exalted, Ancient, Annulment shared out by maxroll's ranking Legion 1 / Beasts 0.8 / Abyss 0.5, everyone 0.25), beasts = 10% of listings (estimate). Abyss jewels, temples, logbooks etc. have no price list: shown as "not counted"; Incursion alone can't be ranked.
   - Mixes: only ones with evidence (much-copied player trees, creator trees, pairs taken 1.3x+ more than chance, known pairings); each mechanic counts by how many points real mixed trees give it; helping pairs +15% each up to 30%. Max 3 kinds of Thread. Cards differ from each other.
   - Maps: `core/data/farms.json` (hand-kept facts with source: maxroll, guide sites, patch notes; also pairings, altar → Thread drops, maps to skip), plus creators' maps; his own average minutes from the map tracker. Toxic Sewer left out: sources disagree whether it's on the 3.30 atlas.
   - Players' trees: `core/data/atlas_meta.json`, by hand with `node tools/build_atlas_meta.mjs <snapshot>` (poe.ninja's 100,000 trees; Harvest = its "Wildwood"). poe.ninja answers scripts 403 on its pages, so the snapshot number has to come from a browser and it can't run in the price job; don't work round it. The app itself never asks poe.ninja. Refresh before releases.
   - `public/atlas_picks.json` now has threads / altar / rolls (build_atlas_picks.mjs). "Build this tree" opens Build my own with the farm's mechanics; Mirage tile added there.
   - Next: his own div per hour per farm (needs the cloud branch's `MapRun.atlas` + loot working again), AI part = "copy for Claude" button.
-- **Price check: Wickerman body parts (24 Nov, not released yet).** 3.30's "Item Class: Viscera" items are copied with no Rarity line, so `parse_item` gave up ("No item was copied"). Now Rarity defaults to Normal when there's an Item Class; their unmarked mod is an implicit (`trade::mods`) and ticked at your roll. Test `wickerman_body_part` (text from the trade site's own copy of Blackened Lungs; search checked live: 1,050 for 25%+).
-- **Themes page: cards show real drops (24 Nov, not released yet; he asked: Divine is red on white in his filter, the card showed orange).** Cards used a fixed item per value level. Now command `theme_cards` (`core/src/preview.rs`): 8 sample drops this filter shows, each with its own look (Divine first; ones the theme colours first, found by comparing with a Classic PoE render), run through the whole filter with each theme (~33 in parallel). A gold dot = your own look, same in every theme. Theme editor examples come from the filter too (`level_examples`). Dev: `theme_cards_real` with THEME_CARDS_OUT=.claude/theme-cards.json feeds preview-app.html.
+- **Price check: Wickerman body parts (24 Nov, released in 0.2.65).** 3.30's "Item Class: Viscera" items are copied with no Rarity line, so `parse_item` gave up ("No item was copied"). Now Rarity defaults to Normal when there's an Item Class; their unmarked mod is an implicit (`trade::mods`) and ticked at your roll. Test `wickerman_body_part` (text from the trade site's own copy of Blackened Lungs; search checked live: 1,050 for 25%+).
+- **Themes page: cards show real drops (24 Nov, released in 0.2.65; he asked: Divine is red on white in his filter, the card showed orange).** Cards used a fixed item per value level. Now command `theme_cards` (`core/src/preview.rs`): 8 sample drops this filter shows, each with its own look (Divine first; ones the theme colours first, found by comparing with a Classic PoE render), run through the whole filter with each theme (~33 in parallel). A gold dot = your own look, same in every theme. Theme editor examples come from the filter too (`level_examples`). Dev: `theme_cards_real` with THEME_CARDS_OUT=.claude/theme-cards.json feeds preview-app.html.
+- **24 Nov, cloud session while he was out (merged and released in 0.2.65).** "Build everything else" on the Left to do list:
+  - **Phone alerts (8a)** — `src-tauri/src/phone_app.rs`, `core/src/shop.rs` (tests), Settings → **Phone** (`src/Phone.tsx`,
+    saves as you change it; phone.json). ntfy (`POST {server}/{topic}`, Title header) and/or a Discord webhook. Buyer
+    whisper (with `check_price` verdict), that buyer joining your area (whispered in the last 15 min), and sales. Default
+    "only while I'm away" = the game isn't the window in front. **Sales:** the shop watcher (off by default, every N≥2
+    min) reads the trade tabs (`wealth_app::shop_tabs`: tabs named ~price/~b/o + tabs where the last scan found listed
+    items) and diffs listed items by id (gone or smaller stack = sold, "or moved"); first read only remembers. Sales log
+    (500) in phone.json. `note_chaos` reads "~price 5 chaos" and "~price 10/20 chaos". Not tested live: ntfy.sh and
+    pathofexile.com are blocked from the cloud, so try "Send a test message" and "Check now" on his PC first.
+  - **Phone stats page (8b)** — same module: std `TcpListener` on 0.0.0.0:port (default 7777, off by default), every
+    request needs `?k=<secret>` (`page_key`, "New secret link"), `/` = `src-tauri/src/phone_page.html` (self-contained,
+    refreshes every minute), `/data.json` = sales, stash worth snapshots, strategies, current session, map tracker
+    session + last 20 maps with loot. Address shown with the PC's LAN IP. Windows Firewall asks the first time.
+    Away from home = Tailscale (nothing opened to the internet). Rendered with sample data here (phone width).
+  - **Chat commands (7d)** — `journey::chat_command` (tests: only your own lines, local/party/guild/global or "@To you"),
+    `play_app::run_chat_command`: !next, !filter <word>, !reload, !done, !start/!stop/!lap/!reset, !level/!tracker/
+    !sheet/!notes/!searches. Commands that type in game wait 400 ms for the chat box to close. On/off + list on Play tools
+    (`chat_off` in play.json). Private: whisper yourself "@CharName !next".
+  - **Atlas: what each tree earned (plan step 4 option 3)** — `MapRun.atlas` and `Session.atlas` record the active atlas
+    tree (`atlas_app::active_id`) at map start / session start; `atlas::tree_results` (test) → `atlas_results`; each
+    saved tree on the Atlas page shows "≈ Nc an hour · N maps" (sessions first, else tracked loot per hour), best ★.
+    Only counts runs from now on (old runs have no tree).
+  - **Race splits (the rank tracker, done differently)** — a live ladder rank isn't possible: GGG's ladder API needs an
+    approved OAuth app and the site no longer sends experience. `journey::Races` (test): race clock from level 2,
+    first entry to each act (maps = 11) per character; `race_get`; levelling window line (⏱ clock, this act ± your best,
+    next act time to beat) and a Race splits card on Play tools. play.json `races`.
+  - **PoE 2 campaign route** — `core/data/levelling_poe2.json` from Exile UI's "[leveltracker] default guide 2.json" +
+    "areas 2.json" (MIT), `node tools/build_levelling_poe2.mjs <guide> <areas>` (raw.githubusercontent.com/Lailloken/
+    Exile-UI/HEAD/data/english/…). 377 steps, 7 parts (acts 1–4, interludes, endgame). `journey::route_for(poe2)`,
+    `area_key` (PoE 2 ids are lower-cased: the log says "G1_4"). Picked by the active filter's game. No quest gem
+    rewards / gem search / res reminder for PoE 2 (no data / changes between patches). Test `poe2_route_follows_zones`.
+  - **Crafting: Awakener's Orb** as a way for influence mods (guaranteed with a single-mod donor; donor price unknown so
+    not ranked). Veiled/unveil odds can't be worked out from RePoE (unveiled mods carry no per-base weights);
+    recombinators only exist in some leagues; both stay in "More ways". **PoE 2 crafting not started**: its data
+    (RePoE's poe2 export) isn't reachable from the cloud and its rules differ (no Chaos reroll etc.), so it needs its
+    own engine — a bigger job to plan with him.
 - **Corruption implicits in price check (24 Nov, released in 0.2.63).** The advanced copy says `{ Corruption Implicit Modifier … }`; `trade::mod_source` only looked for "Corrupted Implicit", so the line had no source, looked like a fixed base mod (no range) and TradeWindow tucked it away unticked. Now source "corrupted" and ticked at least your roll. Test `corruption_implicit_counts` (from his saved sample).
 - **F2 "Reset to NeverSink's" (24 Nov, he asked; released in 0.2.63).** Command `reset_item(item, from_screen, apply)` (lib.rs): in a loop, removes this filter's edit deciding the item (and the next one down); for a NeverSink step, removes this filter's changes to that step and the item's moves in the section (`rules::touching`) and, when the parent filter changed it, adds a change putting NeverSink's step back (`rules::restore`, from the base file rendered with no edits). apply=false previews (what + "NeverSink shows/hides it"). F2 `ResetLine` under the rule box. Tests `reset_puts_neversink_back`; dev check `status_real::blasting_reset_alchemy`. Note: his Blasting t5 (Stacks of 6+) is NeverSink-shown; Red-Maps hid it.
 - **Tier changes on a filter built on another (24 Nov, released in 0.2.63).** Blasting's "show Stacks of 6+ Tier 5" didn't stick: `apply_with_extra` applied all rules newest-first (right for your own top rules) so Red-Maps' older "hide Tier 5" came last and won. Now top rules newest-first, tier changes / moved bases oldest-first. Test `newest_tier_change_wins`; dev check `status_real::blasting_tier5`.
@@ -1055,9 +1091,19 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
-- [ ] (24 Nov, unreleased) Atlas tree page → What to farm today: three cards with pictures, best maps, Threads cost; Why? explains; Build this tree opens Build my own with those mechanics; the choices (regular drops only, cheap Threads, one / two or more) change the cards.
-- [ ] (24 Nov, unreleased) Ctrl+D on Wickerman body parts (Blackened Lungs etc.): price window opens, the mod ticked, listings found.
-- [ ] (24 Nov, unreleased) Themes: each card's Divine Orb etc. looks like it does in game with that theme (NeverSink's own = red on white); gold dots on your own looks.
+- [ ] (0.2.65) Atlas tree page → What to farm today: three cards with pictures, best maps, Threads cost; Why? explains; Build this tree opens Build my own with those mechanics; the choices (regular drops only, cheap Threads, one / two or more) change the cards.
+- [ ] (0.2.65) Ctrl+D on Wickerman body parts (Blackened Lungs etc.): price window opens, the mod ticked, listings found.
+- [ ] (0.2.65) Themes: each card's Divine Orb etc. looks like it does in game with that theme (NeverSink's own = red on white); gold dots on your own looks.
+- [ ] (0.2.65) Settings → Phone: ntfy topic or Discord webhook → "Send a test message" arrives; a buyer whisper
+  sends "Buyer: … · Fair price" while the game isn't in front; the buyer joining sends "… is in your hideout".
+- [ ] (0.2.65) Watch my trade tabs → Check now twice (first only remembers); sell something → "Sold (or moved)" alert and a line under Sales.
+- [ ] (0.2.65) Stats page on: open the shown link on the phone (same Wi-Fi); Windows Firewall prompt → allow private networks.
+- [ ] (0.2.65) Chat commands: "@YourName !next" switches filter and loads it; !done, !start, !level work.
+- [ ] (0.2.65) Atlas page: after a few maps with a tree "In game", that tree shows "≈ …c an hour · N maps".
+- [ ] (0.2.65) Levelling window: race clock and "act N ±m:ss" on a new character (needs a second character to compare);
+  Play tools → Race splits table.
+- [ ] (0.2.65) PoE 2 filter active → F8 shows the PoE 2 route and moves on as you enter zones.
+- [ ] (0.2.65) Crafting: an influence mod on a base without that influence lists "Awakener's Orb + a … item with this mod".
 - [ ] (0.2.64) F2 reset button now says "Reset to base filter" and names the filter yours starts from (24 Nov: he may use his own filter, not NeverSink's).
 - [ ] (0.2.62) Jewels with my mods: Tiers → Jewels → type "energy shield" → add it; after F4 an identified Cobalt jewel with % max ES is highlighted purple, others unchanged. F2 on an identified jewel: a "Jewels with my mods" box lists its mods → tick → Save to my jewel list. "2+" needs two of the mods. Change the look from the card.
 - [ ] (0.2.61) F2 on Omen of Return (hidden with "Just this item"): the chip says "Only Omen of Return hidden" and a gold "Just this item" line says the rest of its tier still shows. `Source.only_base` (evaluate.rs) = the one BaseType an edit names.
@@ -1641,20 +1687,17 @@ when the game window isn't found. Check in game: the window's spot, and that it 
 
 ## Left to do (agreed order)
 - **Farm finder follow-ups (built 24 Nov, see Done):** why his last 16 map runs have no loot (since 23 Nov); his own div per hour per farm; "copy for Claude" button.
-0. **Play tools (22 Nov) released in 0.2.39.** Bulk-selling helper done 23 Nov (Sell in bulk, see Done). Not built yet: live rank/race tracker (PoeRank-style), PoE 2's campaign route, crafting methods still unmodelled (veiled, conqueror exalts, awakener,
-   recombinators, beastcraft), PoE 2 crafting.
+0. **24 Nov cloud work (see Done): merged and released in 0.2.65.** Phone alerts + stats
+   page (8a/8b), chat commands (7d), atlas earnings per tree (5), race splits (instead of a live rank: GGG's ladder is
+   OAuth-only), PoE 2 campaign route, Awakener's Orb crafting. Still not built: **PoE 2 crafting** (needs its own data
+   and rules: plan with him), veiled/unveil odds (no data), recombinators (league-only).
 1. **GROBBS to work through "Still to check in game" above**; fix what he reports.
 2. Wealth tracker follow-ups (real account tested and rares priced via the trade site, 21 Nov):
    "search every tab" done 21 Nov; guild stash built 21 Nov on branch `guild-stash` (awaiting approval); crafting planner done (0.2.32).
 3. Price check polish: done 21 Nov (Awakened ideas: unique roll ranges, anoints, cluster jewels, flasks, heist,
    influences, "Also searching for"). Waiting on his in-game check.
-4. **One-click login instead of POESESSID** (he asked 22 Nov). GGG's OAuth ("Log in with pathofexile.com", what Sidekick /
-   WealthyExile use) is closed to new apps: the developer docs say "We are currently unable to process new applications"
-   (checked 22 Nov). If it reopens: public client, authorization code + PKCE, loopback redirect (http://127.0.0.1:<port>/callback,
-   fixed at registration), scopes account:characters + account:stashes, 10 h access / 7 day refresh tokens, User-Agent
-   "OAuth {clientId}/{version} (contact: …)"; its character endpoint still returns experience, so XP per hour could come
-   back. The "Log in with pathofexile.com" button (built 22 Nov, see Done) covers it until then.
-5. **Atlas Strategy Builder (idea 23 Nov; step 1 creator picks + step 3 optimiser done 23 Nov, see Done; tree editing + totals done 23 Nov; next: wealth-tracker results).** Pick strategies (e.g. Ritual + Harvest) → creator-pick trees
+4. ~~One-click login~~ **Dropped 24 Nov (his call: too much red tape with GGG's app approval).** POESESSID + the "Log in with pathofexile.com" button stay as they are.
+5. **Atlas Strategy Builder (idea 23 Nov; step 1 creator picks + step 3 optimiser done 23 Nov, see Done; tree editing + totals done 23 Nov; wealth-tracker results per tree done 24 Nov; left: Mobalytics/YouTube creator picks).** Pick strategies (e.g. Ritual + Harvest) → creator-pick trees
    (Maxroll, Mobalytics, YouTube) to load and adjust, plus an optimiser for his own trees. Full plan: `ATLAS_STRATEGY_PLAN.md`.
 6. Deferred earlier: PoE 2 coverage. Batch mode tidy-up done 21 Nov (see "Batch mode"). (Installer + auto-update done 21 Nov: see "Installer and updates".)
 7. **Ideas from PoeFilterX (he asked 23 Nov; 7a, 7b and 7c done 23 Nov, see Done; 7d left).** github.com/SteffenBlake/PoeFilterX is a
@@ -1668,9 +1711,10 @@ when the game window isn't found. Check in game: the window's spot, and that it 
      `apply_with_extra`; useful for trying stricter settings and going back.
    - 7c. **Share packs with friends** (their package system, made simple): export a profile's edits + saved looks +
      theme + price settings as a file / short code, import onto your own NeverSink base. Matters once friends use it.
-   - 7d. Low priority: **chat commands** (on their "investigating" list): read typed commands like "!strict" from
+   - 7d. DONE 24 Nov (see Done). **chat commands** (on their "investigating" list): read typed commands like "!strict" from
      Client.txt (journey.rs already tails it) to switch filters or change a rule. F5 already cycles filters.
-8. **Shop sales and stats on his phone (he asked 24 Nov; rough plan, refine with him before building; 8a first).**
+8. **Shop sales and stats on his phone (he asked 24 Nov; BUILT 24 Nov in the cloud, see Done — he said "build everything
+   else" while out, so it's built with sensible defaults; adjust to taste once he tries it).**
    PoE has no "sold" event, so a sale is a buyer whisper / buyer arriving (whispers.rs, game must be running) or an item
    gone from a premium trade tab between stash reads (wealth tracker, works with the game closed). PC + editor must be on.
    Alerts and stats only: no answering or finishing trades from the phone (against GGG's rules).
