@@ -54,6 +54,9 @@ The optimiser needs a rough value for each node per strategy. Options, simplest 
 - 23 Nov: step 3 built ("Build my own" tab, layout A): optimiser in `core/src/atlas_opt.rs` using options 1 + 2 below
   (node text / tree areas, and which nodes creator trees take). Option 3 (wealth tracker results) is still to do.
 
+- 24 Nov: option 3 started: map runs and earnings sessions now remember the tree in use, and each saved tree shows
+  what it earned (`atlas::tree_results`). Feeding those results back into the optimiser's node values is still to do.
+
 ## Suggested Build Order
 
 1. Creator picks with a small hand-picked list of trees, loaded into the existing planner.

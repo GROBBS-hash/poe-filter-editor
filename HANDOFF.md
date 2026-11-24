@@ -48,6 +48,43 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **24 Nov, cloud session while he was out (branch `ccr-26676017-7ecilq`, NOT released: merge to main on his PC, then
+  `tools/release.ps1`).** "Build everything else" on the Left to do list:
+  - **Phone alerts (8a)** — `src-tauri/src/phone_app.rs`, `core/src/shop.rs` (tests), Settings → **Phone** (`src/Phone.tsx`,
+    saves as you change it; phone.json). ntfy (`POST {server}/{topic}`, Title header) and/or a Discord webhook. Buyer
+    whisper (with `check_price` verdict), that buyer joining your area (whispered in the last 15 min), and sales. Default
+    "only while I'm away" = the game isn't the window in front. **Sales:** the shop watcher (off by default, every N≥2
+    min) reads the trade tabs (`wealth_app::shop_tabs`: tabs named ~price/~b/o + tabs where the last scan found listed
+    items) and diffs listed items by id (gone or smaller stack = sold, "or moved"); first read only remembers. Sales log
+    (500) in phone.json. `note_chaos` reads "~price 5 chaos" and "~price 10/20 chaos". Not tested live: ntfy.sh and
+    pathofexile.com are blocked from the cloud, so try "Send a test message" and "Check now" on his PC first.
+  - **Phone stats page (8b)** — same module: std `TcpListener` on 0.0.0.0:port (default 7777, off by default), every
+    request needs `?k=<secret>` (`page_key`, "New secret link"), `/` = `src-tauri/src/phone_page.html` (self-contained,
+    refreshes every minute), `/data.json` = sales, stash worth snapshots, strategies, current session, map tracker
+    session + last 20 maps with loot. Address shown with the PC's LAN IP. Windows Firewall asks the first time.
+    Away from home = Tailscale (nothing opened to the internet). Rendered with sample data here (phone width).
+  - **Chat commands (7d)** — `journey::chat_command` (tests: only your own lines, local/party/guild/global or "@To you"),
+    `play_app::run_chat_command`: !next, !filter <word>, !reload, !done, !start/!stop/!lap/!reset, !level/!tracker/
+    !sheet/!notes/!searches. Commands that type in game wait 400 ms for the chat box to close. On/off + list on Play tools
+    (`chat_off` in play.json). Private: whisper yourself "@CharName !next".
+  - **Atlas: what each tree earned (plan step 4 option 3)** — `MapRun.atlas` and `Session.atlas` record the active atlas
+    tree (`atlas_app::active_id`) at map start / session start; `atlas::tree_results` (test) → `atlas_results`; each
+    saved tree on the Atlas page shows "≈ Nc an hour · N maps" (sessions first, else tracked loot per hour), best ★.
+    Only counts runs from now on (old runs have no tree).
+  - **Race splits (the rank tracker, done differently)** — a live ladder rank isn't possible: GGG's ladder API needs an
+    approved OAuth app and the site no longer sends experience. `journey::Races` (test): race clock from level 2,
+    first entry to each act (maps = 11) per character; `race_get`; levelling window line (⏱ clock, this act ± your best,
+    next act time to beat) and a Race splits card on Play tools. play.json `races`.
+  - **PoE 2 campaign route** — `core/data/levelling_poe2.json` from Exile UI's "[leveltracker] default guide 2.json" +
+    "areas 2.json" (MIT), `node tools/build_levelling_poe2.mjs <guide> <areas>` (raw.githubusercontent.com/Lailloken/
+    Exile-UI/HEAD/data/english/…). 377 steps, 7 parts (acts 1–4, interludes, endgame). `journey::route_for(poe2)`,
+    `area_key` (PoE 2 ids are lower-cased: the log says "G1_4"). Picked by the active filter's game. No quest gem
+    rewards / gem search / res reminder for PoE 2 (no data / changes between patches). Test `poe2_route_follows_zones`.
+  - **Crafting: Awakener's Orb** as a way for influence mods (guaranteed with a single-mod donor; donor price unknown so
+    not ranked). Veiled/unveil odds can't be worked out from RePoE (unveiled mods carry no per-base weights);
+    recombinators only exist in some leagues; both stay in "More ways". **PoE 2 crafting not started**: its data
+    (RePoE's poe2 export) isn't reachable from the cloud and its rules differ (no Chaos reroll etc.), so it needs its
+    own engine — a bigger job to plan with him.
 - **Corruption implicits in price check (24 Nov, released in 0.2.63).** The advanced copy says `{ Corruption Implicit Modifier … }`; `trade::mod_source` only looked for "Corrupted Implicit", so the line had no source, looked like a fixed base mod (no range) and TradeWindow tucked it away unticked. Now source "corrupted" and ticked at least your roll. Test `corruption_implicit_counts` (from his saved sample).
 - **F2 "Reset to NeverSink's" (24 Nov, he asked; released in 0.2.63).** Command `reset_item(item, from_screen, apply)` (lib.rs): in a loop, removes this filter's edit deciding the item (and the next one down); for a NeverSink step, removes this filter's changes to that step and the item's moves in the section (`rules::touching`) and, when the parent filter changed it, adds a change putting NeverSink's step back (`rules::restore`, from the base file rendered with no edits). apply=false previews (what + "NeverSink shows/hides it"). F2 `ResetLine` under the rule box. Tests `reset_puts_neversink_back`; dev check `status_real::blasting_reset_alchemy`. Note: his Blasting t5 (Stacks of 6+) is NeverSink-shown; Red-Maps hid it.
 - **Tier changes on a filter built on another (24 Nov, released in 0.2.63).** Blasting's "show Stacks of 6+ Tier 5" didn't stick: `apply_with_extra` applied all rules newest-first (right for your own top rules) so Red-Maps' older "hide Tier 5" came last and won. Now top rules newest-first, tier changes / moved bases oldest-first. Test `newest_tier_change_wins`; dev check `status_real::blasting_tier5`.
@@ -1046,6 +1083,16 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
+- [ ] (24 Nov, unreleased) Settings → Phone: ntfy topic or Discord webhook → "Send a test message" arrives; a buyer whisper
+  sends "Buyer: … · Fair price" while the game isn't in front; the buyer joining sends "… is in your hideout".
+- [ ] (24 Nov) Watch my trade tabs → Check now twice (first only remembers); sell something → "Sold (or moved)" alert and a line under Sales.
+- [ ] (24 Nov) Stats page on: open the shown link on the phone (same Wi-Fi); Windows Firewall prompt → allow private networks.
+- [ ] (24 Nov) Chat commands: "@YourName !next" switches filter and loads it; !done, !start, !level work.
+- [ ] (24 Nov) Atlas page: after a few maps with a tree "In game", that tree shows "≈ …c an hour · N maps".
+- [ ] (24 Nov) Levelling window: race clock and "act N ±m:ss" on a new character (needs a second character to compare);
+  Play tools → Race splits table.
+- [ ] (24 Nov) PoE 2 filter active → F8 shows the PoE 2 route and moves on as you enter zones.
+- [ ] (24 Nov) Crafting: an influence mod on a base without that influence lists "Awakener's Orb + a … item with this mod".
 - [ ] (0.2.64) F2 reset button now says "Reset to base filter" and names the filter yours starts from (24 Nov: he may use his own filter, not NeverSink's).
 - [ ] (0.2.62) Jewels with my mods: Tiers → Jewels → type "energy shield" → add it; after F4 an identified Cobalt jewel with % max ES is highlighted purple, others unchanged. F2 on an identified jewel: a "Jewels with my mods" box lists its mods → tick → Save to my jewel list. "2+" needs two of the mods. Change the look from the card.
 - [ ] (0.2.61) F2 on Omen of Return (hidden with "Just this item"): the chip says "Only Omen of Return hidden" and a gold "Just this item" line says the rest of its tier still shows. `Source.only_base` (evaluate.rs) = the one BaseType an edit names.
@@ -1628,8 +1675,10 @@ when the game window isn't found. Check in game: the window's spot, and that it 
       "Best strategies" ranks runs.
 
 ## Left to do (agreed order)
-0. **Play tools (22 Nov) released in 0.2.39.** Bulk-selling helper done 23 Nov (Sell in bulk, see Done). Not built yet: live rank/race tracker (PoeRank-style), PoE 2's campaign route, crafting methods still unmodelled (veiled, conqueror exalts, awakener,
-   recombinators, beastcraft), PoE 2 crafting.
+0. **24 Nov cloud work on branch `ccr-26676017-7ecilq` (see Done): merge into main and release.** Phone alerts + stats
+   page (8a/8b), chat commands (7d), atlas earnings per tree (5), race splits (instead of a live rank: GGG's ladder is
+   OAuth-only), PoE 2 campaign route, Awakener's Orb crafting. Still not built: **PoE 2 crafting** (needs its own data
+   and rules: plan with him), veiled/unveil odds (no data), recombinators (league-only).
 1. **GROBBS to work through "Still to check in game" above**; fix what he reports.
 2. Wealth tracker follow-ups (real account tested and rares priced via the trade site, 21 Nov):
    "search every tab" done 21 Nov; guild stash built 21 Nov on branch `guild-stash` (awaiting approval); crafting planner done (0.2.32).
@@ -1641,7 +1690,7 @@ when the game window isn't found. Check in game: the window's spot, and that it 
    fixed at registration), scopes account:characters + account:stashes, 10 h access / 7 day refresh tokens, User-Agent
    "OAuth {clientId}/{version} (contact: …)"; its character endpoint still returns experience, so XP per hour could come
    back. The "Log in with pathofexile.com" button (built 22 Nov, see Done) covers it until then.
-5. **Atlas Strategy Builder (idea 23 Nov; step 1 creator picks + step 3 optimiser done 23 Nov, see Done; tree editing + totals done 23 Nov; next: wealth-tracker results).** Pick strategies (e.g. Ritual + Harvest) → creator-pick trees
+5. **Atlas Strategy Builder (idea 23 Nov; step 1 creator picks + step 3 optimiser done 23 Nov, see Done; tree editing + totals done 23 Nov; wealth-tracker results per tree done 24 Nov; left: Mobalytics/YouTube creator picks).** Pick strategies (e.g. Ritual + Harvest) → creator-pick trees
    (Maxroll, Mobalytics, YouTube) to load and adjust, plus an optimiser for his own trees. Full plan: `ATLAS_STRATEGY_PLAN.md`.
 6. Deferred earlier: PoE 2 coverage. Batch mode tidy-up done 21 Nov (see "Batch mode"). (Installer + auto-update done 21 Nov: see "Installer and updates".)
 7. **Ideas from PoeFilterX (he asked 23 Nov; 7a, 7b and 7c done 23 Nov, see Done; 7d left).** github.com/SteffenBlake/PoeFilterX is a
@@ -1655,9 +1704,10 @@ when the game window isn't found. Check in game: the window's spot, and that it 
      `apply_with_extra`; useful for trying stricter settings and going back.
    - 7c. **Share packs with friends** (their package system, made simple): export a profile's edits + saved looks +
      theme + price settings as a file / short code, import onto your own NeverSink base. Matters once friends use it.
-   - 7d. Low priority: **chat commands** (on their "investigating" list): read typed commands like "!strict" from
+   - 7d. DONE 24 Nov (see Done). **chat commands** (on their "investigating" list): read typed commands like "!strict" from
      Client.txt (journey.rs already tails it) to switch filters or change a rule. F5 already cycles filters.
-8. **Shop sales and stats on his phone (he asked 24 Nov; rough plan, refine with him before building; 8a first).**
+8. **Shop sales and stats on his phone (he asked 24 Nov; BUILT 24 Nov in the cloud, see Done — he said "build everything
+   else" while out, so it's built with sensible defaults; adjust to taste once he tries it).**
    PoE has no "sold" event, so a sale is a buyer whisper / buyer arriving (whispers.rs, game must be running) or an item
    gone from a premium trade tab between stash reads (wealth tracker, works with the game closed). PC + editor must be on.
    Alerts and stats only: no answering or finishing trades from the phone (against GGG's rules).
