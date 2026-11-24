@@ -8,7 +8,9 @@ import { friendly } from "./errors";
 import { CurrencyIcon, ItemIcon } from "./icons";
 import { worthText } from "./WorthLine";
 
-type Page = { items: [string, number][]; limit: number | null; stack: number | null; unit: string };
+/** What the filter really does: from what stack it shows (null = never), and what hides the rest. */
+type Shows = { from: number | null; kind: string; label: string; rule: number | null; parent: string | null };
+type Page = { items: [string, number][]; limit: number | null; stack: number | null; unit: string; shows?: Record<string, Shows> };
 type Settings = { section_hide?: Record<string, number>; section_stack?: Record<string, number> } & Record<string, unknown>;
 const KEY = "threads";
 
@@ -20,9 +22,11 @@ export default function Threads({ profileId, onChange, onOpenLook }: { profileId
   const [saved, setSaved] = useState("");
   const timer = useRef(0);
 
-  useEffect(() => {
-    invoke<Page>("get_threads", { id: profileId }).then((p) => { setPage(p); setLimit(p.limit); setStack(p.stack); }).catch((e) => setErr(friendly(e)));
-  }, [profileId]);
+  const load = () => invoke<Page>("get_threads", { id: profileId }).then((p) => { setPage(p); setLimit(p.limit); setStack(p.stack); }).catch((e) => setErr(friendly(e)));
+  useEffect(() => { load(); }, [profileId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const removeEdit = (index: number) => {
+    invoke("delete_rule", { id: profileId, index }).then(() => { setErr(""); setSaved("Edit removed. Press F4 in game."); onChange(); load(); }).catch((e) => setErr(friendly(e)));
+  };
 
   // Typing "15" shouldn't rebuild the filter for "1" first.
   const save = (nextLimit: number | null, nextStack: number | null) => {
@@ -35,7 +39,7 @@ export default function Threads({ profileId, onChange, onOpenLook }: { profileId
         if (nextLimit == null) delete hide[KEY]; else hide[KEY] = nextLimit;
         if (nextStack == null || nextLimit == null) delete stacks[KEY]; else stacks[KEY] = nextStack;
         return invoke("set_price_settings", { id: profileId, settings: { ...p.settings, section_hide: hide, section_stack: stacks } });
-      }).then(() => { setErr(""); setSaved("Saved. Press F4 in game."); onChange(); }).catch((e) => setErr(friendly(e)));
+      }).then(() => { setErr(""); setSaved("Saved. Press F4 in game."); onChange(); load(); }).catch((e) => setErr(friendly(e)));
     }, 600);
   };
 
@@ -54,7 +58,7 @@ export default function Threads({ profileId, onChange, onOpenLook }: { profileId
     <div className="card threads">
       <h2 className="with-icon"><ItemIcon base="Breach Thread" size={28} />Threads</h2>
       <div className="note">
-        NeverSink shows every Thread with one purple look (it keeps them in <b>Fragments › Tier 3</b>, with the Goddess items).
+        NeverSink shows every Thread with one purple look (it keeps them in <b>Fragments › Tier 3</b>, with the Goddess items; the worth line on Fragments leaves Threads to this page).
         Here you choose which ones are worth picking up, from poe.ninja's prices. A stack counts at its total worth, so
         a pile of cheap Threads still shows.
         {onOpenLook && <> <button className="link small" onClick={onOpenLook}>Change how they look</button></>}
@@ -68,7 +72,7 @@ export default function Threads({ profileId, onChange, onOpenLook }: { profileId
         <input className="num" type="number" min={0} step="any" disabled={!on} value={limit ?? ""}
           onChange={(e) => save(Math.max(0, +e.target.value || 0), stack)} />
         {unit === "chaos" ? <CurrencyIcon id="chaos" /> : <span className="muted small">{unit}</span>}
-        <span className="muted small">{on ? <>hides single drops of <b>{hidden}</b> of {page.items.length} Threads right now · updates with the prices</> : "Off: NeverSink shows them all."}</span>
+        <span className="muted small">{on ? <>hides single drops of <b>{hidden}</b> of {page.items.length} Threads right now · updates with the prices</> : "Off: this page hides none."}</span>
       </div>
       <div className={`worth-line ${on && stack ? "on" : ""}`}>
         <label title={on ? "" : "Set a price line first"}>
@@ -83,13 +87,20 @@ export default function Threads({ profileId, onChange, onOpenLook }: { profileId
       {page.items.length === 0 ? <div className="empty">No Thread prices yet (poe.ninja's prices load in the background).</div> : (
         <div className="thr-list">
           {[...page.items].reverse().map(([name, v]) => {
-            const n = from(v);
+            // What the filter really does; the sums above only until it has answered (or while a number is being typed).
+            const real = page.shows?.[name];
+            const settled = page.limit === limit && page.stack === stack;
+            const n = real && settled ? real.from : from(v);
+            const other = real && settled && n !== 1 && !real.label.startsWith("Price: Threads") ? real : null;
             return (
-              <div key={name} className={`thr-row ${n > 1 ? "thr-stack" : ""}`}>
+              <div key={name} className={`thr-row ${n !== 1 ? "thr-stack" : ""}`}>
                 <ItemIcon base={name} size={30} />
-                <b>{name}</b>
+                <div><b>{name}</b>
+                {other && <span className="thr-by small">{other.kind === "edit" ? `your edit “${other.label}”${other.parent ? ` (in ${other.parent})` : ""}` : other.label || "NeverSink's strictness"}
+                  {other.rule != null && <button className="link small" onClick={() => removeEdit(other.rule!)}>Remove</button>}</span>}
+                </div>
                 <span className="thr-price">{worthText(v, unit)}</span>
-                <span className={n > 1 ? "thr-when muted" : "thr-when ok"}>{n > 1 ? `shows in stacks of ${n}+` : "always shows"}</span>
+                <span className={n !== 1 ? "thr-when muted" : "thr-when ok"}>{n == null ? "hidden" : n > 1 ? `shows in stacks of ${n}+` : "always shows"}</span>
               </div>
             );
           })}

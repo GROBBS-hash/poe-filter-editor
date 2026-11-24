@@ -266,3 +266,23 @@ fn blasting_reset_alchemy() {
     let after = verdict(&store);
     println!("after reset: {} by {:?} {:?}", after.visibility, after.source.type_path, after.source.tier);
 }
+
+/// Dev check (24 Nov): from what stack each Thread shows in his filters, and what hides the rest.
+/// `cargo test -p filter-core --test status_real threads_show -- --ignored --nocapture`
+#[test]
+#[ignore]
+fn threads_show() {
+    use filter_core::{filter::parse_filter, prices::{thread_prices, PriceFile}, profiles::{render_profile, Store}};
+    let appdata = format!("{}/com.grobbs.poefiltereditor", std::env::var("APPDATA").unwrap());
+    let store = Store::load(std::path::Path::new(&format!("{appdata}/profiles.json")));
+    let file: PriceFile = serde_json::from_str(&std::fs::read_to_string(format!("{appdata}/prices_poe1.json")).unwrap()).unwrap();
+    let dir = std::path::PathBuf::from(format!("{}/Documents/My Games/Path of Exile", std::env::var("USERPROFILE").unwrap()));
+    for id in ["blasting", "red-maps", "mid-game"] {
+        let segs = parse_filter(&render_profile(&store, id, &dir, Some(&file), None).unwrap().0);
+        println!("== {id}");
+        for (n, v) in thread_prices(&file) {
+            let (from, why) = filter_core::preview::shows_from(&segs, "Map Fragments", &n, 83);
+            println!("{n:20} {v:5.2}c from {from:?} {:?}", why.map(|w| (w.kind, w.label, w.section, w.tier_name)));
+        }
+    }
+}

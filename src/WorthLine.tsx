@@ -90,7 +90,8 @@ export function SectionWorth({ profileId, sectionKey, prices, limit: start, onCh
   const timer = useRef(0);
   useEffect(() => setLimit(start), [start, sectionKey]);
   useEffect(() => { invoke<Page>("get_price_settings", { id: profileId }).then((p) => setUnit(p.info?.unit ?? "chaos")).catch(() => {}); }, [profileId]);
-  const values = Object.values(prices);
+  // Threads are listed in Fragments but only their own page hides them.
+  const values = Object.entries(prices).filter(([n]) => sectionKey !== "fragments" || !n.endsWith(" Thread")).map(([, v]) => v);
   const save = (next: number | null) => {
     setLimit(next);
     clearTimeout(timer.current);

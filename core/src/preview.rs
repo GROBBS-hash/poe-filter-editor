@@ -170,6 +170,19 @@ pub fn card_labels(segs: &[Segment], items: &[Item], area_level: u32) -> Vec<Pre
     }).collect()
 }
 
+/// From what stack size an item shows in this filter (None = never), and which rule hides the smaller ones.
+pub fn shows_from(segs: &[Segment], class: &str, base: &str, area_level: u32) -> (Option<u32>, Option<crate::evaluate::Source>) {
+    let at = |n: u32| status(segs, &it(class, "Normal", None, base, Some(n), None, None), Some(area_level), false).verdict;
+    // The smallest stack that shows, with every bigger one showing too.
+    let (mut from, mut why) = (None, None);
+    for n in (1..=60).rev() {
+        let v = at(n);
+        if v.visibility == "Hide" { why = Some(v.source); break; }
+        from = Some(n);
+    }
+    (from, why)
+}
+
 /// One theme card's labels ("" = NeverSink's own colours).
 #[derive(Debug, Clone, Serialize)]
 pub struct ThemeCard {

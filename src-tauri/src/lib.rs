@@ -1479,16 +1479,35 @@ fn rule_label(r: &Rule) -> String {
 /// Tiers → Threads (24 Nov): every Thread poe.ninja prices (cheapest first), with the page's "hide if worth under"
 /// line and "always show stacks of N+" (both kept in the profile's price settings, key "threads").
 #[derive(Serialize)]
-struct ThreadsPage { items: Vec<(String, f64)>, limit: Option<f64>, stack: Option<u32>, unit: String }
-#[tauri::command]
+struct ThreadsPage { items: Vec<(String, f64)>, limit: Option<f64>, stack: Option<u32>, unit: String,
+    /// What the filter really does with each: from what stack it shows (None = never), and what hides the rest.
+    shows: std::collections::BTreeMap<String, ThreadShows> }
+#[derive(Serialize)]
+struct ThreadShows { from: Option<u32>, kind: String, label: String,
+    /// Your edit hiding it, when it's in this filter (its place in My edits), else the filter it's in.
+    rule: Option<usize>, parent: Option<String> }
+#[tauri::command(async)]
 fn get_threads(state: State<AppState>, id: String) -> Result<ThreadsPage, String> {
     let store = state.store.lock().unwrap();
     let p = store.profiles.get(&id).ok_or("Profile not found")?;
     let prices = state.prices.lock().unwrap();
     let file = prices.get(&p.game);
     let key = filter_core::prices::THREADS_KEY;
+    let items = file.map(filter_core::prices::thread_prices).unwrap_or_default();
+    let mut shows = std::collections::BTreeMap::new();
+    if let Ok((text, _)) = render_profile(&store, &id, &filter_dir(p.game), file, None) {
+        let segs = parse_filter(&text);
+        for (name, _) in &items {
+            let (from, why) = filter_core::preview::shows_from(&segs, "Map Fragments", name, 83);
+            let why = why.unwrap_or_default();
+            let mine = |q: &filter_core::profiles::Profile| q.rules.iter().position(|r| !r.is_off() && rule_label(r) == why.label);
+            let rule = (why.kind == "edit").then(|| mine(p)).flatten();
+            let parent = (why.kind == "edit" && rule.is_none()).then(|| store.profiles.values().find(|q| q.id != id && mine(q).is_some()).map(|q| q.name.clone())).flatten();
+            shows.insert(name.clone(), ThreadShows { from, kind: why.kind, label: why.label, rule, parent });
+        }
+    }
     Ok(ThreadsPage {
-        items: file.map(filter_core::prices::thread_prices).unwrap_or_default(),
+        items, shows,
         limit: p.prices.as_ref().and_then(|s| s.section_hide.get(key).copied()),
         stack: p.prices.as_ref().and_then(|s| s.section_stack.get(key).copied()),
         unit: file.map(|f| f.unit.clone()).unwrap_or_else(|| "chaos".into()),

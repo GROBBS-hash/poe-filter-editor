@@ -2369,6 +2369,7 @@ button.qm-rule:hover, .qm-rule.can-open:hover { border-color: var(--gold); backg
 .thr-list { display: grid; gap: 2px; margin-top: 10px; }
 .thr-row { display: grid; grid-template-columns: 34px 1fr auto 170px; align-items: center; gap: 10px; padding: 5px 8px; border-radius: 6px; border-bottom: 1px solid var(--line); }
 .thr-price { color: var(--gold); font-variant-numeric: tabular-nums; text-align: right; }
+.thr-by { display: block; color: var(--gold); } .thr-by .link { margin-left: 8px; }
 .thr-when { font-size: 12.5px; text-align: right; }
 .thr-when.ok { color: var(--green, #7bd46a); }
 .thr-row.thr-stack b { color: var(--text-2); font-weight: 500; }

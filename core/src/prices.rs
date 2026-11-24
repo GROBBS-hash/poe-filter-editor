@@ -180,6 +180,9 @@ pub fn default_settings(unit: &str) -> PriceSettings {
 pub fn section_hide_blocks(segs: &[crate::filter::Segment], hides: &BTreeMap<String, f64>, stacks: &BTreeMap<String, u32>, file: &PriceFile, nl: &str) -> String {
     let u = unit_short(&file.unit);
     let mut out = String::new();
+    // Threads sit in NeverSink's Fragments, but have a page of their own: only its line decides them (24 Nov: he
+    // unticked it and Fragments' "under 4c" line still hid them).
+    let threads: std::collections::BTreeSet<String> = thread_prices(file).into_iter().map(|(n, _)| n).collect();
     for (key, limit) in hides {
         // "Always show stacks of N+": a cheap item's stack shows from N even when it's worth less than the line.
         let cap = stacks.get(key).copied().filter(|n| *n > 1).unwrap_or(5000);
@@ -193,7 +196,7 @@ pub fn section_hide_blocks(segs: &[crate::filter::Segment], hides: &BTreeMap<Str
         let mut by_stack: BTreeMap<u32, Vec<String>> = BTreeMap::new();
         let mut seen = std::collections::BTreeSet::new();
         for b in &bases {
-            if !seen.insert(b.clone()) { continue; }
+            if !seen.insert(b.clone()) || (key != THREADS_KEY && threads.contains(b)) { continue; }
             let Some(v) = price_of(file, None, b, "Normal").filter(|v| *v > 0.0) else { continue };
             if v >= *limit { continue; }
             by_stack.entry(((limit / v).ceil().min(5000.0) as u32).min(cap)).or_default().push(b.clone());
@@ -394,6 +397,11 @@ mod tests {
         let blocks = section_hide_blocks(&[], &hides, &stacks, &f, "\n");
         assert!(blocks.contains("StackSize < 3\n    BaseType == \"Betrayal Thread\""), "{blocks}");
         assert!(blocks.contains("Threads worth under"));
+        // The Fragments line leaves Threads alone: they have their own page.
+        let segs = parse_filter("Show # $type->fragments $tier->t3\n\tClass == \"Map Fragments\"\n\tBaseType == \"Betrayal Thread\" \"Offering to the Goddess\"\n\tSetFontSize 45\n");
+        f.items.push(PriceItem { cat: "Fragment".into(), ..it("Offering to the Goddess", 1.0) });
+        let blocks = section_hide_blocks(&segs, &[("fragments".to_string(), 4.0)].into(), &BTreeMap::new(), &f, "\n");
+        assert!(blocks.contains("Offering to the Goddess") && !blocks.contains("Thread"), "{blocks}");
     }
 
     #[test]
