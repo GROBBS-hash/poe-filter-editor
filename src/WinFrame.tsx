@@ -119,6 +119,11 @@ export function SizeButtons({ s }: { s: ReturnType<typeof useWinScale> }) {
 export function useFitHeight(width: number, min = 200) {
   useEffect(() => {
     let last = 0;
+    let later: ReturnType<typeof setTimeout> | undefined;
+    const size = (want: number) => {
+      last = want;
+      import("@tauri-apps/api/dpi").then(({ LogicalSize }) => getCurrentWindow().setSize(new LogicalSize(width, want))).catch(() => {});
+    };
     const fit = () => {
       const bar = document.querySelector<HTMLElement>(".bo-bar");
       const body = document.querySelector<HTMLElement>(".bo-body");
@@ -128,9 +133,10 @@ export function useFitHeight(width: number, min = 200) {
       const pad = parseFloat(getComputedStyle(body).paddingBottom) || 0;
       const content = last2 ? last2.getBoundingClientRect().bottom - body.getBoundingClientRect().top + body.scrollTop + pad : body.scrollHeight;
       const want = Math.max(min, Math.min(window.screen.availHeight - 40, Math.ceil((bar?.offsetHeight ?? 0) + content + 4)));
+      clearTimeout(later);
       if (Math.abs(want - last) < 3) return;
-      last = want;
-      import("@tauri-apps/api/dpi").then(({ LogicalSize }) => getCurrentWindow().setSize(new LogicalSize(width, want))).catch(() => {});
+      // Taller straight away; shorter only once it has stayed shorter (no jumping while a map's numbers come and go).
+      if (want > last) size(want); else later = setTimeout(() => size(want), 1500);
     };
     const ro = new ResizeObserver(fit);
     const body = document.querySelector<HTMLElement>(".bo-body");
@@ -138,6 +144,6 @@ export function useFitHeight(width: number, min = 200) {
     const mo = new MutationObserver(() => { fit(); const b = document.querySelector<HTMLElement>(".bo-body"); if (b) Array.from(b.children).forEach((c) => ro.observe(c)); });
     mo.observe(document.body, { childList: true, subtree: true });
     fit();
-    return () => { ro.disconnect(); mo.disconnect(); };
+    return () => { clearTimeout(later); ro.disconnect(); mo.disconnect(); };
   }, [width, min]);
 }

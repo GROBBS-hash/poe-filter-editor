@@ -382,10 +382,10 @@ mod imp {
     const H: i32 = 240;
 
     /// A picture: BGRA pixels, width, height.
-    struct Pic { px: Vec<u8>, w: i32, h: i32 }
+    pub(super) struct Pic { pub(super) px: Vec<u8>, pub(super) w: i32, pub(super) h: i32 }
 
     /// Grabs up to w x h around the mouse (kept on screen). Returns the picture and the mouse in it.
-    fn capture(cx: i32, cy: i32, w: i32, h: i32) -> windows::core::Result<(Pic, i32, i32)> {
+    pub(super) fn capture(cx: i32, cy: i32, w: i32, h: i32) -> windows::core::Result<(Pic, i32, i32)> {
         unsafe {
             let (vx, vy) = (GetSystemMetrics(SM_XVIRTUALSCREEN), GetSystemMetrics(SM_YVIRTUALSCREEN));
             let (vw, vh) = (GetSystemMetrics(SM_CXVIRTUALSCREEN), GetSystemMetrics(SM_CYVIRTUALSCREEN));
@@ -617,6 +617,51 @@ fn grey(raw: &[u8], invert: bool) -> Vec<u8> {
 
 #[cfg(test)]
 mod tests {
+    /// Dev check (run by hand with PAUSE_LOG set to a file): what the pause check sees while the game is in front.
+    #[cfg(windows)]
+    #[test]
+    #[ignore]
+    fn pause_watch() {
+        use std::io::Write;
+        #[link(name = "user32")]
+        extern "system" { fn SetProcessDpiAwarenessContext(v: isize) -> i32; }
+        unsafe { SetProcessDpiAwarenessContext(-4); }
+        let mut shots = 0;
+        let Ok(path) = std::env::var("PAUSE_LOG") else { return };
+        let mut f = std::fs::File::create(&path).unwrap();
+        let (mut prev, mut still) = (vec![], 0);
+        let start = std::time::Instant::now();
+        while start.elapsed().as_secs() < 5400 {
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            let front = crate::game_in_front();
+            let Some(rect) = crate::game_client_rect() else { continue };
+            let (x, y, w, h) = filter_core::journey::pause_box(rect);
+            let t0 = std::time::Instant::now();
+            let lines = if front { super::read_lines_in(x, y, w, h) } else { Ok(vec![]) };
+            let hud = super::sample_points(&filter_core::journey::hud_points(rect));
+            let sum = hud.as_ref().map(|h| h.iter().flatten().map(|c| *c as u64).sum::<u64>()).unwrap_or(0);
+            let now = hud.clone().unwrap_or_default();
+            still = if filter_core::journey::changed_share(&prev, &now) < 0.03 { still + 1 } else { 0 };
+            prev = now;
+            // Dimmed or a menu read: keep a few pictures of the box to look at.
+            if front && shots < 40 && (still == 3 || lines.as_ref().is_ok_and(|l| filter_core::journey::is_pause_menu(l))) {
+                if let Ok((p, _, _)) = super::imp::capture(x + w / 2, y + h / 2, w, h) {
+                    let mut b = vec![0u8; 54];
+                    b[..2].copy_from_slice(b"BM");
+                    b[10] = 54; b[14] = 40; b[26] = 1; b[28] = 32;
+                    b[2..6].copy_from_slice(&((54 + p.px.len()) as u32).to_le_bytes());
+                    b[18..22].copy_from_slice(&p.w.to_le_bytes());
+                    b[22..26].copy_from_slice(&(-p.h).to_le_bytes());
+                    b.extend(&p.px);
+                    let _ = std::fs::write(format!("{path}.{shots}.bmp"), b);
+                    shots += 1;
+                }
+            }
+            let _ = writeln!(f, "{:?} front {front} rect {rect:?} still {still} menu {:?} took {:?} hud {:?} lines {lines:?}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs(),
+                lines.as_ref().map(|l| filter_core::journey::is_pause_menu(l)), t0.elapsed(), hud.map(|h| h.iter().flatten().map(|c| *c as u64).sum::<u64>()));
+        }
+    }
+
     #[test]
     fn picks_text_over_background() {
         let mut px = vec![[20u8, 20, 20]; 300];

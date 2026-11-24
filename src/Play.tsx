@@ -33,7 +33,7 @@ type MapStats = { runs: number; avg_inside: number; avg_cycle: number; per_hour:
 type TrackerView = {
   current: MapRun | null; inside: boolean; current_inside: number; paused: boolean; recent: MapRun[]; today: MapStats; all: MapStats;
   char_name: string | null; char_level: number | null; watch_ms: number; watch_running: boolean; laps: number[]; now: number;
-  session: SessionSummary | null; pause: PauseInfo; loot_prefs: LootPrefs; loot_note: string; divine: number | null; has_account?: boolean;
+  session: SessionSummary | null; pause: PauseInfo; loot_prefs: LootPrefs; loot_note: string; loot_reading?: boolean; divine: number | null; has_account?: boolean;
 };
 type SessionSummary = { start: number; played: number; maps: number; map_time: number; per_hour: number; deaths: number; levels: number;
   made: number | null; best: MapRun | null; loot: LootLine[]; loot_value: number; loot_maps: number; loot_secs: number };
@@ -607,9 +607,14 @@ function TrackerLoot({ v }: { v: TrackerView }) {
   const p = v.loot_prefs;
   if (!p.on) return null;
   const cur = v.current?.loot ?? [];
-  const last = v.recent[0]?.loot ?? [];
-  // Says which map, so a boss fight's loot (the Maven's Orb of Conflict) isn't taken for the map you're in now (23 Nov).
-  const [label, loot] = cur.length > 0 ? ["This map", cur] : last.length > 0 ? [`Last map · ${v.recent[0].name}`, last] : ["This map", [] as LootLine[]];
+  // Until this map has its own, the last map that was counted stays up: the block never goes blank as you die, leave or
+  // open the next one (24 Nov). Says which map, so a boss fight's loot isn't taken for the map you're in now (23 Nov).
+  const at = v.recent.findIndex((r) => (r.loot ?? []).length > 0);
+  const [label, loot] = cur.length > 0 ? ["This map", cur]
+    : at >= 0 ? [`${at === 0 ? "Last map" : `${at + 1} maps ago`} · ${v.recent[at].name}`, v.recent[at].loot ?? []] : ["This map", [] as LootLine[]];
+  const says = needsLogin(v.loot_note) ? "" : v.loot_reading ? "Reading what it dropped…" : v.loot_note ? v.loot_note
+    : v.current?.loot_missed ? "Some of this map's loot couldn't be counted." : v.inside && cur.length === 0 ? "This map's loot shows when you leave it."
+    : loot.length === 0 ? "Loot per map: run a map and it shows here." : "";
   const total = lootTotal(loot);
   const shown = loot.filter((l) => !p.hide.includes(l.cat));
   const best = shown.filter((l) => l.value >= p.min_chaos).slice(0, 4);
@@ -620,7 +625,9 @@ function TrackerLoot({ v }: { v: TrackerView }) {
   return (
     <div className="trk-sec">
       {needsLogin(v.loot_note) && <div className="pw-small"><ErrNote msg={v.loot_note} onRetry={() => {}} /><div>Loot isn't being counted until then.</div></div>}
-      {loot.length === 0 ? <div className="pw-small">{needsLogin(v.loot_note) ? null : v.loot_note || (v.inside ? "Loot shows when you leave the map (your bags are read as you go in and out)." : "Loot per map: run a map and it shows here.")}</div> : <>
+      {/* Always one line, so nothing jumps when it's empty. */}
+      <div className="pw-small trk-says" title={says}>{says || "\u00a0"}</div>
+      {loot.length > 0 && <>
         <div className="pw-row between"><span className="loot-label">{label}</span>
           <span className="loot-total">{Math.round(total).toLocaleString()}c{v.divine ? <span className="pw-small"> ≈ {(total / v.divine).toFixed(1)} div</span> : null}</span></div>
         <LootBar loot={loot.filter((l) => !p.hide.includes(l.cat))} />

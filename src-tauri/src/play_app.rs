@@ -207,6 +207,8 @@ struct Live {
     /// Your bags when you last went into the current map: (run, items).
     loot_base: Option<(RunKey, Vec<serde_json::Value>)>,
     loot_note: String,
+    /// Bag reads still to come after leaving a map (its loot shows when they're done).
+    loot_reading: u32,
     /// Stopwatch: running since (unix ms), time banked (ms), laps (ms).
     watch_since: Option<i64>,
     watch_acc: i64,
@@ -632,6 +634,8 @@ pub struct TrackerView {
     pub loot_prefs: LootPrefs,
     /// Why loot isn't showing ("" when it is).
     pub loot_note: String,
+    /// Your bags are being read after leaving a map: its loot is on the way.
+    pub loot_reading: bool,
     /// The divine's price (chaos), to show totals in divines.
     pub divine: Option<f64>,
     /// Logged in to pathofexile.com (account + POESESSID saved).
@@ -724,7 +728,7 @@ fn tracker_view(app: &AppHandle) -> TrackerView {
             current, inside, current_inside, paused, recent, today, all,
             char_name: l.site_char.as_ref().map(|c| c.0.clone()), char_level: l.site_char.as_ref().map(|c| c.1),
             watch_ms, watch_running: l.watch_since.is_some(), laps: l.laps.clone(), now, session,
-            pause, loot_prefs: prefs, loot_note: l.loot_note.clone(), divine, has_account,
+            pause, loot_prefs: prefs, loot_note: l.loot_note.clone(), loot_reading: l.loot_reading > 0, divine, has_account,
         }
     })
 }
@@ -976,7 +980,10 @@ fn queue_loot(app: &AppHandle, job: LootJob) {
         with_live(|l| l.loot_note = "Loot per map needs you logged in: press \"Log in with pathofexile.com\" in Settings → Map tracker".into());
         return;
     }
-    if let Some(tx) = LOOT_TX.lock().unwrap().as_ref() { let _ = tx.send(job); }
+    let leave = matches!(job, LootJob::Leave(..));
+    if let Some(tx) = LOOT_TX.lock().unwrap().as_ref() {
+        if tx.send(job).is_ok() && leave { with_live(|l| l.loot_reading += 1); }
+    }
 }
 
 /// This map's loot couldn't be read: say so in the history instead of "0c", and leave it out of the averages.
@@ -996,22 +1003,31 @@ fn start_loot_worker(app: AppHandle) {
     let (tx, rx) = std::sync::mpsc::channel::<LootJob>();
     *LOOT_TX.lock().unwrap() = Some(tx);
     thread::spawn(move || {
+        // Whatever way a read ends, the tracker stops saying it's reading.
+        let done = |job: &LootJob| if matches!(job, LootJob::Leave(..)) { with_live(|l| l.loot_reading = l.loot_reading.saturating_sub(1)); };
         for job in rx {
             let (key, at) = match &job { LootJob::Enter(k, t) | LootJob::Leave(k, t) => (k.clone(), *t) };
             let bags = match read_bags(&app, at) {
                 Ok(b) => b,
-                Err(e) => { loot_missed(&app, &key); with_live(|l| l.loot_note = format!("Couldn't read your bags: {e}")); emit_all(&app); continue; }
+                Err(e) => { done(&job); loot_missed(&app, &key); with_live(|l| l.loot_note = format!("Couldn't read your bags: {e}")); emit_all(&app); continue; }
             };
+            done(&job);
             match job {
                 LootJob::Enter(..) => with_live(|l| { l.loot_base = Some((key, bags)); l.loot_note.clear(); }),
                 LootJob::Leave(..) => {
                     let base = with_live(|l| match &l.loot_base { Some((k, b)) if *k == key => { let b = b.clone(); l.loot_base = None; Some(b) } _ => None });
-                    let Some(before) = base else { loot_missed(&app, &key); emit_all(&app); continue };
+                    let Some(before) = base else {
+                        loot_missed(&app, &key);
+                        with_live(|l| l.loot_note = "That visit's loot wasn't counted: your bags weren't read as you went in".into());
+                        emit_all(&app);
+                        continue;
+                    };
                     let new = loot::gained(&before, &bags);
                     let divine = currency_rates(&app).get("divine").copied().unwrap_or(0.0);
                     let Some(lines) = wealth_app::with_lookup(&app, |look| loot::lines(&new, look, divine)) else {
                         loot_missed(&app, &key);
                         with_live(|l| l.loot_note = "Prices haven't loaded yet: loot not counted for that visit".into());
+                        emit_all(&app);
                         continue;
                     };
                     with_store(&app, |s| {
