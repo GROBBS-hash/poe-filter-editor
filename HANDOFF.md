@@ -48,7 +48,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
-- **Import from Atlas Tree Planner (24 Nov, not released yet).** atlas-blush-beta.vercel.app links keep the tree after `#`: byte 0xA1, then a breadth-first walk of *their* data.json graph (neighbours in number order, no masteries), one bit per newly reached node, then 3 bits per taken choice notable (index into `variantEffects`). Older "id,id.option" and pathofexile.com codes also work. `atlas::decode_planner` / `from_planner`, app fetches `<page dir>/data.json` (1.4 MB) each import so the graph matches. His link (read off a screenshot, `PI` not `Pl`) gives 150 points + 3 picks; dev check `planner_real` (ignored, needs `PLANNER_DATA`). Site key `planner`.
+- **Import from Atlas Tree Planner (24 Nov, released in 0.2.59).** atlas-blush-beta.vercel.app links keep the tree after `#`: byte 0xA1, then a breadth-first walk of *their* data.json graph (neighbours in number order, no masteries), one bit per newly reached node, then 3 bits per taken choice notable (index into `variantEffects`). Older "id,id.option" and pathofexile.com codes also work. `atlas::decode_planner` / `from_planner`, app fetches `<page dir>/data.json` (1.4 MB) each import so the graph matches. His link (read off a screenshot, `PI` not `Pl`) gives 150 points + 3 picks; dev check `planner_real` (ignored, needs `PLANNER_DATA`). Site key `planner`.
 - **Atlas: one influence per map + Find on the atlas (23 Nov, released in 0.2.57).** He saw Ritual + Pack size + Map mod
   take both Eater of Worlds and Searing Exarch pack size; a map only has one Eldritch influence (and one of Conquerors /
   Shaper / Elder). atlas_opt.rs `ONE_PER_MAP`: the optimiser tries each side (`grow` per combination), keeps the best
@@ -1038,8 +1038,8 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
-- [ ] (next) Atlas tree page → Add a strategy from a link → paste an Atlas Tree Planner link (atlas-blush-beta.vercel.app/#…): it imports with all 150 points and the options picked; "Open on Atlas Tree Planner" opens it again.
-- [ ] (next) Find on the atlas: type a mechanic ("harvest", "ritual", "div") → every node for it lights up blue, including ones in its area and ones not taken ("harvest" found 1 before, 56 now). Shared word list `src/atlasGroups.ts` (same as Totals) + nearest area name.
+- [ ] (0.2.59) Atlas tree page → Add a strategy from a link → paste an Atlas Tree Planner link (atlas-blush-beta.vercel.app/#…): it imports with all 150 points and the options picked; "Open on Atlas Tree Planner" opens it again.
+- [ ] (0.2.59) Find on the atlas: type a mechanic ("harvest", "ritual", "div") → every node for it lights up blue, including ones in its area and ones not taken ("harvest" found 1 before, 56 now). Shared word list `src/atlasGroups.ts` (same as Totals) + nearest area name.
 - [ ] (0.2.58) Edit this tree → take points off → Save: no "This page hit a problem" (reading 'nodes'). Cause: the remembered step was past the end of the shorter tree for one render; `useStep` now clamps what it returns.
 - [ ] (0.2.58) Edit this tree: zoom in, click points on and off; the view stays where you zoomed (it used to jump back to the whole tree on every click). AtlasTreeView skips the refit while `onPick` is set.
 - [ ] (0.2.57) Build my own, Ritual + Pack size + Map mod effect: only Eater of Worlds (or only Exarch) nodes, never both, and the gold note under "3 · Your tree" says which; Always on Word of the Exarch switches to the Exarch side. Type "pack size" in "Find on the atlas": nodes ringed, Enter steps through them.
