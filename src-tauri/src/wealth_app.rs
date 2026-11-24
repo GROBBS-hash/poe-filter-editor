@@ -571,7 +571,8 @@ pub async fn session_start(app: AppHandle, name: String) -> Result<WealthView, S
         let name = if name.trim().is_empty() { "Unnamed strategy".to_string() } else { name.trim().to_string() };
         with_store(&state, |s| {
             if let Some(mut old) = s.current.take() { old.end = Some(now()); s.sessions.push(old); }
-            s.current = Some(Session { name, league, tabs, start: now(), end: None, start_value: total, last_value: total, paused: 0, paused_at: None });
+            let atlas = atlas_app::active_id(&app);
+            s.current = Some(Session { name, league, tabs, start: now(), end: None, start_value: total, last_value: total, paused: 0, paused_at: None, atlas });
         });
         show_overlay(&app);
         notify(&app);
@@ -710,4 +711,10 @@ pub(crate) fn read_tab_items(app: &AppHandle, index: usize) -> Result<serde_json
     let (account, sessid, league, poe2) = who(app)?;
     let v = read_tab(&account, &sessid, &league, poe2, index)?;
     Ok(v["items"].clone())
+}
+
+/// Finished earnings sessions (for the Atlas page's "what each tree earned").
+pub(crate) fn finished_sessions(app: &AppHandle) -> Vec<Session> {
+    let state = app.state::<AppState>();
+    with_store(&state, |w| w.sessions.clone())
 }

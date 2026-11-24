@@ -189,9 +189,11 @@ pub fn on_line(app: &AppHandle, line: &str) {
                 // A Ctrl+D map check in the last 10 minutes: that's the map you just opened.
                 let check = with_live(|l| l.map_check.take()).filter(|(t, ..)| unix() - t < 600);
                 let value = session_value(app);
+                let atlas = atlas_app::active_id(app);
                 with_store(app, |s| if let Some(cur) = s.maps.current.as_mut() {
                     if let Some((_, _, mods)) = &check { cur.mods = mods.clone(); }
                     cur.value_at_start = value;
+                    cur.atlas = atlas;
                 });
                 save = true;
             }

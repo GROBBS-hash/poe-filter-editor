@@ -3127,7 +3127,7 @@ pub fn run() {
             pob_set_follow,
             hide_build_window,
             atlas_app::atlas_list, atlas_app::atlas_import, atlas_app::atlas_rename, atlas_app::atlas_delete, atlas_app::atlas_use,
-            atlas_app::atlas_own_notes, atlas_app::atlas_official_link, atlas_app::hide_atlas_window,
+            atlas_app::atlas_own_notes, atlas_app::atlas_official_link, atlas_app::hide_atlas_window, atlas_app::atlas_results,
             atlas_app::atlas_optimise, atlas_app::atlas_save_plan, atlas_app::atlas_save_tree,
             play_app::level_view, play_app::level_move, play_app::level_jump_act, play_app::level_options, play_app::play_view,
             play_app::maps_done, play_app::maps_history, play_app::maps_clear, play_app::watch_action, play_app::searches_get,

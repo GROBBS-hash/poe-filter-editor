@@ -124,6 +124,9 @@ pub struct MapRun {
     /// What you picked up in it (from your inventory before and after each visit), priced.
     #[serde(default)]
     pub loot: Vec<crate::loot::LootLine>,
+    /// The atlas tree in use when it started (Atlas page id), so loot can be compared per tree.
+    #[serde(default)]
+    pub atlas: Option<u64>,
 }
 
 impl MapRun {

@@ -19,8 +19,10 @@ export default function Atlas() {
   const [msg, setMsg] = useState("");
   const [sel, setSel] = useState<number | null>(null);
   const [key, setKey] = useState("F7");
+  const [results, setResults] = useState<TreeResult[]>([]);
 
   useEffect(() => {
+    invoke<TreeResult[]>("atlas_results").then(setResults).catch(() => {});
     const load = () => invoke<AtlasStore>("atlas_list").then(setStore).catch((e) => setMsg(String(e)));
     load();
     invoke<{ key_atlas?: string }>("get_settings").then((s) => setKey(s?.key_atlas || "F7")).catch(() => {});
@@ -69,10 +71,11 @@ export default function Atlas() {
         <>
           <div className="card">
             <h2>My strategies</h2>
-            <p className="muted small">The one ticked “In game” shows when you press <b>{key}</b> (change the key in Settings).</p>
+            <p className="muted small">The one ticked “In game” shows when you press <b>{key}</b> (change the key in Settings).
+              Maps you run and earnings sessions you start count for that tree, so you can see which one earns most.</p>
             <div className="at-list">
               {store.list.map((s) => (
-                <StrategyRow key={s.id} s={s} active={store.active === s.id} selected={shown?.id === s.id}
+                <StrategyRow key={s.id} s={s} active={store.active === s.id} selected={shown?.id === s.id} result={results.find((r) => r.id === s.id)} best={results[0]?.id === s.id && results.length > 1}
                   onSelect={() => setSel(s.id)}
                   onUse={() => run("atlas_use", { id: s.id, variant: store.active === s.id ? store.variant : 0 })}
                   onRename={(n) => run("atlas_rename", { id: s.id, name: n })}
@@ -87,8 +90,25 @@ export default function Atlas() {
   );
 }
 
-function StrategyRow({ s, active, selected, onSelect, onUse, onRename, onDelete }: {
+type TreeResult = { id: number; maps: number; loot_per_map: number | null; loot_per_hour: number | null; sessions: number; session_hours: number; session_per_hour: number | null };
+
+/** "≈ 2.1 div/h · 14 maps": what this tree earned (earnings sessions first, else the map tracker's loot). */
+function Earned({ r, best }: { r: TreeResult; best: boolean }) {
+  const per = r.session_per_hour ?? r.loot_per_hour;
+  if (per == null && !r.maps) return null;
+  return (
+    <span className={`at-earned ${best ? "best" : ""}`} title={[
+      r.sessions ? `${r.sessions} earnings session${r.sessions > 1 ? "s" : ""}, ${r.session_hours.toFixed(1)} h` : "",
+      r.maps ? `${r.maps} maps tracked${r.loot_per_map != null ? `, about ${Math.round(r.loot_per_map)}c loot a map` : ""}` : "",
+    ].filter(Boolean).join("\n")}>
+      {best && "★ "}{per != null ? `≈ ${Math.round(per).toLocaleString()}c an hour` : null}{r.maps ? ` · ${r.maps} maps` : ""}
+    </span>
+  );
+}
+
+function StrategyRow({ s, active, selected, onSelect, onUse, onRename, onDelete, result, best }: {
   s: AtlasStrategy; active: boolean; selected: boolean; onSelect: () => void; onUse: () => void; onRename: (n: string) => void; onDelete: () => void;
+  result?: TreeResult; best?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [n, setN] = useState(s.name);
@@ -106,6 +126,7 @@ function StrategyRow({ s, active, selected, onSelect, onUse, onRename, onDelete 
         <div className="at-name">
           <b>{s.name}</b>
           <span className="muted small"> · {SITE[s.site] ?? s.site}{s.author ? ` · by ${s.author}` : ""} · {s.variants.length > 1 ? `${s.variants.length} trees, up to ` : ""}{pts} points</span>
+          {result && <Earned r={result} best={!!best} />}
         </div>
       )}
       <span className="grow" />
