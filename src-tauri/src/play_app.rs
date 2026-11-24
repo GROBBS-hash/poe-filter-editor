@@ -63,6 +63,134 @@ pub struct Alert {
     pub fired: Option<i64>,
 }
 
+/// What the tracker shows but the log can't say again after a relaunch; kept in play_live.json.
+#[derive(Serialize, serde::Deserialize, Clone, Default)]
+#[serde(default)]
+struct Kept {
+    /// When this was saved (the editor was running), and the last game event it had seen.
+    at: i64,
+    sess_start: i64,
+    sess_last: i64,
+    sess_deaths: u32,
+    sess_levels: u32,
+    watch_since: Option<i64>,
+    watch_acc: i64,
+    laps: Vec<i64>,
+    site_char: Option<(String, u32)>,
+    loot_base: Option<(RunKey, Vec<serde_json::Value>)>,
+    loot_note: String,
+    map_check: Option<(i64, String, Vec<String>)>,
+    /// Play windows put away for the map you're in (they return in town).
+    hidden: Vec<String>,
+}
+
+fn kept_path(app: &AppHandle) -> PathBuf { app.state::<AppState>().data_dir.join("play_live.json") }
+/// What the last run left (read once, at the start), until the log has been caught up with.
+static LAST_RUN: Mutex<Option<Kept>> = Mutex::new(None);
+/// Loaded: from now on it may be written.
+static KEPT_READY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Every few seconds, and just before a restart: what the tracker shows now.
+pub fn keep_live(app: &AppHandle) {
+    if !KEPT_READY.load(Ordering::Relaxed) { return; }
+    let hidden = HIDDEN_FOR_MAP.lock().unwrap().clone();
+    let k = with_live(|l| Kept {
+        at: unix(), sess_start: l.sess_start, sess_last: l.sess_last, sess_deaths: l.sess_deaths, sess_levels: l.sess_levels,
+        watch_since: l.watch_since, watch_acc: l.watch_acc, laps: l.laps.clone(), site_char: l.site_char.clone(),
+        loot_base: l.loot_base.clone(), loot_note: l.loot_note.clone(), map_check: l.map_check.clone(), hidden,
+    });
+    let Ok(t) = serde_json::to_string(&k) else { return };
+    let p = kept_path(app);
+    let tmp = p.with_extension("json.tmp");
+    if std::fs::write(&tmp, t).is_ok() { let _ = std::fs::rename(tmp, p); }
+}
+
+/// At the start: the tracker picks up where the last run left it (the session only when it's still going).
+fn load_kept(app: &AppHandle) {
+    if let Some(k) = std::fs::read_to_string(kept_path(app)).ok().and_then(|t| serde_json::from_str::<Kept>(&t).ok()) {
+        with_live(|l| {
+            if unix() - k.sess_last < 30 * 60 { l.sess_start = k.sess_start; l.sess_last = k.sess_last; l.sess_deaths = k.sess_deaths; l.sess_levels = k.sess_levels; }
+            l.watch_since = k.watch_since;
+            l.watch_acc = k.watch_acc;
+            l.laps = k.laps.clone();
+            l.site_char = k.site_char.clone();
+            l.loot_base = k.loot_base.clone();
+            l.loot_note = k.loot_note.clone();
+            l.map_check = k.map_check.clone();
+        });
+        // The game went on (or not) without us for long: the clock stands still from then until you're seen playing.
+        if unix() - k.at > 10 * 60 { with_store(app, |s| s.maps.set_paused(true, k.at)); }
+        *LAST_RUN.lock().unwrap() = Some(k);
+    }
+    KEPT_READY.store(true, Ordering::Relaxed);
+}
+
+/// Once the log is found: what happened while the editor was closed (left the map, a new one, deaths) is counted too.
+fn catch_up(app: &AppHandle, log: &str) {
+    let Some(k) = LAST_RUN.lock().unwrap().take() else { return };
+    // No event seen yet last time, or too long ago: only where you are now matters.
+    let since = if k.sess_last > 0 && unix() - k.at < 12 * 3600 { k.sess_last } else { k.at };
+    let events = journey::missed(log, utc_offset(), since);
+    if events.is_empty() { return; }
+    for ev in &events {
+        let changes = with_store(app, |s| s.maps.on_event(ev));
+        map_visibility(app, &changes);
+        let t = match ev { PlayEvent::Area { time, .. } | PlayEvent::Entered { time, .. } | PlayEvent::Level { time, .. } | PlayEvent::Slain { time, .. } => *time };
+        for c in &changes {
+            let Some(key) = with_store(app, |s| s.maps.current.as_ref().map(run_key)) else { continue };
+            // Loot only when it's fresh: after minutes in town your bags say nothing about the map any more.
+            let fresh = unix() - t < 90;
+            match c {
+                MapChange::Started => {
+                    let atlas = atlas_app::active_id(app);
+                    with_store(app, |s| if let Some(cur) = s.maps.current.as_mut() { cur.atlas = atlas; });
+                    if fresh { queue_loot(app, LootJob::Enter(key, t)); } else { loot_missed(app, &key); }
+                }
+                MapChange::Resumed => if fresh { queue_loot(app, LootJob::Enter(key, t)); } else { loot_missed(app, &key); },
+                MapChange::Left => if fresh { queue_loot(app, LootJob::Leave(key, t)); } else { loot_missed(app, &key); },
+                _ => {}
+            }
+        }
+        with_live(|l| {
+            if t - l.sess_last > 30 * 60 { l.sess_start = t; l.sess_deaths = 0; l.sess_levels = 0; }
+            l.sess_last = t;
+            match ev {
+                PlayEvent::Slain { name, .. } if l.character.as_ref().map_or(true, |c| &c.0 == name) => l.sess_deaths += 1,
+                PlayEvent::Level { .. } => l.sess_levels += 1,
+                _ => {}
+            }
+        });
+        if let PlayEvent::Area { id, .. } = ev { follow_route(app, id); }
+    }
+    // Only a session still going is shown.
+    with_live(|l| if unix() - l.sess_last > 30 * 60 { l.sess_start = 0; });
+    save_store(app);
+}
+
+/// The PC's clock minus UTC, in seconds (the log is in local time).
+#[cfg(windows)]
+fn utc_offset() -> i64 {
+    let t = unsafe { windows::Win32::System::SystemInformation::GetLocalTime() };
+    let s = format!("{:04}/{:02}/{:02} {:02}:{:02}:{:02}", t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond);
+    let diff = journey::log_time(&s).unwrap_or_else(unix) - unix();
+    (diff as f64 / 900.0).round() as i64 * 900
+}
+#[cfg(not(windows))]
+fn utc_offset() -> i64 { 0 }
+
+/// Play windows put away for a map, for the list of windows to reopen; and put back as put away after a relaunch.
+pub fn reopen_hidden(app: &AppHandle) -> Vec<String> {
+    let k = std::fs::read_to_string(kept_path(app)).ok().and_then(|t| serde_json::from_str::<Kept>(&t).ok()).unwrap_or_default();
+    k.hidden
+}
+/// After a relaunch: windows to open now; ones put away for the map you're still in stay put away.
+pub fn still_hidden(app: &AppHandle, label: &str) -> bool {
+    if !with_store(app, |s| s.maps.inside && !s.keep_in_maps) { return false; }
+    let mut h = HIDDEN_FOR_MAP.lock().unwrap();
+    if !h.iter().any(|x| x == label) { h.push(label.into()); }
+    true
+}
+
 #[derive(Default)]
 struct Live {
     /// (area id, area level, when).
@@ -159,6 +287,13 @@ pub fn prime(app: &AppHandle, log: &std::path::Path) {
         }
     });
     if let Some((name, ..)) = with_live(|l| l.character.clone()) { with_store(app, |s| s.maps.character = Some(name)); }
+    catch_up(app, &text);
+    // A session still going shows straight away, not only from the next zone.
+    if with_live(|l| l.sess_start == 0) {
+        if let Some((start, deaths)) = with_store(app, |s| journey::session_start(&s.maps.history, s.maps.current.as_ref(), unix(), 30 * 60)) {
+            with_live(|l| { l.sess_start = start; l.sess_deaths = deaths; l.sess_last = unix(); });
+        }
+    }
     emit_all(app);
 }
 
@@ -248,7 +383,7 @@ pub fn on_line(app: &AppHandle, line: &str) {
                 save = true;
             }
         }
-        PlayEvent::Entered { name, .. } => with_live(|l| l.zone_name = name.clone()),
+        PlayEvent::Entered { name, .. } => { with_live(|l| l.zone_name = name.clone()); save = true; }
         PlayEvent::Level { name, class, level, time } => {
             with_live(|l| l.character = Some((name.clone(), class.clone(), *level)));
             with_store(app, |s| s.races.level(name, class, *level, *time));
@@ -257,6 +392,7 @@ pub fn on_line(app: &AppHandle, line: &str) {
         _ => {}
     }
     if save { save_store(app); }
+    keep_live(app);
     emit_all(app);
 }
 
@@ -625,12 +761,14 @@ pub fn watch_action(app: AppHandle, action: String) -> PlayView {
         "lap" => { let ms = l.watch_acc + l.watch_since.map(|t| unix_ms() - t).unwrap_or(0); l.laps.insert(0, ms); l.laps.truncate(10); }
         _ => { l.watch_since = None; l.watch_acc = 0; l.laps.clear(); }
     });
+    keep_live(&app);
     emit_all(&app);
     play_view(app)
 }
 
 /// Starts the tracker's background helpers: your level from pathofexile.com, the menu check, and the loot reader.
 pub fn start_watchers(app: AppHandle) {
+    load_kept(&app);
     start_level_watch(app.clone());
     start_pause_watch(app.clone());
     start_loot_worker(app);
@@ -688,6 +826,8 @@ fn start_pause_watch(app: AppHandle) {
     // The Escape menu, read off the screen ("GAME PAUSED"): paused by it now, and when it was last looked for.
     let mut menu_up = false;
     let mut looked = 0i64;
+    // Paused when the editor last closed: the first look at the game in front lets the clock go on.
+    let mut first = true;
     thread::spawn(move || loop {
         thread::sleep(Duration::from_secs(1));
         let (on, look, inside, in_for) = with_store(&app, |s| {
@@ -717,7 +857,7 @@ fn start_pause_watch(app: AppHandle) {
             if away_streak == 2 { set(true, unix() - 1); with_live(|l| l.steady.reset()); }
             continue;
         }
-        if away_streak >= 2 {
+        if away_streak >= 2 || std::mem::take(&mut first) {
             // Back in the game: the menu check below decides from here (a menu still open stops it again).
             set(false, unix());
         }

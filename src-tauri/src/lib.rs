@@ -873,6 +873,8 @@ fn show_price(app: &AppHandle, payload: PriceCheck, text: &str, compare: bool) {
 #[derive(Serialize)]
 struct TradeResult {
     listings: Vec<filter_core::trade::Listing>,
+    /// Vessels: (how many of the listings have all of yours' unique monsters, how many were looked at).
+    same: Option<(usize, usize)>,
     /// (lowest, typical) in chaos.
     summary: Option<(f64, f64)>,
     total: u64,
@@ -921,8 +923,19 @@ fn trade_search(app: AppHandle, setup: filter_core::trade::TradeSetup) -> Result
     let (id, ids, total) = trade_api::search(poe2, &league, &q)?;
     let fetched = trade_api::fetch(poe2, &ids, &id)?;
     let rates = currency_rates(&app);
-    let listings = filter_core::trade::listings(&fetched, &rates);
-    let r = TradeResult { summary: filter_core::trade::summary(&listings), total, url: trade_api::site_url(poe2, &league, &id),
+    let mut listings = filter_core::trade::listings(&fetched, &rates);
+    // A vessel's uniques can't be searched by name: look through the thirty cheapest for ones with yours.
+    let uniques = filter_core::trade::vessel(&setup.raw).map(|v| v.0).unwrap_or_default();
+    let mut same = None;
+    if !uniques.is_empty() {
+        for more in ids.chunks(10).skip(1).take(2) {
+            if let Ok(v) = trade_api::fetch(poe2, more, &id) { listings.extend(filter_core::trade::listings(&v, &rates)); }
+        }
+        same = Some((filter_core::trade::same_monsters(&mut listings, &uniques), listings.len()));
+    }
+    // Three or more like yours decide the price; fewer and it's every one found.
+    let like: Vec<_> = if same.is_some_and(|s| s.0 >= 3) { listings.iter().filter(|l| l.same).cloned().collect() } else { listings.clone() };
+    let r = TradeResult { same, summary: filter_core::trade::summary(&like), total, url: trade_api::site_url(poe2, &league, &id),
         divine: rates.get("divine").copied(), listings };
     save_sample(&app.state::<AppState>().data_dir, &setup.item, ".result", &r);
     Ok(r)
@@ -1194,7 +1207,7 @@ async fn map_tool_trade(app: AppHandle, bad: Vec<i64>, wants: filter_core::mapre
         let fetched = trade_api::fetch(poe2, &ids, &id)?;
         let rates = currency_rates(&app);
         let listings = filter_core::trade::listings(&fetched, &rates);
-        Ok(TradeResult { summary: filter_core::trade::summary(&listings), total, url: trade_api::site_url(poe2, &league, &id),
+        Ok(TradeResult { same: None, summary: filter_core::trade::summary(&listings), total, url: trade_api::site_url(poe2, &league, &id),
             divine: rates.get("divine").copied(), listings })
     }).await.map_err(err)?
 }
@@ -3128,7 +3141,7 @@ pub fn run() {
                             let _ = w.set_focus();
                         }
                     }
-                    "quit" => app.exit(0),
+                    "quit" => { win_place::on_quit(app); app.exit(0) }
                     // He asked for it: it comes back in front.
                     "restart" => { win_place::mark_front(app); app.restart(); }
                     "update" => updates::from_tray(app.clone()),

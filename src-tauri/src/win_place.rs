@@ -106,6 +106,7 @@ pub fn show_over_game(app: &AppHandle, w: &tauri::WebviewWindow) {
 /// A small heartbeat file ("alive.txt": time and front/shown/hidden) is how a restart is told from a start.
 pub fn start_main(app: &AppHandle) {
     let Some(w) = app.get_webview_window("main") else { return };
+    reopen(app);
     let file = alive_path(app);
     let last = std::fs::read_to_string(&file).unwrap_or_default();
     let mut parts = last.split_whitespace();
@@ -121,8 +122,54 @@ pub fn start_main(app: &AppHandle) {
     let app = app.clone();
     thread::spawn(move || loop {
         beat(&app);
-        thread::sleep(Duration::from_secs(10));
+        keep_open(&app);
+        play_app::keep_live(&app);
+        thread::sleep(Duration::from_secs(5));
     });
+}
+
+/// Windows over the game that open again after a relaunch, where they were.
+const REOPEN: [&str; 8] = ["tracker", "level", "sheet", "notes", "searches", "build", "atlas", "earnings"];
+/// The last run's list has been read: from now on it's kept up to date.
+static REOPENED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+#[derive(Serialize, serde::Deserialize, Default)]
+struct Open { at: u64, open: Vec<String> }
+
+fn open_path(app: &AppHandle) -> PathBuf { app.state::<AppState>().data_dir.join("open.json") }
+
+/// Remembers which windows are open now.
+fn keep_open(app: &AppHandle) {
+    if !REOPENED.load(Ordering::Relaxed) { return; }
+    let open = REOPEN.iter().filter(|l| app.get_webview_window(l).is_some_and(|w| w.is_visible().unwrap_or(false))).map(|l| l.to_string()).collect();
+    if let Ok(t) = serde_json::to_string(&Open { at: unix_now(), open }) { let _ = std::fs::write(open_path(app), t); }
+}
+
+/// The windows that were open when the editor closed (within 12 hours), shown again without taking the keyboard from
+/// whatever is in front.
+fn reopen(app: &AppHandle) {
+    let o: Open = std::fs::read_to_string(open_path(app)).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
+    if unix_now().saturating_sub(o.at) < 12 * 3600 {
+        for label in play_app::reopen_hidden(app) {
+            if !o.open.contains(&label) && !play_app::still_hidden(app, &label) { open_quietly(app, &label); }
+        }
+        for label in &o.open { if REOPEN.contains(&label.as_str()) { open_quietly(app, label); } }
+    }
+    REOPENED.store(true, Ordering::Relaxed);
+}
+
+fn open_quietly(app: &AppHandle, label: &str) {
+    let Some(w) = app.get_webview_window(label) else { return };
+    restore(app, &w);
+    #[cfg(windows)]
+    {
+        use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, SetForegroundWindow};
+        let front = unsafe { GetForegroundWindow() };
+        let _ = w.show();
+        unsafe { if !front.is_invalid() && GetForegroundWindow() != front { let _ = SetForegroundWindow(front); } }
+    }
+    #[cfg(not(windows))]
+    { let _ = w.show(); }
 }
 
 fn alive_path(app: &AppHandle) -> PathBuf { app.state::<AppState>().data_dir.join("alive.txt") }
@@ -136,7 +183,12 @@ pub fn beat(app: &AppHandle) { beat_as(app, None) }
 /// A restart he asked for (tray "Restart editor", an update): the editor comes back in front afterwards.
 pub fn mark_front(app: &AppHandle) {
     let _ = std::fs::write(alive_path(app), format!("{} front", unix_now()));
+    keep_open(app);
+    play_app::keep_live(app);
 }
+
+/// Quitting: what's open now, for the next start.
+pub fn on_quit(app: &AppHandle) { keep_open(app); play_app::keep_live(app); }
 
 /// focused: what a focus event just said (asking the window right then can still give the old answer).
 fn beat_as(app: &AppHandle, focused: Option<bool>) {

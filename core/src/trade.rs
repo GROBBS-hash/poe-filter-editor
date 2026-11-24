@@ -598,6 +598,7 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
     // Heist contracts and blueprints: area level, wings, the job they need.
     filters.splice(0..0, crate::trade_rules::heist_props(text, &item));
     filters.extend(temple_rows(text, index));
+    filters.extend(vessel_rows(text));
     // Influences ("Has Shaper Influence"), there to tick: the mods they bring are usually what's ticked.
     for inf in &item.influences {
         let id = index.pseudo_id(&format!("Has {inf} Influence")).unwrap_or_else(|| format!("pseudo.pseudo_has_{}_influence", inf.to_lowercase()));
@@ -704,6 +705,40 @@ fn base_item(text: &str, item: &Item, lines: &[ModLine], filters: &[StatFilter])
     if synthesised { misc.push("synthesised_item".into()); }
     if fractured { misc.push("fractured_item".into()); }
     Some(BaseItem { why, ids, ilvl_min: ilvl_min.filter(|l| *l > 0), misc })
+}
+
+/// What's caught in a Blood-filled Vessel: (its unique monsters by name, how many others).
+pub fn vessel(text: &str) -> Option<(Vec<String>, u32)> {
+    let text = text.replace('\r', "");
+    if !text.lines().any(|l| l.trim() == "Blood-filled Vessel") { return None; }
+    let num = |s: &str| s.chars().filter(|c| c.is_ascii_digit()).collect::<String>().parse::<u32>().ok();
+    let sec = text.split("--------").find(|s| s.trim_start().starts_with("Monsters:"))?;
+    let (mut names, mut others) = (vec![], 0);
+    for l in sec.lines().map(str::trim).filter(|l| !l.is_empty()) {
+        if let Some(n) = l.strip_prefix("Monsters:") { others = num(n).unwrap_or(0); }
+        else if l.ends_with("Other Monsters") { others = num(l).unwrap_or(0); }
+        else if l.starts_with("Monster Level:") || l.starts_with("From:") { break; }
+        else { names.push(l.to_string()); }
+    }
+    Some((names, others))
+}
+
+/// A vessel's uniques and others as search rows (the site counts them, it can't search them by name): uniques ticked.
+fn vessel_rows(text: &str) -> Vec<StatFilter> {
+    let Some((names, others)) = vessel(text) else { return vec![] };
+    let row = |id: &str, label: String, n: f64, enabled: bool| StatFilter { id: id.into(), label, value: n, min: Some(n), enabled, kind: "pseudo".into(), ..Default::default() };
+    let mut out = vec![];
+    if !names.is_empty() { out.push(row("pseudo.pseudo_ritual_unique_monsters", format!("Unique monsters: {}", names.join(" + ")), names.len() as f64, true)); }
+    if others > 0 { out.push(row("pseudo.pseudo_ritual_other_monsters", format!("Other monsters: {others}"), others as f64, false)); }
+    out
+}
+
+/// The listings with all of these unique monsters first (cheapest first within each), marked; how many there are.
+pub fn same_monsters(ls: &mut [Listing], names: &[String]) -> usize {
+    if names.is_empty() { return 0; }
+    for l in ls.iter_mut() { l.same = names.iter().all(|n| l.monsters.iter().any(|m| m.eq_ignore_ascii_case(n))); }
+    ls.sort_by_key(|l| !l.same);
+    ls.iter().filter(|l| l.same).count()
 }
 
 /// A Chronicle of Atzoatl's open rooms: the ones worth something ticked.
@@ -912,6 +947,13 @@ pub struct Listing {
     /// The listed item's mods (implicit, fractured, explicit, crafted), to compare with yours.
     #[serde(default)]
     pub mods: Vec<String>,
+    /// Blood-filled Vessels: the unique monsters in it, how many others, and whether it has all of yours.
+    #[serde(default)]
+    pub monsters: Vec<String>,
+    #[serde(default)]
+    pub others: Option<u32>,
+    #[serde(default)]
+    pub same: bool,
 }
 
 /// Reads the trade site's fetch answer.
@@ -921,7 +963,14 @@ pub fn listings(fetched: &Value, rates: &HashMap<String, f64>) -> Vec<Listing> {
         let p = &l["price"];
         let amount = p["amount"].as_f64()?;
         let currency = p["currency"].as_str()?.to_string();
+        // Vessels: "Monsters:\n{0}" = the uniques, one a line; "{0} Other Monsters" / "Monsters" = how many (others).
+        let vessel = r["item"]["baseType"] == "Blood-filled Vessel";
+        let prop = |f: &dyn Fn(&str) -> bool| r["item"]["properties"].as_array().into_iter().flatten().filter(|_| vessel)
+            .find(|p| p["name"].as_str().is_some_and(f)).and_then(|p| p["values"][0][0].as_str()).map(String::from);
         Some(Listing {
+            monsters: prop(&|n| n.starts_with("Monsters:")).map(|v| v.lines().map(|l| l.trim().to_string()).filter(|l| !l.is_empty()).collect()).unwrap_or_default(),
+            others: prop(&|n| n.ends_with("Other Monsters") || n == "Monsters").and_then(|v| v.parse().ok()),
+            same: false,
             chaos: rates.get(&currency).map(|r| r * amount),
             amount, currency,
             account: l["account"]["lastCharacterName"].as_str().or(l["account"]["name"].as_str()).unwrap_or("").to_string(),
@@ -1306,6 +1355,25 @@ Item Level: 75
     }
 
     #[test]
+    fn vessels_by_their_uniques() {
+        let t = "Item Class: Map Fragments\r\nRarity: Normal\r\nBlood-filled Vessel\r\n--------\r\nMonsters:\r\nPileah, Corpse Burner\r\nPileah, Burning Corpse\r\n39 Other Monsters\r\nMonster Level: 83\r\nFrom: City Square\r\n--------\r\nRituals have 20% improved Favour Rewards\r\n";
+        assert_eq!(vessel(t).unwrap(), (vec!["Pileah, Corpse Burner".to_string(), "Pileah, Burning Corpse".into()], 39));
+        assert_eq!(vessel(&t.replace("Monsters:\r\nPileah, Corpse Burner\r\nPileah, Burning Corpse\r\n39 Other Monsters", "Monsters: 50")).unwrap(), (vec![], 50));
+        let s = setup(t, &StatIndex::default()).unwrap();
+        let on: Vec<(&str, Option<f64>)> = s.filters.iter().filter(|f| f.enabled).map(|f| (f.id.as_str(), f.min)).collect();
+        assert_eq!(on, [("pseudo.pseudo_ritual_unique_monsters", Some(2.0))], "{:?}", s.filters);
+        let q = query(&s);
+        assert_eq!((q["query"]["type"].as_str(), q["query"]["stats"][0]["filters"][0]["value"]["min"].as_f64()), (Some("Blood-filled Vessel"), Some(2.0)));
+        // Listings as the site sends them (24 Nov): the ones with both of yours come first.
+        let l = |price: f64, names: &str| json!({ "listing": { "price": { "amount": price, "currency": "chaos" }, "account": { "name": format!("a{price}") }, "indexed": "" },
+            "item": { "baseType": "Blood-filled Vessel", "properties": [{ "name": "Monsters:\n{0}", "values": [[names, 0]] }, { "name": "{0} Other Monsters", "values": [["38", 0]] }] } });
+        let mut ls = listings(&json!({ "result": [l(35.0, "Master of the Blade\nMassier"), l(38.0, "Carius, the Unnatural\nPileah, Corpse Burner\nPileah, Burning Corpse"), l(40.0, "Pileah, Corpse Burner\nPileah, Burning Corpse")] }), &[("chaos".to_string(), 1.0)].into());
+        assert_eq!(same_monsters(&mut ls, &vessel(t).unwrap().0), 2);
+        assert_eq!(ls.iter().map(|x| (x.amount, x.same)).collect::<Vec<_>>(), [(38.0, true), (40.0, true), (35.0, false)]);
+        assert_eq!((ls[0].monsters.len(), ls[0].others), (3, Some(38)));
+    }
+
+    #[test]
     fn temple_rooms_are_searched() {
         let t = "Item Class: Misc Map Items\r\nRarity: Currency\r\nChronicle of Atzoatl\r\n--------\r\nArea Level: 80\r\n--------\r\nOpen Rooms:\r\nLocus of Corruption (Tier 3)\r\nHalls\r\n--------\r\nRight click this item to view the Temple of Atzoatl.\r\n";
         let idx = StatIndex::from_json(&json!({ "result": [ { "label": "Pseudo", "entries": [
@@ -1591,7 +1659,7 @@ Note: ~b/o 1 alch
         assert_eq!(summary(&ls), Some((50.0, 200.0)));
         // One price fixer listing six cheap copies counts once: the typical price comes from the real sellers.
         let l = |acc: &str, c: f64| Listing { amount: c, currency: "chaos".into(), chaos: Some(c), account: acc.into(), indexed: String::new(),
-            whisper: String::new(), ilvl: None, instant: false, mods: vec![] };
+            whisper: String::new(), ilvl: None, instant: false, mods: vec![], monsters: vec![], others: None, same: false };
         let mut fixed: Vec<Listing> = (0..6).map(|_| l("fixer", 0.1)).collect();
         fixed.extend([l("a", 3.0), l("b", 3.0), l("c", 4.0), l("d", 5.0)]);
         assert_eq!(summary(&fixed), Some((0.1, 3.0)));

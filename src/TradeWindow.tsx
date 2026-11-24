@@ -55,8 +55,10 @@ type Offer = { pay: number; pay_currency: string; get: number; get_currency: str
 type Bulk = { offers: Offer[]; url: string; divine: number | null;
   /** What sellers ask, when poe.ninja's price comes from too few sales to go by (chaos each). */
   asking?: { each: number; under: number; sellers: number } | null };
-type Listing = { amount: number; currency: string; chaos: number | null; account: string; indexed: string; whisper: string; instant?: boolean; ilvl: number | null; mods?: string[] };
-type Result = { listings: Listing[]; summary: [number, number] | null; total: number; url: string; divine: number | null };
+type Listing = { amount: number; currency: string; chaos: number | null; account: string; indexed: string; whisper: string; instant?: boolean; ilvl: number | null; mods?: string[];
+  /** Blood-filled Vessels: the unique monsters, how many others, and whether it has all of yours. */
+  monsters?: string[]; others?: number | null; same?: boolean };
+type Result = { same?: [number, number] | null; listings: Listing[]; summary: [number, number] | null; total: number; url: string; divine: number | null };
 
 const UNIT: Record<string, string> = { chaos: "c", exalted: "ex", divine: "div" };
 const KIND: Record<string, string> = { pseudo: "total", implicit: "implicit", crafted: "crafted", enchant: "enchant", fractured: "fractured", mutated: "foulborn", property: "" };
@@ -764,7 +766,7 @@ export default function TradeWindow() {
   const ilvls = new Set((res?.listings ?? []).map((l) => l.ilvl).filter(Boolean)).size > 1;
   const collapsed = (res?.listings ?? []).reduce<{ l: Listing; n: number; i: number }[]>((acc, l, i) => {
     const last = acc[acc.length - 1];
-    if (last && last.l.account === l.account && last.l.amount === l.amount && last.l.currency === l.currency) last.n += 1; else acc.push({ l, n: 1, i });
+    if (last && last.l.account === l.account && last.l.amount === l.amount && last.l.currency === l.currency && !l.monsters?.length) last.n += 1; else acc.push({ l, n: 1, i });
     return acc;
   }, []);
   const copy = (text: string, key: string) => { invoke("copy_text", { text }); setCopied(key); };
@@ -1060,7 +1062,8 @@ export default function TradeWindow() {
       )}
       {res && res.listings.length > 0 && (
         <div className="tw-res">
-          <div className="tw-sec tw-res-sec">For sale now <span className="tw-group-hint">cheapest first</span></div>
+          <div className="tw-sec tw-res-sec">For sale now <span className="tw-group-hint">{res.same ? "same monsters first" : "cheapest first"}</span></div>
+          {res.same && <div className="small muted">{res.same[0] > 0 ? <><b className="tw-monsters same">{res.same[0]}</b> of the {res.same[1]} cheapest have the same unique monsters{res.same[0] >= 3 ? ": the price above is theirs" : ", too few to price by"}</> : `None of the ${res.same[1]} cheapest have the same unique monsters (the site only searches how many)`}</div>}
           {style === "compare" && <PriceSpread res={res} divine={divine} />}
           <div className="tw-table">
             <div className="tw-th"><span>Price</span><span>{ilvls ? "ilvl" : ""}</span><span>Listed</span><span>Seller</span><span /></div>
@@ -1075,6 +1078,7 @@ export default function TradeWindow() {
                 {l.instant ? <span />
                   : l.whisper ? <button className="link small" onClick={() => copy(l.whisper, "l" + i)}>
                   {copied === "l" + i ? "Copied" : "Whisper"}</button> : <span />}
+                {l.others != null && <span className={`tw-monsters small ${l.same ? "same" : "muted"}`}>{l.same ? "✓ " : ""}{l.monsters?.length ? l.monsters.join(" + ") + " · " : ""}{l.others} others</span>}
                 {style === "compare" && l.mods && <ListingMods mods={l.mods} yours={setup.filters} />}
               </div>
             ))}

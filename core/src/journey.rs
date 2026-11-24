@@ -374,6 +374,19 @@ impl Steady {
     pub fn reset(&mut self) { *self = Steady::default(); }
 }
 
+/// What the log says happened after `since` (unix seconds), with its local times turned into unix ones (`offset` = local
+/// minus UTC, seconds): the editor was closed or restarting then.
+pub fn missed(log: &str, offset: i64, since: i64) -> Vec<PlayEvent> {
+    log.lines().filter_map(parse_line).filter_map(|mut ev| {
+        let t = match &mut ev {
+            PlayEvent::Area { time, .. } | PlayEvent::Entered { time, .. } | PlayEvent::Level { time, .. } | PlayEvent::Slain { time, .. } => time,
+        };
+        if *t == 0 { return None; }
+        *t -= offset;
+        (*t > since).then_some(ev)
+    }).collect()
+}
+
 /// "MapWorldsStrand" -> "Strand", "MapWorldsArachnidTomb" -> "Arachnid Tomb" (until the game names it).
 pub fn map_name(id: &str) -> String {
     let core = id.trim_start_matches("MapWorlds").trim_start_matches("Map");
@@ -773,6 +786,24 @@ mod tests {
         assert!(pause_look_suspect(12, 159));
         assert!(!pause_look_suspect(150, 30));
         assert!(!pause_look_suspect(10, 40));
+    }
+
+    #[test]
+    fn catches_up_after_a_relaunch() {
+        // In a map when the editor closed (10:00:00 local = 08:00:00 UTC); left it a minute later, before it was back.
+        let z = log_time("2026/11/24 08:00:00").unwrap();
+        let l = |t: &str, m: &str| format!("2026/11/24 {t} 1 a [INFO Client 1] {m}\n");
+        let area = |t: &str, id: &str, seed: u64| format!("2026/11/24 {t} 1 a [DEBUG Client 1] Generating level 83 area \"{id}\" with seed {seed}\n");
+        let log = area("09:55:00", "MapWorldsStrand", 7) + &l("09:55:03", ": You have entered Strand.") + &l("09:59:00", ": Bob has been slain.")
+            + &area("10:01:00", "HideoutFelled", 1) + &l("10:01:02", ": You have entered Felled Hideout.");
+        let mut m = MapTracker::default();
+        for ev in missed(&log, 7200, 0).iter().take(3) { m.on_event(ev); }
+        assert!(m.inside && m.current.as_ref().unwrap().deaths == 1);
+        let late = missed(&log, 7200, z);
+        assert_eq!(late.len(), 2, "the death before it closed isn't counted twice");
+        let changes: Vec<MapChange> = late.iter().flat_map(|e| m.on_event(e)).collect();
+        assert!(changes.contains(&MapChange::Left) && !m.inside);
+        assert_eq!(m.current.as_ref().unwrap().in_map, 360, "09:55 to 10:01");
     }
 
     #[test]

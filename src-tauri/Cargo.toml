@@ -31,5 +31,5 @@ windows-core = "0.62"
 windows = { version = "0.61", features = [
   "Foundation", "Foundation_Collections", "Graphics_Imaging", "Media_Ocr",
   "Security_Cryptography", "Storage_Streams", "Win32_Foundation", "Win32_Graphics_Gdi",
-  "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse", "Win32_System_SystemInformation",
 ] }

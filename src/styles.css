@@ -786,6 +786,8 @@ body.overlay.scroll::-webkit-scrollbar-thumb { background: #3a404c; border-radiu
 .tw-table { font-size: 12.5px; margin-bottom: 4px; max-height: 300px; overflow-y: auto; }
 .tw-th, .tw-tr { display: grid; grid-template-columns: 104px 30px 34px 1fr auto; gap: 6px; align-items: center; padding: 3px 2px; }
 .tw-th { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); border-bottom: 1px solid var(--line); position: sticky; top: 0; background: rgba(21,23,28,.98); }
+.tw-monsters { grid-column: 1 / -1; }
+.tw-monsters.same { color: var(--green); }
 .tw-tr { border-bottom: 1px solid #22262e; }
 .tw-tr:nth-child(odd) { background: rgba(255,255,255,0.02); }
 .tw-eq { margin-left: 5px; font-size: 11px; font-weight: 400; color: var(--muted); }
