@@ -1684,12 +1684,7 @@ when the game window isn't found. Check in game: the window's spot, and that it 
    "search every tab" done 21 Nov; guild stash built 21 Nov on branch `guild-stash` (awaiting approval); crafting planner done (0.2.32).
 3. Price check polish: done 21 Nov (Awakened ideas: unique roll ranges, anoints, cluster jewels, flasks, heist,
    influences, "Also searching for"). Waiting on his in-game check.
-4. **One-click login instead of POESESSID** (he asked 22 Nov). GGG's OAuth ("Log in with pathofexile.com", what Sidekick /
-   WealthyExile use) is closed to new apps: the developer docs say "We are currently unable to process new applications"
-   (checked 22 Nov). If it reopens: public client, authorization code + PKCE, loopback redirect (http://127.0.0.1:<port>/callback,
-   fixed at registration), scopes account:characters + account:stashes, 10 h access / 7 day refresh tokens, User-Agent
-   "OAuth {clientId}/{version} (contact: …)"; its character endpoint still returns experience, so XP per hour could come
-   back. The "Log in with pathofexile.com" button (built 22 Nov, see Done) covers it until then.
+4. ~~One-click login~~ **Dropped 24 Nov (his call: too much red tape with GGG's app approval).** POESESSID + the "Log in with pathofexile.com" button stay as they are.
 5. **Atlas Strategy Builder (idea 23 Nov; step 1 creator picks + step 3 optimiser done 23 Nov, see Done; tree editing + totals done 23 Nov; wealth-tracker results per tree done 24 Nov; left: Mobalytics/YouTube creator picks).** Pick strategies (e.g. Ritual + Harvest) → creator-pick trees
    (Maxroll, Mobalytics, YouTube) to load and adjust, plus an optimiser for his own trees. Full plan: `ATLAS_STRATEGY_PLAN.md`.
 6. Deferred earlier: PoE 2 coverage. Batch mode tidy-up done 21 Nov (see "Batch mode"). (Installer + auto-update done 21 Nov: see "Installer and updates".)
