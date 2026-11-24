@@ -147,6 +147,33 @@ pub fn going_rate(offers: &[(f64, u32)]) -> Option<f64> {
     rows.last().map(|r| r.0)
 }
 
+/// What sellers really ask for something poe.ninja's price can't be trusted on.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct Asking {
+    /// Chaos each: where a quarter of the sellers are at or under it (the first few are bait).
+    pub each: f64,
+    /// Sellers well under poe.ninja's price, of all of them.
+    pub under: usize,
+    pub sellers: usize,
+}
+
+/// Fewer sold recently than this: a few trades decide poe.ninja's number.
+const FEW_SOLD: f64 = 50.0;
+/// This many sellers well under the market isn't a few price fixers.
+const MANY_UNDER: usize = 10;
+
+/// poe.ninja's price on something hardly traded, next to the sellers (`asks`: chaos each, one per seller). When many
+/// of them ask well under it, they're the market, not price fixers (24 Nov: The Gambler, "8.65c" from 13 sold, 33 of
+/// 80 sellers at 1-5c, every one shown called a price fixer).
+pub fn asking(asks: &[f64], market: f64, sold: Option<f64>) -> Option<Asking> {
+    if market <= 0.0 || !sold.is_some_and(|s| s < FEW_SOLD) { return None; }
+    let mut v: Vec<f64> = asks.iter().copied().filter(|a| *a > 0.0).collect();
+    v.sort_by(f64::total_cmp);
+    let under = v.iter().filter(|a| **a < market * 0.75).count();
+    if under < MANY_UNDER || under * 4 < v.len() { return None; }
+    Some(Asking { each: v[v.len() / 4], under, sellers: v.len() })
+}
+
 /// Whether a live exchange rate is believable next to poe.ninja's: within 3x either way. Cheap things like
 /// lifeforce barely trade for chaos on the exchange (23 Nov: the cheapest Wild Lifeforce offer was 1c each,
 /// poe.ninja 0.02c), so a live number far off is a few odd listings, not the market.
@@ -218,6 +245,28 @@ mod tests {
         let p = post("Essences & currency", "Keepers", &lines, Some(180.0), 10.0, "MyChar");
         assert_eq!(p, "WTS Keepers · Essences & currency\n24x Deafening Essence of Greed · 86c\n380x Orb of Alchemy · 324c\nAll for 410c (2.3 div) · 10% under market\nIGN: @MyChar");
         assert!(!post("x", "L", &lines, None, 0.0, "").contains("IGN"));
+    }
+
+    #[test]
+    fn many_cheap_sellers_beat_a_thin_price() {
+        // The Gambler, 24 Nov: 8 at 1c, 1 at 2, 3 at 3, 3 at 4, 18 at 5, then 10c and up (80 sellers).
+        let mut asks = vec![1.0; 8];
+        asks.push(2.0);
+        asks.extend([3.0; 3]);
+        asks.extend([4.0; 3]);
+        asks.extend([5.0; 18]);
+        asks.extend([10.0; 15]);
+        asks.extend([20.0; 32]);
+        assert_eq!(asking(&asks, 8.65, Some(13.2)), Some(Asking { each: 5.0, under: 33, sellers: 80 }));
+        // Plenty sold: poe.ninja's price stands, and the cheap ones are bait.
+        assert_eq!(asking(&asks, 8.65, Some(4000.0)), None);
+        assert_eq!(asking(&asks, 8.65, None), None);
+        // A few bait listings on a rare card don't move it.
+        assert_eq!(asking(&[1.0, 1.0, 1.0, 80.0, 90.0, 95.0, 99.0, 100.0], 90.0, Some(6.0)), None);
+        // Ten baits among a hundred honest sellers don't either.
+        let mut many = vec![1.0; 10];
+        many.extend([90.0; 90]);
+        assert_eq!(asking(&many, 90.0, Some(20.0)), None);
     }
 
     #[test]

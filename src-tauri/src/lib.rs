@@ -1045,18 +1045,25 @@ async fn send_whisper(text: String) -> Result<(), String> {
 }
 
 #[derive(Serialize)]
-struct BulkResult { offers: Vec<filter_core::trade::Offer>, url: String, divine: Option<f64> }
+struct BulkResult { offers: Vec<filter_core::trade::Offer>, url: String, divine: Option<f64>,
+    /// What sellers ask, when poe.ninja's price is too thin to go by.
+    asking: Option<filter_core::bulk::Asking> }
 
 /// Bulk rates: people selling `want` (a trade id like "divine") for `pay` ("chaos"/"divine").
 #[tauri::command(async)]
 /// `minimum`: only sellers with at least this many in stock (Awakened's stock filter: your stack size).
-fn trade_bulk(app: AppHandle, want: String, pay: String, minimum: Option<u32>) -> Result<BulkResult, String> {
+/// `market` / `sold`: poe.ninja's chaos price and how many sold recently, to judge it by the sellers.
+fn trade_bulk(app: AppHandle, want: String, pay: String, minimum: Option<u32>, market: Option<f64>, sold: Option<f64>) -> Result<BulkResult, String> {
     let (poe2, league) = trade_league(&app);
     let (id, v) = trade_api::exchange(poe2, &league, &filter_core::trade::exchange_query(&pay, &want, minimum.filter(|m| *m > 1)))?;
     let state = app.state::<AppState>();
     let game = active_game(&state);
     let divine = state.prices.lock().unwrap().get(&game).and_then(|f| price_of(f, None, "Divine Orb", "Currency"));
-    Ok(BulkResult { offers: filter_core::trade::offers(&v).into_iter().take(20).collect(), url: trade_api::exchange_url(poe2, &league, &id), divine })
+    let offers = filter_core::trade::offers(&v);
+    // Judged on every seller for chaos (not only the twenty shown, nor the ones with a big stock).
+    let asking = market.filter(|_| pay == "chaos" && minimum.is_none_or(|m| m <= 1))
+        .and_then(|m| filter_core::bulk::asking(&offers.iter().map(|o| o.each).collect::<Vec<_>>(), m, sold));
+    Ok(BulkResult { offers: offers.into_iter().take(20).collect(), url: trade_api::exchange_url(poe2, &league, &id), divine, asking })
 }
 
 // ---------- map tools (regex + trade) ----------

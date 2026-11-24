@@ -108,6 +108,10 @@ mockIPC(async (cmd, args) => {
   if (cmd === "trade_bulk") {
     // Offers shaped like his Stacked Deck check: two price fixers with tiny stock, the real market at 3c.
     const min = ((args as Json)?.minimum as number | null) ?? 0;
+    if (((args as Json)?.sold as number | null ?? 1e9) < 50) {
+      const g = [...Array(8).fill(1), 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 5, 5].map((each, i) => ({ pay: each, pay_currency: "chaos", get: 1, get_currency: "x", each, stock: 1 + (i % 3), account: "Seller" + i, whisper: "@x hi" }));
+      return { offers: g, url: "https://www.pathofexile.com/trade/exchange", divine: 195, asking: { each: 5, under: 33, sellers: 80 } };
+    }
     const o = (each: number, stock: number, account: string) => ({ pay: each, pay_currency: "chaos", get: 1, get_currency: "x", each, stock, account, whisper: "@x hi" });
     const offers = [o(1, 7, "Simi"), o(1, 3, "Klei"), o(2, 1, "Plasi"), o(3, 12, "Life"), o(3, 20, "Tat"), o(3, 41, "Nox"), o(3, 42, "Wu"), o(3, 3, "Necro")]
       .filter((x) => x.stock >= min);
