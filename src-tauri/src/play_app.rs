@@ -862,24 +862,27 @@ fn start_pause_watch(app: AppHandle) {
             continue;
         }
         if away_streak >= 2 || std::mem::take(&mut first) {
-            // Back in the game: the menu check below decides from here (a menu still open stops it again).
-            set(false, unix());
+            // Back in the game: look for the Escape menu straight away. If it was up when he left, the clock stays stopped
+            // until that look says it's gone (24 Nov: he came back to an open menu and the clock ran on).
+            if !menu_up { set(false, unix()); }
+            looked = 0;
         }
         away_streak = 0;
         let Some(rect) = game_client_rect() else { continue };
         let Ok(hud) = screen::sample_points(&journey::hud_points(rect)) else { continue };
-        // The Escape menu says so itself: look every 2 s while it's up or the screen looks dimmed or still, else every 4.
+        // The Escape menu says so itself: look every second while it's up or the screen looks dimmed or still, else every 2.
         let known = !look.hud.is_empty() && (rect.2, rect.3) == look.size;
         let likely = menu_up || (known && journey::brightness(&look.hud, &hud) < 0.85) || (!prev.is_empty() && journey::changed_share(&prev, &hud) < 0.03);
-        if unix() - looked >= if likely { 2 } else { 4 } {
+        if unix() - looked >= if likely { 1 } else { 2 } {
             looked = unix();
             let (x, y, w, h) = journey::pause_box(rect);
             if let Ok(lines) = screen::read_lines_in(x, y, w, h) {
                 let up = journey::is_pause_menu(&lines);
+                // Up and the clock running (whatever set it going): stop it.
+                if up { set(true, unix() - 1); }
                 if up != menu_up {
                     menu_up = up;
-                    // It opened or closed some time since the last look.
-                    set(up, unix() - if likely { 1 } else { 2 });
+                    set(up, unix() - 1);
                     with_live(|l| l.steady.reset());
                     prev = hud.clone();
                     learn.clear();
