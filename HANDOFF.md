@@ -1238,6 +1238,7 @@ when the game window isn't found. Check in game: the window's spot, and that it 
    to read on every page? Home page + Ctrl+K search feel easier?
 
 **Batch mode (21 Nov, in 0.2.36)**
+- [x] (Confirmed 24 Nov.) F2 → Hide → "Just this item" on Omen of Return: hidden on the ground in Red-Maps (shows only with the filter off). The Ritual favours window keeps an item's old look until it's closed and reopened (game behaviour, he saw it still bright there).
 - [x] (Confirmed 22 Nov, "seems good".) Box was cut off at its fixed 250×64 size; it now fits itself to its text
   (in 0.2.37; check the box shows its close button and whole second line).
 - [ ] Press F3 in game: the editor no longer pops up over the game; a small "Batch mode · N items" box shows instead
