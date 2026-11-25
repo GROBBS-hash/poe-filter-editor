@@ -16,7 +16,9 @@ pub mod search;
 
 #[derive(Debug, Deserialize)]
 struct RawMod { id: String, name: String, gen: String, lvl: u32, text: String, r#type: String, group: String, tags: Vec<String>, sw: Vec<(String, f64)>, src: String,
-    #[serde(default)] dom: String }
+    #[serde(default)] dom: String,
+    /// Percentage multipliers on the spawn weight, first matching tag.
+    #[serde(default)] gw: Vec<(String, f64)> }
 #[derive(Debug, Deserialize)]
 struct RawEssence { name: String, corrupt: bool, mods: HashMap<String, String> }
 #[derive(Debug, Deserialize)]
@@ -230,7 +232,9 @@ fn influence_of(m: &RawMod, tags: &HashSet<String>) -> Option<String> {
 fn weight(m: &RawMod, tags: &HashSet<String>) -> f64 {
     // Only mods from the base's own mod list (jewel mods never roll on a ring, and the other way round).
     if !tags.contains(&format!("dom:{}", m.dom)) { return 0.0 }
-    m.sw.iter().find(|(t, _)| tags.contains(t)).map(|(_, w)| *w).unwrap_or(0.0)
+    let w = m.sw.iter().find(|(t, _)| tags.contains(t)).map(|(_, w)| *w).unwrap_or(0.0);
+    // The game's multipliers on top, in % (attack mods are half as likely on caster weapons).
+    w * m.gw.iter().find(|(t, _)| tags.contains(t)).map(|(_, p)| p / 100.0).unwrap_or(1.0)
 }
 
 /// Fossils' effect on a mod's weight (each matching tag multiplies: 1000 = ×10, 0 = never).
@@ -668,16 +672,19 @@ pub fn ways(base: &str, ilvl: u32, influences: &[String], key: &str, min_tier: u
     let jewel = jewel_tags(&tags);
     let cap = side_cap(jewel);
     let natural = !fam.tiers.is_empty() && fam.tiers.iter().any(|t| t.ok && t.tier <= min_tier);
-    // Needs an influence the item doesn't have: a conqueror / Shaper / Elder Exalted Orb adds it with one of its mods.
+    // Needs an influence the item doesn't have: a conqueror's Exalted Orb adds it with one of its mods.
     if let Some(n) = fam.needs.as_ref().filter(|n| !influences.contains(n)) {
         let inf = [n.clone()];
         let Some((_, itags)) = tagset(base, &inf) else { return vec![] };
         let ipool = rollable(&itags, ilvl, &[]);
         let plain: HashSet<usize> = roll.iter().map(|(i, ..)| *i).collect();
         let only: Vec<(usize, f64, bool, usize)> = ipool.iter().filter(|(i, ..)| !plain.contains(i)).copied().collect();
-        let orb = format!("{n}'s Exalted Orb");
-        let x = add_one(&only, &HashSet::new(), 0, 0, 3, &is_target);
-        out.push(way("Add a mod", orb.clone(), x, cost(&orb), format!("Makes a non-influenced rare {n} and adds one {n} mod (needs a free {} slot)", fam.affix)));
+        // Shaper and Elder have no Exalted Orb of their own: start from a base that already has the influence.
+        if !matches!(n.as_str(), "Shaper" | "Elder") {
+            let orb = format!("{n}'s Exalted Orb");
+            let x = add_one(&only, &HashSet::new(), 0, 0, 3, &is_target);
+            out.push(way("Add a mod", orb.clone(), x, cost(&orb), format!("Makes a non-influenced rare {n} and adds one {n} mod (needs a free {} slot)", fam.affix)));
+        }
         let c = hit(&simulate(&ipool, TRIALS, jewel));
         out.push(way("Reroll", format!("Chaos Orb on a {n} item"), c, cost("Chaos Orb"), format!("Once the item is {n}, Chaos Orbs can roll it too")));
         // Awakener's Orb (24 Nov): buy or make a cheap {n} item of the same kind that has this mod, and merge. The result
@@ -895,10 +902,10 @@ mod tests {
         let c = both.iter().find(|w| w.method == "Chaos Orb").unwrap().chance;
         assert!(c > 0.0 && c < one, "{c} vs {one}");
         assert!(both.iter().any(|w| w.method.contains("Essence of") && w.chance > c), "{both:?}");
-        // A Shaper-only mod on a plain helmet: the Shaper's Exalted Orb route.
+        // A Shaper-only mod on a plain helmet: there's no Shaper's Exalted Orb (25 Nov), only a Shaper base or a merge.
         let sh = p.families.iter().find(|f| f.needs.as_deref() == Some("Shaper")).unwrap();
         let w = ways("Eternal Burgonet", 85, &[], &sh.key, 99, &[], "", &price);
-        assert!(w.iter().any(|w| w.method == "Shaper's Exalted Orb" && w.chance > 0.0), "{w:?}");
+        assert!(!w.iter().any(|w| w.method.ends_with("Exalted Orb")) && w.iter().any(|w| w.method.contains("Shaper item")), "{w:?}");
     }
 
     #[test]

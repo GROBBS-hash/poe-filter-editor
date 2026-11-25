@@ -80,6 +80,8 @@ for (const id of keep) {
     id, name: m.name, gen: m.generation_type === "prefix" ? "p" : "s", lvl: m.required_level, text: (m.text ?? "").replace(/\[([^\]|]*)\|([^\]]*)\]/g, "$2").replace(/\[([^\]]*)\]/g, "$1"),
     type: m.type, group: m.groups[0] ?? m.type, tags: m.implicit_tags,
     sw: m.spawn_weights.map((s) => [s.tag, s.weight]),
+    // Percentage multipliers on the spawn weight, first matching tag (caster weapons and attack mods).
+    ...(m.generation_weights?.length ? { gw: m.generation_weights.map((s) => [s.tag, s.weight]) } : {}),
     src: m.domain === "crafted" ? "bench" : m.is_essence_only ? "essence" : "",
     dom: DOMAINS[m.domain] ?? "",
   });

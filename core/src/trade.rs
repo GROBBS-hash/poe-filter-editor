@@ -1014,7 +1014,7 @@ pub const CURRENCY_NAMES: &[(&str, &str)] = &[
     ("divine", "Divine Orb"), ("exalted", "Exalted Orb"), ("alch", "Orb of Alchemy"), ("fusing", "Orb of Fusing"),
     ("alt", "Orb of Alteration"), ("jewellers", "Jeweller's Orb"), ("chrome", "Chromatic Orb"), ("chance", "Orb of Chance"),
     ("regal", "Regal Orb"), ("vaal", "Vaal Orb"), ("scour", "Orb of Scouring"), ("gcp", "Gemcutter's Prism"),
-    ("mirror", "Mirror of Kalandra"), ("annul", "Orb of Annulment"), ("regret", "Orb of Regret"), ("blessed", "Blessed Orb"),
+    ("mirror", "Mirror of Kalandra"), ("annul", "Orb of Annulment"), ("aug", "Orb of Augmentation"), ("transmute", "Orb of Transmutation"), ("regret", "Orb of Regret"), ("blessed", "Blessed Orb"),
 ];
 
 /// Chaos value of each trade currency, from poe.ninja prices.

@@ -376,7 +376,7 @@ function Detail({ fam, base, ilvl, infl, have, rarity, inPlan, onPlan }: { fam: 
       </div>
       <div className="muted small">{fam.affix === "prefix" ? "Prefix" : "Suffix"}{fam.tags.length ? ` · ${fam.tags.join(", ")}` : ""}</div>
       {locked && <div className="cr-needs" style={{ "--ic": INF_COLOUR[fam.needs!] } as CSSProperties}>
-        <InfIcon name={fam.needs!} size={22} /><div><b>Only on a {fam.needs} item.</b> Your base has no {fam.needs} influence: add it with a {fam.needs}'s Exalted Orb,
+        <InfIcon name={fam.needs!} size={22} /><div><b>Only on a {fam.needs} item.</b> Your base has no {fam.needs} influence: {["Shaper", "Elder"].includes(fam.needs!) ? <>buy one with {fam.needs} influence (there's no {fam.needs} Exalted Orb),</> : <>add it with a {fam.needs}'s Exalted Orb,</>}
         or tick {fam.needs} above to see the odds on an item that already has it.</div></div>}
 
       <h3>Ways to get it</h3>

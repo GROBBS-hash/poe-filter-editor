@@ -1478,7 +1478,8 @@ pub fn trade_price_check(app: AppHandle, item: String, price: String) -> Option<
     let state = app.state::<AppState>();
     let game = active_game(&state);
     let prices = state.prices.lock().unwrap();
-    filter_core::whispers::check_price(&item, &price, &prices.get(&game)?.items, &rates)
+    let f = prices.get(&game)?;
+    filter_core::whispers::check_price(&item, &price, &f.items, &rates, filter_core::prices::chaos_per_unit(f))
 }
 
 /// Where a stash cell is on screen: (x, y, size) in physical pixels, from the game's drawing area.
@@ -1569,8 +1570,9 @@ pub fn check_alerts(app: &AppHandle) {
         let game = active_game(&state);
         let prices = state.prices.lock().unwrap();
         let Some(f) = prices.get(&game) else { return };
-        let div = f.items.iter().find(|i| i.name == "Divine Orb").map(|i| i.value).unwrap_or(0.0);
-        (f.items.clone(), div)
+        let k = filter_core::prices::chaos_per_unit(f);
+        let div = f.items.iter().find(|i| i.name == "Divine Orb").map(|i| i.value * k).unwrap_or(0.0);
+        (f.items.iter().cloned().map(|mut i| { i.value *= k; i }).collect::<Vec<_>>(), div)
     };
     let mut fired = vec![];
     with_store(app, |s| for a in s.alerts.iter_mut() {
@@ -1609,7 +1611,8 @@ pub fn read_choice(app: AppHandle) {
             (s.map_avoid.unwrap_or_default(), active_game(&st))
         };
         let file = app.state::<AppState>().prices.lock().unwrap().get(&game).cloned();
-        let price = |n: &str| file.as_ref().and_then(|f| f.items.iter().filter(|i| i.name.eq_ignore_ascii_case(n) && i.cat != "SkillGem").map(|i| i.value).reduce(f64::max));
+        let k = file.as_ref().map_or(1.0, filter_core::prices::chaos_per_unit);
+        let price = |n: &str| file.as_ref().and_then(|f| f.items.iter().filter(|i| i.name.eq_ignore_ascii_case(n) && i.cat != "SkillGem").map(|i| i.value * k).reduce(f64::max));
         let read = filter_core::choices::read(&lines, &avoid, &price);
         if read.lines.is_empty() { show_choice(&app, None, Some("Couldn't read any text there: hover the altar or remnant and try again".into())); return; }
         show_choice(&app, Some(read), None);
@@ -1677,7 +1680,7 @@ pub fn price_names(app: AppHandle, names: Vec<String>) -> HashMap<String, f64> {
     names.into_iter().filter_map(|n| {
         if n == "Chaos Orb" { return Some((n, 1.0)); }
         let v = f.items.iter().filter(|i| i.name.eq_ignore_ascii_case(&n) && i.cat != "SkillGem").map(|i| i.value).reduce(f64::max)?;
-        Some((n, v))
+        Some((n, v * filter_core::prices::chaos_per_unit(f)))
     }).collect()
 }
 

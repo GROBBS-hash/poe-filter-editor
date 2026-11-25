@@ -21,7 +21,7 @@ use filter_core::{
     search::{build_defaults, farm_presets, farm_rules, level_builds, level_rules_opts, search, weapon_classes, Found, LevelOptions, Preset, ARMOUR_TYPES, LEVEL_PREFIX, VENDOR_RANGES},
     item::{is_stackable, parse_item, resolve_magic_base, Item},
     preview::{preview, PreviewDrop},
-    prices::{default_settings, price_of, PriceFile, PriceSettings},
+    prices::{chaos_per_unit, default_settings, price_of, PriceFile, PriceSettings},
     profiles::{build_with_prices, render_profile, Game, Settings, Store},
     themes::{builtin_themes, Theme},
     rules::{add_rule, shadowed_by, custom_rule, edited_rule, known_bases, locate, quick_rule, rule_detail, Action, CustomStyle, Location, MatchOpts, Rule, RuleDetail, RuleEdit, SavedLook},
@@ -684,7 +684,7 @@ fn ninja_price(app: &AppHandle, item: &Item) -> Option<(f64, String)> {
     let game = active_game(&state);
     let prices = state.prices.lock().unwrap();
     let f = prices.get(&game)?;
-    price_of(f, item.name.as_deref(), &item.base_type, &item.rarity).map(|v| (v, f.unit.clone()))
+    price_of(f, item.name.as_deref(), &item.base_type, &item.rarity).map(|v| (v * chaos_per_unit(f), "chaos".into()))
 }
 
 /// Ctrl+D: copies the hovered item (advanced copy: mod tiers too) and opens the price window.
@@ -819,8 +819,9 @@ fn show_price(app: &AppHandle, payload: PriceCheck, text: &str, compare: bool) {
         let game = active_game(&state);
         let prices = state.prices.lock().unwrap();
         if let Some((f, u)) = prices.get(&game).and_then(|f| filter_core::prices::unique_price(f, &n, &base, Some(&text)).map(|u| (f, u))) {
-            payload.ninja = Some((u.value, f.unit.clone()));
-            payload.ninja_high = u.high;
+            let k = chaos_per_unit(f);
+            payload.ninja = Some((u.value * k, "chaos".into()));
+            payload.ninja_high = u.high.map(|h| h * k);
         }
     }
     if let Some(it) = payload.setup.as_ref().map(|s| &s.item) {
@@ -902,7 +903,8 @@ fn currency_rates(app: &AppHandle) -> std::collections::HashMap<String, f64> {
     let game = active_game(&state);
     let prices = state.prices.lock().unwrap();
     let f = prices.get(&game);
-    filter_core::trade::rates(|name| f.and_then(|f| price_of(f, None, name, "Currency")))
+    let k = f.map_or(1.0, chaos_per_unit);
+    filter_core::trade::rates(|name| f.and_then(|f| price_of(f, None, name, "Currency")).map(|v| v * k))
 }
 
 /// The trade site search for a price window setup (with transfigured gems' search names).
@@ -1111,9 +1113,7 @@ struct BulkResult { offers: Vec<filter_core::trade::Offer>, url: String, divine:
 fn trade_bulk(app: AppHandle, want: String, pay: String, minimum: Option<u32>, market: Option<f64>, sold: Option<f64>, card: Option<bool>) -> Result<BulkResult, String> {
     let (poe2, league) = trade_league(&app);
     let (id, v) = trade_api::exchange(poe2, &league, &filter_core::trade::exchange_query(&pay, &want, minimum.filter(|m| *m > 1)))?;
-    let state = app.state::<AppState>();
-    let game = active_game(&state);
-    let divine = state.prices.lock().unwrap().get(&game).and_then(|f| price_of(f, None, "Divine Orb", "Currency"));
+    let divine = currency_rates(&app).get("divine").copied();
     let offers = filter_core::trade::offers(&v);
     // Judged on every seller for chaos (not only the twenty shown, nor the ones with a big stock).
     let asking = Some(market.unwrap_or(0.0)).filter(|_| pay == "chaos" && minimum.is_none_or(|m| m <= 1))
@@ -2619,7 +2619,7 @@ fn refresh_prices(app: AppHandle) -> bool {
 fn base_uniques(state: State<AppState>, base: String) -> Vec<(String, f64)> {
     let game = active_game(&state);
     let prices = state.prices.lock().unwrap();
-    prices.get(&game).map(|f| filter_core::prices::uniques_on_base(f, &base)).unwrap_or_default()
+    prices.get(&game).map(|f| { let k = chaos_per_unit(f); filter_core::prices::uniques_on_base(f, &base).into_iter().map(|(n, v)| (n, v * k)).collect() }).unwrap_or_default()
 }
 
 /// Awakened-style "related items" for the Ctrl+D window: a fragment's set or parts, and the boss's drops, with prices.

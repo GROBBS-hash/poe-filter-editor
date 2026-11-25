@@ -410,6 +410,13 @@ pub fn card_show_blocks(settings: &PriceSettings, file: &PriceFile, segs: &[crat
     out
 }
 
+/// What to multiply this file's prices by to get chaos: 1 for PoE 1; PoE 2's are in exalted (25 Nov: they were shown as
+/// chaos, with a Chaos Orb counted as 1 exalted while it was worth 27).
+pub fn chaos_per_unit(file: &PriceFile) -> f64 {
+    if file.unit == "chaos" { return 1.0; }
+    price_of(file, None, "Chaos Orb", "Currency").filter(|v| *v > 0.0).map_or(1.0, |v| 1.0 / v)
+}
+
 /// The price of one item, if poe.ninja has it (for the in-game pop-up).
 pub fn price_of(file: &PriceFile, name: Option<&str>, base: &str, rarity: &str) -> Option<f64> {
     if rarity == "Unique" {
@@ -701,6 +708,18 @@ mod tests {
         assert_eq!(v["Rain of Chaos"], 0.3);
         assert_eq!(v["Father's Love"], 8497.0, "rare but valuable keeps its price");
         assert_eq!(v["A Dab of Ink"], 14.9, "20 sold is a real price");
+    }
+
+    #[test]
+    fn exalted_file_in_chaos() {
+        let mut f = file();
+        assert_eq!(chaos_per_unit(&f), 1.0);
+        f.unit = "exalted".into();
+        let it = |name: &str, value: f64| PriceItem { name: name.into(), base: name.into(), cat: "Currency".into(), value, variant: None, listings: None, trend: None, change: None, volume: None };
+        f.items = vec![it("Chaos Orb", 26.7), it("Divine Orb", 432.54), it("Exalted Orb", 1.0)];
+        let k = chaos_per_unit(&f);
+        let r = crate::trade::rates(|n| price_of(&f, None, n, "Currency").map(|v| v * k));
+        assert_eq!((r["chaos"], (r["divine"] * 10.0).round() / 10.0, (r["exalted"] * 1000.0).round() / 1000.0), (1.0, 16.2, 0.037));
     }
 
     #[test]

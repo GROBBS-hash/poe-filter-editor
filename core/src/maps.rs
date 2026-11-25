@@ -170,10 +170,25 @@ const AILMENT: &[&str] = &["ignite", "burning damage", "unbound ailments", "dead
 pub fn suggest(build: &Build) -> Vec<Suggestion> {
     let mut out: Vec<Suggestion> = Vec::new();
     let mut add = |name: &str, why: &str| if !out.iter().any(|s| s.name == name) { out.push(Suggestion { name: name.into(), why: why.into() }) };
-    let Some(stage) = build.stages.last() else { return out };
+    // Levelling stages are often listed last: the last one that isn't for the campaign and has gems, else the one PoB has open.
+    let has_gems = |s: &&crate::pob::Stage| s.groups.iter().any(|g| g.enabled && !g.gems.is_empty());
+    let Some(stage) = build.stages.iter().filter(has_gems).filter(|s| crate::pob::stage_act(&s.title).is_none_or(|a| a >= 11)).last()
+        .or_else(|| build.stages.get(build.active).filter(|s| has_gems(s)))
+        .or_else(|| build.stages.iter().filter(has_gems).last()).or_else(|| build.stages.last()) else { return out };
     let gems: Vec<String> = stage.groups.iter().filter(|g| g.enabled).flat_map(|g| g.gems.iter())
         .filter(|g| g.enabled).map(|g| g.name.to_lowercase()).collect();
-    let has = |list: &[&str], names: &[String]| names.iter().any(|n| list.iter().any(|k| n.contains(k)));
+    // Parts of a name only count from the start of a word; some only as the whole word ("Arcane Surge" isn't Arc,
+    // "Shockwave" isn't Shock), and a damage-over-time skill only by its own name ("Blade Vortex" isn't Vortex).
+    let word = |n: &str, k: &str| {
+        let whole = matches!(k, "arc" | "ice" | "shock" | "spark" | "comet" | "cold");
+        n.match_indices(k).any(|(i, _)| (i == 0 || !n.as_bytes()[i - 1].is_ascii_alphanumeric())
+            && (!whole || n[i + k.len()..].chars().next().is_none_or(|c| !c.is_alphanumeric())))
+    };
+    let has = |list: &[&str], names: &[String]| names.iter().any(|n| list.iter().any(|k| word(n, k)));
+    let is = |list: &[&str], names: &[String]| names.iter().any(|n| {
+        let n = n.strip_prefix("vaal ").unwrap_or(n);
+        list.iter().any(|k| n == *k || n.strip_prefix(k).is_some_and(|r| r.starts_with(" of ")))
+    });
     // Main skill: the biggest link group's active gems.
     let main = stage.groups.iter().filter(|g| g.enabled).max_by_key(|g| g.gems.len());
     let main_gems: Vec<String> = main.map(|g| g.gems.iter().filter(|x| x.enabled).map(|x| x.name.to_lowercase()).collect()).unwrap_or_default();
@@ -184,7 +199,7 @@ pub fn suggest(build: &Build) -> Vec<Suggestion> {
     add("No regen", "Most builds need regen for mana (and life)");
     if has(MINION, &main_active) {
         // Minions take the reflected damage, not you.
-    } else if has(DOT, &main_active) {
+    } else if is(DOT, &main_active) {
         // Damage over time isn't reflected.
     } else if has(ELEMENTAL, &main_gems) {
         add("Elemental reflect", "Your main skill hits with elemental damage");
@@ -329,6 +344,22 @@ Travel to this Map by using it in a personal Map Device. Maps can only be used o
         assert!(unid.unidentified && unid.mods.is_empty());
         assert!(is_map("Maps") && !is_map("Rings"));
         assert!(danger_names().contains(&"Hexproof"));
+    }
+
+    #[test]
+    fn suggestions_go_by_whole_names() {
+        let gem = |n: &str, s: bool| Gem { name: n.into(), level: 20, quality: 0, enabled: true, support: s, colour: "b".into() };
+        let group = |g: Vec<Gem>| Group { label: String::new(), slot: String::new(), enabled: true, gems: g };
+        let stage = |t: &str, g: Vec<Gem>| Stage { title: t.into(), tree: None, gear: vec![], jewels: vec![], groups: if g.is_empty() { vec![] } else { vec![group(g)] } };
+        let names = |stages: Vec<Stage>| suggest(&Build { class: "Scion".into(), ascendancy: String::new(), level: 90, active: 0, stages }).into_iter().map(|s| s.name).collect::<Vec<_>>();
+        // Blade Vortex isn't Vortex, and Arcane Surge isn't Arc.
+        let n = names(vec![stage("Endgame", vec![gem("Blade Vortex", false), gem("Arcane Surge", true), gem("Unleash", true)])]);
+        assert!(n.contains(&"Physical reflect".to_string()) && !n.contains(&"Elemental reflect".to_string()), "{n:?}");
+        let n = names(vec![stage("Endgame", vec![gem("Vortex of Projection", false)])]);
+        assert!(!n.iter().any(|x| x.contains("reflect")), "{n:?}");
+        // Levelling stages listed last don't decide.
+        let n = names(vec![stage("Red Maps", vec![gem("Frostbolt", false)]), stage("Levelling 1", vec![gem("Cleave", false)]), stage("Levelling 2", vec![])]);
+        assert!(n.contains(&"Elemental reflect".to_string()) && !n.contains(&"Physical reflect".to_string()), "{n:?}");
     }
 
     #[test]
