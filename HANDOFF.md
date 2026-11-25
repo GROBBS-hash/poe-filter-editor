@@ -1749,6 +1749,7 @@ when the game window isn't found. Check in game: the window's spot, and that it 
 4. ~~One-click login~~ **Dropped 24 Nov (his call: too much red tape with GGG's app approval).** POESESSID + the "Log in with pathofexile.com" button stay as they are.
 5. **Atlas Strategy Builder (idea 23 Nov; step 1 creator picks + step 3 optimiser done 23 Nov, see Done; tree editing + totals done 23 Nov; wealth-tracker results per tree done 24 Nov; left: Mobalytics/YouTube creator picks).** Pick strategies (e.g. Ritual + Harvest) → creator-pick trees
    (Maxroll, Mobalytics, YouTube) to load and adjust, plus an optimiser for his own trees. Full plan: `ATLAS_STRATEGY_PLAN.md`.
+   **Next: rebuild the optimiser** (25 Nov, he asked; research by 20 agents done, nothing built yet): `ATLAS_KNOWLEDGE.md` has the rules, values, pairs, goals and fix order; full reports and the prototype are in `.claude/atlas-research/` (his PC only). Wants: score by effect, travel nodes by value, goals (boss kills, map drops) as well as mechanics.
 6. Deferred earlier: PoE 2 coverage. Batch mode tidy-up done 21 Nov (see "Batch mode"). (Installer + auto-update done 21 Nov: see "Installer and updates".)
 7. **Ideas from PoeFilterX (he asked 23 Nov; 7a, 7b and 7c done 23 Nov, see Done; 7d left).** github.com/SteffenBlake/PoeFilterX is a
    code-style filter "transpiler" (multi-file, .fss style sheets, JSON/env variables, npm packages). Its syntax doesn't
