@@ -37,7 +37,7 @@ const WEAPONS = ["Bows", "Claws", "Daggers", "One Hand Axes", "One Hand Maces", 
 const CHIPS = ["Purple", "Yellow", "Cyan", "Red", "Green", "Orange", "Pink", "White"];
 
 /** The item a search result stands for (rarity can be changed in the panel). */
-function toItem(f: Found): Item {
+export function toItem(f: Found): Item {
   const rarity = GEAR.includes(f.item_class) ? "Rare"
     : f.item_class === "Divination Cards" ? "Divination Card"
     : f.item_class.endsWith("Gems") ? "Gem" : "Currency";

@@ -8,6 +8,9 @@ import { ItemIcon, useIcons } from "./icons";
 import MapTiers, { MapSection } from "./MapTiers";
 import Threads from "./Threads";
 import StepConds, { Cond, Menu } from "./StepConds";
+import ItemPanel from "./ItemPanel";
+import { toItem } from "./Find";
+import type { Item } from "./types";
 import { JewelMod, JewelRule, jewelModList, readJewelRule, saveJewelRule } from "./jewelMods";
 
 /** Which "+ Add a condition" choices a section gets. */
@@ -156,6 +159,23 @@ const editHides = (s: Section, t: TierRow, b: string) => {
 
 const SHOW_ITEMS = 24;
 
+/** The item a chip stands for, so clicking it opens everything about it (25 Nov, his idea). null = the chip is only part
+ *  of a name ("Small" flasks, "Omen of"), so there's no single item to open. */
+async function itemOfChip(s: Section, t: TierRow, base: string): Promise<Item | null> {
+  const classes = (t.conds ?? []).filter((c) => c.key === "Class").flatMap((c) => c.value.split('"').filter((_, i) => i % 2 === 1));
+  const hits = await invoke<{ base_type: string; item_class: string }[]>("search_items", { q: base }).catch(() => []);
+  const known = hits.find((f) => f.base_type === base)?.item_class ?? "";
+  const fits = known !== "" && (classes.length === 0 || classes.includes(known));
+  if (!fits && (classes.length === 0 ? known === "" : !base.includes(" ") || base.endsWith(" of"))) return null;
+  const it = toItem({ base_type: base, item_class: fits ? known : classes[0] ?? known });
+  const rarity = (t.conds ?? []).find((c) => c.key === "Rarity")?.value.replace(/^[=\s]+/, "").trim();
+  if (s.group === "Uniques") it.rarity = "Unique";
+  else if (rarity && ["Normal", "Magic", "Rare", "Unique"].includes(rarity)) it.rarity = rarity;
+  // On a stack step, that stack: what the filter does to 3 of them, not to one.
+  if (t.min_stack != null && t.min_stack > 1) it.stack_size = t.min_stack;
+  return it;
+}
+
 /** Like FilterBlade: NeverSink's tier lists. Tick to show/hide a tier, click its label to restyle it,
  *  drag items between tiers to re-rank them. */
 export default function Tiers({ profile, onChange, focus }: { profile: ProfileInfo; onChange: () => void;
@@ -213,6 +233,17 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
     }).catch(() => {});
   }, [focus, sections]); // eslint-disable-line react-hooks/exhaustive-deps
   const [found, setFound] = useState<{ base: string; tier: string } | null>(null);
+  /** The item opened by clicking its chip, under its step. */
+  const [opened, setOpened] = useState<{ sec: string; tier: string; base: string; item: Item } | null>(null);
+  const openItem = async (s: Section, t: TierRow, base: string) => {
+    const sec = s.type_path.join(">");
+    if (opened && opened.sec === sec && opened.tier === t.tier && opened.base === base) { setOpened(null); return; }
+    const item = await itemOfChip(s, t, base);
+    if (!item) { setMsg(`“${base}” stands for every item with that in its name: untick its step, or click the step's look, to change them.`); return; }
+    setMsg("");
+    setOpened({ sec, tier: t.tier, base, item });
+    window.setTimeout(() => document.querySelector(".tier-item")?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 250);
+  };
   const [copied, setCopied] = useState<{ style: CustomStyle; from: string } | null>(null);
 
   const load = () => invoke<Section[]>("get_tiers", { id: profile.id }).then((s) => {
@@ -255,6 +286,7 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
   const unit = profile.game === "Poe2" ? "exalted" : "chaos";
   const section = sections.find((s) => s.type_path.join(">") === sel) ?? (extra && extraKey === sel ? extra : undefined);
   const isExtra = !!extra && section === extra;
+  const isOpen = (t: TierRow, b: string) => !!opened && opened.sec === section?.type_path.join(">") && opened.tier === t.tier && opened.base === b;
   const done = async (p: Promise<unknown>, m: string) => {
     try { await p; setMsg(`${m} Press F4 in game.`); onChange(); await load(); } catch (e) { setMsg(String(e)); }
   };
@@ -379,7 +411,12 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
               <SectionWorth profileId={profile.id} sectionKey={section.type_path.join("->")} prices={section.prices}
                 limit={section.hide_below ?? null} onChange={() => { onChange(); load(); }} />
             )}
-            <EditHidesNote section={section} onRemove={(b, h) => done(invoke("delete_rule", { id: profile.id, index: h.rule }), `${b} shows as its tier again.`)} />
+            <EditHidesNote section={section} onRemove={(b, h) => done(invoke("delete_rule", { id: profile.id, index: h.rule }), `${b} shows as its tier again.`)}
+              onOpen={(t, b) => openItem(section, t, b)}
+              onShow={async (t, b) => {
+                const item = await itemOfChip(section, t, b);
+                if (item) done(invoke("only_show_stack", { item, min: t.min_stack, opts: { same_rarity: false } }), `Stacks of ${t.min_stack}+ ${b} show in this filter now.`);
+              }} />
             {section.tiers.map((t) => {
               const key = t.tier;
               const shown = t.visibility !== "Hide";
@@ -424,10 +461,12 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
                   <div className="tier-items">
                     {items.map((b) => (
                       <span key={b} data-chip={`${key}|${b}`}
-                        className={`chip ${editHides(section, t, b) ? "edit-hid" : ""} ${drag?.base === b ? "dragging" : ""} ${found?.base === b && found.tier === key ? "found" : ""}`} draggable={!section.shared_bases}
+                        className={`chip clicky ${isOpen(t, b) ? "on" : ""} ${editHides(section, t, b) ? "edit-hid" : ""} ${drag?.base === b ? "dragging" : ""} ${found?.base === b && found.tier === key ? "found" : ""}`} draggable={!section.shared_bases}
                         onDragStart={(e) => { e.dataTransfer.setData("text/plain", b); e.dataTransfer.effectAllowed = "move"; setDrag({ base: b, from: key }); }}
                         onDragEnd={() => { setDrag(null); setOver(null); }}
-                        title={editHides(section, t, b) ? `Your edit “${section.edit_hides![b].label}” hides it` : `Drag to another tier`}>
+                        title={editHides(section, t, b) ? `Your edit “${section.edit_hides![b].label}” hides it. Click to change it` : section.shared_bases ? "Click to change just this item" : "Click to change just this item, or drag it to another tier"}
+                        role="button" tabIndex={0} aria-expanded={isOpen(t, b)} onClick={() => openItem(section, t, b)}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openItem(section, t, b); } }}>
                         <ItemIcon base={b} size={20} />{b}
                         {section.prices?.[b] != null && <span className={`chip-price ${section.hide_below != null && section.prices[b] < section.hide_below ? "below" : ""}`}
                           title={section.group === "Uniques" ? "poe.ninja: the most a unique on this base is worth" : "poe.ninja price"}>
@@ -441,6 +480,13 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
                     )}
                     {!section.shared_bases && t.bases.length > 0 && <AddItem onAdd={(b) => addTo(t, b)} />}
                   </div>
+                  {opened && opened.sec === section.type_path.join(">") && opened.tier === key && (
+                    <div className="find-panel qm tier-item">
+                      <ItemPanel key={opened.base} inGame={false} justItem
+                        start={{ item: opened.item, from_screen: false, screen_text: null, confidence: 1 }}
+                        onClose={() => setOpened(null)} onChanged={() => { onChange(); load(); }} />
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -453,7 +499,8 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
 }
 
 /** Items in this list that your own edits (F2, My edits) hide, whatever their tier says, with a button to undo each. */
-function EditHidesNote({ section, onRemove }: { section: Section; onRemove: (base: string, h: EditHide) => void }) {
+function EditHidesNote({ section, onRemove, onOpen, onShow }: { section: Section; onRemove: (base: string, h: EditHide) => void;
+  onOpen: (t: TierRow, base: string) => void; onShow: (t: TierRow, base: string) => void }) {
   const list = [...new Set(section.tiers.flatMap((t) => t.bases.filter((b) => editHides(section, t, b))))];
   if (list.length === 0) return null;
   return (
@@ -461,12 +508,15 @@ function EditHidesNote({ section, onRemove }: { section: Section; onRemove: (bas
       <b>Your own edits hide {list.length === 1 ? "this one" : `these ${list.length}`}, whatever the tier says:</b>
       {list.map((b) => {
         const h = section.edit_hides![b];
+        const t = section.tiers.find((x) => x.bases.includes(b))!;
         return (
           <div key={b} className="eh-row">
-            <ItemIcon base={b} size={24} /><b>{b}</b>
+            <button type="button" className="eh-item" title="Click to change it" onClick={() => onOpen(t, b)}><ItemIcon base={b} size={24} /><b>{b}</b></button>
             <span className="small">{h.from == null ? "every stack hidden" : `only stacks of ${h.from}+ show`}
-              <span className="muted"> · “{h.label}”{h.parent ? `, an edit in ${h.parent}: change it there` : ""}</span></span>
-            {h.rule != null && <button onClick={() => onRemove(b, h)}>Remove this edit</button>}
+              <span className="muted"> · “{h.label}”{h.parent ? `, an edit in ${h.parent}` : ""}</span></span>
+            {h.rule != null ? <button onClick={() => onRemove(b, h)}>Remove this edit</button>
+              : t.min_stack != null && t.min_stack > 1 ? <button title={`${h.parent ?? "The other filter"} keeps hiding it`} onClick={() => onShow(t, b)}>Show {t.min_stack}+ in this filter</button>
+              : <button onClick={() => onOpen(t, b)}>Change it</button>}
           </div>
         );
       })}

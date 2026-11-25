@@ -166,7 +166,7 @@ function StackTiers({ base, onDone }: { base: string; onDone: (msg: string) => v
   );
 }
 
-export default function ItemPanel({ start, inGame, replacing: replacingProp, onClose, onChanged, onEditingChange, openLook, onMoved, startToast }: {
+export default function ItemPanel({ start, inGame, replacing: replacingProp, onClose, onChanged, onEditingChange, openLook, onMoved, startToast, justItem }: {
   start: Picked;
   inGame: boolean;
   replacing?: Replacing | null;
@@ -179,6 +179,8 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
   /** The saved edit being changed is another one now, or at another place in the list (with the message to show). */
   onMoved?: (index: number, detail: RuleDetail, message: string) => void;
   startToast?: string;
+  /** Opened for this one item (clicked on the Tiers page): start on "Just this item", whatever F2 last used. */
+  justItem?: boolean;
 }) {
   const [picked, setPicked] = useState<Picked>(start);
   const [replacing, setReplacing] = useState<Replacing | null>(replacingProp ?? null);
@@ -265,8 +267,8 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
 
   /** "All <group>" (change the NeverSink rule in charge, like the Tiers / Map tiers page) or "Just this" (your own
    *  edit on top). He chose this switch (2A) on 23 Nov so only one rule decides a look; remembered. */
-  const [scope, setScopeRaw] = useState<"group" | "item">(() => { try { return localStorage.getItem("f2.scope") === "item" ? "item" : "group"; } catch { return "group"; } });
-  const setScope = (s: "group" | "item") => { setScopeRaw(s); try { localStorage.setItem("f2.scope", s); } catch { /* not kept */ } };
+  const [scope, setScopeRaw] = useState<"group" | "item">(() => { if (justItem) return "item"; try { return localStorage.getItem("f2.scope") === "item" ? "item" : "group"; } catch { return "group"; } });
+  const setScope = (s: "group" | "item") => { setScopeRaw(s); if (justItem) return; try { localStorage.setItem("f2.scope", s); } catch { /* not kept */ } };
   const groupSrc = status?.verdict.source;
   /** The NeverSink rule in charge, when there is one F2 can change for the whole group. */
   const group = !replacing && groupSrc?.kind === "neversink" && groupSrc.type_path.length > 0 && groupSrc.tier ? groupSrc : null;
@@ -301,8 +303,11 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
         const [id, index] = await invoke<[string, number, RuleDetail]>("get_rule", { id: null, index: null, label: v.decided_by });
         await invoke("delete_rule", { id, index });
         await afterChange(`Removed your hide (“${v.decided_by}”): it shows again.`);
-      } catch (e) { setToast(String(e)); }
-      return;
+        return;
+      } catch (e) {
+        // The hide is in the filter this one builds on: show it here with an edit of its own (below).
+        if (!String(e).includes("another profile")) { setToast(String(e)); return; }
+      }
     }
     // Hidden by NeverSink (e.g. single orbs in a low tier): its hiding rule still has its own look, so show it with
     // that look rather than a plain one.
@@ -552,6 +557,11 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
         })()}
 
       </div>
+
+      {/* Hide on a stack hides 38 of them too (25 Nov): point at the cut-off instead. */}
+      {extra?.stackable && !wholeType && status && status.verdict.visibility !== "Hide" && !(group && scope === "group") && (
+        <div className="qm-hint">Hide covers every stack size. To keep the big stacks, use <b>Only show {stackN.toLocaleString()}+</b> {inGame ? <button className="qm-inline" onClick={() => toggleMore(true)}>(More options)</button> : "on the right"}.</div>
+      )}
 
       {(status || wholeType) && (() => {
         const snd = current().sound;

@@ -2190,7 +2190,12 @@ button.tw-chip:hover { border-color: #59606b; color: var(--text); }
 .tw-nosale { font-size: 22px; }
 .chip.edit-hid { opacity: .5; text-decoration: line-through; border-style: dashed; }
 .edit-hides { display: grid; gap: 6px; margin-bottom: 12px; }
-.eh-row { display: flex; align-items: center; gap: 8px; } .eh-row button { margin-left: auto; }
+.eh-row { display: flex; align-items: center; gap: 8px; } .eh-row > button:last-child { margin-left: auto; }
+.tiers-main > .note { position: sticky; bottom: 10px; z-index: 5; box-shadow: 0 6px 24px rgba(0, 0, 0, .5); }
+.eh-item { display: inline-flex; align-items: center; gap: 8px; padding: 0; border: 0; background: none; color: inherit; font: inherit; }
+.eh-item:hover { background: none; text-decoration: underline; }
+.chip.clicky { cursor: pointer; } .chip.clicky:hover { border-color: var(--gold); } .chip.clicky:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+.chip.edit-hid:hover, .chip.edit-hid.on { opacity: 1; text-decoration: none; }
 .chip-price.below { background: transparent; color: var(--muted); text-decoration: line-through; }
 /* A− / A+ in a window's title bar (map tracker). */
 .win-size { display: inline-flex; gap: 2px; margin-right: 4px; }
