@@ -410,7 +410,7 @@ export default function App() {
       {tab === "gear" && <Gear />}
       {tab === "build" && <MyBuild />}
       {tab === "maps" && <Maps />}
-      {tab === "atlas" && <Atlas />}
+      {tab === "atlas" && <Atlas go={(t) => setTab(t as Tab)} />}
       {tab === "wealth" && <Wealth />}
       {tab === "bulk" && <Bulk />}
       {tab === "pricecheck" && <PriceCheck keys={keys} />}

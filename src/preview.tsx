@@ -128,6 +128,7 @@ mockIPC(async (cmd, args) => {
     return { offers, url: "https://www.pathofexile.com/trade/exchange", divine: 217 };
   }
   if (cmd === "saved_list") return [];
+  if (cmd === "base_worth") return { worth: { influence: "", ilvl: 70, value: 42, listings: 86, if_level: false }, divine: 179, loud: null };
   if (cmd === "worn_compare" || cmd === "worn_refresh" || cmd === "worn_set") {
     const cls = String((args as Json).class);
     if (cls !== "Rings") return { slots: ["Helmet"], character: "Bob_Witch", at: Math.floor(Date.now() / 1000) - 60, by_hand: false, login: cmd === "worn_compare", stale: false, list: [] };

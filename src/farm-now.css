@@ -1,0 +1,26 @@
+/* "Farm this": the farm in use, at the top of the Atlas page */
+.fn { border-color: rgba(240,200,90,0.45); }
+.fn > header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.fn > header h2 { margin: 0; }
+.fn > header > button { margin-left: auto; }
+.fn-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(260px, 1fr); gap: 24px; }
+@media (max-width: 860px) { .fn-grid { grid-template-columns: minmax(0, 1fr); } }
+.fn-step { display: grid; grid-template-columns: 22px 36px minmax(0, 1fr); gap: 10px; align-items: start; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.fn-step:last-child { border-bottom: 0; }
+.fn-tick { width: 20px; height: 20px; border-radius: 5px; border: 1px solid #555c6a; text-align: center; line-height: 18px; font-size: 13px; color: #8fe0a4; margin-top: 4px; }
+.fn-tick.on { border-color: #4f9a66; background: rgba(60,180,90,0.18); }
+.fn-pic { display: flex; justify-content: center; min-height: 30px; align-items: center; }
+.fn-key { font-weight: 700; font-size: 13px; padding: 4px 7px; border: 1px solid var(--gold); border-radius: 5px; color: var(--gold); }
+.fn-plan { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
+.fn-thread { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 2px 0; }
+.fn-btns { gap: 12px; margin-top: 2px; }
+.fn-profit { padding: 12px 14px; border-radius: 10px; background: rgba(255,255,255,0.04); }
+.fn-sum { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-variant-numeric: tabular-nums; }
+.fn-sum b { text-align: right; }
+.fn-sum .cur-icon, .fn-costs .cur-icon { width: 18px; height: 18px; vertical-align: -4px; margin-left: 2px; }
+.fn-net { font-size: 18px; font-weight: 700; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 4px; }
+.fn-hour { display: flex; flex-direction: column; margin-top: 8px; }
+.fn-hour > b { font-size: 20px; }
+.fn-costs { margin-top: 14px; display: grid; gap: 4px; font-size: 13px; }
+.fn-costs label { display: grid; grid-template-columns: minmax(0, 1fr) auto 22px; gap: 4px; align-items: center; }
+.fn-total { display: flex; justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 5px; margin-top: 2px; }

@@ -46,6 +46,8 @@ const mapStyle = (b: string) => ({ font_size: 45, muted: false, text: b === "d" 
   background: b === "d" ? [20, 20, 0, 255] : b === "c" ? [235, 235, 120, 255] : [235, 235, 235, 255], border: b === "a" ? [255, 0, 0, 255] : null,
   beam: b === "d" ? "White" : "Yellow", minimap_parts: [b === "d" ? 2 : 1, b === "d" ? "White" : "Red", "Square"] });
 const extrasOff = new Set<string>();
+let farmOn = true, farmFilter = false;
+const basesOn: number | null = 179;
 const mapTiers = () => ({
   extras: [["upgrade", "Upgrade borders", "A red border on maps above the tier you're running now, so upgrades stand out."], ["bands", "Tier group borders", "A dark border on red maps and a light one on lower maps."], ["implicit", "Implicit borders", "A gold border on maps with implicit mods (e.g. from the atlas)."]]
     .map(([key, title, what]) => ({ key, title, what, tiers: [key], on: !extrasOff.has(key), border: key === "upgrade" ? [220, 50, 0, 255] : key === "bands" ? [0, 0, 0, 255] : [255, 180, 0, 255], sample_tier: key === "implicit" ? 10 : 14 })),
@@ -334,6 +336,20 @@ mockIPC((cmd, args) => {
   }
   // Its cards: real drops per theme (dev: dump his with THEME_CARDS_OUT=.claude/theme-cards.json, see preview.rs).
   if (cmd === "theme_cards") return fetch("/.claude/theme-cards.json").then((r) => r.json());
+  // "Farm this": a farm in use, its Threads and what it made.
+  if (cmd === "farm_start") { farmOn = true; (window as unknown as { farmArgs: unknown }).farmArgs = args; }
+  if (cmd === "farm_stop") { farmOn = false; return null; }
+  if (cmd === "farm_filter") farmFilter = (args as { on: boolean }).on;
+  if (["farm_now", "farm_start", "farm_costs", "farm_use_tree", "farm_filter"].includes(cmd)) return !farmOn ? null : {
+    farm: { title: "Ritual + Harvest", keys: ["ritual", "harvest"], strategy: 3, strategy_name: "Farm: Ritual + Harvest", threads: [["Ritual Thread", 8], ["Harvest Thread", 4]], maps: ["Strand Map", "City Square Map"],
+      rolls: "70%+ more Currency found in Area", drops: ["Omen of Amelioration"], started: now - 9000, plan: 20, map_cost: 4, other_cost: 2, thread_cost: null },
+    threads: [{ name: "Ritual Thread", each_map: 8, need: 160, have: 96, buy: 64, each: 3.1, bulk: "ritual-thread" }, { name: "Harvest Thread", each_map: 4, need: 80, have: 80, buy: 0, each: 2.6, bulk: "harvest-thread" }],
+    threads_now: 35.2, cost: 41.2, divine: 179, tree_in_use: true, tree_saved: true, scanned: now - 4000, in_filter: farmFilter,
+    profit: { maps: 23, loot: 130, cost: 41.2, net: 88.8, hour: 1500, likely: [1075, 2500], few: false } };
+  if (cmd === "bases_get" || cmd === "bases_save") return { min: basesOn, influenced: false, total: 41, divine: 179, known: true,
+    list: [["Focused Amulet", 83, 6534, 41], ["Simplex Amulet", 83, 1508, 38], ["Helical Ring", 84, 2692, 114], ["Gloam Ring", 83, 1616, 67], ["Dusk Ring", 83, 718, 76], ["Cord Belt", 86, 359, 54], ["Crystal Belt", 86, 100, 73]]
+      .map(([base, ilvl, value, listings]) => ({ base, ilvl, value, listings, influence: "" })) };
+  if (cmd === "base_worth") return { worth: { influence: "", ilvl: 86, value: 7665, listings: 86, if_level: false }, divine: 179, loud: null };
   // The farm finder (dev: FARM_OUT=.claude/farm.json, see core farm.rs).
   if (cmd === "farm_find") { const want = (args as { ask: { want: string[] } }).ask.want ?? [];
     return fetch(want.length ? `/.claude/farm-${want.join("+")}.json` : "/.claude/farm.json").then((r) => r.json()); }

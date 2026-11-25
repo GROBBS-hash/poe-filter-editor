@@ -12,6 +12,7 @@ pub mod craft;
 pub mod ask;
 pub mod evaluate;
 pub mod farm;
+pub mod farming;
 pub mod temple;
 pub mod explain;
 pub mod filter;

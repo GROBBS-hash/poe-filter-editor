@@ -12,7 +12,7 @@ import FarmFinder from "./FarmFinder";
 const SITE: Record<string, string> = { maxroll: "maxroll", official: "pathofexile.com", optimiser: "built by the optimiser", planner: "Atlas Tree Planner", poeplanner: "poeplanner" };
 
 /** Endgame → Atlas: import atlas strategies from a link, keep them by name, pick the one shown in game. */
-export default function Atlas() {
+export default function Atlas({ go }: { go?: (tab: string) => void }) {
   const [store, setStore] = useState<AtlasStore | null>(null);
   const [link, setLink] = useState("");
   const [name, setName] = useState("");
@@ -51,7 +51,7 @@ export default function Atlas() {
 
   return (
     <div className="atlas-page">
-      <FarmFinder onBuild={() => { setBuild((n) => n + 1); window.setTimeout(() => document.querySelector(".ap")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }} />
+      <FarmFinder go={go} onBuild={() => { setBuild((n) => n + 1); window.setTimeout(() => document.querySelector(".ap")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }} />
       <AtlasPicks key={build} store={store} onShow={(id) => setSel(id)}
         onImported={(s, m) => { setStore(s); setSel(s.active); setMsg(`${m} (${key})`); }} />
       <div className="card">
