@@ -454,6 +454,57 @@ pub fn add_rule(rules: &mut Vec<Rule>, rule: Rule) {
     rules.push(rule);
 }
 
+/// "Only show N+": hides the smaller stacks, and drops this filter's own plain hides of the same item, which would
+/// keep hiding the bigger ones too (25 Nov: 20 Orbs of Alteration stayed hidden). Returns the new edit's label.
+pub fn only_show(rules: &mut Vec<Rule>, item: &Item, min: u32, opts: &MatchOpts) -> String {
+    let opts = MatchOpts { min_stack: None, below_stack: Some(min), ..opts.clone() };
+    let rule = quick_rule(item, Action::Hide, None, &opts);
+    let new = rule_detail(&rule);
+    rules.retain(|r| {
+        let (Some(old), Some(new)) = (rule_detail(r), &new) else { return true };
+        !(!old.show && old.min_stack.is_none() && old.below_stack.is_none() && old.mods.is_empty()
+            && old.item_class == new.item_class && old.base_type == new.base_type && old.rarity == new.rarity
+            && old.corrupted == new.corrupted && (new.when == When::Always || old.when == new.when))
+    });
+    let label = match &rule { Rule::Override { label, .. } => label.clone(), _ => String::new() };
+    add_rule(rules, rule);
+    label
+}
+
+/// After "Only show N+": when stacks of N are still hidden by something else (a price line, NeverSink's strictness, an
+/// edit in the filter this one builds on), the edit that shows them, up to the size that shows anyway. Their look is
+/// the one the filter has for that size underneath those hides.
+pub fn show_hidden_stacks(segs: &[Segment], item: &Item, min: u32, opts: &MatchOpts, area_level: u32) -> Option<Rule> {
+    use crate::evaluate::status_with_fallback;
+    let it = Item { stack_size: Some(min), ..item.clone() };
+    let st = status_with_fallback(segs, &it, Some(area_level), area_level, false);
+    let at = |n: u32| st.by_stack.iter().rev().find(|b| b.from <= n).map_or(st.verdict.visibility.as_str(), |b| b.visibility.as_str());
+    if at(min) != "Hide" { return None; }
+    let until = st.by_stack.iter().find(|b| b.from > min && b.visibility != "Hide").map(|b| b.from);
+    // Without your own and the price lines' hides (they aren't NeverSink sections).
+    let under: Vec<Segment> = segs.iter().filter(|s| !matches!(s, Segment::Block(b) if b.type_path.is_empty() && b.header.trim_start().starts_with("Hide"))).cloned().collect();
+    let look = status_with_fallback(&under, &it, Some(area_level), area_level, false).verdict.style;
+    let opts = MatchOpts { min_stack: Some(min), below_stack: until, ..opts.clone() };
+    Some(custom_rule(item, &style_to_custom(&look), &opts))
+}
+
+/// An item's current look as one you can save in an edit.
+fn style_to_custom(s: &crate::evaluate::Style) -> CustomStyle {
+    let sound = match (s.muted, &s.sound_id, &s.sound_file) {
+        (true, ..) => Sound::Off,
+        (_, Some(id), _) => Sound::Builtin { id: id.clone(), volume: s.volume.unwrap_or(300) },
+        (_, _, Some(f)) => Sound::Custom { file: f.clone(), volume: s.volume.unwrap_or(300) },
+        _ => Sound::Default,
+    };
+    CustomStyle {
+        font_size: if s.label_hidden { 36 } else { s.font_size.unwrap_or(40) },
+        text: s.text.unwrap_or([170, 158, 130, 255]), border: s.border, background: s.background.unwrap_or([0, 0, 0, 240]),
+        beam: s.beam.clone().map(|colour| Beam { colour, temp: s.beam_temp }),
+        minimap: s.minimap_parts.clone().map(|(size, colour, shape)| Minimap { size, colour, shape }),
+        sound, label_hidden: s.label_hidden,
+    }
+}
+
 /// Rebuilds a saved edit with changes, keeping what it matches.
 pub fn edited_rule(rule: &Rule, edit: &RuleEdit) -> Option<Rule> {
     let d = rule_detail(rule)?;
@@ -707,6 +758,47 @@ mod tests {
         // The pop-up's stack summary sees the new cut-off too.
         let s = status(&segs, &crate::item::Item { stack_size: Some(40), ..gold }, Some(60), false);
         assert!(s.by_stack.iter().any(|b| b.from == 500 && b.visibility == "Show"), "{:?}", s.by_stack);
+    }
+
+    #[test]
+    fn only_show_really_shows() {
+        let orb = parse_item("Item Class: Stackable Currency\nRarity: Currency\nOrb of Alteration\n").unwrap();
+        let text = "Hide # Price: Currency worth under 1c\n    StackSize < 5\n    BaseType == \"Orb of Alteration\"\n\n\
+            Show # %D6 $type->currency->stackedsix $tier->t4\n    StackSize >= 6\n    BaseType == \"Orb of Alteration\"\n    SetFontSize 45\n\n\
+            Hide # %D4 $type->currency->stackedthree $tier->t5\n    StackSize >= 3\n    BaseType == \"Orb of Alteration\"\n    SetTextColor 1 2 3 255\n\n\
+            Show # $type->currency $tier->t9\n    BaseType == \"Orb of Alteration\"\n    SetFontSize 20\n";
+        let build = |rules: &[Rule]| {
+            let mut segs = parse_filter(text);
+            apply(&mut segs, rules, "\n");
+            parse_filter(&crate::filter::render_filter(&segs))
+        };
+        let at = |segs: &[Segment], n: u32| status(segs, &crate::item::Item { stack_size: Some(n), ..orb.clone() }, Some(83), false).verdict;
+        // His Blasting: a plain hide of every stack, then "Only show 3+".
+        let mut rules = vec![quick_rule(&orb, Action::Hide, None, &MatchOpts::default())];
+        assert_eq!(at(&build(&rules), 20).visibility, "Hide");
+        let label = only_show(&mut rules, &orb, 3, &MatchOpts::default());
+        assert_eq!((label.as_str(), rules.len()), ("Hide: Orb of Alteration (stacks under 3)", 1));
+        assert_eq!(at(&build(&rules), 20).visibility, "Show");
+        // 3-5 are still hidden (the price line, then NeverSink's own step): an edit shows them, with that step's look.
+        let show = show_hidden_stacks(&build(&rules), &orb, 3, &MatchOpts::default(), 83).unwrap();
+        assert_eq!(rule_detail(&show).unwrap().label, "Style: Orb of Alteration (stacks 3–5)");
+        add_rule(&mut rules, show);
+        let segs = build(&rules);
+        assert_eq!(at(&segs, 2).visibility, "Hide");
+        assert_eq!((at(&segs, 3).visibility.as_str(), at(&segs, 3).style.text), ("Show", Some([1, 2, 3, 255])));
+        assert_eq!((at(&segs, 6).visibility.as_str(), at(&segs, 6).style.font_size), ("Show", Some(45)));
+        assert_eq!(show_hidden_stacks(&segs, &orb, 3, &MatchOpts::default(), 83), None);
+        // Hidden in the filter this one builds on: still shows here, with the look underneath.
+        let mut rules = vec![quick_rule(&orb, Action::Hide, None, &MatchOpts::default()),
+            quick_rule(&orb, Action::Hide, None, &MatchOpts { below_stack: Some(10), ..Default::default() })];
+        let show = show_hidden_stacks(&build(&rules), &orb, 10, &MatchOpts::default(), 83).unwrap();
+        assert_eq!(rule_detail(&show).unwrap().style.font_size, Some(45));
+        rules.push(show);
+        assert_eq!((at(&build(&rules), 9).visibility.as_str(), at(&build(&rules), 40).visibility.as_str()), ("Hide", "Show"));
+        // "In maps" only: a hide that also covers levelling isn't thrown away.
+        let mut rules = vec![quick_rule(&orb, Action::Hide, None, &MatchOpts::default())];
+        only_show(&mut rules, &orb, 3, &MatchOpts { when: When::Maps, ..Default::default() });
+        assert_eq!(rules.len(), 2);
     }
 
     #[test]

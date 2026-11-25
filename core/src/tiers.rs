@@ -58,6 +58,41 @@ pub struct Section {
     /// "Hide if worth under N" for this section (your price settings), when set.
     #[serde(default)]
     pub hide_below: Option<f64>,
+    /// Items here your own edits hide (25 Nov: his tiers were ticked while four edits hid every stack).
+    #[serde(default)]
+    pub edit_hides: std::collections::BTreeMap<String, EditHide>,
+}
+
+/// One of your edits hiding an item a tier lists.
+#[derive(Debug, Clone, Serialize)]
+pub struct EditHide {
+    /// From what stack size it shows anyway (None = never).
+    pub from: Option<u32>,
+    pub label: String,
+    /// The edit's place in this filter's list, else the filter it's in.
+    pub rule: Option<usize>,
+    pub parent: Option<String>,
+}
+
+/// The items listed here that your own edits hide: base -> (from what stack it shows, the edit's label).
+pub fn hidden_by_edits(sections: &[Section], segs: &[Segment], rules: &[crate::rules::Rule], area_level: u32) -> std::collections::BTreeMap<String, (Option<u32>, String)> {
+    let listed: std::collections::HashSet<&String> = sections.iter().filter(|s| s.group != LEVELLING).flat_map(|s| s.tiers.iter().flat_map(|t| &t.bases)).collect();
+    let mut out = std::collections::BTreeMap::new();
+    for d in rules.iter().filter(|r| !r.is_off()).filter_map(crate::rules::rule_detail) {
+        // Hides of some rarity, or only while levelling, don't hide the item as such.
+        if d.show || d.rarity.is_some() || d.corrupted || !d.mods.is_empty() || d.when == crate::rules::When::Levelling
+            || !listed.contains(&d.base_type) || out.contains_key(&d.base_type) { continue; }
+        let (from, why) = crate::preview::shows_from(segs, &d.item_class, &d.base_type, area_level);
+        let Some(w) = why.filter(|w| w.kind == "edit" && from != Some(1)) else { continue };
+        // Gold's cut-offs are past what shows_from tries: ask at the edit's own number.
+        let cut = rules.iter().filter_map(crate::rules::rule_detail).find(|x| x.label == w.label).and_then(|x| x.below_stack);
+        let from = from.or(cut.filter(|n| {
+            let it = crate::item::Item { item_class: d.item_class.clone(), rarity: "Currency".into(), base_type: d.base_type.clone(), stack_size: Some(*n), ..Default::default() };
+            crate::evaluate::status(segs, &it, Some(area_level), false).verdict.visibility != "Hide"
+        }));
+        out.insert(d.base_type, (from, w.label));
+    }
+    out
 }
 
 /// Adds worth to each section's items and its "hide if worth under" line. Unique sections show the most a unique on
@@ -538,7 +573,7 @@ pub fn sections(segs: &[Segment]) -> Vec<Section> {
             None => {
                 let (group, title) = KNOWN.iter().find(|k| k.0 == key).map(|k| (k.1.to_string(), k.2.to_string()))
                     .unwrap_or_else(|| ("Other".into(), b.type_path.iter().map(|p| tier_name(p)).collect::<Vec<_>>().join(" › ")));
-                found.push(Section { type_path: b.type_path.clone(), title, group, tiers: vec![], shared_bases: false, prices: Default::default(), hide_below: None });
+                found.push(Section { type_path: b.type_path.clone(), title, group, tiers: vec![], shared_bases: false, prices: Default::default(), hide_below: None, edit_hides: Default::default() });
                 found.len() - 1
             }
         };
@@ -610,7 +645,7 @@ pub fn section_at(segs: &[Segment], type_path: &[String]) -> Option<Section> {
     }
     if tiers.is_empty() { return None; }
     let title = section_title(type_path).unwrap_or_else(|| type_path.iter().map(|p| plain_part(p)).collect::<Vec<_>>().join(" › "));
-    Some(Section { type_path: type_path.to_vec(), title, group: "Opened rule".into(), tiers, shared_bases: true, prices: Default::default(), hide_below: None })
+    Some(Section { type_path: type_path.to_vec(), title, group: "Opened rule".into(), tiers, shared_bases: true, prices: Default::default(), hide_below: None, edit_hides: Default::default() })
 }
 
 /// NeverSink's short section names in plain words.

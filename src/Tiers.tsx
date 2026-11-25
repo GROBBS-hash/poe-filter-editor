@@ -144,7 +144,15 @@ function StackBox({ value, onSave, label = "stacks of", title = "Smallest stack 
   );
 }
 type Section = { type_path: string[]; title: string; group: string; tiers: TierRow[]; shared_bases?: boolean;
-  prices?: Record<string, number>; hide_below?: number | null };
+  prices?: Record<string, number>; hide_below?: number | null;
+  /** Items listed here that your own edits hide, and from what stack size they show anyway (null = never). */
+  edit_hides?: Record<string, EditHide> };
+type EditHide = { from: number | null; label: string; rule: number | null; parent: string | null };
+/** Your edit keeps this row's stacks (some or all of them) hidden. */
+const editHides = (s: Section, t: TierRow, b: string) => {
+  const h = s.edit_hides?.[b];
+  return h && (h.from == null || h.from > Math.max(1, t.min_stack ?? 1)) ? h : null;
+};
 
 const SHOW_ITEMS = 24;
 
@@ -371,6 +379,7 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
               <SectionWorth profileId={profile.id} sectionKey={section.type_path.join("->")} prices={section.prices}
                 limit={section.hide_below ?? null} onChange={() => { onChange(); load(); }} />
             )}
+            <EditHidesNote section={section} onRemove={(b, h) => done(invoke("delete_rule", { id: profile.id, index: h.rule }), `${b} shows as its tier again.`)} />
             {section.tiers.map((t) => {
               const key = t.tier;
               const shown = t.visibility !== "Hide";
@@ -415,10 +424,10 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
                   <div className="tier-items">
                     {items.map((b) => (
                       <span key={b} data-chip={`${key}|${b}`}
-                        className={`chip ${drag?.base === b ? "dragging" : ""} ${found?.base === b && found.tier === key ? "found" : ""}`} draggable={!section.shared_bases}
+                        className={`chip ${editHides(section, t, b) ? "edit-hid" : ""} ${drag?.base === b ? "dragging" : ""} ${found?.base === b && found.tier === key ? "found" : ""}`} draggable={!section.shared_bases}
                         onDragStart={(e) => { e.dataTransfer.setData("text/plain", b); e.dataTransfer.effectAllowed = "move"; setDrag({ base: b, from: key }); }}
                         onDragEnd={() => { setDrag(null); setOver(null); }}
-                        title={`Drag to another tier`}>
+                        title={editHides(section, t, b) ? `Your edit “${section.edit_hides![b].label}” hides it` : `Drag to another tier`}>
                         <ItemIcon base={b} size={20} />{b}
                         {section.prices?.[b] != null && <span className={`chip-price ${section.hide_below != null && section.prices[b] < section.hide_below ? "below" : ""}`}
                           title={section.group === "Uniques" ? "poe.ninja: the most a unique on this base is worth" : "poe.ninja price"}>
@@ -439,6 +448,28 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
         )}
         {msg && <div className="note">{msg}</div>}
       </div>
+    </div>
+  );
+}
+
+/** Items in this list that your own edits (F2, My edits) hide, whatever their tier says, with a button to undo each. */
+function EditHidesNote({ section, onRemove }: { section: Section; onRemove: (base: string, h: EditHide) => void }) {
+  const list = [...new Set(section.tiers.flatMap((t) => t.bases.filter((b) => editHides(section, t, b))))];
+  if (list.length === 0) return null;
+  return (
+    <div className="warn-line edit-hides">
+      <b>Your own edits hide {list.length === 1 ? "this one" : `these ${list.length}`}, whatever the tier says:</b>
+      {list.map((b) => {
+        const h = section.edit_hides![b];
+        return (
+          <div key={b} className="eh-row">
+            <ItemIcon base={b} size={24} /><b>{b}</b>
+            <span className="small">{h.from == null ? "every stack hidden" : `only stacks of ${h.from}+ show`}
+              <span className="muted"> · “{h.label}”{h.parent ? `, an edit in ${h.parent}: change it there` : ""}</span></span>
+            {h.rule != null && <button onClick={() => onRemove(b, h)}>Remove this edit</button>}
+          </div>
+        );
+      })}
     </div>
   );
 }

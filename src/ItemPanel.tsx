@@ -166,7 +166,7 @@ function StackTiers({ base, onDone }: { base: string; onDone: (msg: string) => v
   );
 }
 
-export default function ItemPanel({ start, inGame, replacing: replacingProp, onClose, onChanged, onEditingChange, openLook }: {
+export default function ItemPanel({ start, inGame, replacing: replacingProp, onClose, onChanged, onEditingChange, openLook, onMoved, startToast }: {
   start: Picked;
   inGame: boolean;
   replacing?: Replacing | null;
@@ -176,6 +176,9 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
   onEditingChange?: (editing: boolean) => void;
   /** Open straight on the look editor (a label preview was clicked). */
   openLook?: boolean;
+  /** The saved edit being changed is another one now, or at another place in the list (with the message to show). */
+  onMoved?: (index: number, detail: RuleDetail, message: string) => void;
+  startToast?: string;
 }) {
   const [picked, setPicked] = useState<Picked>(start);
   const [replacing, setReplacing] = useState<Replacing | null>(replacingProp ?? null);
@@ -184,7 +187,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
   const [more, setMore] = useState(() => { try { return localStorage.getItem("qm-more") === "1"; } catch { return false; } });
   const toggleMore = (on: boolean) => { setMore(on); try { localStorage.setItem("qm-more", on ? "1" : "0"); } catch { /* not kept */ } };
   const [extra, setExtra] = useState<Omit<Reply, "status"> | null>(null);
-  const [toast, setToast] = useState("");
+  const [toast, setToast] = useState(startToast ?? "");
   const [anyRarity, setAnyRarity] = useState(replacingProp ? !replacingProp.detail.rarity : false);
   /** Always, only while levelling (areas below 68), or only in maps. */
   const [when, setWhen] = useState<When>(replacingProp?.detail.when ?? "always");
@@ -235,7 +238,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
     setToast(warning ?? `${message} Press F4 in game to reload.`);
     refresh(picked);
   };
-  const saved = async (call: Promise<{ label: string; warnings: string[] }>, addedNew = false) => {
+  const saved = async (call: Promise<{ label: string; warnings: string[] }>, addedNew = false, follow = false) => {
     try {
       const r = await call;
       // Keep editing the same rule after a change. A new rule can shift the
@@ -243,10 +246,11 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
       if (replacing) {
         try {
           const [id, index, detail] = await invoke<[string, number, RuleDetail]>("get_rule", addedNew
-            ? { id: replacing.id, index: null, label: replacing.detail.label }
+            ? { id: replacing.id, index: null, label: follow ? r.label : replacing.detail.label }
             : { id: replacing.id, index: replacing.index, label: null });
           setReplacing({ id, index, detail });
-        } catch { /* keep the old details */ }
+          if (index !== replacing.index) onMoved?.(index, detail, `Updated “${r.label}”. Press F4 in game to reload.`);
+        } catch { if (follow) { onChanged?.(); onClose(); return; } /* else keep the old details */ }
       }
       // Notes about older edits whose NeverSink tier no longer exists aren't about this change (My edits lists
       // them): don't let them block the reload or replace the "Saved" message.
@@ -305,9 +309,8 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
     const look = v?.style && (v.style.text || v.style.background || v.style.border) ? v.style : undefined;
     return commit(true, fromCurrent(look, picked.item.rarity), {});
   };
-  // Stack rules always sit alongside your other rules for this item ("hide the
-  // small piles" + "style the big ones"), so they're added, never swapped in.
-  const hideBelow = (n: number) => commit(false, null, { below_stack: n }, true);
+  // Hides the small piles and makes sure the rest shows: your own hide of every stack is replaced (25 Nov).
+  const hideBelow = (n: number) => saved(invoke("only_show_stack", { item: picked.item, min: n, opts: opts() }), true, true);
   /** `look`: a saved look's name; the edit then follows that look when it's changed later. */
   const saveStyle = (style: CustomStyle, look: string | null = null) => {
     const minStack = editing ? editing.minStack : 1;
@@ -488,7 +491,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
               : <>only {src!.only_base} looks like this; {rest} keeps NeverSink's look.</>;
             const chips = shown(v.visibility)
               ? [st?.muted ? "No sound" : st?.sound ? `🔊 ${st.sound}` : "Default sound", st?.beam ? `${st.beam} beam` : "", st?.minimap ? "Map icon" : ""]
-              : [only ? `Only ${src!.only_base} hidden` : "Hidden on the ground"];
+              : [`${only ? `Only ${src!.only_base} hidden` : "Hidden on the ground"}${extra?.stackable && status!.by_stack.length === 0 ? ", every stack size" : ""}`];
             return (
               <>
                 <div className="qm-chips">{chips.filter(Boolean).map((c) => <span key={c} className="qm-chip">{c}</span>)}</div>
@@ -611,7 +614,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
             onChange={(e) => setStackPick(+e.target.value)} />
           <div className="qm-row">
             <button className="qm-btn small hide" onClick={() => hideBelow(stackN)} disabled={stackN <= 1}
-              title={`Hide stacks smaller than ${stackN.toLocaleString()}`}>
+              title={`Hide stacks smaller than ${stackN.toLocaleString()} and show the rest`}>
               Only show {stackN.toLocaleString()}+
             </button>
             <button className="qm-btn small" onClick={() => setEditing({ minStack: stackN })}>

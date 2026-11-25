@@ -1564,7 +1564,18 @@ fn get_tiers(state: State<AppState>, id: String) -> Result<Vec<filter_core::tier
     let prices = state.prices.lock().unwrap();
     let (text, _) = render_profile(&store, &id, &filter_dir(game), prices.get(&game), None).map_err(err)?;
     let mut s = filter_core::tiers::sections(&parse_filter(&text));
-    filter_core::tiers::mark_changed(&mut s, &store.resolved_rules(&id));
+    let rules = store.resolved_rules(&id);
+    filter_core::tiers::mark_changed(&mut s, &rules);
+    // Items your own edits hide, whatever the tiers say.
+    let hidden = filter_core::tiers::hidden_by_edits(&s, &parse_filter(&text), &rules, if game == Game::Poe1 { 83 } else { 80 });
+    for (base, (from, label)) in hidden {
+        let mine = |q: &filter_core::profiles::Profile| q.rules.iter().position(|r| !r.is_off() && rule_label(r) == label);
+        let rule = store.profiles.get(&id).and_then(mine);
+        let parent = if rule.is_none() { store.profiles.values().find(|q| q.id != id && mine(q).is_some()).map(|q| q.name.clone()) } else { None };
+        for sec in s.iter_mut().filter(|x| x.group != filter_core::tiers::LEVELLING && x.tiers.iter().any(|t| t.bases.contains(&base))) {
+            sec.edit_hides.insert(base.clone(), filter_core::tiers::EditHide { from, label: label.clone(), rule, parent: parent.clone() });
+        }
+    }
     // poe.ninja worth beside each item, and each section's "hide if worth under" line.
     if let Some(file) = prices.get(&game) {
         let hides = store.profiles.get(&id).and_then(|p| p.prices.as_ref()).map(|p| p.section_hide.clone()).unwrap_or_default();
@@ -2165,6 +2176,32 @@ fn apply_quick_action(
     let label = rule_label(&rule);
     remember(&state, &store, &id, &label);
     add_rule(&mut store.profiles.get_mut(&id).ok_or("Profile not found")?.rules, rule);
+    let warnings = save_and_build(&state, &store, &id)?;
+    Ok(ActionResult { label, warnings })
+}
+
+/// F2 / My edits: "Only show 3+". Hides the smaller stacks and makes sure stacks of that size really show (25 Nov).
+#[tauri::command]
+fn only_show_stack(state: State<AppState>, item: Item, min: u32, opts: Option<MatchOpts>) -> Result<ActionResult, String> {
+    let mut store = state.store.lock().unwrap();
+    let id = store.active.clone().ok_or("Set up a profile first")?;
+    let opts = opts.unwrap_or_default();
+    let game = store.profiles.get(&id).ok_or("Profile not found")?.game;
+    let name = item.base_type.clone();
+    remember(&state, &store, &id, &format!("Only show {name} in stacks of {min}+"));
+    let label = filter_core::rules::only_show(&mut store.profiles.get_mut(&id).ok_or("Profile not found")?.rules, &item, min, &opts);
+    let (text, _) = {
+        let prices = state.prices.lock().unwrap();
+        render_profile(&store, &id, &filter_dir(game), prices.get(&game), None).map_err(err)?
+    };
+    let level = match (opts.when, game) { (filter_core::rules::When::Levelling, _) => 60, (_, Game::Poe1) => 83, _ => 80 };
+    if let Some(show) = filter_core::rules::show_hidden_stacks(&parse_filter(&text), &item, min, &opts, level) {
+        // Below the "stacks under N" hide it belongs to, so that one stays the newest.
+        let rules = &mut store.profiles.get_mut(&id).unwrap().rules;
+        let hide = rules.pop();
+        add_rule(rules, show);
+        rules.extend(hide);
+    }
     let warnings = save_and_build(&state, &store, &id)?;
     Ok(ActionResult { label, warnings })
 }
@@ -3220,7 +3257,7 @@ pub fn run() {
             list_farm_presets,
             apply_farm_preset,
             list_level_presets,
-            get_tiers, get_threads, reset_item, get_rule_section, get_map_tiers, set_tiers, build_tree_opt, set_build_tree, trade_search, trade_bulk, map_dangers, map_suggest, map_tool_get, map_tool_save, map_tool_regex, map_regex_copy, map_tool_trade, trade_action, hide_trades_window, wealth_app::wealth_get, bulk_app::bulk_get, bulk_app::bulk_basket, bulk_app::bulk_live, wealth_app::wealth_setup, wealth_app::wealth_prefs, wealth_app::wealth_scan, wealth_app::wealth_profile_save, wealth_app::wealth_profile_delete, wealth_app::wealth_profile_use, wealth_app::wealth_tabs_refresh, wealth_app::wealth_price_rares, wealth_app::wealth_find, wealth_app::wealth_count_rares, wealth_app::wealth_guild, updates::update_status, open_editor, price_count_below, price_thin_cards, updates::update_install, wealth_app::session_start, wealth_app::session_check, wealth_app::session_pause, wealth_app::session_stop, wealth_app::session_delete, wealth_app::earnings_overlay, saved_list, saved_add, saved_delete, saved_live, report_problem, send_whisper, copy_text, hide_trade_window, keep_on_screen,
+            get_tiers, only_show_stack, get_threads, reset_item, get_rule_section, get_map_tiers, set_tiers, build_tree_opt, set_build_tree, trade_search, trade_bulk, map_dangers, map_suggest, map_tool_get, map_tool_save, map_tool_regex, map_regex_copy, map_tool_trade, trade_action, hide_trades_window, wealth_app::wealth_get, bulk_app::bulk_get, bulk_app::bulk_basket, bulk_app::bulk_live, wealth_app::wealth_setup, wealth_app::wealth_prefs, wealth_app::wealth_scan, wealth_app::wealth_profile_save, wealth_app::wealth_profile_delete, wealth_app::wealth_profile_use, wealth_app::wealth_tabs_refresh, wealth_app::wealth_price_rares, wealth_app::wealth_find, wealth_app::wealth_count_rares, wealth_app::wealth_guild, updates::update_status, open_editor, price_count_below, price_thin_cards, updates::update_install, wealth_app::session_start, wealth_app::session_check, wealth_app::session_pause, wealth_app::session_stop, wealth_app::session_delete, wealth_app::earnings_overlay, saved_list, saved_add, saved_delete, saved_live, report_problem, send_whisper, copy_text, hide_trade_window, keep_on_screen,
             move_tier_item,
             stack_choices,
             gear_setup,

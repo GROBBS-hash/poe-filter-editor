@@ -103,7 +103,7 @@ function History({ profile, onChange }: { profile: ProfileInfo; onChange: () => 
 
 export default function Edits({ profile, onChange, focus }: { profile: ProfileInfo; onChange: () => void; focus?: { label: string } | null }) {
   const [msg, setMsg] = useState("");
-  const [open, setOpen] = useState<{ index: number; detail: RuleDetail } | null>(null);
+  const [open, setOpen] = useState<{ index: number; detail: RuleDetail; toast?: string } | null>(null);
   // Opened by clicking its look: start on the look editor.
   const [lookFirst, setLookFirst] = useState(false);
   const [q, setQ] = useState("");
@@ -212,6 +212,7 @@ export default function Edits({ profile, onChange, focus }: { profile: ProfileIn
                           <ItemPanel key={r.index + (lookFirst ? "l" : "")} inGame={false} openLook={lookFirst}
                             start={{ item: itemFromRule(open.detail), from_screen: false, screen_text: null, confidence: 1 }}
                             replacing={{ id: profile.id, index: r.index, detail: open.detail }}
+                            startToast={open.toast} onMoved={(index, detail, toast) => setOpen({ index, detail, toast })}
                             onClose={() => setOpen(null)} onChanged={onChange} />
                         </div>
                       )}
