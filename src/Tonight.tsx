@@ -8,7 +8,7 @@ import { usePersist } from "./usePersist";
 import { Tip } from "./Help";
 import "./tonight.css";
 
-type Card = { kind: "sell" | "run" | "fix"; title: string; reason: string; worth: [number, number] | null; items: [string, string][]; mechs: string[];
+type Card = { kind: "sell" | "run" | "fix"; title: string; reason: string; worth: [number, number] | null; items: [string, string][]; mechs: string[]; names: string[];
   action: string; button: string; as_of: number | null };
 
 const LABEL = { sell: "Sell", run: "Run", fix: "Fix" };
@@ -32,7 +32,7 @@ export default function Tonight({ go }: { go: (tab: string) => void }) {
     let on = true;
     const load = () => invoke<Card[]>("tonight_get", { minutes }).then((x) => on && setCards(x ?? [])).catch(() => on && setCards([]));
     load();
-    const un = ["prices-updated", "farm-now", "deaths-changed", "wealth-updated"].map((e) => listen(e, load));
+    const un = ["prices-updated", "farm-now", "deaths-changed"].map((e) => listen(e, load));
     return () => { on = false; un.forEach((u) => u.then((f) => f())); };
   }, [minutes]);
   if (!cards || cards.length === 0) return null;
@@ -41,8 +41,8 @@ export default function Tonight({ go }: { go: (tab: string) => void }) {
     try {
       if (k.action.startsWith("tab:")) go(k.action.slice(4));
       else if (k.action === "highlight") {
-        const [, n] = await invoke<[string, number]>("stash_highlight", { names: k.items.map((i) => i[0]), typeIt: true });
-        setNote(`Typed in game: ${n} of ${k.items.length} names fit. Open your stash first if nothing lit up.`);
+        const [, n] = await invoke<[string, number]>("stash_highlight", { names: k.names, typeIt: true });
+        setNote(`Typed in game: ${n} of ${k.names.length} names fit. Open your stash first if nothing lit up.`);
       } else if (k.action.startsWith("avoid:")) {
         await invoke("deaths_avoid", { text: k.action.slice(6), on: true });
         setNote("On your can't-run list: Ctrl+D warns about it, and your map search leaves it out.");

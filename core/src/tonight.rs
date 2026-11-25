@@ -17,6 +17,8 @@ pub struct Card {
     /// (item name, picture or "") and mechanics, for the pictures.
     pub items: Vec<(String, String)>,
     pub mechs: Vec<String>,
+    /// Everything it's about, for "Highlight in stash" (the pictures show the first few).
+    pub names: Vec<String>,
     /// What the button does: "tab:wealth", "highlight", "avoid:<mod>".
     pub action: String,
     pub button: String,
@@ -39,6 +41,7 @@ pub fn sell(missed: &[Valued], minutes: u32, keep: &[String], scanned: i64) -> O
         reason: format!("Most valuable: {}", pick.iter().take(3).map(|v| if v.stack > 1 { format!("{} × {}", v.stack, v.name) } else { v.name.clone() }).collect::<Vec<_>>().join(", ")),
         worth: Some((total, total)),
         items: pick.iter().take(6).map(|v| (v.name.clone(), v.icon.clone())).collect(),
+        names: pick.iter().map(|v| v.name.clone()).collect(),
         action: "highlight".into(), button: "Highlight in stash".into(), as_of: Some(scanned), ..Default::default()
     })
 }

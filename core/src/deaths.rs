@@ -80,15 +80,16 @@ pub fn patterns(runs: &[MapRun]) -> Patterns {
         let mut seen = std::collections::BTreeSet::new();
         for m in &r.mods {
             let k = shape(m);
-            if !seen.insert(k.clone()) { continue; }
+            // A line on every currency-limited map, not something that kills you.
+            if k.starts_with("modifiable with") || !seen.insert(k.clone()) { continue; }
             let e = mods.entry(k).or_insert_with(|| (plain(m), (0, 0, 0)));
             count(&mut e.1, r.deaths);
         }
     }
-    // The ones that stand out first, then by how often you died in them.
+    // The ones that stand out first, then the ones you died in most.
     let order = |v: &mut Vec<Row>| {
         v.retain(|r| r.bad_runs > 0);
-        v.sort_by(|a, b| (b.stands_out, b.bad_runs * a.runs, b.deaths).cmp(&(a.stands_out, a.bad_runs * b.runs, a.deaths)));
+        v.sort_by(|a, b| (b.stands_out, b.bad_runs, b.deaths, a.runs).cmp(&(a.stands_out, a.bad_runs, a.deaths, b.runs)));
         v.truncate(12);
     };
     let mut map_rows: Vec<Row> = maps.into_iter().map(|(n, w)| row(n.to_string(), w, all)).collect();
