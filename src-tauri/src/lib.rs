@@ -817,7 +817,8 @@ fn show_price(app: &AppHandle, payload: PriceCheck, text: &str, compare: bool) {
             .and_then(|f| filter_core::prices::trend_of(f, it.name.as_deref(), &it.base_type, &it.rarity));
         if it.rarity != "Unique" {
             payload.sold = state.prices.lock().unwrap().get(&game)
-                .and_then(|f| f.items.iter().find(|p| p.name == it.base_type && p.volume.is_some()).and_then(|p| p.sold()));
+                .and_then(|f| f.items.iter().find(|p| p.name == it.base_type && p.volume.is_some()).and_then(|p| p.sold())
+                    .or_else(|| (it.item_class == "Divination Cards" && filter_core::prices::unsold_card(f, &it.base_type)).then_some(0.0)));
         }
     }
     payload.instant_all = state.store.lock().unwrap().settings.price_instant_all;
@@ -1103,7 +1104,7 @@ fn trade_bulk(app: AppHandle, want: String, pay: String, minimum: Option<u32>, m
     let divine = state.prices.lock().unwrap().get(&game).and_then(|f| price_of(f, None, "Divine Orb", "Currency"));
     let offers = filter_core::trade::offers(&v);
     // Judged on every seller for chaos (not only the twenty shown, nor the ones with a big stock).
-    let asking = market.filter(|_| pay == "chaos" && minimum.is_none_or(|m| m <= 1))
+    let asking = Some(market.unwrap_or(0.0)).filter(|_| pay == "chaos" && minimum.is_none_or(|m| m <= 1))
         .and_then(|m| filter_core::bulk::asking(&offers.iter().map(|o| o.each).collect::<Vec<_>>(), m, sold));
     Ok(BulkResult { offers: offers.into_iter().take(20).collect(), url: trade_api::exchange_url(poe2, &league, &id), divine, asking })
 }

@@ -234,6 +234,15 @@ function bulkTypical(offers: Offer[], divine: number | null, market: number | nu
   return { typical, cheapest: rows[0]?.c ?? 0, fixer };
 }
 
+/** A cheap card hardly anyone buys (fewer than 5 sold recently; 0 = poe.ninja saw none sell): what sellers ask isn't what
+ *  it's worth, so no price (25 Nov: 2 x The Pack Leader "30c", none of them sell). Dear cards keep their price. */
+function unsold(sold: number | null | undefined, ninja: number | null, bulk: Bulk | null): boolean {
+  if (sold == null || sold >= 5) return false;
+  const o = bulk?.offers[0];
+  const worth = bulk?.asking?.each ?? ninja ?? (o ? (o.pay_currency === "divine" ? o.each * (bulk?.divine ?? 100) : o.each) : null);
+  return worth != null ? worth < 50 : sold === 0 && !!bulk;
+}
+
 /** Fewer listings than this: the price box says "low confidence" instead of "sells for about". */
 const LOW_CONFIDENCE = 5;
 
@@ -367,6 +376,21 @@ function TrendLine({ t, few }: { t: { points: number[]; change: number }; few?: 
 function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote, waiting, stack, name, sold }: { sold?: number | null; res: Result | null; bulk: Bulk | null; busy: boolean; err: string; waiting?: string | null; stack?: number; name?: string;
   divine: number | null; ninja: [number, string] | null; ninjaNote: string }) {
   const ninjaChaos = ninja ? (ninja[1] === "divine" && divine ? ninja[0] * divine : ninja[1] === "chaos" ? ninja[0] : null) : null;
+  if (unsold(sold, ninjaChaos, bulk)) {
+    const a = bulk?.asking, o = bulk?.offers[0], n = a?.sellers ?? bulk?.offers.length ?? 0;
+    return (
+      <div className="tw-hero low">
+        <div className="tw-hero-main">
+          <span className="tw-hero-price tw-nosale">{sold === 0 ? "Doesn't sell" : "Hardly sells"}</span>
+          <span className="tw-hero-side"><span className="tw-hero-label tw-low-tag">{sold === 0 ? "none" : `about ${Math.max(1, Math.round(sold ?? 0))}`} sold recently</span></span>
+        </div>
+        <div className="tw-hero-foot muted small">
+          {busy ? <><Spinner /> checking trade…</> : o ? <>{n} seller{n === 1 ? "" : "s"} ask from <Price n={o.each} cur={o.pay_currency} />{a && a.each > o.each ? <>, a quarter of them {money(a.each, divine)} or less</> : null}, but {sold === 0 ? "nobody has bought one lately" : "hardly anyone buys"}</> : "nobody has it listed"}
+          {ninjaChaos != null && <span> · poe.ninja's {money(ninjaChaos, divine)} comes from those few</span>}
+        </div>
+      </div>
+    );
+  }
   let main: number | null = null, label = "", sub: React.ReactNode = null, source = "", low = false;
   if (res?.summary) {
     main = res.summary[1];
@@ -388,8 +412,8 @@ function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote, waiting, st
     const o = bulk.offers[0];
     main = ask?.each ?? ninjaChaos ?? t.typical; label = ask ? "each, what sellers ask" : "each";
     if (ask) low = true;
-    source = ask ? "Hardly traded, so poe.ninja's price comes from a few sales: this is what sellers really ask" : ninjaChaos != null ? "poe.ninja's price, from real trades on the in-game Currency Exchange" : "Going rate on the trade site's exchange, weighted by stock";
-    sub = ask ? <>{ask.under} of {ask.sellers} sellers ask less than poe.ninja's {money(ninjaChaos ?? 0, divine)}{sold != null ? <>, which comes from about {Math.max(1, Math.round(sold))} sold</> : null}</> : <>cheapest listed {money(t.cheapest, divine)}{o.stock ? ` (${o.stock} in stock)` : ""}
+    source = ask && ask.under === 0 ? "None sold recently on the in-game exchange: this is only what sellers ask" : ask ? "Hardly traded, so poe.ninja's price comes from a few sales: this is what sellers really ask" : ninjaChaos != null ? "poe.ninja's price, from real trades on the in-game Currency Exchange" : "Going rate on the trade site's exchange, weighted by stock";
+    sub = ask && ask.under === 0 ? <>none sold recently, so this is what the cheapest quarter of {ask.sellers} sellers ask</> : ask ? <>{ask.under} of {ask.sellers} sellers ask less than poe.ninja's {money(ninjaChaos ?? 0, divine)}{sold != null ? <>, which comes from about {Math.max(1, Math.round(sold))} sold</> : null}</> : <>cheapest listed {money(t.cheapest, divine)}{o.stock ? ` (${o.stock} in stock)` : ""}
       {ninjaChaos == null && <> · going rate {money(t.typical, divine)}</>} · {bulk.offers.length} sellers</>;
   } else if (ninjaChaos != null) {
     main = ninjaChaos; label = `poe.ninja${ninjaNote}`;
@@ -758,6 +782,9 @@ export default function TradeWindow() {
   const ninjaC = check.ninja ? (check.ninja[1] === "divine" && divine ? check.ninja[0] * divine : check.ninja[1] === "chaos" ? check.ninja[0] : null) : null;
   const asking = bulk?.asking ?? null;
   const bt = bulk?.offers.length ? bulkTypical(bulk.offers, bulk.divine, asking?.each ?? ninjaC) : null;
+  const dead = unsold(check.sold, ninjaC, check.bulk ? bulk : null);
+  // Nobody buys it at any price: the cheap ones aren't bait.
+  if (bt && dead) bt.fixer = () => false;
   const fixers = bulk && bt ? bulk.offers.filter((o) => bt.fixer(o)).length : 0;
   // Where poe.ninja's price sits among the offers (Awakened's "market ratio" row).
   const ratioAt = bulk && ninjaC != null ? (() => { const i = bulk.offers.findIndex((o) => (o.pay_currency === "divine" && bulk.divine ? o.each * bulk.divine : o.each) >= ninjaC); return i === -1 ? bulk.offers.length : i; })() : -1;
@@ -831,9 +858,9 @@ export default function TradeWindow() {
       {heroTop && hero}
       {style === "awakened-price" && res && <MarketStats res={res} divine={divine} />}
       {heroTop && trend}
-      {check.sold != null && check.sold < 5 && (
+      {check.sold != null && check.sold < 5 && !dead && (
         <div className="qm-warn tw-thin" title="poe.ninja's price comes from the few that sold. The filter's worth line counts cards like this under 50c as worthless.">
-          Hardly traded: about {Math.max(1, Math.round(check.sold))} sold recently on the exchange, so this price is a guess.</div>
+          Hardly traded: {check.sold === 0 ? "none" : `about ${Math.max(1, Math.round(check.sold))}`} sold recently on the exchange, so this price is a guess.</div>
       )}
       <ErrNote msg={err} className="qm-warn" />
       {res && res.total === 0 && searched === searchKey(setup) && (setup.filters.some((f) => f.enabled) || (setup.base_only && setup.category) || setup.ilvl_min) && (
@@ -1018,7 +1045,7 @@ export default function TradeWindow() {
       {check.bulk && (
         <div className="tw-res">
           <div className="tw-sum tw-bulkhead">
-            <span>{bulk?.offers[0] && bt ? <>{asking ? "Sellers ask" : ninjaC != null ? "Market price" : "Going rate"} <b><Price n={asking?.each ?? ninjaC ?? bt.typical} cur="chaos" /></b> each
+            <span>{bulk?.offers[0] && dead ? <>What sellers ask</> : bulk?.offers[0] && bt ? <>{asking ? "Sellers ask" : ninjaC != null ? "Market price" : "Going rate"} <b><Price n={asking?.each ?? ninjaC ?? bt.typical} cur="chaos" /></b> each
               {" "}<Other n={asking?.each ?? ninjaC ?? bt.typical} cur="chaos" divine={bulk.divine} /></> : busy ? "checking…" : "no offers"}</span>
             <span className="tw-pay">
               {(["chaos", "divine"] as const).map((p) => (

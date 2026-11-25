@@ -42,6 +42,13 @@ pub fn thin_card_at(it: &PriceItem, min_sold: f64) -> bool {
     it.cat == "DivinationCard" && it.value < THIN_CAP && it.sold().is_some_and(|n| n < min_sold)
 }
 
+/// A divination card poe.ninja has no line for: nobody bought one lately (it lists every card that traded). False when
+/// the file has too few cards to tell (no list that day).
+pub fn unsold_card(file: &PriceFile, name: &str) -> bool {
+    let mut cards = file.items.iter().filter(|i| i.cat == "DivinationCard" && i.volume.is_some());
+    cards.clone().nth(99).is_some() && !cards.any(|i| i.name == name)
+}
+
 /// Cards that don't count at that number, dearest first: (name, value, sold).
 pub fn thin_cards(file: &PriceFile, min_sold: f64) -> Vec<(String, f64, f64)> {
     let mut v: Vec<_> = file.items.iter().filter(|i| i.value > 0.0 && thin_card_at(i, min_sold))

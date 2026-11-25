@@ -166,9 +166,11 @@ const MANY_UNDER: usize = 10;
 /// of them ask well under it, they're the market, not price fixers (24 Nov: The Gambler, "8.65c" from 13 sold, 33 of
 /// 80 sellers at 1-5c, every one shown called a price fixer).
 pub fn asking(asks: &[f64], market: f64, sold: Option<f64>) -> Option<Asking> {
-    if market <= 0.0 || !sold.is_some_and(|s| s < FEW_SOLD) { return None; }
+    if !sold.is_some_and(|s| s < FEW_SOLD) { return None; }
     let mut v: Vec<f64> = asks.iter().copied().filter(|a| *a > 0.0).collect();
     v.sort_by(f64::total_cmp);
+    // Nobody bought one, so poe.ninja has no price (25 Nov: The Pack Leader, 31 sellers from 1c to 111c).
+    if market <= 0.0 { return (!v.is_empty() && sold == Some(0.0)).then(|| Asking { each: v[v.len() / 4], under: 0, sellers: v.len() }); }
     let under = v.iter().filter(|a| **a < market * 0.75).count();
     if under < MANY_UNDER || under * 4 < v.len() { return None; }
     Some(Asking { each: v[v.len() / 4], under, sellers: v.len() })
@@ -261,6 +263,11 @@ mod tests {
         // Plenty sold: poe.ninja's price stands, and the cheap ones are bait.
         assert_eq!(asking(&asks, 8.65, Some(4000.0)), None);
         assert_eq!(asking(&asks, 8.65, None), None);
+        // The Pack Leader, 25 Nov: none sold, so poe.ninja has no price; the cheap ones are what it's worth, not bait.
+        let pack = [1.0, 3.0, 3.0, 5.0, 5.0, 5.0, 5.0, 5.0, 9.0, 10.0, 10.0, 10.0, 10.0, 12.0, 15.0, 19.0, 20.0, 20.0, 20.0, 25.0, 30.0, 40.0,
+            50.0, 50.0, 64.0, 70.0, 99.0, 100.0, 100.0, 100.0, 101.0];
+        assert_eq!(asking(&pack, 0.0, Some(0.0)), Some(Asking { each: 5.0, under: 0, sellers: 31 }));
+        assert_eq!(asking(&pack, 0.0, None), None);
         // A few bait listings on a rare card don't move it.
         assert_eq!(asking(&[1.0, 1.0, 1.0, 80.0, 90.0, 95.0, 99.0, 100.0], 90.0, Some(6.0)), None);
         // Ten baits among a hundred honest sellers don't either.
