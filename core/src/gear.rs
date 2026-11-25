@@ -35,6 +35,11 @@ pub fn gems() -> &'static HashMap<String, Gem> {
     D.get_or_init(|| serde_json::from_str(include_str!("../data/poe1_gems.json")).unwrap_or_default())
 }
 
+/// "Fireball of Radiation": a gem whose name is another gem's plus "of …" (not Herald of Ash).
+pub fn is_transfigured(name: &str) -> bool {
+    name.split_once(" of ").is_some_and(|(g, _)| gems().contains_key(g))
+}
+
 pub fn stat_list() -> &'static Vec<StatInfo> {
     static D: OnceLock<Vec<StatInfo>> = OnceLock::new();
     D.get_or_init(|| serde_json::from_str(include_str!("../data/levelling_stats.json")).unwrap_or_default())

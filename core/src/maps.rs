@@ -136,7 +136,7 @@ pub fn map_info(text: &str, avoid: Option<&[String]>) -> MapInfo {
         if invitation && headed && !sec.iter().any(|l| l.starts_with('{')) { continue; }
         // Not mods: the "how to use" text, flavour, corrupted/unidentified markers.
         if sec.iter().any(|l| l.starts_with("Travel to") || l.starts_with("Place into") || l.starts_with("Right click")
-            || l.starts_with("Note:") || *l == "Corrupted" || *l == "Unidentified" || *l == "Mirrored" || l.starts_with("Can be used")) {
+            || l.starts_with("Note:") || *l == "Corrupted" || *l == "Twice Corrupted" || *l == "Unidentified" || *l == "Mirrored" || l.starts_with("Can be used")) {
             continue;
         }
         for l in sec {

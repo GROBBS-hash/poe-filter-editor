@@ -213,7 +213,7 @@ fn check(key: &str, op: &str, vals: &[String], c: &Ctx) -> Tri {
         "AreaLevel" => cmp_num(c.area_level, op, vals),
         "StackSize" => cmp_num(c.stack.or(it.stack_size).or(Some(1)), op, vals),
         "Quality" => cmp_num(if c.from_screen { None } else { Some(it.quality.unwrap_or(0)) }, op, vals),
-        "MapTier" | "WaypointTier" => cmp_num(it.map_tier, op, vals),
+        "MapTier" | "WaystoneTier" => cmp_num(it.map_tier, op, vals),
         // Read from the ground we can't see sockets: assume none unless the label's look says it's linked.
         "LinkedSockets" => cmp_num(Some(it.sockets.as_deref().map(max_links).unwrap_or(0)), op, vals),
         "Sockets" => match (&it.sockets, c.from_screen) {
@@ -236,9 +236,17 @@ fn check(key: &str, op: &str, vals: &[String], c: &Ctx) -> Tri {
             let any = vals.iter().any(|v| it.influences.iter().any(|i| i.eq_ignore_ascii_case(v)));
             if any { Tri::Yes } else { Tri::No }
         }
-        "FracturedItem" | "SynthesisedItem" | "Replica" | "Foulborn" | "Scourged" | "IsVaalUnique"
-        | "ElderMap" | "ShapedMap" | "BlightedMap" | "UberBlightedMap"
-        | "TransfiguredGem" | "ZanaMemory" | "Imbued" =>
+        // The copied text says what it is (25 Nov: copied items always counted as none of these).
+        "FracturedItem" | "SynthesisedItem" | "Replica" | "Foulborn" if !c.from_screen => cmp_bool(Some(it.kinds.iter().any(|k| k == key)), vals),
+        // "TransfiguredGem True", or the gems by name.
+        "TransfiguredGem" if !c.from_screen => match vals.first().map(|v| v.to_lowercase()) {
+            Some(v) if v == "true" || v == "false" => cmp_bool(Some(it.kinds.iter().any(|k| k == key)), vals),
+            _ => cmp_text(&it.base_type, op, vals),
+        },
+        // Can't be told from a copied gem; nothing else has it.
+        "Imbued" if it.item_class.contains("Gem") => Tri::Unknown,
+        "Scourged" | "IsVaalUnique" | "ElderMap" | "ShapedMap" | "BlightedMap" | "UberBlightedMap" | "ZanaMemory" | "Imbued"
+        | "FracturedItem" | "SynthesisedItem" | "Replica" | "Foulborn" | "TransfiguredGem" =>
             if c.from_screen { Tri::Unknown } else { cmp_bool(Some(false), vals) },
         // Jewels copied from the game: their mod names are known ("HasExplicitMod >=2 \"Shimmering\" \"Vivid\"").
         "HasExplicitMod" if it.mod_names.is_some() && !c.from_screen => {
@@ -482,6 +490,18 @@ mod tests {
     const F: &str = "Show # $type->currency $tier->t1\n    BaseType == \"Divine Orb\"\n    SetFontSize 45\n    SetTextColor 255 0 0 255\n    PlayAlertSound 1 300\n\nHide # $type->currency $tier->wisdom\n    StackSize < 6\n    BaseType == \"Scroll of Wisdom\"\n\nShow # $type->currency $tier->wisdomstack\n    BaseType == \"Scroll of Wisdom\"\n    SetFontSize 30\n\nShow # $type->rare $tier->mods\n    HasExplicitMod \"of Haast\"\n    Rarity Rare\n    SetFontSize 40\n\nHide # $type->rare $tier->rest\n    Rarity Rare\n";
 
     fn item(t: &str) -> Item { parse_item(t).unwrap() }
+
+    #[test]
+    fn copied_items_know_what_they_are() {
+        let filter = |cond: &str| parse_filter(&format!("Hide\n    {cond}\n\nShow\n    SetFontSize 30\n"));
+        let hidden = |text: &str, cond: &str| status(&filter(cond), &parse_item(text).unwrap(), Some(83), false).verdict.visibility == "Hide";
+        let boots = "Item Class: Boots\nRarity: Rare\nDoom Pace\nTwo-Toned Boots\n--------\nItem Level: 85\n--------\nFractured Item\n";
+        assert!(hidden(boots, "FracturedItem True") && !hidden(boots, "FracturedItem False") && !hidden(boots, "SynthesisedItem True"));
+        let ring = "Item Class: Rings\nRarity: Rare\nComposite Ring\n--------\nItem Level: 85\n--------\nUnidentified (Tier 4)\n";
+        assert!(hidden(ring, "UnidentifiedItemTier >= 4") && !hidden(ring, "UnidentifiedItemTier >= 5"));
+        let gem = "Item Class: Skill Gems\nRarity: Gem\nFireball of Radiation\n--------\nSpell\n";
+        assert!(hidden(gem, "TransfiguredGem True") && hidden(gem, "TransfiguredGem \"Fireball of Radiation\"") && !hidden(gem, "TransfiguredGem \"Cleave of Rage\""));
+    }
 
     #[test]
     fn shown_with_style() {

@@ -172,7 +172,12 @@ pub fn item_worth(item: &str, items: &[crate::prices::PriceItem]) -> Option<f64>
     }
     // A unique: its name starts the text and its base is in it; the longest name wins.
     items.iter().filter(|i| i.cat.starts_with("Unique") && !i.name.is_empty() && item.starts_with(&i.name) && item.contains(&i.base))
-        .max_by_key(|i| i.name.len()).map(|i| i.value)
+        .max_by_key(|i| i.name.len()).and_then(|best| {
+            // Its version isn't in the whisper: no verdict when the versions' prices are far apart.
+            let u = items.iter().filter(|i| i.name == best.name && i.base == best.base && i.cat.starts_with("Unique")).map(|i| i.value);
+            let (lo, hi) = u.fold((f64::INFINITY, 0.0f64), |(l, h), v| (l.min(v), h.max(v)));
+            (hi <= lo * 1.5).then_some(lo)
+        })
         .or_else(|| items.iter().filter(|i| i.name.eq_ignore_ascii_case(item) && i.cat != "SkillGem").map(|i| i.value).reduce(f64::max))
 }
 
@@ -207,5 +212,8 @@ mod price_tests {
         let c = check_price("2 Divine Orb", "360 Chaos Orb", &items, &rates).unwrap();
         assert_eq!(c.verdict, "fair");
         assert!(check_price("Doom Grip Titan Gauntlets", "1 divine", &items, &rates).is_none());
+        // Versions far apart (Voices): no telling whether the offer is fair.
+        let voices = vec![it("Voices", "Large Cluster Jewel", "UniqueJewel", 185396.0), it("Voices", "Large Cluster Jewel", "UniqueJewel", 0.86)];
+        assert!(check_price("Voices Large Cluster Jewel", "1 divine", &voices, &rates).is_none());
     }
 }

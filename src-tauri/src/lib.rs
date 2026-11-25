@@ -654,6 +654,8 @@ struct PriceCheck {
     /// About how many sold recently on the in-game exchange (poe.ninja), for cards and other exchange items:
     /// a handful means its poe.ninja price is a guess.
     sold: Option<f64>,
+    /// A unique whose version can't be told: poe.ninja's price for the dearest one (`ninja` is the cheapest).
+    ninja_high: Option<f64>,
 }
 
 
@@ -712,9 +714,9 @@ fn price_check(app: AppHandle) {
                     let category = filter_core::trade::category(&item.item_class).map(|c| if item.base_type.ends_with("Cluster Jewel") { "jewel.cluster" } else { c }).map(String::from);
                     let s = filter_core::trade::TradeSetup { item: item.clone(), filters: vec![], base_only: true, ilvl_min: None, ilvl_max: None,
                         links_min: None, gem_level: None, unknown: vec![], unknown_kinds: vec![], category, raw: String::new(), misc: vec![], base: String::new(), base_item: None, affix_max: None, corrupted: None, buyout: None };
-                    PriceCheck { ninja: ninja_price(&app, &item), setup: Some(s), league, from_ground: true, error: None, bulk: None, map: None, divine: None, compare: vec![], instant_all: false, trend: None, sold: None }
+                    PriceCheck { ninja: ninja_price(&app, &item), setup: Some(s), league, from_ground: true, error: None, bulk: None, map: None, divine: None, compare: vec![], instant_all: false, trend: None, sold: None, ninja_high: None }
                 }
-                Err(e) => PriceCheck { setup: None, ninja: None, league, from_ground: true, error: Some(e), bulk: None, map: None, divine: None, compare: vec![], instant_all: false, trend: None, sold: None },
+                Err(e) => PriceCheck { setup: None, ninja: None, league, from_ground: true, error: Some(e), bulk: None, map: None, divine: None, compare: vec![], instant_all: false, trend: None, sold: None, ninja_high: None },
             }
         };
         show_price(&app, payload, &text, true);
@@ -726,16 +728,16 @@ fn text_payload(app: &AppHandle, text: &str) -> PriceCheck {
     let (poe2, league) = trade_league(app);
     let state = app.state::<AppState>();
     let none = |league: String, error: String| PriceCheck { setup: None, ninja: None, league, from_ground: false, error: Some(error), bulk: None,
-        map: None, divine: None, compare: vec![], instant_all: false, trend: None, sold: None };
+        map: None, divine: None, compare: vec![], instant_all: false, trend: None, sold: None, ninja_high: None };
     match trade_api::stats(&state.data_dir, poe2) {
         Ok(index) => match filter_core::trade::setup(text, &index) {
-            Some(s) => PriceCheck { ninja: ninja_price(app, &s.item), setup: Some(s), league, from_ground: false, error: None, bulk: None, map: None, divine: None, compare: vec![], instant_all: false, trend: None, sold: None },
+            Some(s) => PriceCheck { ninja: ninja_price(app, &s.item), setup: Some(s), league, from_ground: false, error: None, bulk: None, map: None, divine: None, compare: vec![], instant_all: false, trend: None, sold: None, ninja_high: None },
             // The game copied no item (the pointer was on an empty slot, a ground label or a window): say what to do.
             None => none(league, "No item was copied: hold the mouse over the item itself (in your stash or inventory) and press the key again".into()),
         },
         Err(e) => match filter_core::trade::setup(text, &Default::default()) {
             Some(s) => PriceCheck { ninja: ninja_price(app, &s.item), setup: Some(s), league, from_ground: false,
-                error: Some(format!("Stat list unavailable, searching by name only ({e})")), bulk: None, map: None, divine: None, compare: vec![], instant_all: false, trend: None, sold: None },
+                error: Some(format!("Stat list unavailable, searching by name only ({e})")), bulk: None, map: None, divine: None, compare: vec![], instant_all: false, trend: None, sold: None, ninja_high: None },
             None => none(league, e),
         },
     }
@@ -811,6 +813,16 @@ fn show_price(app: &AppHandle, payload: PriceCheck, text: &str, compare: bool) {
     let text = text.to_string();
     let mut payload = payload;
     payload.divine = currency_rates(app).get("divine").copied();
+    // A unique with versions (Voices, Bubonic Trail): the copied text says which one this is.
+    if let Some(n) = payload.setup.as_ref().filter(|s| s.item.rarity == "Unique").and_then(|s| s.item.name.clone()) {
+        let base = payload.setup.as_ref().map(|s| s.item.base_type.clone()).unwrap_or_default();
+        let game = active_game(&state);
+        let prices = state.prices.lock().unwrap();
+        if let Some((f, u)) = prices.get(&game).and_then(|f| filter_core::prices::unique_price(f, &n, &base, Some(&text)).map(|u| (f, u))) {
+            payload.ninja = Some((u.value, f.unit.clone()));
+            payload.ninja_high = u.high;
+        }
+    }
     if let Some(it) = payload.setup.as_ref().map(|s| &s.item) {
         let game = active_game(&state);
         payload.trend = state.prices.lock().unwrap().get(&game)
@@ -2352,6 +2364,10 @@ fn get_icons(state: State<AppState>) -> std::collections::HashMap<String, String
     state.icons.lock().unwrap().get(&game).cloned().unwrap_or_default()
 }
 
+/// Files of the app that were damaged when it started, and what was done about it.
+#[tauri::command]
+fn file_trouble() -> Vec<String> { filter_core::keep::trouble() }
+
 #[tauri::command]
 fn get_history(state: State<AppState>, id: String) -> Vec<HistoryItem> {
     let h = state.history.lock().unwrap();
@@ -2697,11 +2713,13 @@ async fn craft_plan(state: State<'_, AppState>, base: String, ilvl: u32, influen
 
 /// What poe.ninja says this item is worth (for the pop-up).
 #[tauri::command]
-fn item_price(state: State<AppState>, item: Item) -> Option<(f64, String)> {
+fn item_price(state: State<AppState>, item: Item) -> Option<(f64, String, Option<f64>)> {
     let game = active_game(&state);
     let prices = state.prices.lock().unwrap();
     let f = prices.get(&game)?;
-    price_of(f, item.name.as_deref(), &item.base_type, &item.rarity).map(|v| (v, f.unit.clone()))
+    // A unique whose versions differ: the cheapest, and the most it could be.
+    let high = item.name.as_deref().filter(|_| item.rarity == "Unique").and_then(|n| filter_core::prices::unique_price(f, n, &item.base_type, None)).and_then(|u| u.high);
+    price_of(f, item.name.as_deref(), &item.base_type, &item.rarity).map(|v| (v, f.unit.clone(), high))
 }
 
 #[derive(Serialize)]
@@ -3265,7 +3283,7 @@ pub fn run() {
             list_farm_presets,
             apply_farm_preset,
             list_level_presets,
-            get_tiers, only_show_stack, get_threads, reset_item, get_rule_section, get_map_tiers, set_tiers, build_tree_opt, set_build_tree, trade_search, trade_bulk, map_dangers, map_suggest, map_tool_get, map_tool_save, map_tool_regex, map_tool_stats, map_regex_copy, map_tool_trade, trade_action, hide_trades_window, wealth_app::wealth_get, bulk_app::bulk_get, bulk_app::bulk_basket, bulk_app::bulk_live, wealth_app::wealth_setup, wealth_app::wealth_prefs, wealth_app::wealth_scan, wealth_app::wealth_profile_save, wealth_app::wealth_profile_delete, wealth_app::wealth_profile_use, wealth_app::wealth_tabs_refresh, wealth_app::wealth_price_rares, wealth_app::wealth_find, wealth_app::wealth_count_rares, wealth_app::wealth_guild, updates::update_status, open_editor, price_count_below, price_thin_cards, updates::update_install, wealth_app::session_start, wealth_app::session_check, wealth_app::session_pause, wealth_app::session_stop, wealth_app::session_delete, wealth_app::earnings_overlay, saved_list, saved_add, saved_delete, saved_live, report_problem, send_whisper, copy_text, hide_trade_window, keep_on_screen,
+            get_tiers, only_show_stack, get_threads, reset_item, get_rule_section, get_map_tiers, set_tiers, build_tree_opt, set_build_tree, trade_search, trade_bulk, map_dangers, map_suggest, map_tool_get, map_tool_save, map_tool_regex, map_tool_stats, file_trouble, map_regex_copy, map_tool_trade, trade_action, hide_trades_window, wealth_app::wealth_get, bulk_app::bulk_get, bulk_app::bulk_basket, bulk_app::bulk_live, wealth_app::wealth_setup, wealth_app::wealth_prefs, wealth_app::wealth_scan, wealth_app::wealth_profile_save, wealth_app::wealth_profile_delete, wealth_app::wealth_profile_use, wealth_app::wealth_tabs_refresh, wealth_app::wealth_price_rares, wealth_app::wealth_find, wealth_app::wealth_count_rares, wealth_app::wealth_guild, updates::update_status, open_editor, price_count_below, price_thin_cards, updates::update_install, wealth_app::session_start, wealth_app::session_check, wealth_app::session_pause, wealth_app::session_stop, wealth_app::session_delete, wealth_app::earnings_overlay, saved_list, saved_add, saved_delete, saved_live, report_problem, send_whisper, copy_text, hide_trade_window, keep_on_screen,
             move_tier_item,
             stack_choices,
             gear_setup,

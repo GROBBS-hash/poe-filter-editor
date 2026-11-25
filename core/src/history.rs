@@ -4,7 +4,7 @@
 
 use crate::profiles::Profile;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, io, path::Path};
+use std::{collections::HashMap, io, path::Path};
 
 const KEEP: usize = 50;
 
@@ -26,13 +26,11 @@ pub struct History {
 
 impl History {
     pub fn load(path: &Path) -> Self {
-        fs::read_to_string(path).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
+        crate::keep::load(path).unwrap_or_default()
     }
 
     pub fn save(&self, path: &Path) -> io::Result<()> {
-        let tmp = path.with_extension("tmp");
-        fs::write(&tmp, serde_json::to_string(self)?)?;
-        fs::rename(tmp, path)
+        crate::keep::save(path, self, false)
     }
 
     /// Remember a filter's setup before a change.

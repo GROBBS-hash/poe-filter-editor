@@ -143,15 +143,12 @@ pub fn slug(name: &str) -> String {
 
 impl Store {
     pub fn load(path: &Path) -> Self {
-        fs::read_to_string(path).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
+        crate::keep::load(path).unwrap_or_default()
     }
 
     /// Writes to a temp file then swaps it in, so a crash never leaves a half file.
     pub fn save(&self, path: &Path) -> io::Result<()> {
-        if let Some(dir) = path.parent() { fs::create_dir_all(dir)?; }
-        let tmp = path.with_extension("tmp");
-        fs::write(&tmp, serde_json::to_string_pretty(self)?)?;
-        fs::rename(tmp, path)
+        crate::keep::save(path, self, true)
     }
 
     pub fn create(&mut self, name: &str, game: Game, base_file: &str) -> String {

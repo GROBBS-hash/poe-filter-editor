@@ -114,6 +114,10 @@ pub(crate) fn with_lookup<T>(app: &AppHandle, f: impl FnOnce(wealth::Lookup) -> 
             // The most it could be, for "8c – 2 div" on the map tracker.
             "unique-max" => price_of(f, None, base, "Unique"),
             "unique" => price_of(f, name, base, "Unique"),
+            k if k.starts_with("unique|") => match name.filter(|n| !n.is_empty()) {
+                Some(n) => filter_core::prices::unique_price(f, n, base, k.strip_prefix("unique|")).map(|u| u.value),
+                None => filter_core::prices::uniques_on_base(f, base).last().map(|u| u.1),
+            },
             // Gems come in many levels/qualities: count the cheapest, so totals don't run away.
             "gem" => f.items.iter().filter(|i| i.name == base && i.cat.contains("Gem")).map(|i| i.value).reduce(f64::min),
             // A card hardly anyone trades (under 5 sold, under 50c) isn't worth its poe.ninja number: not counted

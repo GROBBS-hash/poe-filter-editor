@@ -61,7 +61,7 @@ fn path(app: &AppHandle) -> PathBuf { app.state::<AppState>().data_dir.join("pho
 fn with_store<T>(app: &AppHandle, f: impl FnOnce(&mut PhoneStore) -> T) -> T {
     let mut g = STORE.lock().unwrap();
     let s = g.get_or_insert_with(|| {
-        let mut s: PhoneStore = std::fs::read_to_string(path(app)).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
+        let mut s: PhoneStore = filter_core::keep::load(&path(app)).unwrap_or_default();
         if s.prefs.page_key.is_empty() { s.prefs.page_key = new_key(); }
         s
     });
@@ -71,9 +71,7 @@ fn with_store<T>(app: &AppHandle, f: impl FnOnce(&mut PhoneStore) -> T) -> T {
 fn save(app: &AppHandle) {
     let text = with_store(app, |s| serde_json::to_string(s).ok());
     if let Some(t) = text {
-        let p = path(app);
-        let tmp = p.with_extension("json.tmp");
-        if std::fs::write(&tmp, t).is_ok() { let _ = std::fs::rename(tmp, p); }
+        let _ = filter_core::keep::save_text(&path(app), &t);
     }
 }
 

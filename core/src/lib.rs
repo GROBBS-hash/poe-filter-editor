@@ -18,6 +18,7 @@ pub mod gear;
 pub mod history;
 pub mod ground;
 pub mod item;
+pub mod keep;
 pub mod journey;
 pub mod loot;
 pub mod maps;

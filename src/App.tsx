@@ -176,6 +176,19 @@ function UpdateBar() {
   );
 }
 
+/** A file of the app was damaged (a crash, a power cut): what happened to it, until he closes the bar. */
+function TroubleBar() {
+  const [list, setList] = useState<string[]>([]);
+  useEffect(() => { const t = window.setTimeout(() => invoke<string[]>("file_trouble").then((l) => setList(l ?? [])).catch(() => {}), 1500); return () => window.clearTimeout(t); }, []);
+  if (list.length === 0) return null;
+  return (
+    <div className="update-bar">
+      <span>{list.map((l) => <span key={l} style={{ display: "block" }}>{l}</span>)}</span>
+      <button onClick={() => setList([])}>OK</button>
+    </div>
+  );
+}
+
 /** An update changed how filters are built, so yours were rebuilt: the game needs to load them once. */
 function RebuiltBar() {
   const [names, setNames] = useState<string[]>([]);
@@ -378,6 +391,7 @@ export default function App() {
 
       <main className={`content ${tab === "craft" ? "wide" : ""}`}>
         <UpdateBar />
+        <TroubleBar />
         <LoginBar />
         <RebuiltBar />
         <ErrorBoundary key={tab + undoN}>

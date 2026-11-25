@@ -238,16 +238,14 @@ fn store_path(app: &AppHandle) -> PathBuf { app.state::<AppState>().data_dir.joi
 
 fn with_store<T>(app: &AppHandle, f: impl FnOnce(&mut PlayStore) -> T) -> T {
     let mut g = STORE.lock().unwrap();
-    let s = g.get_or_insert_with(|| std::fs::read_to_string(store_path(app)).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_else(default_store));
+    let s = g.get_or_insert_with(|| filter_core::keep::load(&store_path(app)).unwrap_or_else(default_store));
     f(s)
 }
 
 fn save_store(app: &AppHandle) {
     let text = with_store(app, |s| serde_json::to_string(s).ok());
     if let Some(t) = text {
-        let p = store_path(app);
-        let tmp = p.with_extension("json.tmp");
-        if std::fs::write(&tmp, t).is_ok() { let _ = std::fs::rename(tmp, p); }
+        let _ = filter_core::keep::save_text(&store_path(app), &t);
     }
 }
 
