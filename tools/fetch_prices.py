@@ -270,6 +270,8 @@ def run(game, exchange_types, stash_types, league, pictures=True):
 PUBLISHED = "https://raw.githubusercontent.com/GROBBS-hash/poe-filter-editor/prices"
 # The other leagues are only read this often: few people play them, and poe.ninja shouldn't be asked for nothing.
 OTHERS_EVERY = 6 * 3600
+# A league hardly anyone plays (PoE 2 Hardcore: 3 items, 26 Nov) has no prices to go by, not even a Divine Orb's.
+ENOUGH = 100
 
 
 def slug(name):
@@ -285,6 +287,8 @@ def league_file(out_dir, name, game, ex, st, league):
     """One of the other leagues: what's published if it's under 6 hours old, else read again (the old one if that
     fails). True when there's a file for it."""
     old = fetch_json(f"{PUBLISHED}/{name}")
+    if old and len(old.get("items") or []) < ENOUGH:
+        old = None
     if old and old.get("updated"):
         at = datetime.strptime(old["updated"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
         if (datetime.now(timezone.utc) - at).total_seconds() < OTHERS_EVERY:
@@ -292,7 +296,7 @@ def league_file(out_dir, name, game, ex, st, league):
             return True
     new = run(game, ex, st, league, pictures=False)
     # PoE 2 without a divine rate would price every unique wrongly.
-    good = new["items"] and (game == "poe1" or poe2_exalted_per_divine != 1.0)
+    good = len(new["items"]) >= ENOUGH and (game == "poe1" or poe2_exalted_per_divine != 1.0)
     keep = new if good else old
     if not keep:
         return False
