@@ -754,6 +754,12 @@ pub(crate) fn read_tab_items(app: &AppHandle, index: usize) -> Result<serde_json
 }
 
 /// Finished earnings sessions (for the Atlas page's "what each tree earned").
+/// What a divine was worth when a map was run: kept with it, or for maps before that was kept, the nearest stash scan's.
+pub(crate) fn run_rates(app: &AppHandle) -> impl Fn(&filter_core::journey::MapRun) -> Option<f64> {
+    let snaps = with_store(&app.state::<AppState>(), |w| w.snapshots.clone());
+    move |r| r.divine.or_else(|| wealth::divine_at(&snaps, r.start))
+}
+
 pub(crate) fn finished_sessions(app: &AppHandle) -> Vec<Session> {
     let state = app.state::<AppState>();
     with_store(&state, |w| w.sessions.clone())

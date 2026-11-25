@@ -355,7 +355,7 @@ mockIPC((cmd, args) => {
       rolls: "70%+ more Currency found in Area", drops: ["Omen of Amelioration"], started: now - 9000, plan: 20, map_cost: 4, other_cost: 2, thread_cost: null },
     threads: [{ name: "Ritual Thread", each_map: 8, need: 160, have: 96, buy: 64, each: 3.1, bulk: "ritual-thread" }, { name: "Harvest Thread", each_map: 4, need: 80, have: 80, buy: 0, each: 2.6, bulk: "harvest-thread" }],
     threads_now: 35.2, cost: 41.2, divine: 179, tree_in_use: true, tree_saved: true, scanned: now - 4000, in_filter: farmFilter,
-    profit: { maps: 23, loot: 130, cost: 41.2, net: 88.8, hour: 1500, likely: [1075, 2500], few: false } };
+    profit: { maps: 23, loot: 130, cost: 41.2, net: 88.8, hour: 1500, likely: [1075, 2500], hour_div: 8.4, likely_div: [6, 14], few: false } };
   if (cmd === "bases_get" || cmd === "bases_save") return { min: basesOn, influenced: false, total: 41, divine: 179, known: true,
     list: [["Focused Amulet", 83, 6534, 41], ["Simplex Amulet", 83, 1508, 38], ["Helical Ring", 84, 2692, 114], ["Gloam Ring", 83, 1616, 67], ["Dusk Ring", 83, 718, 76], ["Cord Belt", 86, 359, 54], ["Crystal Belt", 86, 100, 73]]
       .map(([base, ilvl, value, listings]) => ({ base, ilvl, value, listings, influence: "" })) };

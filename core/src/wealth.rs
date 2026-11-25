@@ -385,6 +385,12 @@ pub fn snapshot(time: u64, league: &str, divine: Option<f64>, valued: &[Valued])
     Snapshot { time, league: league.into(), total: valued.iter().map(|v| v.value).sum(), divine, tabs, profile: String::new() }
 }
 
+/// What a divine was worth around then: the stash scan nearest in time, up to three days off.
+pub fn divine_at(snapshots: &[Snapshot], time: i64) -> Option<f64> {
+    snapshots.iter().filter_map(|s| Some(((s.time as i64 - time).abs(), s.divine.filter(|d| *d > 0.0)?)))
+        .filter(|x| x.0 <= 3 * 86400).min_by_key(|x| x.0).map(|x| x.1)
+}
+
 /// Worth selling and not listed yet, most valuable first. The same item in several stacks or tabs is
 /// added up first: ten Blight threads together can be worth listing when three alone aren't.
 pub fn missed(valued: &[Valued], at_least: f64) -> Vec<Valued> {
@@ -612,6 +618,8 @@ mod tests {
         let snap = snapshot(100, "Covens", Some(210.0), &v);
         assert!((snap.total - 30680.0).abs() < 1e-6);
         assert_eq!(snap.tabs, vec![("Dump".to_string(), snap.total)]);
+        assert_eq!(divine_at(&[snap.clone(), Snapshot { time: 90_000, divine: Some(150.0), ..snap.clone() }], 80_000), Some(150.0));
+        assert_eq!(divine_at(&[snap.clone()], 9_000_000), None, "too long ago to go by");
         let m = missed(&v, 10.0);
         assert_eq!(m.iter().map(|x| x.name.as_str()).collect::<Vec<_>>(), ["Divine Orb"], "chaos and listed items aren't 'missed'");
         let tabs = tabs_from_json(&json!({ "tabs": [ { "n": "Dump", "i": 0, "type": "PremiumStash", "colour": { "r": 255, "g": 0, "b": 16 } },

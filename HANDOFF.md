@@ -48,6 +48,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
 ## Done (recent sessions)
+- **The mistakes list, the atlas pieces (25 Nov, not released yet).** (a) The F7 atlas window redrew for ever, also while hidden: `useSize` in `AtlasOverlay.tsx` now watches the element once and ignores an unchanged size. (b) A damaged `atlas.json` comes back from its good copy (`keep.rs`), like the other files. (c) Divines an hour: `MapRun.divine` keeps the rate when loot is priced; older maps use the nearest stash scan's rate within 3 days (`wealth::divine_at`), else today's. Used by the farm finder (`OwnTree.divines`) and Farm this (`Profit.hour_div`). Left as it was: time idle in the hideout (up to an hour) still counts for the map before it (`tree_results`, `farming::runs_on`).
 - **Five research ideas (25 Nov, not released yet; he said "just build them all, except the craft what now").**
   - **Better than mine?** `core/src/worn.rs` + `src-tauri/src/worn_app.rs` + `src/WornCompare.tsx`. Ctrl+D compares with the gear he wears, best swap first, build guide one tab away. The gear comes with the map tracker's bag reads (`worn_app::note` in `read_bags`), or is read when he checks an item (old copy over 5 min, one or two site requests, quietly); no login: "I'm wearing this" per slot. Kept in `worn.json`. `compare.rs` now also compares weapon DPS, crit, armour, evasion, ES, ward, block (as written on the item) and shows all-gear resistances before → after (gear only: no tree, jewels, auras). No PoB damage numbers: that's the next step if he wants it (idea 3 in the research report 05).
   - **Worth picking up.** `tools/fetch_prices.py` `base_types()` writes `bases` ([base, ilvl, influence, chaos, listings]; 10c+ and 10+ listed, plain or one influence) into poe1.json. `core/src/bases.rs`, `bases_app.rs`, `src/Bases.tsx`: a line in F2 and Ctrl+D, and a "Bases worth picking up" card on Price tiers (saves by itself, off until ticked, `PriceSettings.bases_min`). Filter rules: Rarity <= Rare, not corrupted / mirrored / fractured, under 5 links, from the lowest item level above which every listed level asks that much. Asking prices, so it always says how many are for sale.
@@ -1131,6 +1132,8 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
+- [ ] (next release) F7 atlas window: opens, resizes, Notes and back to Tree all still work; the PC is quieter with it hidden.
+- [ ] (next release) Atlas tree > Your trees so far: div an hour stays about the same from day to day when the divine's price moves.
 - [ ] (next release) Ctrl+D a rare ring, gloves, weapon: "Better than mine?" against what you wear, both rings, best swap first; weapons show DPS; "Read again" after changing gear and zone.
 - [ ] (next release) Ctrl+D or F2 on a plain base (Focused Amulet, Stygian Vise 86): what it lists at and how many are for sale (after the next hourly prices).
 - [ ] (next release) Price tiers > Bases worth picking up: tick it, 1 divine; F4; a Simplex / Dusk Ring at 83+ stands out; untick, F4: back to before.

@@ -75,8 +75,9 @@ impl FarmView {
 
 /// Your ordinary maps on the farm's tree (boss fights and other special areas don't count).
 fn made(app: &AppHandle, tree: u64) -> Vec<farming::RunMade> {
-    let runs: Vec<_> = play_app::maps_history(app.clone()).iter().map(|r| (r.start, (r.left - r.start).max(r.in_map),
-        (!r.loot_missed).then(|| r.loot.iter().map(|l| l.value).sum::<f64>()), r.atlas.filter(|_| r.area.starts_with("MapWorlds")))).collect();
+    let rate = wealth_app::run_rates(app);
+    let runs: Vec<farming::Run> = play_app::maps_history(app.clone()).iter().map(|r| (r.start, (r.left - r.start).max(r.in_map),
+        (!r.loot_missed).then(|| r.loot.iter().map(|l| l.value).sum::<f64>()), r.atlas.filter(|_| r.area.starts_with("MapWorlds")), rate(r))).collect();
     farming::runs_on(&runs, tree)
 }
 
@@ -99,7 +100,7 @@ fn view(app: &AppHandle) -> Option<FarmView> {
         s.active.as_ref().and_then(|id| s.profiles.get(id)).is_some_and(|p| p.rules.iter().any(|r| !r.is_off() && rule_label(r).starts_with(farming::RULE_PREFIX)))
     };
     Some(FarmView {
-        profit: farming::profit(&made(app, farm.strategy), cost), threads, threads_now, cost, in_filter,
+        profit: farming::profit(&made(app, farm.strategy), cost, currency_rates(app).get("divine").copied()), threads, threads_now, cost, in_filter,
         divine: currency_rates(app).get("divine").copied(),
         tree_in_use: atlas_app::active_id(app) == Some(farm.strategy),
         tree_saved: store.is_some_and(|s| s.list.iter().any(|x| x.id == farm.strategy)),

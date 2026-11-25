@@ -11,12 +11,13 @@ import "./farm-now.css";
 export type FarmPlan = { title: string; keys: string[]; threads: [string, number][]; maps: string[]; rolls: string | null; drops: string[] };
 type FarmData = FarmPlan & { strategy: number; strategy_name: string; started: number; plan: number; map_cost: number; other_cost: number; thread_cost: number | null };
 type ThreadNeed = { name: string; each_map: number; need: number; have: number | null; buy: number; each: number | null; bulk: string | null };
-type Profit = { maps: number; loot: number; cost: number; net: number; hour: number; likely: [number, number] | null; few: boolean };
+type Profit = { maps: number; loot: number; cost: number; net: number; hour: number; likely: [number, number] | null; hour_div: number | null; likely_div: [number, number] | null; few: boolean };
 export type FarmView = { farm: FarmData; threads: ThreadNeed[]; threads_now: number; cost: number; profit: Profit | null; divine: number | null;
   tree_in_use: boolean; tree_saved: boolean; scanned: number | null; in_filter: boolean };
 
 const c = (v: number) => (Math.abs(v) >= 10 ? Math.round(v).toLocaleString() : +v.toFixed(1));
-const perHour = (v: number, div: number | null) => (div ? `${(v / div).toFixed(Math.abs(v / div) >= 10 ? 0 : 1)} div` : `${c(v)}c`);
+/** In divines (each map at its own day's rate), or chaos when there's no divine price. */
+const perHour = (chaos: number, div: number | null) => (div != null ? `${div.toFixed(Math.abs(div) >= 10 ? 0 : 1)} div` : `${c(chaos)}c`);
 
 function Step({ done, icon, title, children }: { done?: boolean; icon: ReactNode; title: string; children: ReactNode }) {
   return (
@@ -53,9 +54,9 @@ export function ProfitBlock({ v }: { v: FarmView }) {
         <span className="fn-net">Profit a map</span><b className={`fn-net ${p.net >= 0 ? "ff-up" : "ff-dn"}`}>{p.net < 0 ? "−" : ""}{c(Math.abs(p.net))}<CurrencyIcon id="chaos" /></b>
       </div>
       <div className="fn-hour">
-        <b className={p.hour >= 0 ? "ff-up" : "ff-dn"}>{perHour(p.hour, v.divine)} an hour</b>
+        <b className={p.hour >= 0 ? "ff-up" : "ff-dn"}>{perHour(p.hour, p.hour_div)} an hour</b>
         <span className="muted small">
-          {p.likely ? `Likely ${perHour(p.likely[0], v.divine).replace(" div", "")} to ${perHour(p.likely[1], v.divine)}, going by your ${p.maps} maps`
+          {p.likely ? `Likely ${perHour(p.likely[0], p.likely_div?.[0] ?? null).replace(" div", "")} to ${perHour(p.likely[1], p.likely_div?.[1] ?? null)}, going by your ${p.maps} maps`
             : `From ${p.maps} map${p.maps > 1 ? "s" : ""}: too few to say how sure`}
           {p.likely && p.few && " (still early)"}
         </span>

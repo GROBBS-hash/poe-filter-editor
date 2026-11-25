@@ -258,6 +258,8 @@ pub struct OwnTree {
     pub name: String,
     pub nodes: Vec<u32>,
     pub result: crate::atlas::TreeResult,
+    /// Its loot in divines at each map's own rate (None = divide by today's).
+    pub divines: Option<f64>,
 }
 
 /// What your own maps made with a tree for a farm.
@@ -290,9 +292,9 @@ pub fn farmed(nodes: &[u32]) -> Vec<String> {
 
 /// Adds up trees' results by the time they took.
 fn own_of(trees: &[&OwnTree], div: f64) -> Option<Own> {
-    let (mut loot, mut secs, mut maps) = (0.0, 0.0, 0);
-    for t in trees { loot += t.result.loot; secs += t.result.secs; maps += t.result.maps; }
-    (maps > 0 && secs > 0.0 && div > 0.0).then(|| Own { div_hour: loot / div / (secs / 3600.0), chaos_map: loot / maps as f64, maps, few: maps < OWN_MAPS, trees: trees.iter().map(|t| t.name.clone()).collect() })
+    let (mut loot, mut divines, mut secs, mut maps) = (0.0, 0.0, 0.0, 0);
+    for t in trees { loot += t.result.loot; divines += t.divines.unwrap_or(t.result.loot / div.max(1e-9)); secs += t.result.secs; maps += t.result.maps; }
+    (maps > 0 && secs > 0.0 && div > 0.0).then(|| Own { div_hour: divines / (secs / 3600.0), chaos_map: loot / maps as f64, maps, few: maps < OWN_MAPS, trees: trees.iter().map(|t| t.name.clone()).collect() })
 }
 
 fn change_of(list: &[(f64, f64)]) -> Option<f64> {
@@ -712,13 +714,16 @@ mod tests {
         // The most copied Legion + Beasts + Delirium tree: it farms exactly those, so its maps show on that card.
         let t = meta().trees["All"].iter().find(|t| t.copies == 297).expect("the most copied tree");
         assert_eq!(farmed(&t.nodes), ["legion", "bestiary", "delirium"], "{:?}", crate::atlas_opt::points_in(&t.nodes));
-        let mine = OwnTree { name: "My legion".into(), nodes: t.nodes.clone(), result: crate::atlas::TreeResult { id: 1, maps: 12, loot: 2400.0, secs: 7200.0, ..Default::default() } };
+        let mine = OwnTree { name: "My legion".into(), nodes: t.nodes.clone(), result: crate::atlas::TreeResult { id: 1, maps: 12, loot: 2400.0, secs: 7200.0, ..Default::default() }, divines: None };
         let r = find(&file(), Temples::shipped(), &[], &[mine, OwnTree::default()], &FarmAsk::default());
         let card = r.farms.iter().find(|f| f.keys == ["legion", "bestiary", "delirium"]).expect("card");
         let own = card.own.as_ref().expect("own");
         assert!((own.div_hour - 6.0).abs() < 0.01 && own.maps == 12 && !own.few && own.chaos_map == 200.0, "{own:?}");
         assert_eq!(r.farms.iter().filter(|f| f.own.is_some()).count(), 1);
         assert_eq!((r.own.len(), r.own[0].title.as_str()), (1, "Legion + Beasts + Delirium"));
+        // Maps run when a divine was 100c made 24 of them, whatever it is today.
+        let then = OwnTree { divines: Some(24.0), ..OwnTree { name: "x".into(), nodes: t.nodes.clone(), result: crate::atlas::TreeResult { id: 1, maps: 12, loot: 2400.0, secs: 7200.0, ..Default::default() }, divines: None } };
+        assert!((own_of(&[&then], 200.0).unwrap().div_hour - 12.0).abs() < 0.01);
     }
 
     /// How well `farmed` agrees with poe.ninja on the much-copied trees.

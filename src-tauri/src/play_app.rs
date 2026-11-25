@@ -1213,6 +1213,7 @@ fn start_loot_worker(app: AppHandle) {
                             _ => s.maps.history.iter_mut().rev().take(5).find(|r| run_key(r) == key),
                         };
                         if let Some(r) = run {
+                            if divine > 0.0 { r.divine = Some(divine); }
                             loot::merge(&mut r.loot, lines);
                             r.loot.truncate(60);
                         }

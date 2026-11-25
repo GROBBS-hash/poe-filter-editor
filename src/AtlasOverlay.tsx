@@ -1,22 +1,26 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ResizeGrips, WinBar } from "./WinFrame";
 import AtlasTreeView, { AtlasStore, ChoiceList, StepBar, StepList, StrategyNotes, currentStrategy, useStep } from "./AtlasTreeView";
 
 type View = "tree" | "notes";
 
 /** Size of an element, kept up to date as the window is resized. */
-function useSize<T extends HTMLElement>(): [React.RefObject<T | null>, { w: number; h: number }] {
-  const ref = useRef<T | null>(null);
+function useSize<T extends HTMLElement>(): [(el: T | null) => void, { w: number; h: number }] {
   const [size, setSize] = useState({ w: 0, h: 0 });
-  useEffect(() => {
-    const el = ref.current;
+  const watch = useRef<ResizeObserver | null>(null);
+  // Called when the element comes and goes, not on every draw; the same size changes nothing (it used to redraw for ever).
+  const ref = useCallback((el: T | null) => {
+    watch.current?.disconnect();
+    watch.current = null;
     if (!el) return;
-    const ro = new ResizeObserver(() => { const r = el.getBoundingClientRect(); setSize({ w: r.width, h: r.height }); });
-    ro.observe(el);
-    return () => ro.disconnect();
-  });
+    watch.current = new ResizeObserver(() => {
+      const r = el.getBoundingClientRect();
+      setSize((s) => (s.w === r.width && s.h === r.height ? s : { w: r.width, h: r.height }));
+    });
+    watch.current.observe(el);
+  }, []);
   return [ref, size];
 }
 

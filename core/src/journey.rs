@@ -132,6 +132,9 @@ pub struct MapRun {
     /// The atlas tree in use when it started (Atlas page id), so loot can be compared per tree.
     #[serde(default)]
     pub atlas: Option<u64>,
+    /// What a divine was worth (chaos) when its loot was priced, so old maps' divines don't move with today's price.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub divine: Option<f64>,
 }
 
 impl MapRun {
