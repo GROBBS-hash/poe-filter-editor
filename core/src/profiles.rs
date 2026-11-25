@@ -87,6 +87,8 @@ pub struct Settings {
     pub poesessid: String,
     /// Tabs an earnings session watches (your dump tabs).
     pub wealth_tabs: Vec<usize>,
+    /// The league you play, per game ("poe1" / "poe2"); none = automatic (the newest, as poe.ninja lists it).
+    pub leagues: BTreeMap<String, String>,
     /// "Worth selling" from this many chaos.
     pub wealth_min: f64,
     /// Minutes between earnings session checks.
@@ -131,7 +133,7 @@ impl Default for Settings {
             key_build: "F6".into(), pob_link: String::new(), pob_stage: None, pob_follow: true,
             key_price: "Ctrl+D".into(), map_avoid: None,
             trade_helper: true, thanks_message: "thanks, good luck!".into(), chat_keys: vec![], map_tool: Default::default(),
-            poe_account: String::new(), poesessid: String::new(), wealth_tabs: vec![], wealth_min: 10.0, earn_minutes: 3,
+            poe_account: String::new(), poesessid: String::new(), leagues: BTreeMap::new(), wealth_tabs: vec![], wealth_min: 10.0, earn_minutes: 3,
             price_compare: true, price_rolls: true, price_instant_all: false, price_buyout_only: true, build_with_tree: false, key_tree: "P".into(), key_atlas: "F7".into(),
             key_level: "F8".into(), key_tracker: "F9".into(), key_searches: "F10".into(), key_sheet: "F11".into(), key_notes: String::new(), key_wiki: "Alt+W".into(), key_read: "Alt+R".into() }
     }

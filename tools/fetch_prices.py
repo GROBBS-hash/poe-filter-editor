@@ -1,7 +1,9 @@
 """Fetches poe.ninja prices once for everyone (run hourly by GitHub Actions)
 and writes small, simple files the app downloads:
 
-    prices/poe1.json, prices/poe2.json
+    prices/poe1.json, prices/poe2.json            (the current league: what "Automatic" uses)
+    prices/poe1_hardcore-covens.json, ...         (poe.ninja's other leagues, at most every 6 hours)
+    prices/leagues.json                           ({"poe1": [{"id": "Covens", "file": "poe1.json"}, ...], ...})
     {
       "game": "poe1", "league": "...", "updated": "2026-11-18T02:17:00Z",
       "unit": "chaos",
@@ -229,16 +231,12 @@ def extra_icons(game):
     print(f"  pictures: {len(icons[game])}")
 
 
-def run(game, exchange_types, stash_types):
-    leagues = get(f"/{game}/api/economy/leagues")
-    if not leagues:
-        print(f"{game}: no leagues", file=sys.stderr)
-        return None
-    league = leagues[0]
+def run(game, exchange_types, stash_types, league, pictures=True):
     league_id = league.get("id") or league.get("name")
     print(f"{game}: league {league_id}")
     items, unit, core_seen = [], "chaos" if game == "poe1" else "exalted", None
     global poe2_exalted_per_divine
+    poe2_exalted_per_divine = 1.0
     for t in exchange_types:
         res = exchange(game, league_id, t)
         if res:
@@ -254,7 +252,8 @@ def run(game, exchange_types, stash_types):
         print(f"  {t}: {len(got)}")
     bases = base_types(game, league_id)
     print(f"  bases: {len(bases)}")
-    extra_icons(game)
+    if pictures:
+        extra_icons(game)
     if game == "poe1" and core_seen and core_seen.get("primary"):
         unit = str(core_seen["primary"])
     return {
@@ -268,16 +267,67 @@ def run(game, exchange_types, stash_types):
     }
 
 
+PUBLISHED = "https://raw.githubusercontent.com/GROBBS-hash/poe-filter-editor/prices"
+# The other leagues are only read this often: few people play them, and poe.ninja shouldn't be asked for nothing.
+OTHERS_EVERY = 6 * 3600
+
+
+def slug(name):
+    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+
+
+def write(out_dir, name, what):
+    with open(os.path.join(out_dir, name), "w", encoding="utf-8") as f:
+        json.dump(what, f, separators=(",", ":"), ensure_ascii=False)
+
+
+def league_file(out_dir, name, game, ex, st, league):
+    """One of the other leagues: what's published if it's under 6 hours old, else read again (the old one if that
+    fails). True when there's a file for it."""
+    old = fetch_json(f"{PUBLISHED}/{name}")
+    if old and old.get("updated"):
+        at = datetime.strptime(old["updated"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        if (datetime.now(timezone.utc) - at).total_seconds() < OTHERS_EVERY:
+            write(out_dir, name, old)
+            return True
+    new = run(game, ex, st, league, pictures=False)
+    # PoE 2 without a divine rate would price every unique wrongly.
+    good = new["items"] and (game == "poe1" or poe2_exalted_per_divine != 1.0)
+    keep = new if good else old
+    if not keep:
+        return False
+    write(out_dir, name, keep)
+    return True
+
+
 def main(out_dir):
     os.makedirs(out_dir, exist_ok=True)
-    for game, ex, st in (("poe1", POE1_EXCHANGE, POE1_STASH), ("poe2", POE2_EXCHANGE, POE2_STASH)):
-        result = run(game, ex, st)
-        if result and result["items"]:
-            with open(os.path.join(out_dir, f"{game}.json"), "w", encoding="utf-8") as f:
-                json.dump(result, f, separators=(",", ":"), ensure_ascii=False)
+    games = (("poe1", POE1_EXCHANGE, POE1_STASH), ("poe2", POE2_EXCHANGE, POE2_STASH))
+    leagues, listed = {}, {}
+    for game, ex, st in games:
+        leagues[game] = get(f"/{game}/api/economy/leagues") or []
+        if not leagues[game]:
+            print(f"{game}: no leagues", file=sys.stderr)
+            continue
+        first = leagues[game][0]
+        result = run(game, ex, st, first)
+        if result["items"]:
+            write(out_dir, f"{game}.json", result)
+            listed[game] = [{"id": result["league"], "name": first.get("name") or result["league"], "file": f"{game}.json"}]
         if icons[game]:
             with open(os.path.join(out_dir, f"{game}_icons.json"), "w", encoding="utf-8") as f:
                 json.dump(icons[game], f, separators=(",", ":"), ensure_ascii=False)
+    # After the main files, so trouble with an odd league never costs anyone their prices.
+    for game, ex, st in games:
+        for league in leagues[game][1:] if game in listed else []:
+            lid = league.get("id") or league.get("name")
+            name = f"{game}_{slug(lid)}.json"
+            try:
+                if league_file(out_dir, name, game, ex, st, league):
+                    listed[game].append({"id": lid, "name": league.get("name") or lid, "file": name})
+            except Exception as e:  # noqa: BLE001
+                print(f"  ! {game} {lid}: {e}", file=sys.stderr)
+    write(out_dir, "leagues.json", listed)
     with open(os.path.join(out_dir, "debug.json"), "w", encoding="utf-8") as f:
         json.dump(debug, f, indent=1, ensure_ascii=False, default=str)
 

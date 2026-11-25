@@ -202,6 +202,11 @@ mockIPC((cmd, args) => {
   // Real icons when the editor is running (vite serves the app's icon list), else none.
   // public/_icons.json (git-ignored) when present: a picture list with the extra sources merged in, else his own.
   if (cmd === "get_icons") return fetch("/_icons.json").then((r) => r.ok ? r.json() : Promise.reject()).catch(() => fetch("/preview-data/icons").then((r) => r.json())).catch(() => ({}));
+  if (cmd === "league_get" || cmd === "league_set") {
+    const p = (args as { league?: string } | undefined)?.league ?? null;
+    return [{ game: "Poe1", automatic: "Covens", now: p ?? "Covens", updated: new Date().toISOString(), picked: p, gone: false,
+      choices: ["Covens", "Hardcore Covens", "Standard", "Hardcore"].map((id) => ({ id, name: id, file: "" })) }];
+  }
   if (cmd === "get_settings") return { key_atlas: "F7" };
   // Price check page: saved searches (Live on/off and delete work in the preview).
   if (cmd === "saved_list") return savedSearches;

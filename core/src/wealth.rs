@@ -481,6 +481,43 @@ pub struct WealthStore {
     pub skip_rares: bool,
     /// "Include my guild stash": its tabs join the tab list (off by default: guild items aren't always yours).
     pub guild: bool,
+    /// The league all of the above is about ("poe1|Covens"), and the same for leagues you've been in before.
+    pub league: String,
+    pub parked: std::collections::BTreeMap<String, Parked>,
+}
+
+/// What belongs to one league's stash (tab numbers mean nothing in another league).
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Parked {
+    pub tabs: Vec<Tab>,
+    pub current: Option<Session>,
+    pub missed: Vec<Valued>,
+    pub last_items: Vec<Valued>,
+    pub profiles: Vec<ScanProfile>,
+    pub active: Option<String>,
+    pub rares: Vec<Rare>,
+    /// The earnings tabs (kept in the settings).
+    pub tracked: Vec<usize>,
+}
+
+/// You're in another league now: this one's tabs, scan, profiles and running session (paused) are put by, and the other
+/// league's come back as you left them. Returns that league's earnings tabs; None when it's the same league.
+pub fn switch_league(s: &mut WealthStore, league: &str, tracked: &[usize], now: u64) -> Option<Vec<usize>> {
+    if s.league == league { return None; }
+    // From before leagues were kept apart: what's here is taken to be this league's.
+    if s.league.is_empty() { s.league = league.into(); return None; }
+    if let Some(c) = s.current.as_mut() { c.paused_at.get_or_insert(now); }
+    let old = std::mem::replace(&mut s.league, league.into());
+    let p = s.parked.remove(league).unwrap_or_default();
+    let put = Parked {
+        tabs: std::mem::replace(&mut s.tabs, p.tabs), current: std::mem::replace(&mut s.current, p.current),
+        missed: std::mem::replace(&mut s.missed, p.missed), last_items: std::mem::replace(&mut s.last_items, p.last_items),
+        profiles: std::mem::replace(&mut s.profiles, p.profiles), active: std::mem::replace(&mut s.active, p.active),
+        rares: std::mem::replace(&mut s.rares, p.rares), tracked: tracked.to_vec(),
+    };
+    s.parked.insert(old, put);
+    Some(p.tracked)
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
@@ -541,6 +578,27 @@ mod guild_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The league picker (26 Nov): another league's stash has other tabs, and coming back finds yours as they were.
+    #[test]
+    fn each_league_keeps_its_own_stash() {
+        let tab = |i, n: &str| Tab { index: i, name: n.into(), kind: String::new(), colour: String::new(), id: n.into() };
+        let mut s = WealthStore { tabs: vec![tab(4, "Dump")], ..Default::default() };
+        save_profile(&mut s, "Dump", vec![4], None).unwrap();
+        s.current = Some(Session { name: "Strand".into(), league: "Covens".into(), tabs: vec![4], start: 100, end: None, start_value: 1.0, last_value: 5.0,
+            paused: 0, paused_at: None, atlas: None });
+        assert_eq!(switch_league(&mut s, "poe1|Covens", &[4], 100), None); // saved before leagues were kept apart
+        assert_eq!(switch_league(&mut s, "poe1|Covens", &[4], 150), None);
+        assert_eq!(switch_league(&mut s, "poe1|Standard", &[4], 200), Some(vec![]));
+        assert!(s.tabs.is_empty() && s.profiles.is_empty() && s.active.is_none() && s.current.is_none());
+        s.tabs = vec![tab(0, "Old stuff")];
+        assert_eq!(switch_league(&mut s, "poe1|Covens", &[0], 900), Some(vec![4]));
+        assert_eq!((s.tabs[0].name.as_str(), s.active.as_deref()), ("Dump", Some("Dump")));
+        // Its session waited, paused.
+        assert_eq!(s.current.as_ref().unwrap().seconds(2000), 100);
+        assert_eq!(switch_league(&mut s, "poe1|Standard", &[4], 950), Some(vec![0]));
+        assert_eq!(s.tabs[0].name, "Old stuff");
+    }
 
     #[test]
     fn editing_a_profile() {

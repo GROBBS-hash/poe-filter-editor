@@ -351,7 +351,7 @@ export default function Wealth() {
           <div className="row">
             <button className="primary" disabled={!!busy || !account.trim()} onClick={() => run("setup", "wealth_setup", { account, sessid: sessid || null }).then(() => { setSessid(""); setShowSetup(false); })}>
               {busy === "setup" ? "Checking…" : "Connect"}</button>
-            <span className="muted small">League: {v.league} (from your price settings)</span>
+            <span className="muted small">League: {v.league} (change it in Settings, League and prices)</span>
           </div>
           </details>
         </div>

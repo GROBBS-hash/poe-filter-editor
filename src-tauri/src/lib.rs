@@ -11,6 +11,7 @@ mod tonight_app;
 mod deaths_app;
 mod farming_app;
 mod bases_app;
+mod league_app;
 mod phone_app;
 mod win_place;
 mod updates;
@@ -204,14 +205,15 @@ fn game_key(g: Game) -> &'static str { match g { Game::Poe1 => "poe1", Game::Poe
 fn fetch_prices(app: &AppHandle) -> Vec<Game> {
     let state = app.state::<AppState>();
     let mut changed = Vec::new();
+    league_app::refresh(app);
     for g in [Game::Poe1, Game::Poe2] {
-        let url = format!("{PRICE_URL}/{}.json", game_key(g));
+        let url = format!("{PRICE_URL}/{}", league_app::price_file(app, g));
         let Ok(resp) = ureq::get(&url).set("User-Agent", "poe-filter-editor").timeout(Duration::from_secs(20)).call() else { continue };
         let Ok(body) = resp.into_string() else { continue };
         let Ok(file) = serde_json::from_str::<PriceFile>(&body) else { continue };
         let mut prices = state.prices.lock().unwrap();
         let no_icons = state.icons.lock().unwrap().get(&g).is_none();
-        let new_prices = prices.get(&g).map(|p| p.updated != file.updated).unwrap_or(true);
+        let new_prices = prices.get(&g).map(|p| p.updated != file.updated || p.league != file.league).unwrap_or(true);
         if new_prices || no_icons {
             let _ = std::fs::write(state.data_dir.join(format!("prices_{}.json", game_key(g))), &body);
             prices.insert(g, file);
@@ -2907,7 +2909,9 @@ fn save_settings(app: AppHandle, state: State<AppState>, settings: Settings) -> 
         return Err(e);
     }
     let mut store = state.store.lock().unwrap();
-    store.settings = Settings { fallback_area_level: settings.fallback_area_level.clamp(1, 86), ..settings };
+    // The league is changed on its own (league_set): the page's copy may be older. So are the earnings tabs (they move).
+    store.settings = Settings { fallback_area_level: settings.fallback_area_level.clamp(1, 86), leagues: old.leagues.clone(),
+        wealth_tabs: old.wealth_tabs.clone(), ..settings };
     store.save(&state.store_path).map_err(err)
 }
 
@@ -3290,6 +3294,8 @@ pub fn run() {
             read_pack,
             import_pack,
             get_settings,
+            league_app::league_get,
+            league_app::league_set,
             save_settings,
             search_items,
             list_farm_presets,

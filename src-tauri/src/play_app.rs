@@ -1590,14 +1590,17 @@ pub fn alerts_save(app: AppHandle, list: Vec<Alert>) -> Vec<Alert> {
 
 /// Each price update: an alert whose price has crossed its line tells you (in the trades pop-up, once per crossing).
 pub fn check_alerts(app: &AppHandle) {
-    let (items, divine) = {
+    /// The league the last check was about: another league's prices crossing your line is no news.
+    static LAST: Mutex<Option<String>> = Mutex::new(None);
+    let (items, divine, quiet) = {
         let state = app.state::<AppState>();
         let game = active_game(&state);
         let prices = state.prices.lock().unwrap();
         let Some(f) = prices.get(&game) else { return };
         let k = filter_core::prices::chaos_per_unit(f);
         let div = f.items.iter().find(|i| i.name == "Divine Orb").map(|i| i.value * k).unwrap_or(0.0);
-        (f.items.iter().cloned().map(|mut i| { i.value *= k; i }).collect::<Vec<_>>(), div)
+        let quiet = LAST.lock().unwrap().replace(f.league.clone()).is_some_and(|l| l != f.league);
+        (f.items.iter().cloned().map(|mut i| { i.value *= k; i }).collect::<Vec<_>>(), div, quiet)
     };
     let mut fired = vec![];
     with_store(app, |s| for a in s.alerts.iter_mut() {
@@ -1605,7 +1608,7 @@ pub fn check_alerts(app: &AppHandle) {
         let line = a.value * if a.unit == "divine" && divine > 0.0 { divine } else { 1.0 };
         let crossed = if a.when == "above" { now >= line } else { now <= line };
         let was = a.last.map(|l| if a.when == "above" { l >= line } else { l <= line }).unwrap_or(false);
-        if crossed && !was {
+        if crossed && !was && !quiet {
             a.fired = Some(unix());
             let shown = if a.unit == "divine" && divine > 0.0 { format!("{:.1} div", now / divine) } else { format!("{:.0}c", now) };
             fired.push(format!("{} is {} now (your alert: {} {} {})", a.name, shown, a.when, a.value, a.unit));

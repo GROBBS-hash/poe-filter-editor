@@ -6,6 +6,7 @@ import PhoneSettings from "./Phone";
 import { TW_LAYOUTS, TW_LAYOUT_KEY, TW_STYLES, TW_STYLE_KEY } from "./TradeWindow";
 import { TrackerSettings } from "./Play";
 import { hotkey } from "./hotkeys";
+import LeaguePicker from "./League";
 
 type Settings = {
   key_quick_edit: string; key_batch: string; key_reload: string; key_cycle: string; key_build: string; key_price?: string; key_atlas?: string;
@@ -65,7 +66,7 @@ function ClearableKey({ value, onChange }: { value: string; onChange: (k: string
 /** Settings is split into parts with a small menu down the side (22 Nov 2026, GROBBS picked mock-up "Settings 1"). */
 const SECTIONS: [string, string, string][] = [
   ["keys", "Hotkeys", "M3 7h18v10H3zM7 11h.01M11 11h.01M15 11h.01M8 14h8"],
-  ["price", "Price check", "M12 3v18M16.5 7.5c0-1.7-2-3-4.5-3s-4.5 1.3-4.5 3 2 2.6 4.5 3 4.5 1.3 4.5 3-2 3-4.5 3-4.5-1.3-4.5-3"],
+  ["price", "League and prices", "M12 3v18M16.5 7.5c0-1.7-2-3-4.5-3s-4.5 1.3-4.5 3 2 2.6 4.5 3 4.5 1.3 4.5 3-2 3-4.5 3-4.5-1.3-4.5-3"],
   ["trade", "Trading", "M4 8h13l-3-3M20 16H7l3 3"],
   ["maps", "Maps and area", "M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14"],
   ["tracker", "Map tracker", "M12 7v5l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z"],
@@ -130,7 +131,7 @@ export default function SettingsPage() {
         </div>
       </div>}
 
-      {sec === "price" && <div className="card">
+      {sec === "price" && <><LeaguePicker /><div className="card">
         <h2>Price check</h2>
         <p className="muted small">What the price window shows besides the price.</p>
         <label className="check"><input type="checkbox" checked={s.price_compare ?? true} onChange={(e) => set({ price_compare: e.target.checked })} />
@@ -144,7 +145,7 @@ export default function SettingsPage() {
             <span className="muted small" style={{ display: "block" }}>Uniques, currency and unidentified items always search straight away. With this off
               (like Awakened), rares and gear wait for you to tick the stats you care about and press Search.</span></span></label>
         <p className="muted small">How the price window looks is under <button className="link" onClick={() => pickSec("looks")}>Looks</button>.</p>
-      </div>}
+      </div></>}
 
       {sec === "trade" && <div className="card">
         <h2>Trade helper <Tip>When someone whispers to buy from you, a small list pops up with Invite, Trade, Thanks and Kick

@@ -16,6 +16,9 @@ pub fn farm_find(app: AppHandle, ask: FarmAsk) -> Result<Finder, String> {
     Ok(filter_core::farm::find(&prices, &temples, &runs, &trees, &ask))
 }
 
+/// Another league: the temple prices read for the last one don't count.
+pub(crate) fn forget_temples(app: &AppHandle) { let _ = std::fs::remove_file(temples_path(app)); }
+
 fn temples_path(app: &AppHandle) -> PathBuf { app.state::<AppState>().data_dir.join("temples.json") }
 
 /// The last prices read from the trade site, else the ones shipped with the app.

@@ -33,8 +33,35 @@ pub(crate) fn who(app: &AppHandle) -> Result<(String, String, String, bool), Str
     if s.poe_account.trim().is_empty() || s.poesessid.trim().is_empty() {
         return Err("Set your account name and POESESSID on the Stash worth page first".into());
     }
+    settle(app);
     let (poe2, league) = trade_league(app);
     Ok((s.poe_account.trim().to_string(), s.poesessid.trim().to_string(), league, poe2))
+}
+
+/// Each league has its own tabs, scans, profiles and running session: in another league than last time, they change places.
+pub(crate) fn settle(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let game = active_game(&state);
+    // Before prices have loaded the league isn't known.
+    let Some(key) = state.prices.lock().unwrap().get(&game).map(|f| format!("{}|{}", game_key(game), f.league)) else { return };
+    let mine = state.store.lock().unwrap().settings.wealth_tabs.clone();
+    let tracked = {
+        let mut g = STORE.lock().unwrap();
+        let s = g.get_or_insert_with(|| WealthStore::load(&store_path(&state)));
+        if s.league == key { return; }
+        let back = wealth::switch_league(s, &key, &mine, now());
+        let _ = s.save(&store_path(&state));
+        back
+    };
+    let Some(tracked) = tracked else { return };
+    {
+        let mut st = state.store.lock().unwrap();
+        st.settings.wealth_tabs = tracked;
+        let _ = st.save(&state.store_path);
+    }
+    // "Find in stash" starts empty there, and the shop watcher doesn't call the other league's items sold.
+    with_index(&state, |ix| *ix = StashIndex::default());
+    phone_app::tabs_moved(app);
 }
 
 /// Your tab list, plus the guild stash's when "Include my guild stash" is on (left out quietly if it can't be read).
@@ -262,7 +289,8 @@ pub struct WealthView {
     reprice: Vec<wealth::Reprice>,
 }
 
-fn view(app: &AppHandle) -> WealthView {
+pub(crate) fn view(app: &AppHandle) -> WealthView {
+    settle(app);
     let state = app.state::<AppState>();
     let s = state.store.lock().unwrap().settings.clone();
     let (_, league) = trade_league(app);
@@ -285,8 +313,10 @@ fn view(app: &AppHandle) -> WealthView {
 
 /// The last scan's priced items and its snapshot (for Sell in bulk).
 pub(crate) fn last_scan(app: &AppHandle) -> (Vec<Valued>, Option<Snapshot>) {
+    settle(app);
     let state = app.state::<AppState>();
-    with_store(&state, |s| (s.last_items.clone(), s.snapshots.last().cloned()))
+    let (_, league) = trade_league(app);
+    with_store(&state, |s| (s.last_items.clone(), s.snapshots.iter().rev().find(|x| x.league == league).cloned()))
 }
 
 #[tauri::command]
@@ -624,6 +654,7 @@ pub async fn session_check(app: AppHandle) -> Result<WealthView, String> {
 }
 
 fn check_session(app: &AppHandle) -> Result<(), String> {
+    settle(app);
     let state = app.state::<AppState>();
     let Some(cur) = with_store(&state, |s| s.current.clone()) else { return Ok(()) };
     if cur.paused_at.is_some() { return Ok(()); }
@@ -682,7 +713,7 @@ fn show_overlay(app: &AppHandle) {
 }
 
 /// Tells the page and the overlay the latest numbers.
-fn notify(app: &AppHandle) {
+pub(crate) fn notify(app: &AppHandle) {
     let _ = app.emit("earn-update", view(app));
 }
 

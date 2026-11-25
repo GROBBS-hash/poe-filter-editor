@@ -113,7 +113,7 @@ const MENU: { group: string; sub?: string; colour?: string; items: MenuItem[] }[
 /** A page's colour: its group's colour, or its own (Home, Settings, Help). */
 const tabColour = (t: Tab) => MENU.find((g) => g.items.some((i) => i.id === t))?.colour ?? COLOURS[t];
 const BOTTOM: MenuItem[] = [
-  { id: "settings", name: "Settings", hint: "Hotkeys, price check, trading, maps, looks and AI" },
+  { id: "settings", name: "Settings", hint: "Hotkeys, league, price check, trading, maps, looks and AI" },
   { id: "help", name: "Help", hint: "Quick answers, and what each hotkey does" },
 ];
 const ALL: MenuItem[] = [...MENU.flatMap((g) => g.items), ...BOTTOM];
