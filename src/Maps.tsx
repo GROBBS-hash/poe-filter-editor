@@ -2,11 +2,15 @@ import { Tip } from "./Help";
 import { friendly } from "./errors";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CurrencyIcon } from "./icons";
+import { CurrencyIcon, ItemIcon } from "./icons";
+import { MechArt } from "./mechArt";
 
 type MapMod = { id: number; text: string; token: string; scary: number; nightmare: boolean; trade_id: string | null; danger: string | null };
 type Wants = { quantity: number | null; pack_size: number | null; rarity: number | null; more_maps: number | null; more_currency: number | null;
-  more_scarabs: number | null; more_cards: number | null; tier_min: number | null; kind: string; corrupted_ok: boolean };
+  more_scarabs: number | null; more_cards: number | null; tier_min: number | null; kind: string; corrupted_ok: boolean;
+  extras?: Extra[]; extras_any?: boolean; price_max?: number | null; instant?: boolean };
+/** A line the map must have: the trade site's stat, its words, and the least it must be ("#" lines). */
+type Extra = { id: string; text: string; min: number | null };
 type ToolState = { mods: MapMod[]; bad: number[]; wants: Wants; source: string };
 type Listing = { amount: number; currency: string; chaos: number | null; account: string; indexed: string; whisper: string; instant?: boolean };
 type Result = { listings: Listing[]; summary: [number, number] | null; total: number; url: string; divine: number | null };
@@ -16,9 +20,74 @@ const LIMIT = 250;
 
 const NUMBERS: [keyof Wants, string][] = [
   ["quantity", "Item quantity"], ["pack_size", "Pack size"], ["rarity", "Item rarity"], ["more_maps", "More maps"],
-  ["more_currency", "More currency"], ["more_scarabs", "More scarabs / threads"], ["more_cards", "More divination cards"],
+  ["more_currency", "More currency"], ["more_scarabs", "More threads"], ["more_cards", "More divination cards"],
 ];
-const KINDS: [string, string][] = [["", "Any map"], ["originator", "8-mod (Originator)"], ["conqueror", "Conqueror"], ["elder", "Elder"], ["shaper", "Shaper"]];
+const KINDS: [string, string][] = [["", "Any map"], ["originator", "8-mod (Originator)"], ["conqueror", "Conqueror"], ["elder", "Elder"], ["shaper", "Shaper"],
+  ["blighted", "Blighted"], ["ravaged", "Blight-ravaged"]];
+/** One click for the ones people buy maps for (checked on the trade site, 25 Nov). */
+const QUICK: { m: string; label: string; id: string; text: string }[] = [
+  { m: "shrines", label: "Terror Shrines", id: "enchant.stat_667284445", text: "Area is dominated by Terror Shrines" },
+  { m: "shrines", label: "Extra shrines", id: "enchant.stat_1468737867", text: "Area contains an additional Shrine" },
+  { m: "strongboxes", label: "Extra strongboxes", id: "enchant.stat_3240183538", text: "Area contains an additional Strongbox" },
+  { m: "strongboxes", label: "Ambush", id: "enchant.stat_112276874", text: "Area's inhabitants are lying in ambush" },
+  { m: "blight", label: "Blight", id: "enchant.stat_2459443694", text: "Area contains a Blight Encounter" },
+  { m: "item:Vaal Orb", label: "Vaal Vessel", id: "implicit.stat_44159086", text: "Area contains an additional guarded Vaal Vessel" },
+  { m: "item:Orb of Unmaking", label: "Extra atlas notable", id: "implicit.stat_2834034653", text: "Area is affected by an additional random Unallocated Notable Atlas Passives" },
+];
+const KIND_NAMES: Record<string, string> = { enchant: "Extra content", implicit: "Implicit", explicit: "Map mod", pseudo: "Total" };
+
+/** "Must have" on the Maps page: search any line a map can carry, or click a common one. */
+function MustHave({ wants, set }: { wants: Wants; set: (p: Partial<Wants>) => void }) {
+  const [all, setAll] = useState<Extra[]>([]);
+  const [q, setQ] = useState("");
+  const [err, setErr] = useState("");
+  useEffect(() => { invoke<Extra[]>("map_tool_stats").then(setAll).catch((e) => setErr(friendly(e))); }, []);
+  const list = wants.extras ?? [];
+  const has = (id: string) => list.some((x) => x.id === id);
+  const add = (x: Extra) => { if (!has(x.id)) set({ extras: [...list, { id: x.id, text: x.text, min: null }] }); setQ(""); };
+  const drop = (id: string) => set({ extras: list.filter((x) => x.id !== id) });
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  // Every word anywhere, then just the start of each word ("terror shrines" finds "Terror Shrine…" too).
+  const found = words.join("").length < 2 ? [] : all.filter((s) => !has(s.id) && words.every((w) => s.text.toLowerCase().includes(w.replace(/s$/, "")))).slice(0, 14);
+  return (
+    <div className="map-must">
+      <h3>Must have</h3>
+      <div className="mm-quick">
+        {QUICK.map((k) => (
+          <button key={k.id} className={`mm-tile ${has(k.id) ? "on" : ""}`} aria-pressed={has(k.id)} title={k.text} onClick={() => (has(k.id) ? drop(k.id) : add({ id: k.id, text: k.text, min: null }))}>
+            {k.m.startsWith("item:") ? <ItemIcon base={k.m.slice(5)} size={26} /> : <MechArt m={k.m} size={26} />}<span>{k.label}</span>
+          </button>
+        ))}
+      </div>
+      <input className="text mm-find" placeholder="Find any other line: shrine, beyond, totems, rare monsters…" value={q} onChange={(e) => setQ(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter" && found[0]) add(found[0]); if (e.key === "Escape") setQ(""); }} />
+      {found.length > 0 && (
+        <ul className="results mm-results">
+          {found.map((s) => <li key={s.id} onClick={() => add(s)}><span>{s.text}</span><span className="muted small">{KIND_NAMES[s.id.split(".")[0]] ?? ""}</span></li>)}
+        </ul>
+      )}
+      {words.join("").length >= 2 && found.length === 0 && <div className="muted small">{err || "No map line has those words."}</div>}
+      {list.length > 0 && (
+        <div className="mm-list">
+          {list.map((x) => (
+            <div key={x.id} className="mm-row">
+              <span className="mm-text">{x.text}</span>
+              {/#|an additional/.test(x.text) && !x.id.includes("|") && <label className="small">at least <input className="num" type="number" min={0} placeholder="any" value={x.min ?? ""}
+                onChange={(e) => set({ extras: list.map((y) => (y.id === x.id ? { ...y, min: e.target.value === "" ? null : Math.max(0, +e.target.value || 0) } : y)) })} /></label>}
+              <button className="link small" aria-label={`Remove ${x.text}`} onClick={() => drop(x.id)}>Remove</button>
+            </div>
+          ))}
+          {list.length > 1 && (
+            <div className="mm-any">
+              <button className={!wants.extras_any ? "primary" : ""} onClick={() => set({ extras_any: false })}>All of these</button>
+              <button className={wants.extras_any ? "primary" : ""} onClick={() => set({ extras_any: true })}>Any one of them</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** Map tools: a stash regex that hides maps you can't run, and a trade search for maps you can. */
 export default function Maps() {
@@ -107,7 +176,13 @@ export default function Maps() {
               {KINDS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
           <label className="check"><input type="checkbox" checked={st.wants.corrupted_ok} onChange={(e) => setWants({ corrupted_ok: e.target.checked })} />
             <span>Corrupted maps are fine</span></label>
+          <label><span className="with-icon">At most <CurrencyIcon id="chaos" /></span>
+            <input className="num" type="number" min={1} value={st.wants.price_max ?? ""} placeholder="any"
+              onChange={(e) => setWants({ price_max: e.target.value === "" ? null : Math.max(1, Math.round(+e.target.value) || 1) })} /></label>
+          <label className="check"><input type="checkbox" checked={!!st.wants.instant} onChange={(e) => setWants({ instant: e.target.checked })} />
+            <span>Instant buyout only</span></label>
         </div>
+        <MustHave wants={st.wants} set={setWants} />
         <div className="row">
           <button className="primary" disabled={busy} onClick={trade}>{busy ? "Searching…" : "Find maps like this on trade"}</button>
           {res && <button onClick={() => invoke("open_url", { url: res.url })}>Open on the trade site</button>}
@@ -115,7 +190,7 @@ export default function Maps() {
         {tradeErr && <div className="note warn-text">{tradeErr}</div>}
         {res && (
           <div className="map-trade">
-            <div className="small">{res.total === 0 ? "None for sale like that: lower a minimum or untick a mod."
+            <div className="small">{res.total === 0 ? "None for sale like that: lower a minimum, raise the price, or take out a line."
               : <>{res.total} for sale{res.summary ? <>, from <b>{Math.round(res.summary[0])}</b><CurrencyIcon id="chaos" /> (usually about <b>{Math.round(res.summary[1])}</b><CurrencyIcon id="chaos" />{res.divine ? <> = {+(res.summary[1] / res.divine).toFixed(2)}<CurrencyIcon id="divine" /></> : null})</> : null}</>}</div>
             <ul className="map-trade-list">
               {res.listings.map((l, i) => (

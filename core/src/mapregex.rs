@@ -65,10 +65,47 @@ pub struct MapWants {
     pub more_cards: Option<u32>,
     /// Trade only.
     pub tier_min: Option<u32>,
-    /// "any", "conqueror", "elder", "shaper", "originator" (8-mod) — trade only.
+    /// "any", "conqueror", "elder", "shaper", "originator" (8-mod), "blighted", "ravaged" — trade only.
     pub kind: String,
     /// Trade: allow corrupted maps.
     pub corrupted_ok: bool,
+    /// Trade: lines the map must have ("Area is dominated by Terror Shrines"), and whether any one of them is enough.
+    pub extras: Vec<MapExtra>,
+    pub extras_any: bool,
+    /// Trade: at most this many chaos, and only instant buyout.
+    pub price_max: Option<u32>,
+    pub instant: bool,
+}
+
+/// A line to ask for when buying maps: the trade site's stat, its words, and the least it must be.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct MapExtra { pub id: String, pub text: String, pub min: Option<f64> }
+
+/// Every line the trade site knows that a map can carry (from its stat list): what "Must have" searches through.
+pub fn map_stats(v: &Value) -> Vec<MapExtra> {
+    let mut out: Vec<MapExtra> = Vec::new();
+    for e in v["result"].as_array().into_iter().flatten().flat_map(|g| g["entries"].as_array().into_iter().flatten()) {
+        let (Some(id), Some(text), Some(kind)) = (e["id"].as_str(), e["text"].as_str(), e["type"].as_str()) else { continue };
+        let t = text.replace('\n', " ").split_whitespace().collect::<Vec<_>>().join(" ");
+        // Not the ones on tablets, idols, logbooks and gear ("Your Maps have…", "While a Pinnacle Atlas Boss…").
+        if t.contains("our Maps") || t.contains("Pinnacle") || t.contains("Lesser ") || t.contains("Shrine Buffs on you") || e.get("option").is_some() { continue; }
+        let l = t.to_lowercase();
+        let map_line = match kind {
+            "enchant" | "implicit" => l.starts_with("area") || l.starts_with("map ") || l.starts_with("this map") || l.contains(" in area") || l.starts_with("players in area")
+                || l.starts_with("players and monsters") || l.starts_with("unique boss") || l.starts_with("unique monsters drop") || l.starts_with("strongboxes in area")
+                || l.starts_with("gain a random shrine buff") || l.starts_with("rare monsters") || l.contains("monster packs") || l.contains("blight")
+                || l.starts_with("natural inhabitants") || l.contains("explicit modifier magnitudes") || l.contains("additional enchantment mod")
+                || l.starts_with("area's inhabitants") || l.contains("atlas passives") || l == "+#% pack size" || l == "+#% item rarity",
+            "explicit" => l.starts_with("area ") || l.contains(" in area") || l.starts_with("unique boss") || l.starts_with("map bosses") || l.starts_with("rare monsters each") || l.starts_with("players "),
+            "pseudo" => id.starts_with("pseudo.pseudo_map_more_") || id.starts_with("pseudo.pseudo_map_conversion_") || id.starts_with("pseudo.pseudo_map_quality_"),
+            _ => false,
+        };
+        if map_line && !out.iter().any(|o| o.id == id) { out.push(MapExtra { id: id.into(), text: t, min: None }); }
+    }
+    // What's added to a map (Terror Shrines…) before its own mods.
+    out.sort_by_key(|o| ["enchant.", "implicit.", "pseudo."].iter().position(|k| o.id.starts_with(k)).unwrap_or(9));
+    out
 }
 
 /// The saved map tool choices.
@@ -153,18 +190,33 @@ pub fn trade_query(mods: &[MapModEntry], bad: &[i64], w: &MapWants) -> Value {
         "originator" => and.push(json!({ "id": "implicit.stat_2696470877" })),
         "shaper" => and.push(json!({ "id": "implicit.stat_1792283443", "value": { "option": 1 } })),
         "elder" => and.push(json!({ "id": "implicit.stat_1792283443", "value": { "option": 2 } })),
+        "blighted" => map_f["map_blighted"] = json!({ "option": "true" }),
+        "ravaged" => map_f["map_uberblighted"] = json!({ "option": "true" }),
         "conqueror" => stats.push(json!({ "type": "count", "value": { "min": 1 },
             "filters": (1..=4).map(|o| json!({ "id": "implicit.stat_2563183002", "value": { "option": o } })).collect::<Vec<_>>() })),
         _ => {}
     }
+    // Lines the map must have. An id like "implicit.stat_1792283443|2" is a stat and its option.
+    let extras: Vec<Value> = w.extras.iter().filter(|x| !x.id.is_empty()).map(|x| {
+        let mut f = match x.id.split_once('|') {
+            Some((id, o)) => json!({ "id": id, "value": { "option": o.parse::<u32>().unwrap_or(0) } }),
+            None => json!({ "id": x.id }),
+        };
+        if let Some(n) = x.min.filter(|_| !x.id.contains('|')) { f["value"] = json!({ "min": n }); }
+        f
+    }).collect();
+    if w.extras_any && extras.len() > 1 { stats.push(json!({ "type": "count", "value": { "min": 1 }, "filters": extras })); }
+    else { and.extend(extras); }
     if !and.is_empty() { stats.push(json!({ "type": "and", "filters": and })); }
     if stats.is_empty() { stats.push(json!({ "type": "and", "filters": [] })); }
     let mut filters = json!({
         "type_filters": { "filters": { "category": { "option": "map" }, "rarity": { "option": "nonunique" } } },
         "map_filters": { "filters": map_f },
     });
+    if let Some(n) = w.price_max.filter(|n| *n > 0) { filters["trade_filters"] = json!({ "filters": { "price": { "max": n } } }); }
     if misc.as_object().map(|o| !o.is_empty()).unwrap_or(false) { filters["misc_filters"] = json!({ "filters": misc }); }
-    json!({ "query": { "status": { "option": "available" }, "filters": filters, "stats": stats }, "sort": { "price": "asc" } })
+    let status = if w.instant { "securable" } else { "available" };
+    json!({ "query": { "status": { "option": status }, "filters": filters, "stats": stats }, "sort": { "price": "asc" } })
 }
 
 /// The mods to tick by default: those matching your map check list (None = all known dangers).
@@ -235,5 +287,30 @@ mod tests {
         assert_eq!(q["query"]["stats"][2]["filters"][0]["id"], "pseudo.pseudo_map_more_map_drops");
         assert_eq!(q["query"]["filters"]["map_filters"]["filters"]["map_tier"]["min"], 16);
         assert_eq!(q["query"]["filters"]["misc_filters"]["filters"]["identified"]["option"], "true");
+    }
+
+    #[test]
+    fn must_have_lines() {
+        let x = |id: &str, min| MapExtra { id: id.into(), text: String::new(), min };
+        // Terror Shrines (25 Nov), and at least 40% delirious.
+        let mut w = MapWants { extras: vec![x("enchant.stat_667284445", None), x("enchant.stat_1715784068", Some(40.0))], price_max: Some(120), instant: true, ..Default::default() };
+        let q = trade_query(&[], &[], &w);
+        assert_eq!(q["query"]["stats"][0], json!({ "type": "and", "filters": [{ "id": "enchant.stat_667284445" }, { "id": "enchant.stat_1715784068", "value": { "min": 40.0 } }] }));
+        assert_eq!(q["query"]["filters"]["trade_filters"]["filters"]["price"]["max"], 120);
+        assert_eq!(q["query"]["status"]["option"], "securable");
+        w.extras_any = true;
+        assert_eq!(trade_query(&[], &[], &w)["query"]["stats"][0]["type"], "count");
+        let w = MapWants { kind: "blighted".into(), extras: vec![x("implicit.stat_3624393862|4", Some(1.0))], ..Default::default() };
+        let q = trade_query(&[], &[], &w);
+        assert_eq!(q["query"]["stats"][0]["filters"][0], json!({ "id": "implicit.stat_3624393862", "value": { "option": 4 } }));
+        assert_eq!(q["query"]["filters"]["map_filters"]["filters"]["map_blighted"]["option"], "true");
+        // Choices saved before these existed still load.
+        assert!(serde_json::from_str::<MapWants>(r#"{"quantity":80,"kind":"","corrupted_ok":false}"#).unwrap().extras.is_empty());
+        let list = json!({ "result": [{ "entries": [
+            { "id": "enchant.stat_667284445", "text": "Area is dominated by Terror Shrines", "type": "enchant" },
+            { "id": "explicit.stat_1", "text": "Your Maps have +#% chance to contain an Abyss", "type": "explicit" },
+            { "id": "implicit.stat_2", "text": "While a Pinnacle Atlas Boss is in your Presence, #% increased Damage in Area", "type": "implicit" },
+            { "id": "explicit.stat_3", "text": "+# to maximum Life", "type": "explicit" }] }] });
+        assert_eq!(map_stats(&list).iter().map(|m| m.id.as_str()).collect::<Vec<_>>(), ["enchant.stat_667284445"]);
     }
 }

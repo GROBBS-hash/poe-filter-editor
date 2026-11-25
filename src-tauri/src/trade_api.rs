@@ -201,6 +201,11 @@ pub fn stats(data_dir: &Path, poe2: bool) -> Result<StatIndex, String> {
     Ok(StatIndex::from_json(&*data(data_dir, poe2, "stats")?))
 }
 
+/// Every line a map can carry, from the same list (Maps page, "Must have").
+pub fn map_stats(data_dir: &Path, poe2: bool) -> Result<Vec<filter_core::mapregex::MapExtra>, String> {
+    Ok(filter_core::mapregex::map_stats(&*data(data_dir, poe2, "stats")?))
+}
+
 /// The trade site's bulk-exchange item ids.
 pub fn statics(data_dir: &Path, poe2: bool) -> Result<filter_core::trade::StaticIndex, String> {
     Ok(filter_core::trade::StaticIndex::from_json(&*data(data_dir, poe2, "static")?))

@@ -682,6 +682,16 @@ input[type=range] { accent-color: var(--gold); }
 .map-wants { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px 16px; margin: 8px 0; }
 .map-wants label { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; }
 .map-wants .num { width: 70px; }
+.map-must { margin: 14px 0 12px; }
+.mm-quick { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 10px; }
+.mm-tile { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px 5px 7px; min-height: 38px; }
+.mm-tile.on { border-color: var(--gold); background: var(--gold-bg); color: var(--gold); }
+.mm-find { width: min(520px, 100%); }
+.mm-results { width: min(680px, 100%); margin: 4px 0; }
+.mm-list { display: grid; gap: 6px; margin-top: 10px; max-width: 760px; }
+.mm-row { display: flex; align-items: center; gap: 12px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--raised); }
+.mm-text { flex: 1; min-width: 0; color: #b8daf2; } .mm-row .num { width: 70px; }
+.mm-any { display: flex; gap: 8px; }
 .map-mods { max-height: 460px; overflow: auto; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 4px 8px; }
 .map-mod { display: flex; gap: 8px; align-items: flex-start; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 13px; cursor: pointer; }
 .map-mod.on span { color: #ff9b9b; }

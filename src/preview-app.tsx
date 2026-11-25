@@ -194,6 +194,8 @@ mockIPC((cmd, args) => {
   if (cmd === "map_tool_get") return { source: "poe.re (preview)", bad: [1], wants: { quantity: null, pack_size: null, rarity: null, more_maps: null, more_currency: null, more_scarabs: null, more_cards: null, tier_min: null, kind: "any", corrupted_ok: true },
     mods: [{ id: 1, text: "Monsters reflect 18% of Elemental Damage", token: "s def", scary: 900, nightmare: false, trade_id: null, danger: "Elemental reflect" },
       { id: 2, text: "Players cannot Regenerate Life, Mana or Energy Shield", token: "t reg", scary: 800, nightmare: false, trade_id: null, danger: "No regen" }] };
+  if (cmd === "map_tool_stats") return [["enchant.stat_667284445", "Area is dominated by Terror Shrines"], ["enchant.stat_1468737867", "Area contains an additional Shrine"], ["implicit.stat_2878321598", "Area contains up to 1 Shrine"],
+    ["enchant.stat_1715784068", "Players in Area are #% Delirious"], ["explicit.stat_1000591322", "Area contains many Totems"]].map(([id, text]) => ({ id, text, min: null }));
   if (cmd === "map_tool_regex") return "\"!s def\"";
   // Real icons when the editor is running (vite serves the app's icon list), else none.
   // public/_icons.json (git-ignored) when present: a picture list with the extra sources merged in, else his own.
