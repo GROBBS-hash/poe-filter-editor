@@ -163,7 +163,7 @@ export default function FarmFinder({ onBuild }: { onBuild: () => void }) {
   const build = (f: Farm) => {
     try {
       // Only the farm itself: the optimiser treats every ticked tile alike, so "also worth points" would crowd it out.
-      localStorage.setItem("atlas-picks-sel", JSON.stringify(f.keys));
+      localStorage.setItem("atlas-picks-sel", JSON.stringify(f.keys)); localStorage.setItem("atlas-opt-goals", "[]");
       localStorage.setItem("atlas-picks-tab", "own");
       localStorage.setItem("atlas-opt-prio", "profit");
     } catch { /* fine */ }

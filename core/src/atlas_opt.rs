@@ -438,6 +438,18 @@ mod tests {
     }
 
     #[test]
+    fn reads_what_the_page_sends() {
+        let a: Ask = serde_json::from_str(r#"{"mechanics":["abyss"],"goals":["threads"],"priority":"balanced","budget":0,"lock":[],"block":[13833],
+            "threads":[["abyss",8],["ritual",0],["breach",1]],"altar":"exarch","map_has":["mirage"],"map":"juiced","build":"weak"}"#).unwrap();
+        let p = optimise(&a);
+        assert_eq!((p.threads.as_slice(), p.altar.as_str(), p.points), (&[("abyss".to_string(), 8), ("breach".to_string(), 1)][..], "exarch", 100));
+        assert!(!p.nodes.contains(&13833) && !p.nodes.contains(&20929), "blocked, and no Mirage chance when every map has one");
+        // An old page's ask still works.
+        let old: Ask = serde_json::from_str(r#"{"mechanics":["ritual"],"priority":"fewest"}"#).unwrap();
+        assert!(optimise(&old).points == 60);
+    }
+
+    #[test]
     fn options_follow_prices() {
         let mut a = ask(&["harvest"], Priority::Profit);
         a.lock = vec![12826];

@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AtlasTreeView, { type AtlasData, type AtlasStep, type AtlasStore, loadAtlas } from "./AtlasTreeView";
 import AtlasTotals from "./AtlasTotals";
 import { ItemIcon } from "./icons";
@@ -28,6 +28,27 @@ const TRAVEL: [string, string, string][] = [
   ["pack size", "Pack size", "Cartographer's Chisel"], ["explicit effect", "Map mod effect", "Orb of Alchemy"],
   ["threads", "Threads found", "Frayed Thread"], ["maps found", "Maps found", "Map (Tier 16)"], ["rarity", "Item rarity", "Exalted Orb"],
 ];
+/** Goals that aren't a league mechanic (core atlas_model.json), with the picture on their tile. */
+const GOALS: [string, string, string, string][] = [
+  ["currency", "Raw currency", "Divine Orb", "Rare monsters, altars and map bonuses: currency off the floor"],
+  ["rush", "Boss rush", "The Maven's Writ", "Run to the boss, kill it, leave"],
+  ["terror", "Many bosses: Terror Shrines", "Fragment of the Minotaur", "Terror Shrine maps: every shrine is a boss, about 15 a map"],
+  ["destructive", "Many bosses: Destructive Play", "Fragment of the Hydra", "The Maven adds bosses when most of the map is dead: boss maps and chisels"],
+  ["maps", "Map drops", "Map (Tier 16)", "Clear everything, sell the maps"],
+  ["threads", "Threads", "Legion Thread", "Find and sell Threads"],
+];
+type Setup = { map: string; build: string; altar: string; has: string[]; threads: [string, number][] };
+const SETUP: Setup = { map: "rolled", build: "normal", altar: "auto", has: [], threads: [] };
+const MAPS: [string, string, string][] = [["plain", "Plain", "White or quickly rolled maps"], ["rolled", "Rolled", "6 mods, about 90% Atlas Drops"], ["juiced", "Juiced", "8 mods, 120%+ Atlas Drops and more currency"]];
+const BUILDS: [string, string, string][] = [["weak", "Fragile", "Leaves out points that make maps deadly"], ["normal", "Normal", ""], ["strong", "Strong", "Dangerous points cost you nothing"]];
+const ALTARS: [string, string, string][] = [["auto", "Best", "Whichever pays more"], ["eater", "Eater", "Eater of Worlds altars"], ["exarch", "Exarch", "Searing Exarch altars"], ["maven", "Maven", "No altars: the Maven watches"], ["none", "None", "No influence"]];
+const HAS: [string, string][] = [["mirage", "Mirage"], ["delirium", "Delirium mirror"], ["wildwood", "Wildwood"]];
+const PRIMARY = ["abyss", "bestiary", "betrayal", "blight", "breach", "expedition", "incursion", "legion", "ritual", "ultimatum"];
+const SURE: Record<string, [string, string]> = {
+  both: ["Solid", "The maths and what players take agree"],
+  maths: ["Maths", "Pays by the maths, fewer players take it: a good one to test"],
+  players: ["Players", "Most players take it; the maths has no number for it yet"],
+};
 const TRAVEL_KEYS = TRAVEL.map(([k]) => k);
 const ITEM: Record<string, string> = Object.fromEntries([...MECHS, ...TRAVEL].map(([k, , item]) => [k, item]));
 const LABEL: Record<string, string> = Object.fromEntries([...MECHS, ...TRAVEL].map(([k, label]) => [k, label]));
@@ -58,6 +79,8 @@ export default function AtlasPicks({ store, onImported, onShow }: {
   const [err, setErr] = useState("");
   const [all, setAll] = useState(false);
   const [tab, setTabState] = useState<"picks" | "own">(() => { try { return localStorage.getItem("atlas-picks-tab") === "own" ? "own" : "picks"; } catch { return "picks"; } });
+  const [goals, setGoals] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem("atlas-opt-goals") ?? "[]"); } catch { return []; } });
+  useEffect(() => { try { localStorage.setItem("atlas-opt-goals", JSON.stringify(goals)); } catch { /* fine */ } }, [goals]);
   const setTab = (t: "picks" | "own") => { setTabState(t); try { localStorage.setItem("atlas-picks-tab", t); } catch { /* fine */ } };
 
   useEffect(() => {
@@ -102,9 +125,20 @@ export default function AtlasPicks({ store, onImported, onShow }: {
         <button role="tab" aria-selected={own} className={own ? "on" : ""} onClick={() => setTab("own")}>Build my own</button>
       </div>
       <p className="muted small">{own
-        ? "Pick what you want to farm and the editor builds a tree for it, spending points where they do the most."
+        ? "Pick a goal, something to farm, or both. The editor works out what every point does for it, how points multiply each other, and what experts take."
         : <>Pick what you want to farm. Trees from maxroll creators for this league{built ? ` (list from ${new Date(built + "T12:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short" })})` : ""}.</>}</p>
-      <div className="ap-step">1 · What do you want to farm?</div>
+      {own && <>
+        <div className="ap-step">1 · What's your goal? <span className="ap-step-note">(optional)</span></div>
+        <div className="ap-tiles ap-goals">
+          {GOALS.map(([k, label, item, what]) => (
+            <button key={k} className={`ap-tile ${goals.includes(k) ? "on" : ""}`} aria-pressed={goals.includes(k)} title={what}
+              onClick={() => setGoals((g) => g.includes(k) ? [] : [k])}>
+              {k === "terror" ? <MechArt m="shrines" size={34} /> : <ItemIcon name={item} size={34} />}<span>{label}</span>
+            </button>
+          ))}
+        </div>
+      </>}
+      <div className="ap-step">{own ? "2 · What do you want to farm?" : "1 · What do you want to farm?"}</div>
       <div className="ap-tiles">
         {MECHS.filter(([m]) => own || !OWN_ONLY.includes(m)).map(([m, label]) => {
           const n = count[m] ?? 0;
@@ -128,7 +162,7 @@ export default function AtlasPicks({ store, onImported, onShow }: {
           ))}
         </div>
       </>}
-      {own ? <BuildOwn sel={sel} onClear={() => setSel([])} onSaved={onImported} /> : <>
+      {own ? <BuildOwn sel={sel} goals={goals} onClear={() => { setSel([]); setGoals([]); }} onSaved={onImported} /> : <>
       <div className="ap-step">
         {ms.length === 0 ? "2 · Maxroll team picks (choose above to narrow it down)" : `2 · Creator trees for ${names.join(" + ")}`}
         {sel.length > 0 && <button className="link small" onClick={() => setSel([])}>Clear</button>}
@@ -159,11 +193,22 @@ export default function AtlasPicks({ store, onImported, onShow }: {
   );
 }
 
-type NodeWork = { node: number; name: string; value: number; why: string };
+type NodeWork = { node: number; name: string; value: number; why: string; gain?: number; share?: number; sure?: string };
 type Plan = { nodes: number[]; steps: AtlasStep[]; choices: [number, number][]; points: number; budget: number;
-  top: NodeWork[]; weak: NodeWork[]; trees_used: number; notes?: string[] };
+  top: NodeWork[]; weak: NodeWork[]; trees_used: number; notes?: string[]; left_out?: [string, string][]; tips?: string[];
+  threads?: [string, number][]; altar?: string; parts?: { key: string; label: string; share: number }[] };
 type Priority = "fewest" | "balanced" | "profit";
 const PRIORITIES: [Priority, string][] = [["fewest", "Fewest points"], ["balanced", "Balanced"], ["profit", "Most profit"]];
+
+/** One question with a few answers side by side. */
+function Pickers({ label, list, value, onPick }: { label: string; list: [string, string, string][]; value: string; onPick: (v: string) => void }) {
+  return (
+    <div className="ap-set">
+      <span className="ap-set-l">{label}</span>
+      <div className="ap-seg">{list.map(([k, l, what]) => <button key={k} className={value === k ? "on" : ""} aria-pressed={value === k} title={what || l} onClick={() => onPick(k)}>{l}</button>)}</div>
+    </div>
+  );
+}
 
 function readList(key: string): number[] {
   try { const v = JSON.parse(localStorage.getItem(key) ?? "[]"); return Array.isArray(v) ? v : []; } catch { return []; }
@@ -172,10 +217,14 @@ function saveList(key: string, v: unknown) { try { localStorage.setItem(key, JSO
 
 /** "Build my own": the optimiser (core atlas_opt.rs) for the picked mechanics. Always / Never on any node it
  *  shows; the tree updates straight away. Save adds it to My strategies like a creator tree. */
-function BuildOwn({ sel, onClear, onSaved }: { sel: string[]; onClear: () => void; onSaved: (s: AtlasStore, msg: string) => void }) {
+function BuildOwn({ sel, goals, onClear, onSaved }: { sel: string[]; goals: string[]; onClear: () => void; onSaved: (s: AtlasStore, msg: string) => void }) {
   const [prio, setPrio] = useState<Priority>(() => { try { return (localStorage.getItem("atlas-opt-prio") as Priority) || "balanced"; } catch { return "balanced"; } });
   const [lock, setLock] = useState<number[]>(() => readList("atlas-opt-lock"));
   const [block, setBlock] = useState<number[]>(() => readList("atlas-opt-block"));
+  const [setup, setSetup] = useState<Setup>(() => { try { return { ...SETUP, ...JSON.parse(localStorage.getItem("atlas-opt-setup") ?? "{}") }; } catch { return SETUP; } });
+  useEffect(() => { saveList("atlas-opt-setup", setup); }, [setup]);
+  const change = (p: Partial<Setup>) => setSetup((x) => ({ ...x, ...p }));
+  const ask = (p: Priority) => ({ mechanics: sel, goals, priority: p, budget: 0, lock, block, threads: setup.threads, altar: setup.altar, map_has: setup.has, map: setup.map, build: setup.build });
   const [plans, setPlans] = useState<Partial<Record<Priority, Plan>>>({});
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
@@ -196,27 +245,31 @@ function BuildOwn({ sel, onClear, onSaved }: { sel: string[]; onClear: () => voi
   // The atlas data: names for the Always / Never chips (a blocked node isn't in the plan any more) and what each node does.
   useEffect(() => { loadAtlas().then(setTree).catch(() => setTree(null)); }, []);
   useEffect(() => {
-    if (sel.length === 0) { setPlans({}); return; }
+    if (sel.length === 0 && goals.length === 0) { setPlans({}); return; }
     let live = true;
     const t = window.setTimeout(async () => {
       try {
         const out: Partial<Record<Priority, Plan>> = {};
-        for (const [p] of PRIORITIES) out[p] = await invoke<Plan>("atlas_optimise", { ask: { mechanics: sel, priority: p, budget: 0, lock, block } });
+        await Promise.all(PRIORITIES.map(async ([p]) => { out[p] = await invoke<Plan>("atlas_optimise", { ask: ask(p) }); }));
         if (live) { setPlans(out); setErr(""); }
       } catch (e) { if (live) setErr(String(e)); }
     }, 120);
     return () => { live = false; window.clearTimeout(t); };
-  }, [sel.join(","), lock.join(","), block.join(",")]);
+  }, [sel.join(","), goals.join(","), lock.join(","), block.join(","), JSON.stringify(setup)]);
 
-  if (sel.length === 0) return <div className="muted small ap-none">Pick one or more above to build a tree.</div>;
+  // Threads picked for another farm don't follow him to the next one.
+  const first = useRef(true);
+  useEffect(() => { if (first.current) { first.current = false; return; } setSetup((x) => x.threads.length ? { ...x, threads: [] } : x); }, [sel.join(","), goals.join(",")]);
+
+  if (sel.length === 0 && goals.length === 0) return <div className="muted small ap-none">Pick a goal or something to farm above to build a tree.</div>;
   const plan = plans[prio];
-  const label = sel.map((m) => LABEL[m] ?? m).join(" + ");
+  const label = [...goals.map((g) => GOALS.find((x) => x[0] === g)?.[1] ?? g), ...sel.map((m) => LABEL[m] ?? m)].join(" + ");
   const always = (id: number) => { setBlock((b) => b.filter((x) => x !== id)); setLock((l) => l.includes(id) ? l.filter((x) => x !== id) : [...l, id]); };
   const never = (id: number) => { setLock((l) => l.filter((x) => x !== id)); setBlock((b) => b.includes(id) ? b.filter((x) => x !== id) : [...b, id]); };
   const save = async () => {
     setSaving(true);
     try {
-      const s = await invoke<AtlasStore>("atlas_save_plan", { ask: { mechanics: sel, priority: prio, budget: 0, lock, block }, name: "" });
+      const s = await invoke<AtlasStore>("atlas_save_plan", { ask: ask(prio), name: "" });
       onSaved(s, `Saved “${label}” (${plan?.points ?? ""} points) to My strategies. It's the one shown in game now.`);
     } catch (e) { setErr(String(e)); }
     setSaving(false);
@@ -244,7 +297,8 @@ function BuildOwn({ sel, onClear, onSaved }: { sel: string[]; onClear: () => voi
   const row = (w: NodeWork, weak = false) => (
     <div key={w.node} id={`ap-row-${w.node}`} className={`ap-work ${weak ? "weak" : ""} ${openNode === w.node ? "open" : ""}`}>
       <button className="ap-work-name" onClick={() => toggleOpen(w.node)} aria-expanded={openNode === w.node} title="What it does (and find it on the tree)">
-        <b>{w.name}</b><span className="ap-caret" aria-hidden="true">{openNode === w.node ? "▾" : "▸"}</span>
+        <b>{w.name}</b>{(w.gain ?? 0) >= 0.004 && <span className="ap-gain">+{(w.gain! * 100).toFixed(w.gain! < 0.1 ? 1 : 0)}%</span>}
+        {w.sure && SURE[w.sure] && <span className={`ap-sure ${w.sure}`} title={SURE[w.sure][1]}>{SURE[w.sure][0]}</span>}<span className="ap-caret" aria-hidden="true">{openNode === w.node ? "▾" : "▸"}</span>
       </button>
       <span className="ap-acts">
         <button className={`ap-mini lock ${lock.includes(w.node) ? "on" : ""}`} onClick={() => always(w.node)} title="Always keep this in">Always</button>
@@ -261,14 +315,44 @@ function BuildOwn({ sel, onClear, onSaved }: { sel: string[]; onClear: () => voi
 
   return (
     <>
-      <div className="ap-step">2 · How <button className="link small" onClick={onClear}>Clear</button></div>
+      <div className="ap-step">3 · Your maps</div>
+      <div className="ap-setup">
+        <Pickers label="Maps" list={MAPS} value={setup.map} onPick={(map) => change({ map })} />
+        <Pickers label="Your build" list={BUILDS} value={setup.build} onPick={(build) => change({ build })} />
+        <Pickers label="Altars" list={ALTARS} value={setup.altar} onPick={(altar) => change({ altar })} />
+        <div className="ap-set">
+          <span className="ap-set-l" title="Bought or rolled that way: points for its chance are worth nothing then">Every map has</span>
+          <span className="ap-chips">{HAS.map(([k, l]) => (
+            <button key={k} className={`ap-chip ${setup.has.includes(k) ? "on" : ""}`} aria-pressed={setup.has.includes(k)}
+              onClick={() => change({ has: setup.has.includes(k) ? setup.has.filter((x) => x !== k) : [...setup.has, k] })}>{hasMechArt(k) && <MechArt m={k} size={20} />}{l}</button>
+          ))}</span>
+        </div>
+        <div className="ap-set">
+          <span className="ap-set-l" title="A map takes three kinds. Only 1, 3, 6 and 8 of a kind pay">Threads</span>
+          <span className="ap-chips">
+            {(plan?.threads ?? []).map(([t, n], i) => (
+              <span key={i} className="ap-chip on">
+                <MechArt m={t} size={20} />
+                <select aria-label="Thread" value={t} onChange={(e) => change({ threads: (plan!.threads!).map((x, j) => j === i ? [e.target.value, x[1]] : x) })}>
+                  {PRIMARY.filter((p) => p === t || !plan!.threads!.some((x) => x[0] === p)).map((p) => <option key={p} value={p}>{LABEL[p] ?? p}</option>)}
+                </select>
+                <select aria-label="How many" value={n} onChange={(e) => change({ threads: (plan!.threads!).map((x, j) => j === i ? [x[0], Number(e.target.value)] : x) })}>
+                  {[...new Set([0, 1, 3, 6, 8, n])].sort((a, b) => a - b).map((k) => <option key={k} value={k}>{k || "none"}</option>)}
+                </select>
+              </span>
+            ))}
+            {setup.threads.length > 0 && <button className="link small" onClick={() => change({ threads: [] })}>Choose for me</button>}
+          </span>
+        </div>
+      </div>
+      <div className="ap-step">4 · How <button className="link small" onClick={onClear}>Clear</button></div>
       <div className="row ap-how">
         <div className="ap-seg">
           {PRIORITIES.map(([p, l]) => (
             <button key={p} className={prio === p ? "on" : ""} onClick={() => setPrio(p)}>{l}{plans[p] ? ` · ${plans[p]!.points}` : ""}</button>
           ))}
         </div>
-        {plan && <span className="muted small">{plan.trees_used ? `Learned from ${plan.trees_used} creator tree${plan.trees_used > 1 ? "s" : ""} for ${label}` : "No creator trees for these: built from what the nodes say"}</span>}
+        {plan && <span className="muted small">{plan.trees_used ? `Checked against about ${plan.trees_used} different tree ideas for these` : "Built from what the points do and what all trees take"}</span>}
         <span className="grow" />
         <button className="primary" disabled={!plan || saving} onClick={save}>{saving ? "Saving…" : "Save as my strategy"}</button>
       </div>
@@ -280,10 +364,18 @@ function BuildOwn({ sel, onClear, onSaved }: { sel: string[]; onClear: () => voi
       )}
       {err && <div className="small at-msg">{err}</div>}
       {plan && <>
-        <div className="ap-step">3 · Your tree · {plan.points} of {plan.budget} points</div>
-        {(plan.notes ?? []).length > 0 && <div className="small ap-notes">{plan.notes!.join(" · ")}. Lock in (Always) a node of the other side to switch.</div>}
+        <div className="ap-step">5 · Your tree · {plan.points} of {plan.budget} points</div>
+        {(plan.parts ?? []).length > 0 && (
+          <div className="ap-parts" title="Where this plan's income comes from, by the maths">
+            <div className="ap-parts-bar">{plan.parts!.map((x, i) => <i key={x.key} className={`c${i % 6}`} style={{ flexGrow: x.share }} />)}</div>
+            <div className="ap-parts-key">{plan.parts!.map((x, i) => <span key={x.key}><i className={`c${i % 6}`} />{x.label} {Math.round(x.share * 100)}%</span>)}</div>
+          </div>
+        )}
+        {(plan.notes ?? []).length > 0 && <div className="small ap-notes">{plan.notes!.join(" · ")}.</div>}
+        {(plan.tips ?? []).length > 0 && <div className="small ap-tips"><b>How to play it:</b> {plan.tips!.join(" ")}</div>}
+        {(plan.left_out ?? []).length > 0 && <div className="small ap-left"><b>Left out on purpose:</b> {plan.left_out!.map(([n, w]) => `${n} (${w})`).join(" · ")}</div>}
         <div className="ap-own">
-          <div className="ap-own-tree"><AtlasTreeView key={sel.join(",")} nodes={plan.nodes} choices={plan.choices} height={620} find={find} onPick={pickOnTree} /></div>
+          <div className="ap-own-tree"><AtlasTreeView key={[...goals, ...sel].join(",")} nodes={plan.nodes} choices={plan.choices} height={620} find={find} onPick={pickOnTree} /></div>
           <div className="ap-own-side">
             {clicked != null && names[clicked] !== undefined && (
               <div className="ap-clicked">
@@ -301,7 +393,7 @@ function BuildOwn({ sel, onClear, onSaved }: { sel: string[]; onClear: () => voi
               </div>
             )}
             <b>Doing the most</b>
-            <div className="muted small">Always = keep it in. Never = leave it out and build around it.</div>
+            <div className="muted small">+% = what the plan would lose without it (an estimate). Always = keep it in. Never = build around it.</div>
             {plan.top.map((w) => row(w))}
             {plan.weak.length > 0 && <>
               <b className="ap-weak-h">Doing little</b>

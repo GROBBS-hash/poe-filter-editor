@@ -221,7 +221,7 @@ mockIPC((cmd, args) => {
     return atlas;
   }
   if (cmd === "atlas_optimise" || cmd === "atlas_save_plan") {
-    // Stand-in for core atlas_opt.rs: maxroll's sample tree, shorter for fewer points, minus blocked nodes.
+    // A real plan when there is one (ATLAS_OPT_OUT=… atlas_opt::show, copied to public/_plan_profit.json), else a stand-in: maxroll's sample tree, shorter for fewer points, minus blocked nodes.
     const ask = (args as { ask: { mechanics: string[]; priority: string; lock: number[]; block: number[] } }).ask;
     const n = ask.priority === "fewest" ? 60 : ask.priority === "balanced" ? 90 : mxVariant.history.length;
     const pts = [...new Set([...ask.lock, ...mxVariant.history.slice(0, n)])].filter((x: number) => !ask.block.includes(x));
@@ -231,7 +231,7 @@ mockIPC((cmd, args) => {
     const plan = { nodes: [29045, ...pts], steps: atlasSteps(pts), choices: [], points: pts.length, budget: 150,
       top: notable.slice(0, 10).map(work), weak: notable.slice(10, 12).map((x: number, i: number) => ({ ...work(x, i), why: "on the way to better nodes" })), trees_used: 7,
       notes: ["Eater of Worlds side only: a map has one Eldritch influence"] };
-    if (cmd === "atlas_optimise") return plan;
+    if (cmd === "atlas_optimise") return fetch(`/_plan_${ask.priority}.json`).then((r) => (r.ok && r.headers.get("content-type")?.includes("json") ? r.json() : plan)).catch(() => plan);
     atlas = { ...atlas, active: 99, list: [...atlas.list, { ...atlas.list[0], id: 99, name: `${ask.mechanics.join(" + ")} (optimiser)`, site: "optimiser", link: "" }] };
     return atlas;
   }
