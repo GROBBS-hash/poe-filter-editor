@@ -17,7 +17,7 @@ const EXAMPLE: { check: Json; result: Json } = {
     league: "Standard", from_ground: false, error: null, ninja: null, divine: 225, bulk: null, map: null,
     setup: {
       item: { item_class: "Rings", rarity: "Rare", name: "Wrath Coil", base_type: "Amethyst Ring", item_level: 70, corrupted: false, mirrored: false, unidentified: false },
-      base_only: false, ilvl_min: null, links_min: null, gem_level: null, unknown: [], unknown_kinds: [], category: "accessory.ring",
+      base_only: false, ilvl_min: null, links_min: null, gem_level: null, unknown: [], unknown_kinds: [], category: "accessory.ring",  raw: "Item Class: Rings\nRarity: Rare\nWrath Coil\nAmethyst Ring",
       filters: [
         { id: "pseudo.pseudo_total_life", label: "+82 total maximum Life", value: 82, min: 82, enabled: true, kind: "pseudo", tier: null, roll: null },
         { id: "pseudo.pseudo_total_chaos_resistance", label: "+13% total to Chaos Resistance", value: 13, min: 13, enabled: false, kind: "pseudo", tier: null, roll: null },
