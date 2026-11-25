@@ -367,8 +367,8 @@ function BuildOwn({ sel, goals, onClear, onSaved }: { sel: string[]; goals: stri
         <div className="ap-step">5 · Your tree · {plan.points} of {plan.budget} points</div>
         {(plan.parts ?? []).length > 0 && (
           <div className="ap-parts" title="Where this plan's income comes from, by the maths">
-            <div className="ap-parts-bar">{plan.parts!.map((x, i) => <i key={x.key} className={`c${i % 6}`} style={{ flexGrow: x.share }} />)}</div>
-            <div className="ap-parts-key">{plan.parts!.map((x, i) => <span key={x.key}><i className={`c${i % 6}`} />{x.label} {Math.round(x.share * 100)}%</span>)}</div>
+            <div className="ap-parts-bar">{plan.parts!.map((x, i) => <i key={x.key} className={`c${i % 8}`} style={{ flexGrow: x.share }} />)}</div>
+            <div className="ap-parts-key">{plan.parts!.map((x, i) => <span key={x.key}><i className={`c${i % 8}`} />{x.label} {Math.round(x.share * 100)}%</span>)}</div>
           </div>
         )}
         {(plan.notes ?? []).length > 0 && <div className="small ap-notes">{plan.notes!.join(" · ")}.</div>}

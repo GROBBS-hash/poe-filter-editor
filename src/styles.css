@@ -2375,7 +2375,7 @@ button.qm-rule:hover, .qm-rule.can-open:hover { border-color: var(--gold); backg
 .ap-parts-bar i { min-width: 3px; }
 .ap-parts-key { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 6px; font-size: 12.5px; color: var(--text-2); }
 .ap-parts-key i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; }
-.ap-parts .c0 { background: var(--gold); } .ap-parts .c1 { background: #79b4ff; } .ap-parts .c2 { background: #62cf80; } .ap-parts .c3 { background: #b98be0; } .ap-parts .c4 { background: #f0857c; } .ap-parts .c5 { background: #8b92a1; }
+.ap-parts .c0 { background: var(--gold); } .ap-parts .c1 { background: #79b4ff; } .ap-parts .c2 { background: #62cf80; } .ap-parts .c3 { background: #b98be0; } .ap-parts .c4 { background: #f0857c; } .ap-parts .c5 { background: #8b92a1; } .ap-parts .c6 { background: #4fc3c8; } .ap-parts .c7 { background: #d98bb0; }
 .ap-tips, .ap-left { color: var(--text-2); margin-top: 4px; max-width: 110ch; }
 .ap-tips b, .ap-left b { color: var(--text); }
 .ap-gain { color: var(--green); font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; }

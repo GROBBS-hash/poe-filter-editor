@@ -130,30 +130,39 @@
    "pick": [
     "monsters"
    ],
-   "prior": [],
+   "prior": [
+    "goal:currency"
+   ],
    "boost": {
-    "monsters": 2
-   }
+    "monsters": 4
+   },
+   "core": [13833, 34393, 30266, 28477, 39380, 16298, 27261]
   },
   "threads": {
    "label": "Threads",
    "pick": [
     "threads"
    ],
-   "prior": [],
+   "prior": [
+    "goal:threads"
+   ],
    "boost": {
-    "threads": 4
-   }
+    "threads": 8
+   },
+   "core": [61484, 64462, 13833, 61620, 64980]
   },
   "maps": {
    "label": "Map drops",
    "pick": [
     "maps"
    ],
-   "prior": [],
+   "prior": [
+    "goal:maps"
+   ],
    "boost": {
-    "maps": 5
-   }
+    "maps": 10
+   },
+   "core": [43903, 34393, 30266, 28477, 27261]
   },
   "terror": {
    "label": "Many bosses (Terror Shrines)",
@@ -162,13 +171,13 @@
     "shrines"
    ],
    "prior": [
-    "conquerors",
-    "shrines"
+    "goal:terror"
    ],
    "terror": true,
    "boost": {
     "bossmaps": 3
-   }
+   },
+   "core": [18476, 12651, 9780, 58232, 20503, 24679, 27261]
   },
   "destructive": {
    "label": "Many bosses (Destructive Play)",
@@ -176,17 +185,15 @@
     "bosses"
    ],
    "prior": [
-    "conquerors",
-    "mirage"
+    "goal:destructive"
    ],
    "maven": true,
    "boost": {
     "bossmaps": 4,
-    "chisels": 2
+    "chisels": 3
    },
-   "lock": [
-    34384
-   ]
+   "lock": [34384],
+   "core": [34384, 18476, 12651, 14203, 20929, 12302, 62212]
   },
   "rush": {
    "label": "Boss rush",
@@ -195,10 +202,11 @@
     "anomalies"
    ],
    "prior": [
-    "mirage"
+    "goal:rush"
    ],
    "rush": true,
-   "boost": {}
+   "boost": {},
+   "core": [64222, 14203, 20929, 20503, 24679]
   }
  },
  "mechanics": {
@@ -274,7 +282,34 @@
    "gold.rewards"
   ]
  },
- "juice_use": { "legion": 1, "breach": 1, "abyss": 1, "bestiary": 1, "delirium": 1, "monsters": 1, "threads": 1, "maps": 1, "harvest": 0.8, "blight": 0.7, "ritual": 0.8, "expedition": 0.8, "cards": 0.8, "shrines": 0.5, "bosses": 0.3, "incursion": 0.25, "essence": 0.25, "betrayal": 0.25, "settlers": 0.25, "strongboxes": 0.25, "mercenaries": 0.2, "ultimatum": 0.1, "exiles": 0.25, "torment": 0.25, "memories": 0.2, "gold": 0.5 },
+ "juice_use": {
+  "legion": 1,
+  "breach": 1,
+  "abyss": 1,
+  "bestiary": 1,
+  "delirium": 1,
+  "monsters": 1,
+  "threads": 1,
+  "maps": 1,
+  "harvest": 0.8,
+  "blight": 0.7,
+  "ritual": 0.8,
+  "expedition": 0.8,
+  "cards": 0.8,
+  "shrines": 0.5,
+  "bosses": 0.15,
+  "incursion": 0.25,
+  "essence": 0.25,
+  "betrayal": 0.25,
+  "settlers": 0.25,
+  "strongboxes": 0.25,
+  "mercenaries": 0.2,
+  "ultimatum": 0.1,
+  "exiles": 0.25,
+  "torment": 0.25,
+  "memories": 0.2,
+  "gold": 0.5
+ },
  "primaries": [
   "abyss",
   "bestiary",
@@ -877,12 +912,12 @@
    "always": true,
    "factors": [
     ["bosses.item_rarity", 0.4],
-    ["bosses.boss_mods", 0.06],
+    ["bosses.boss_mods", 0.03],
     ["threads.found_unique", 0.02],
     ["gold.volatile", 0.1],
     ["altarboss", 0.4],
-    ["drops", 0.6],
-    ["rarity", 0.3],
+    ["drops", 0.15],
+    ["rarity", 0.1],
     ["juice", 0.25],
     ["bosses.rarity_per_pack", 0.3]
    ],
@@ -1030,7 +1065,7 @@
     ["cards.to_boss", 0.1],
     ["bosses.item_rarity", 0.4],
     ["altarboss", 0.4],
-    ["drops", 0.15]
+    ["drops", 0.05]
    ],
    "conf": "guess"
   },

@@ -83,6 +83,9 @@ pub struct Goal {
     pub rush: bool,
     #[serde(default)]
     pub lock: Vec<u32>,
+    /// What makes this goal pay (research), so it isn't left to the few trees there are for it.
+    #[serde(default)]
+    pub core: Vec<u32>,
 }
 #[derive(Debug, Clone, Deserialize)]
 pub struct Mode { pub when: String, pub node: u32, pub option: u32, pub label: String }
@@ -305,7 +308,8 @@ impl Problem {
             let mech = s.mech.as_deref().unwrap_or(key);
             match s.needs.as_deref() { Some("maven") if !setup.maven => return None, Some("rush") if !setup.rush => return None, _ => {} }
             if let Some(h) = &s.maphas { if !setup.map_has.contains(h) && !setup.pick.contains(mech) { return None; } }
-            if let Some(t) = &s.thread { if !thr.iter().any(|x| x.0 == t) { return None; } }
+            // A filler (one or two Threads of something he isn't farming) is walked past: no income, no time.
+            if let Some(t) = &s.thread { if !thr.iter().any(|x| x.0 == t && (x.1 >= 3.0 || setup.pick.contains(mech))) { return None; } }
             let picked = setup.pick.contains(mech) || setup.pick.contains(key);
             let weight = if picked { 1.0 } else if key == "monsters" { 0.8 * juiced } else if s.always && mech == "bosses" { 0.3 } else if ["threads", "maps", "gold", "cards"].contains(&key.as_str()) { 0.6 } else if s.always { 0.6 } else { 0.1 };
             let how = if let Some(sp) = &s.spawn {
@@ -367,9 +371,10 @@ impl Problem {
         q[PACK] = (1.0 + m.pack / 100.0 * mm + x[c.pack] + x[c.eld] * side) / (1.0 + m.pack / 100.0);
         let drops0 = 1.0 + m.drops / 100.0;
         q[DROPS] = (1.0 + m.drops / 100.0 * mm) / drops0;
-        // "Increased Threads / Maps found" adds to Atlas Drops instead of multiplying it.
-        q[THRB] = (1.0 + m.drops / 100.0 * mm + x[c.t_found]) / drops0;
-        q[MAPB] = (1.0 + m.drops / 100.0 * mm + x[c.m_found] + x[c.m_per]) / drops0;
+        // Whether "increased Threads / Maps found" adds to Atlas Drops or multiplies it isn't known: experts who farm them buy
+        // them, so it multiplies here.
+        q[THRB] = q[DROPS] * (1.0 + x[c.t_found]);
+        q[MAPB] = q[DROPS] * (1.0 + x[c.m_found] + x[c.m_per]);
         q[RARITY] = ((1.0 + m.rarity / 100.0 * mm + x[c.rarity]) / (1.0 + m.rarity / 100.0)).powf(g.rarity_power) * (1.0 + m.currency / 100.0 * mm) / (1.0 + m.currency / 100.0);
         q[MAGIC] = (1.0 + x[c.magic] + x[c.mpk] * 0.03) * (1.0 + x[c.mpack]);
         q[RARE] = 1.0 + x[c.rare] + (x[c.rdup] + x[c.rmir] * 2.0) / g.rare_base * g.added_rare;
@@ -407,7 +412,7 @@ impl Problem {
             if let Some(u) = sr.side { n *= if u { unstable } else { 1.0 - unstable }; }
             if n <= 0.0 { continue; }
             let mut inc = sr.unit * n;
-            if s.rush { match sr.how { How::Count(_) => {} How::Fixed(_) => inc *= 0.3, _ => inc *= if sr.quick { 0.7 } else { 0.2 } } }
+            if s.rush { match sr.how { How::Count(_) => {} How::Fixed(_) => inc *= if sr.thread.is_some() && sr.weight >= 1.0 { 0.8 } else { 0.3 }, _ => inc *= if sr.quick { 0.7 } else { 0.2 } } }
             for &(d, w) in &sr.der { inc *= if d == ALTARBOSS || d == SHRINES { 1.0 + w * q[d] } else { 1.0 + w * (q[d] - 1.0) }; }
             for &(i, w) in &sr.ch { inc *= (1.0 + w * x[i]).max(0.05); }
             if sr.steer {
@@ -468,19 +473,27 @@ fn prior(s: &Setup, sh: &Shares, ids: &[u32]) -> Vec<f64> {
         let f = fam.get(id).copied().unwrap_or("other");
         let all = sh.all.get(id).copied().unwrap_or(0.0);
         let of = |k: &str| { let c = sh.mechs.get(k).unwrap_or(&empty); (c.n.get(id).copied().unwrap_or(0.0) * c.w, c.w) };
-        // A mechanic that isn't in the map at all.
-        if primaries.contains(f) && !s.threads.iter().any(|t| t.0 == f) { return 0.0; }
+        // A mechanic that isn't in the map at all, or only as a filler (one Thread for Multiplying Modifiers).
+        if primaries.contains(f) && !s.mechs.iter().any(|k| k == f) && !s.threads.iter().any(|t| t.0 == f && t.1 >= 3) { return 0.0; }
         if s.map_has.iter().any(|h| h == f) { return 0.0; }
         let p = if s.mechs.iter().any(|k| k == f) {
             let (a, w) = of(f);
             (a + if notable { 0.5 } else { 0.35 }) / (w + 1.0)
         } else {
             let p = if s.mechs.is_empty() { all } else {
-                s.mechs.iter().map(|k| { let (a, w) = of(k); (a + 0.3 * all) / (w + 0.3) }).sum::<f64>() / s.mechs.len() as f64
+                s.mechs.iter().map(|k| {
+                    // Few trees for a goal: lean on everyone's more, so it's never one creator's tree again.
+                    let k0 = if k.starts_with("goal:") { 2.0 } else { 0.3 };
+                    let (a, w) = of(k);
+                    (a + k0 * all) / (w + k0)
+                }).sum::<f64>() / s.mechs.len() as f64
             };
-            p * if general(f) { 1.0 } else { 0.3 }
+            // People with the same goal: whatever they take counts, also other mechanics (shrines for bosses, ore for a rush).
+            let goal = s.mechs.iter().any(|k| k.starts_with("goal:"));
+            p * if general(f) { 1.0 } else if goal { 0.8 } else { 0.3 }
         };
-        p * if notable { 4.0 } else { 1.0 }
+        let core = s.mechs.iter().filter_map(|k| m.goals.get(k.strip_prefix("goal:")?)).any(|g| g.core.contains(id));
+        (if core { p.max(0.9) } else { p }) * if notable { 4.0 } else { 1.0 }
     }).collect();
     let mut sorted = v.clone();
     sorted.sort_by(|a, b| b.total_cmp(a));

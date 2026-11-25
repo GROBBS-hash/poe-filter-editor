@@ -265,7 +265,7 @@ fn optimise_with(ask: &Ask, shares: &Shares) -> Plan {
     let nodes = s.order(&t);
 
     // Why each notable is in: the plan with and without it.
-    let names: Vec<String> = p.setup.mechs.iter().map(|x| atlas_model::cap(x)).collect();
+    let names: Vec<String> = p.setup.mechs.iter().map(|x| x.strip_prefix("goal:").and_then(|k| m.goals.get(k)).map(|g| g.label.split(" (").next().unwrap_or("").to_string()).unwrap_or_else(|| atlas_model::cap(x))).collect();
     let with = p.detail(&t.x);
     let pc = p.prior_channel();
     let maths = |x: &[f64]| p.eval(x) - Problem::lambda() * x[pc];
@@ -435,6 +435,11 @@ mod tests {
         assert_eq!(terror.choices.iter().find(|c| c.0 == 27261).map(|c| c.1), Some(15113), "altars pay on bosses");
         assert!(rush.nodes.contains(&64222), "vaults from anomalies");
         for p in [&maps, &terror, &rush] { joined(p); }
+        // Different goals, different trees (25 Nov: currency, maps and Threads came out 141-146 points the same).
+        let all: Vec<(String, HashSet<u32>)> = goals().into_iter().map(|(k, _)| { let p = goal(&k); (k, p.nodes.into_iter().collect()) }).collect();
+        for (i, (a, x)) in all.iter().enumerate() {
+            for (b, y) in &all[..i] { let same = x.intersection(y).count() - 1; assert!(same <= 120, "{a} and {b} share {same} points"); }
+        }
     }
 
     #[test]
