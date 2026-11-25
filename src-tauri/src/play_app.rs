@@ -932,7 +932,7 @@ pub fn tracker_over_panels(app: AppHandle, on: bool) -> PlayView {
 }
 
 /// Your account name and POESESSID from the Wealth page (None when either is missing), and PoE 2 or not.
-fn account(app: &AppHandle) -> Option<(String, String, bool)> {
+pub fn account(app: &AppHandle) -> Option<(String, String, bool)> {
     let st = app.state::<AppState>();
     let s = st.store.lock().unwrap().settings.clone();
     let (acc, sess) = (s.poe_account.trim().to_string(), s.poesessid.trim().to_string());
@@ -966,6 +966,13 @@ fn pick_character(app: &AppHandle, list: &serde_json::Value) -> Option<serde_jso
     list.iter().find(|c| want.as_deref().is_some_and(|w| c["name"].as_str() == Some(w)))
         .or_else(|| list.iter().max_by_key(|c| c["lastLoginTime"].as_i64().unwrap_or(0)))
         .cloned()
+}
+
+/// The character you're playing: the log's, or the one last played on the site.
+pub fn playing_character(app: &AppHandle, acc: &str, sess: &str, poe2: bool) -> Result<String, String> {
+    if let Some(n) = with_live(|l| l.character.as_ref().map(|c| c.0.clone())) { return Ok(n); }
+    let v = trade_api::characters(acc, sess, poe2)?;
+    pick_character(app, &v).and_then(|c| c["name"].as_str().map(String::from)).ok_or_else(|| "No characters on this account".into())
 }
 
 // ---------- the menu check (timer stops in the Escape menu and the skill tree) ----------
@@ -1230,6 +1237,7 @@ fn read_bags(app: &AppHandle, at: i64) -> Result<Vec<serde_json::Value>, String>
                 with_live(|l| l.site_char = Some((c["name"].as_str().unwrap_or(&name).to_string(), c["level"].as_u64().unwrap_or(0) as u32)));
                 let saved = c["lastLoginTime"].as_i64().unwrap_or(0);
                 let bags = loot::bag_items(&v["items"]);
+                worn_app::note(app, &v, &name, poe2);
                 // Saved at (or after) this zone change, allowing for clocks a little apart.
                 if saved >= at - 15 || attempt == 3 { return Ok(bags); }
                 last = Ok(bags);

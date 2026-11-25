@@ -6,6 +6,7 @@ mod bulk_app;
 mod atlas_app;
 mod farm_app;
 mod play_app;
+mod worn_app;
 mod phone_app;
 mod win_place;
 mod updates;
@@ -3279,6 +3280,7 @@ pub fn run() {
             atlas_app::atlas_own_notes, atlas_app::atlas_official_link, atlas_app::hide_atlas_window, atlas_app::atlas_results,
             atlas_app::atlas_optimise, atlas_app::atlas_goals, atlas_app::atlas_save_plan, atlas_app::atlas_save_tree,
             play_app::level_view, play_app::level_move, play_app::level_jump_act, play_app::level_options, play_app::play_view,
+            worn_app::worn_compare, worn_app::worn_refresh, worn_app::worn_set,
             play_app::maps_done, play_app::maps_history, play_app::maps_clear, play_app::watch_action, play_app::searches_get,
             play_app::searches_save, play_app::search_type, play_app::stash_highlight, play_app::sheets_list, play_app::sheets_add,
             play_app::sheets_remove, play_app::notes_get, play_app::notes_save, play_app::play_toggle, play_app::play_hide,

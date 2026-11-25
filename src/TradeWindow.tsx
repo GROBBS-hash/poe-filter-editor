@@ -3,10 +3,11 @@ import { ErrNote } from "./LoginNeeded";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { CurrencyIcon, ItemIcon } from "./icons";
 import BaseUniques from "./BaseUniques";
 import RelatedItems from "./RelatedItems";
+import WornCompare, { Resists, type Comparison } from "./WornCompare";
 import { Item, RARITY_COLOUR, itemTitle } from "./types";
 import { CRAFT_ITEM_KEY } from "./Craft";
 
@@ -50,7 +51,6 @@ type MapInfo = { mods: { text: string; warn: string | null }[]; unidentified: bo
 type Check = { setup: Setup | null; ninja: [number, string] | null; league: string; from_ground: boolean; error: string | null; bulk?: string | null; map?: MapInfo | null; divine?: number | null; compare?: Comparison[]; instant_all?: boolean;
   /** poe.ninja's last 7 days: % change each day from a week ago (oldest first), and the total. */
   trend?: { points: number[]; change: number } | null; sold?: number | null };
-type Comparison = { slot: string; current: string; rows: { stat: string; now: number; this: number }[]; gain: string[]; lose: string[] };
 type Offer = { pay: number; pay_currency: string; get: number; get_currency: string; each: number; stock: number; account: string; whisper: string };
 type Bulk = { offers: Offer[]; url: string; divine: number | null;
   /** What sellers ask, when poe.ninja's price comes from too few sales to go by (chaos each). */
@@ -161,15 +161,15 @@ function SavedPanel({ list, setList, onRun }: { list: Saved[]; setList: (l: Save
   );
 }
 
-/** "Is this an upgrade?": against the gear in the same slot of your PoB build. */
-function CompareBlock({ list }: { list: Comparison[] }) {
+/** "Is this an upgrade?": against the gear in the same slot (what you wear, or your PoB build's). */
+function CompareBlock({ list, title, head }: { list: Comparison[]; title: string; head?: (c: Comparison) => ReactNode }) {
   const [open, setOpen] = useState(() => { try { return localStorage.getItem("tw-compare") !== "0"; } catch { return true; } });
   const toggle = () => { setOpen(!open); try { localStorage.setItem("tw-compare", open ? "0" : "1"); } catch { /* ignore */ } };
   const score = (c: Comparison) => [c.rows.filter((r) => r.this > r.now).length, c.rows.filter((r) => r.this < r.now).length];
   return (
     <div className="tw-cmp">
       <button className="tw-cmp-toggle" onClick={toggle}>
-        <span className="tw-sec">{open ? "▾" : "▸"} Against your build</span>
+        <span className="tw-sec">{open ? "▾" : "▸"} {title}</span>
         {!open && list.map((c) => { const [u, d] = score(c);
           return <Verdict key={c.slot} up={u} down={d} />; })}
       </button>
@@ -178,9 +178,10 @@ function CompareBlock({ list }: { list: Comparison[] }) {
         return (
           <div key={c.slot} className="tw-cmp-slot">
             <div className="tw-cmp-head">
-              <span className="small"><span className="muted">{c.slot}:</span> {c.current}</span>
+              <span className="small">{head?.(c)}<span className="muted">{c.slot}:</span> {c.current}</span>
               <Verdict up={up} down={down} />
             </div>
+            {c.note && <div className="wc-note">{c.note}</div>}
             {c.rows.length > 0 && (
               <table className="tw-cmp-rows">
                 <thead><tr><th></th><th>yours</th><th>this</th><th></th></tr></thead>
@@ -188,13 +189,14 @@ function CompareBlock({ list }: { list: Comparison[] }) {
                   {c.rows.map((r) => {
                     const d = r.this - r.now;
                     return <tr key={r.stat}><td>{r.stat}</td><td className="muted">{r.now}</td><td>{r.this}</td>
-                      <td className={d > 0 ? "up" : "down"}>{d > 0 ? "▲ " : "▼ "}{Math.abs(d)}</td></tr>;
+                      <td className={d > 0 ? "up" : "down"}>{d > 0 ? "▲ " : "▼ "}{Math.round(Math.abs(d) * 100) / 100}</td></tr>;
                   })}
                 </tbody>
               </table>
             )}
             <ModList title="Only on this item" lines={c.gain} cls="up" mark="+" />
             <ModList title="You'd lose" lines={c.lose} cls="down" mark="−" />
+            {c.resists && <Resists list={c.resists} />}
           </div>
         );
       })}
@@ -876,7 +878,9 @@ export default function TradeWindow() {
       {it.rarity === "Unique" && !it.name && it.base_type && <BaseUniques base={it.base_type} divine={divine} />}
 
       {check.map && <MapCheck map={check.map} rarity={it.rarity} corrupted={/\nCorrupted/.test(setup?.raw ?? "")} />}
-      {check.compare && check.compare.length > 0 && <CompareBlock list={check.compare} />}
+      {setup?.raw && !check.from_ground
+        ? <WornCompare raw={setup.raw} itemClass={it.item_class} build={check.compare ?? []}>{(list, title, head) => <CompareBlock list={list} title={title} head={head} />}</WornCompare>
+        : check.compare && check.compare.length > 0 && <CompareBlock list={check.compare} title="Against your build" />}
 
       {check.map && mapModCount > 0 && (
         <button className="link small tw-mapmods" onClick={() => setMapMods(!mapMods)}>

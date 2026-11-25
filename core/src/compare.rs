@@ -51,6 +51,58 @@ pub struct Comparison {
     /// Mods only the checked item has (not counted above), and ones you'd lose.
     pub gain: Vec<String>,
     pub lose: Vec<String>,
+    /// Against what you're wearing (not the gear in your build guide).
+    pub worn: bool,
+    /// Picture of the item there now.
+    pub icon: String,
+    /// Something to know before swapping ("Needs both hands…").
+    pub note: String,
+    /// Your whole gear's resistances that change (worn gear only).
+    pub resists: Vec<Resist>,
+}
+
+/// One resistance from all your gear, before and after the swap.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct Resist { pub name: String, pub now: f64, pub after: f64 }
+
+pub const RESISTS: [&str; 4] = ["Fire", "Cold", "Lightning", "Chaos"];
+
+/// Those four added up over these mod lines.
+pub fn resists(lines: &[String]) -> [f64; 4] {
+    let (t, _) = add_up(lines);
+    RESISTS.map(|n| STATS.iter().position(|(s, _)| *s == format!("{n} res")).map_or(0.0, |i| t[i]))
+}
+
+/// What the item's own numbers (not its mods) come to: weapon damage a second, armour, evasion, energy shield, block.
+/// As written on it, so quality counts.
+fn properties(text: &str) -> Vec<(&'static str, f64)> {
+    let field = |name: &str| text.lines().find_map(|l| l.trim().strip_prefix(name)?.strip_prefix(':').map(|v| v.replace("(augmented)", "").trim().to_string()));
+    let num = |s: &str| s.trim().trim_start_matches('+').trim_end_matches('%').split_whitespace().next().unwrap_or("").replace(',', "").parse::<f64>().ok();
+    // "50-150, 10-20" (several elements) adds up to its average hit.
+    let hit = |s: &str| s.split(',').filter_map(|r| { let (a, b) = r.trim().split_once(['-', '–'])?; Some((num(a)? + num(b)?) / 2.0) }).sum::<f64>();
+    let mut out = vec![];
+    if let Some(aps) = field("Attacks per Second").and_then(|v| num(&v)) {
+        let part = |n: &str| field(n).map_or(0.0, |v| hit(&v)) * aps;
+        let phys = part("Physical Damage");
+        let rest: f64 = ["Elemental Damage", "Fire Damage", "Cold Damage", "Lightning Damage", "Chaos Damage"].iter().map(|n| part(n)).sum();
+        out.push(("Weapon DPS", phys + rest));
+        if phys > 0.0 && rest > 0.0 { out.push(("Physical DPS", phys)); }
+        if let Some(c) = field("Critical Strike Chance").and_then(|v| num(&v)) { out.push(("Crit chance", c)); }
+    }
+    for (n, keys) in [("Armour", &["Armour"][..]), ("Evasion", &["Evasion Rating", "Evasion"]), ("Energy Shield", &["Energy Shield"]),
+        ("Ward", &["Ward"]), ("Block", &["Chance to Block"])] {
+        if let Some(v) = keys.iter().find_map(|k| field(k)).and_then(|v| num(&v)) { out.push((n, v)); }
+    }
+    out
+}
+
+/// A mod already counted in the item's damage or defences (so it isn't listed again as gained or lost).
+fn in_properties(template: &str, weapon: bool, armour: bool) -> bool {
+    (weapon && ((template.starts_with("adds # to #") && !template.contains("spells") && !template.contains("attacks"))
+        || template == "#% increased physical damage" || template == "#% increased critical strike chance"))
+        || (armour && ((template.starts_with('+') && (template.ends_with("to armour") || template.ends_with("to evasion rating")))
+            || template == "#% increased energy shield" || template == "#% increased evasion rating"
+            || template.starts_with("#% increased armour") || template.starts_with("#% increased evasion and")))
 }
 
 /// PoB slots an item of this class goes in.
@@ -93,19 +145,35 @@ fn add_up(lines: &[String]) -> (Vec<f64>, Vec<String>) {
 
 /// The checked item's mod lines against the gear in each slot it could go in.
 pub fn compare(this_lines: &[String], item_class: &str, gear: &[Gear]) -> Vec<Comparison> {
+    compare_slots(this_lines, "", slots_for(item_class), gear)
+}
+
+/// The same for these slots; with the item's whole text, its damage and defences are compared too.
+pub fn compare_slots(this_lines: &[String], text: &str, slots: &[&'static str], gear: &[Gear]) -> Vec<Comparison> {
     let (mine, my_other) = add_up(this_lines);
-    slots_for(item_class).iter().filter_map(|slot| {
+    let my_props = properties(text);
+    slots.iter().filter_map(|slot| {
         let g = gear.iter().find(|g| g.slot == *slot)?;
         let (now, their_other) = add_up(&g.lines);
-        let rows = STATS.iter().enumerate()
-            .filter(|(i, _)| (mine[*i] - now[*i]).abs() >= 0.5)
-            .map(|(i, (name, _))| Row { stat: name.to_string(), now: now[i].floor(), this: mine[i].floor() })
-            .collect();
+        let their_props = if text.is_empty() { vec![] } else { properties(&g.copy) };
+        let of = |p: &[(&'static str, f64)], n: &str| p.iter().find(|x| x.0 == n).map_or(0.0, |x| x.1);
+        let mut names: Vec<&'static str> = vec![];
+        for (n, _) in my_props.iter().chain(their_props.iter()) { if !names.contains(n) { names.push(n); } }
+        let round = |v: f64| if v < 20.0 { (v * 100.0).round() / 100.0 } else { v.round() };
+        let mut rows: Vec<Row> = names.iter().map(|n| Row { stat: n.to_string(), now: round(of(&their_props, n)), this: round(of(&my_props, n)) })
+            .filter(|r| (r.this - r.now).abs() >= 0.05).collect();
+        // The item's own energy shield / attack speed already counts the mods that raise it.
+        let (weapon, armour) = (names.contains(&"Weapon DPS"), !names.is_empty() && !names.contains(&"Weapon DPS"));
+        let counted = |n: &str| (n == "Energy Shield" && names.contains(&"Energy Shield")) || (n == "Attack speed" && weapon);
+        rows.extend(STATS.iter().enumerate()
+            .filter(|(i, (n, _))| (mine[*i] - now[*i]).abs() >= 0.5 && !counted(n))
+            .map(|(i, (name, _))| Row { stat: name.to_string(), now: now[i].floor(), this: mine[i].floor() }));
         let tmpl = |s: &String| template(s).0.to_lowercase();
-        let gain = my_other.iter().filter(|l| !their_other.iter().any(|o| tmpl(o) == tmpl(l))).cloned().collect();
-        let lose = their_other.iter().filter(|l| !my_other.iter().any(|o| tmpl(o) == tmpl(l))).cloned().collect();
+        let only = |from: &[String], other: &[String]| from.iter()
+            .filter(|l| !in_properties(&tmpl(l), weapon, armour) && !other.iter().any(|o| tmpl(o) == tmpl(l))).cloned().collect();
         Some(Comparison { slot: slot.to_string(), current: if g.rarity == "unique" || g.name != g.base { g.name.clone() } else { g.base.clone() },
-            rows, gain, lose })
+            rows, gain: only(&my_other, &their_other), lose: only(&their_other, &my_other),
+            worn: false, icon: String::new(), note: String::new(), resists: vec![] })
     }).collect()
 }
 

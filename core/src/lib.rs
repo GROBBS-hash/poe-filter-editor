@@ -39,3 +39,4 @@ pub mod wealth;
 pub mod whispers;
 pub mod trade;
 pub mod trade_rules;
+pub mod worn;

@@ -1,0 +1,17 @@
+/* Price window: "Better than mine?" */
+.wc { margin: 6px 0 4px; }
+.wc .tw-cmp { margin: 0; }
+.wc-tabs { display: flex; gap: 4px; margin-bottom: 4px; }
+.wc-tabs button { font-size: 12px; padding: 3px 10px; border-radius: 5px; border: 1px solid var(--line); background: transparent; color: var(--text-2); cursor: pointer; }
+.wc-tabs button:hover { color: #fff; border-color: #555c6a; }
+.wc-tabs button.on { border-color: var(--gold); color: var(--gold); }
+.wc-pic { width: 26px; height: 26px; object-fit: contain; vertical-align: -8px; margin-right: 6px; }
+.wc-note { font-size: 12px; color: #f0c070; margin: 2px 0 4px; }
+.wc-res { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.06); font-variant-numeric: tabular-nums; }
+.wc-res-title { color: var(--muted); }
+.wc-r b { font-weight: 600; }
+.wc-r em { font-style: normal; font-weight: 700; }
+.wc-fire b { color: #ff9a7a; } .wc-cold b { color: #8cc8ff; } .wc-lightning b { color: #f2dc7a; } .wc-chaos b { color: #d79be8; }
+.wc-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.wc-wear { display: flex; gap: 8px; }
+.wc-none { padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,0.04); }

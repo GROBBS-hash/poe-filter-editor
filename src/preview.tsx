@@ -128,6 +128,16 @@ mockIPC(async (cmd, args) => {
     return { offers, url: "https://www.pathofexile.com/trade/exchange", divine: 217 };
   }
   if (cmd === "saved_list") return [];
+  if (cmd === "worn_compare" || cmd === "worn_refresh" || cmd === "worn_set") {
+    const cls = String((args as Json).class);
+    if (cls !== "Rings") return { slots: ["Helmet"], character: "Bob_Witch", at: Math.floor(Date.now() / 1000) - 60, by_hand: false, login: cmd === "worn_compare", stale: false, list: [] };
+    return { slots: ["Ring 1", "Ring 2"], character: "Bob_Witch", at: Math.floor(Date.now() / 1000) - 300, by_hand: false, login: true, stale: false,
+      list: [{ slot: "Ring 2", current: "Bad Loop", worn: true, icon: icons["Iron Ring"] ?? "", note: "", rows: [{ stat: "Life", now: 10, this: 82 }, { stat: "Chaos res", now: 0, this: 13 }, { stat: "Cold res", now: 22, this: 0 }],
+        gain: ["11% increased Global Accuracy Rating"], lose: ["6% increased Attack Speed"],
+        resists: [{ name: "Cold", now: 118, after: 96 }, { name: "Chaos", now: 24, after: 37 }] },
+        { slot: "Ring 1", current: "Old Loop", worn: true, icon: icons["Two-Stone Ring"] ?? "", note: "", rows: [{ stat: "Life", now: 70, this: 82 }, { stat: "Fire res", now: 16, this: 0 }, { stat: "Cold res", now: 46, this: 0 }], gain: [], lose: [],
+          resists: [{ name: "Fire", now: 141, after: 125 }, { name: "Cold", now: 118, after: 72 }] }] };
+  }
   return null;
 }, { shouldMockEvents: true });
 

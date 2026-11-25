@@ -134,7 +134,7 @@ export default function SettingsPage() {
         <h2>Price check</h2>
         <p className="muted small">What the price window shows besides the price.</p>
         <label className="check"><input type="checkbox" checked={s.price_compare ?? true} onChange={(e) => set({ price_compare: e.target.checked })} />
-          <span>Compare the item with your build's gear (needs a Path of Building link on the My build page)</span></label>
+          <span>Compare the item with the gear you're wearing (log in under Map tracker, or click "I'm wearing this" on each item) and your build guide's</span></label>
         <label className="check"><input type="checkbox" checked={s.price_rolls ?? true} onChange={(e) => set({ price_rolls: e.target.checked })} />
           <span>Show how well each mod rolled (a bar from the lowest to the highest roll)</span></label>
         <label className="check"><input type="checkbox" checked={s.price_buyout_only ?? true} onChange={(e) => set({ price_buyout_only: e.target.checked })} />
