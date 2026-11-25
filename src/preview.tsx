@@ -113,6 +113,11 @@ mockIPC(async (cmd, args) => {
       const g = [1, 3, 3, 5, 5, 5, 5, 5, 9, 10, 10, 10, 10, 12, 15, 19, 20, 20, 20, 25].map((each, i) => ({ pay: each, pay_currency: "chaos", get: 1, get_currency: "x", each, stock: 1 + (i % 3), account: "Seller" + i, whisper: "@x hi" }));
       return { offers: g, url: "https://www.pathofexile.com/trade/exchange", divine: 177, asking: { each: 5, under: 0, sellers: 31 } };
     }
+    // The Fletcher, 25 Nov: "6.63c" on poe.ninja, sold 1:1.
+    if ((args as Json)?.card && ((args as Json)?.sold as number | null ?? 1e9) < 500) {
+      const g = [1, 1, 1, 2, 3, 3, 3, 3, 5, 5, 5, 5, 5, 5, 5, 7, 9, 10, 10, 10].map((each, i) => ({ pay: each, pay_currency: "chaos", get: 1, get_currency: "x", each, stock: 1 + (i % 3), account: "Seller" + i, whisper: "@x hi" }));
+      return { offers: g, url: "https://www.pathofexile.com/trade/exchange", divine: 177, asking: { each: 1, wait: 5, under: 8, sellers: 40 } };
+    }
     if (((args as Json)?.sold as number | null ?? 1e9) < 50) {
       const g = [...Array(8).fill(1), 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 5, 5].map((each, i) => ({ pay: each, pay_currency: "chaos", get: 1, get_currency: "x", each, stock: 1 + (i % 3), account: "Seller" + i, whisper: "@x hi" }));
       return { offers: g, url: "https://www.pathofexile.com/trade/exchange", divine: 195, asking: { each: 5, under: 33, sellers: 80 } };

@@ -151,7 +151,10 @@ pub fn going_rate(offers: &[(f64, u32)]) -> Option<f64> {
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct Asking {
     /// Chaos each: where a quarter of the sellers are at or under it (the first few are bait).
+    /// (A cheap card: the second cheapest, what it goes for now.)
     pub each: f64,
+    /// A cheap card: what it may fetch if you wait (a quarter of the sellers ask that or less).
+    pub wait: Option<f64>,
     /// Sellers well under poe.ninja's price, of all of them.
     pub under: usize,
     pub sellers: usize,
@@ -159,21 +162,33 @@ pub struct Asking {
 
 /// Fewer sold recently than this: a few trades decide poe.ninja's number.
 const FEW_SOLD: f64 = 50.0;
+/// Cheap cards: poe.ninja's average runs well over what they go for until this many sell. (25 Nov, each listed at 1c
+/// by several sellers: The Fletcher "6.63c" sold 1:1 on the exchange, 39 sold; Atziri's Arsenal "5.34c", 300 sold.)
+const CHEAP_CARD: f64 = 20.0;
+const CHEAP_CARD_SOLD: f64 = 500.0;
 /// This many sellers well under the market isn't a few price fixers.
 const MANY_UNDER: usize = 10;
 
 /// poe.ninja's price on something hardly traded, next to the sellers (`asks`: chaos each, one per seller). When many
 /// of them ask well under it, they're the market, not price fixers (24 Nov: The Gambler, "8.65c" from 13 sold, 33 of
 /// 80 sellers at 1-5c, every one shown called a price fixer).
-pub fn asking(asks: &[f64], market: f64, sold: Option<f64>) -> Option<Asking> {
+pub fn asking(asks: &[f64], market: f64, sold: Option<f64>, card: bool) -> Option<Asking> {
+    if card && market > 0.0 && market < CHEAP_CARD && sold.is_some_and(|s| s < CHEAP_CARD_SOLD) && asks.len() >= 3 {
+        let mut v: Vec<f64> = asks.iter().copied().filter(|a| *a > 0.0).collect();
+        v.sort_by(f64::total_cmp);
+        if let Some(&now) = v.get(1).filter(|n| **n < market * 0.75) {
+            let under = v.iter().filter(|a| **a < market * 0.75).count();
+            return Some(Asking { each: now, wait: Some(v[v.len() / 4].min(market).max(now)), under, sellers: v.len() });
+        }
+    }
     if !sold.is_some_and(|s| s < FEW_SOLD) { return None; }
     let mut v: Vec<f64> = asks.iter().copied().filter(|a| *a > 0.0).collect();
     v.sort_by(f64::total_cmp);
     // Nobody bought one, so poe.ninja has no price (25 Nov: The Pack Leader, 31 sellers from 1c to 111c).
-    if market <= 0.0 { return (!v.is_empty() && sold == Some(0.0)).then(|| Asking { each: v[v.len() / 4], under: 0, sellers: v.len() }); }
+    if market <= 0.0 { return (!v.is_empty() && sold == Some(0.0)).then(|| Asking { each: v[v.len() / 4], wait: None, under: 0, sellers: v.len() }); }
     let under = v.iter().filter(|a| **a < market * 0.75).count();
     if under < MANY_UNDER || under * 4 < v.len() { return None; }
-    Some(Asking { each: v[v.len() / 4], under, sellers: v.len() })
+    Some(Asking { each: v[v.len() / 4], wait: None, under, sellers: v.len() })
 }
 
 /// Whether a live exchange rate is believable next to poe.ninja's: within 3x either way. Cheap things like
@@ -259,21 +274,31 @@ mod tests {
         asks.extend([5.0; 18]);
         asks.extend([10.0; 15]);
         asks.extend([20.0; 32]);
-        assert_eq!(asking(&asks, 8.65, Some(13.2)), Some(Asking { each: 5.0, under: 33, sellers: 80 }));
+        assert_eq!(asking(&asks, 8.65, Some(13.2), false), Some(Asking { each: 5.0, wait: None, under: 33, sellers: 80 }));
         // Plenty sold: poe.ninja's price stands, and the cheap ones are bait.
-        assert_eq!(asking(&asks, 8.65, Some(4000.0)), None);
-        assert_eq!(asking(&asks, 8.65, None), None);
+        assert_eq!(asking(&asks, 8.65, Some(4000.0), true), None);
+        assert_eq!(asking(&asks, 8.65, None, true), None);
         // The Pack Leader, 25 Nov: none sold, so poe.ninja has no price; the cheap ones are what it's worth, not bait.
         let pack = [1.0, 3.0, 3.0, 5.0, 5.0, 5.0, 5.0, 5.0, 9.0, 10.0, 10.0, 10.0, 10.0, 12.0, 15.0, 19.0, 20.0, 20.0, 20.0, 25.0, 30.0, 40.0,
             50.0, 50.0, 64.0, 70.0, 99.0, 100.0, 100.0, 100.0, 101.0];
-        assert_eq!(asking(&pack, 0.0, Some(0.0)), Some(Asking { each: 5.0, under: 0, sellers: 31 }));
-        assert_eq!(asking(&pack, 0.0, None), None);
+        assert_eq!(asking(&pack, 0.0, Some(0.0), true), Some(Asking { each: 5.0, wait: None, under: 0, sellers: 31 }));
+        assert_eq!(asking(&pack, 0.0, None, true), None);
+        // Cheap cards, live asks of 25 Nov: The Fletcher (he sold it 1:1), Atziri's Arsenal, The Feast.
+        let mut fletcher = vec![1.0, 1.0, 1.0, 2.0, 3.0, 3.0, 3.0, 3.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 7.0, 9.0];
+        fletcher.extend([10.0; 6]);
+        fletcher.extend([50.0; 17]);
+        assert_eq!(asking(&fletcher, 6.63, Some(38.7), true), Some(Asking { each: 1.0, wait: Some(5.0), under: 8, sellers: 40 }));
+        assert_eq!(asking(&[1.0, 1.0, 1.0, 1.0, 2.0, 3.0, 3.0, 3.0, 5.0, 5.0, 5.0, 20.0], 5.34, Some(299.8), true).map(|a| a.each), Some(1.0));
+        assert_eq!(asking(&[1.0, 2.0, 3.0, 3.0, 5.0, 9.0, 10.0, 50.0], 5.51, Some(6.8), true).map(|a| (a.each, a.wait)), Some((2.0, Some(3.0))));
+        // One bait under honest sellers, or plenty sold: poe.ninja's price stands.
+        assert_eq!(asking(&[1.0, 8.0, 8.0, 9.0, 10.0], 8.0, Some(60.0), true), None);
+        assert_eq!(asking(&[1.0, 1.0, 8.0, 9.0], 8.75, Some(1045.0), true), None);
         // A few bait listings on a rare card don't move it.
-        assert_eq!(asking(&[1.0, 1.0, 1.0, 80.0, 90.0, 95.0, 99.0, 100.0], 90.0, Some(6.0)), None);
+        assert_eq!(asking(&[1.0, 1.0, 1.0, 80.0, 90.0, 95.0, 99.0, 100.0], 90.0, Some(6.0), true), None);
         // Ten baits among a hundred honest sellers don't either.
         let mut many = vec![1.0; 10];
         many.extend([90.0; 90]);
-        assert_eq!(asking(&many, 90.0, Some(20.0)), None);
+        assert_eq!(asking(&many, 90.0, Some(20.0), true), None);
     }
 
     #[test]

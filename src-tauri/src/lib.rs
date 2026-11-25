@@ -1096,7 +1096,7 @@ struct BulkResult { offers: Vec<filter_core::trade::Offer>, url: String, divine:
 #[tauri::command(async)]
 /// `minimum`: only sellers with at least this many in stock (Awakened's stock filter: your stack size).
 /// `market` / `sold`: poe.ninja's chaos price and how many sold recently, to judge it by the sellers.
-fn trade_bulk(app: AppHandle, want: String, pay: String, minimum: Option<u32>, market: Option<f64>, sold: Option<f64>) -> Result<BulkResult, String> {
+fn trade_bulk(app: AppHandle, want: String, pay: String, minimum: Option<u32>, market: Option<f64>, sold: Option<f64>, card: Option<bool>) -> Result<BulkResult, String> {
     let (poe2, league) = trade_league(&app);
     let (id, v) = trade_api::exchange(poe2, &league, &filter_core::trade::exchange_query(&pay, &want, minimum.filter(|m| *m > 1)))?;
     let state = app.state::<AppState>();
@@ -1105,7 +1105,7 @@ fn trade_bulk(app: AppHandle, want: String, pay: String, minimum: Option<u32>, m
     let offers = filter_core::trade::offers(&v);
     // Judged on every seller for chaos (not only the twenty shown, nor the ones with a big stock).
     let asking = Some(market.unwrap_or(0.0)).filter(|_| pay == "chaos" && minimum.is_none_or(|m| m <= 1))
-        .and_then(|m| filter_core::bulk::asking(&offers.iter().map(|o| o.each).collect::<Vec<_>>(), m, sold));
+        .and_then(|m| filter_core::bulk::asking(&offers.iter().map(|o| o.each).collect::<Vec<_>>(), m, sold, card.unwrap_or(false)));
     Ok(BulkResult { offers: offers.into_iter().take(20).collect(), url: trade_api::exchange_url(poe2, &league, &id), divine, asking })
 }
 

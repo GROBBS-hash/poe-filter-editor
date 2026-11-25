@@ -5,7 +5,9 @@ name: Price cache
 # of calling poe.ninja from each player's PC (as poe.ninja asks).
 on:
   schedule:
-    - cron: "17 * * * *"
+    # GitHub drops most scheduled runs (25 Nov: two or three a day got through), so it asks more often; a run within
+    # 50 minutes of the last prices fetches nothing, so poe.ninja is still asked at most once an hour.
+    - cron: "3,13,23,33,43,53 * * * *"
   workflow_dispatch:
   push:
     branches: [main]
@@ -24,12 +26,24 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - name: Are the prices due?
+        id: due
+        run: |
+          due=yes
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            at=$(curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/prices/poe1.json" | head -c 400 | grep -o '"updated":"[^"]*"' | cut -d'"' -f4 || true)
+            if [ -n "$at" ] && [ $(( $(date -u +%s) - $(date -u -d "$at" +%s) )) -lt 3000 ]; then due=no; fi
+          fi
+          echo "due=$due" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-python@v5
+        if: steps.due.outputs.due == 'yes'
         with:
           python-version: "3.12"
       - name: Fetch prices
+        if: steps.due.outputs.due == 'yes'
         run: python tools/fetch_prices.py out
       - name: Publish to the prices branch
+        if: steps.due.outputs.due == 'yes'
         run: |
           cd out
           git init -q -b prices
