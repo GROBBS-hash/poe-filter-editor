@@ -333,8 +333,18 @@ pub fn parse(xml: &str) -> Result<Build, String> {
 
     // Stages: one per tree (or per gem set if there are more), matched by title, else by position.
     let n = trees.len().max(skill_sets.len()).max(1);
+    // PoB's loadouts: sets with the same name, or sharing a tag ("Endgame {2}" with gems "{2}" and gear "Gear {1,2}").
+    // By position only when the sets aren't named to match at all (a wrong set is worse than none).
+    let tree_titles: Vec<String> = trees.iter().map(|t| t.0.clone()).collect();
     let pick_by = |title: &str, i: usize, titles: &[String]| -> Option<usize> {
-        titles.iter().position(|t| !t.is_empty() && t == title).or((i < titles.len()).then_some(i))
+        let by_name = |title: &str| titles.iter().position(|t| !t.is_empty() && t == title)
+            .or_else(|| { let tags = loadout_tags(title); titles.iter().position(|t| loadout_tags(t).iter().any(|x| tags.contains(x))) })
+            .or_else(|| { let c = plain_title(title).to_lowercase(); titles.iter().position(|t| !c.is_empty() && plain_title(t).to_lowercase() == c) });
+        if let Some(j) = by_name(title) { return Some(j); }
+        let matched = tree_titles.iter().any(|t| by_name(t).is_some());
+        // One set not named after any tree: it goes with all of them.
+        if titles.len() == 1 && !matched { return Some(0); }
+        (!matched || titles.len() == tree_titles.len()).then_some(i).filter(|i| *i < titles.len())
     };
     let skill_titles: Vec<String> = skill_sets.iter().map(|s| s.0.clone()).collect();
     let item_titles: Vec<String> = item_sets.iter().map(|s| s.0.clone()).collect();
@@ -348,7 +358,8 @@ pub fn parse(xml: &str) -> Result<Build, String> {
         let (abyss, gear): (Vec<Gear>, Vec<Gear>) = gear.into_iter().partition(|g| g.slot.contains("Abyssal Socket"));
         let mut jewels: Vec<Jewel> = tree_jewels.get(i).filter(|_| i < trees.len()).cloned().unwrap_or_default();
         jewels.extend(abyss.into_iter().map(|g| Jewel { node: None, notables: vec![], item: g }));
-        let title = if title.is_empty() { format!("Setup {}", i + 1) } else { title };
+        let shown = plain_title(&title);
+        let title = if shown.is_empty() { format!("Setup {}", i + 1) } else { shown };
         stages.push(Stage { title, tree, groups, gear, jewels });
     }
     Ok(Build {
@@ -358,6 +369,22 @@ pub fn parse(xml: &str) -> Result<Build, String> {
         active: tree_active.saturating_sub(1).min(stages.len().saturating_sub(1)),
         stages,
     })
+}
+
+/// The loadout tags in a set's title: "Endgame {2}", "Gear {1,2}", "Tree {L3}".
+fn loadout_tags(title: &str) -> Vec<String> {
+    title.split('{').skip(1).filter_map(|p| p.split_once('}')).flat_map(|(t, _)| t.split(',').map(|x| x.trim().to_lowercase()).collect::<Vec<_>>())
+        .filter(|t| !t.is_empty()).collect()
+}
+
+/// A set's title without its loadout tags.
+fn plain_title(title: &str) -> String {
+    let mut out = String::new();
+    let mut depth = 0;
+    for c in title.chars() {
+        match c { '{' => depth += 1, '}' => depth = (depth - 1i32).max(0), _ if depth == 0 => out.push(c), _ => {} }
+    }
+    out.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 /// Campaign act for an area level (approximate, PoE 1). 11 = maps.
@@ -371,11 +398,26 @@ pub fn act_of(area_level: u32) -> u32 {
 /// The act a stage's title is for: "Act 2 RF Swap" -> 2, "Start of Maps" -> 11, "Animate Guardian" -> None.
 pub fn stage_act(title: &str) -> Option<u32> {
     let t = title.to_lowercase();
-    if let Some(i) = t.find("act") {
-        let n: String = t[i + 3..].trim_start().chars().take_while(|c| c.is_ascii_digit()).collect();
-        if let Ok(n) = n.parse() { return Some(n); }
+    // "Act 3", "Acts 1-3", "act3", "A3" (its first act); whole words, so "Compact" isn't an act.
+    let words: Vec<&str> = t.split(|c: char| !c.is_alphanumeric()).filter(|w| !w.is_empty()).collect();
+    let num = |w: Option<&&str>| w.and_then(|w| w.parse::<u32>().ok());
+    for (i, w) in words.iter().enumerate() {
+        let rest = w.strip_prefix("acts").or_else(|| w.strip_prefix("act")).or_else(|| w.strip_prefix('a'));
+        let n = match rest {
+            Some("") if *w != "a" => num(words.get(i + 1)),
+            Some(r) if !r.is_empty() && r.chars().all(|c| c.is_ascii_digit()) => r.parse().ok(),
+            _ => None,
+        };
+        if let Some(n) = n.filter(|n| (1..=10).contains(n)) { return Some(n); }
     }
-    ["map", "endgame", "red ", "yellow", "white map", "t16", "t17"].iter().any(|w| t.contains(w)).then_some(11)
+    if ["map", "endgame", "red ", "yellow", "white map", "t16", "t17"].iter().any(|w| t.contains(w)) { return Some(11); }
+    // "Level 12", "Lvl 30", "Levelling 1-30" (from its first level).
+    let level = words.iter().position(|w| matches!(*w, "level" | "levels" | "lvl" | "lv" | "levelling" | "leveling"));
+    if let Some(i) = level {
+        if let Some(n) = num(words.get(i + 1)) { return Some(act_of(n)); }
+        if words[i].starts_with("levell") || words[i].starts_with("leveling") { return Some(1); }
+    }
+    words.iter().any(|w| *w == "campaign").then_some(1)
 }
 
 /// The stage to show for where you are: the last one for your act (or earlier),
@@ -394,6 +436,18 @@ pub fn stage_for(stages: &[Stage], area_level: u32) -> Option<usize> {
 mod tests {
     use super::*;
     use std::io::Write;
+
+    #[test]
+    fn stage_names_and_loadout_tags() {
+        for (t, a) in [("Act 3", Some(3)), ("Acts 1-3", Some(1)), ("act10", Some(10)), ("A4 twink", Some(4)), ("Compact tree", None), ("Character", None),
+            ("Level 12", Some(act_of(12))), ("Lvl 30", Some(act_of(30))), ("Levelling 1-30", Some(1)), ("Leveling", Some(1)), ("Campaign", Some(1)),
+            ("Early Mapping", Some(11)), ("Level 90 Endgame", Some(11)), ("Endgame {2}", Some(11)), ("Uber", None)] {
+            assert_eq!(stage_act(t), a, "{t}");
+        }
+        assert_eq!(loadout_tags("Gear {1,L2}"), ["1", "l2"]);
+        assert_eq!(plain_title("Endgame {L2}"), "Endgame");
+        assert_eq!(plain_title("{1} Acts"), "Acts");
+    }
 
     // A trimmed copy of a real export (an Elementalist levelling guide), two stages.
     const XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>

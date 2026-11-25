@@ -1,0 +1,12 @@
+/* "Worth picking up": bases to craft on */
+.bs-worth { display: flex; gap: 10px; align-items: center; margin: 6px 0; padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.04); font-size: 13px; }
+.bs-worth.big { background: rgba(240,200,90,0.12); outline: 1px solid rgba(240,200,90,0.35); }
+.bs-text { min-width: 0; }
+.bs-money { font-weight: 700; color: var(--gold); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.bs-money .cur-icon { width: 18px; height: 18px; vertical-align: -4px; margin-left: 2px; }
+.bs-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0 4px; }
+.bs-row input[type="number"] { width: 84px; }
+.bs-row .check { margin: 0 0 0 10px; }
+.bs-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 2px 14px; margin: 8px 0; }
+.bs-item { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.bs-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

@@ -7,6 +7,7 @@ import React, { useCallback, useEffect, useRef, useState, type ReactNode } from 
 import { CurrencyIcon, ItemIcon } from "./icons";
 import BaseUniques from "./BaseUniques";
 import RelatedItems from "./RelatedItems";
+import { BaseWorth } from "./Bases";
 import WornCompare, { Resists, type Comparison } from "./WornCompare";
 import { Item, RARITY_COLOUR, itemTitle } from "./types";
 import { CRAFT_ITEM_KEY } from "./Craft";
@@ -50,7 +51,7 @@ type Setup = { buyout?: boolean | null; item: Item; filters: StatFilter[]; unkno
 type MapInfo = { mods: { text: string; warn: string | null }[]; unidentified: boolean; tier: number | null; stats: string[]; no_sale?: boolean };
 type Check = { setup: Setup | null; ninja: [number, string] | null; league: string; from_ground: boolean; error: string | null; bulk?: string | null; map?: MapInfo | null; divine?: number | null; compare?: Comparison[]; instant_all?: boolean;
   /** poe.ninja's last 7 days: % change each day from a week ago (oldest first), and the total. */
-  trend?: { points: number[]; change: number } | null; sold?: number | null };
+  trend?: { points: number[]; change: number } | null; sold?: number | null; ninja_high?: number | null };
 type Offer = { pay: number; pay_currency: string; get: number; get_currency: string; each: number; stock: number; account: string; whisper: string };
 type Bulk = { offers: Offer[]; url: string; divine: number | null;
   /** What sellers ask, when poe.ninja's price comes from too few sales to go by (chaos each). */
@@ -377,7 +378,7 @@ function TrendLine({ t, few }: { t: { points: number[]; change: number }; few?: 
   );
 }
 
-function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote, waiting, stack, name, sold, card }: { sold?: number | null; card: boolean; res: Result | null; bulk: Bulk | null; busy: boolean; err: string; waiting?: string | null; stack?: number; name?: string;
+function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote, waiting, stack, name, sold, card, high }: { sold?: number | null; card: boolean; high: number | null; res: Result | null; bulk: Bulk | null; busy: boolean; err: string; waiting?: string | null; stack?: number; name?: string;
   divine: number | null; ninja: [number, string] | null; ninjaNote: string }) {
   const ninjaChaos = ninja ? (ninja[1] === "divine" && divine ? ninja[0] * divine : ninja[1] === "chaos" ? ninja[0] : null) : null;
   if (unsold(sold, ninjaChaos, bulk, card)) {
@@ -420,7 +421,7 @@ function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote, waiting, st
     sub = ask?.wait != null ? <>{ask.wait > ask.each ? <>up to {money(ask.wait, divine)} if you wait · </> : null}{ask.under} of {ask.sellers} sellers ask less than poe.ninja's {money(ninjaChaos ?? 0, divine)}{sold != null ? <>, an average of about {Math.round(sold)} sold</> : null}</> : ask && ask.under === 0 ? <>none sold recently, so this is what the cheapest quarter of {ask.sellers} sellers ask</> : ask ? <>{ask.under} of {ask.sellers} sellers ask less than poe.ninja's {money(ninjaChaos ?? 0, divine)}{sold != null ? <>, which comes from about {Math.max(1, Math.round(sold))} sold</> : null}</> : <>cheapest listed {money(t.cheapest, divine)}{o.stock ? ` (${o.stock} in stock)` : ""}
       {ninjaChaos == null && <> · going rate {money(t.typical, divine)}</>} · {bulk.offers.length} sellers</>;
   } else if (ninjaChaos != null) {
-    main = ninjaChaos; label = `poe.ninja${ninjaNote}`;
+    main = ninjaChaos; label = `poe.ninja${high != null ? `, up to ${money(high, divine)} by version` : ninjaNote}`;
   }
   // With a stack (e.g. 732 lifeforce): two tiles, "your 732" (bright) and "each". The ratio line ("11,880 Wild
   // Crystallised Lifeforce = 1 [divine]") is for bulk items: how they're traded.
@@ -458,7 +459,7 @@ function PriceHero({ res, bulk, busy, err, divine, ninja, ninjaNote, waiting, st
       <div className="tw-hero-foot muted small">
         {sub}
         {busy && main != null && <span className="tw-hero-busy"> · <Spinner /> checking trade…</span>}
-        {res?.summary && ninjaChaos != null && <span> · poe.ninja {money(ninjaChaos, divine)}</span>}
+        {res?.summary && ninjaChaos != null && <span> · poe.ninja {money(ninjaChaos, divine)}{high != null && <> to {money(high, divine)}, by version</>}</span>}
       </div>
     </div>
   );
@@ -811,7 +812,7 @@ export default function TradeWindow() {
   const hero = (
     <PriceHero res={res} bulk={check.bulk ? bulk : null} busy={busy} err={err} divine={divine}
       waiting={!res && !busy && !check.bulk ? (searched ? "Filters changed: move onto Search again" : "Pick the stats, then move your mouse onto Search") : null}
-      ninja={check.ninja} ninjaNote={it.rarity === "Unique" && !it.name ? " (best ground unique on this base)" : ""} stack={it.stack_size ?? undefined} name={it.base_type} sold={check.sold} card={it.item_class === "Divination Cards"} />
+      ninja={check.ninja} ninjaNote={it.rarity === "Unique" && !it.name ? " (best ground unique on this base)" : ""} stack={it.stack_size ?? undefined} name={it.base_type} sold={check.sold} high={check.ninja_high ?? null} card={it.item_class === "Divination Cards"} />
   );
   const trend = check.trend ? <TrendLine t={check.trend} few={check.sold != null && check.sold < 50} /> : null;
   // Which look: where the price sits, and the extras each look adds.
@@ -875,6 +876,7 @@ export default function TradeWindow() {
               : { ...setup, filters: setup.filters.map((f) => f.id === key ? { ...f, enabled: false } : f) };
             setUntick(null); setSetup(s); run(s); }} />
       )}
+      <BaseWorth item={it} />
       {it.rarity === "Unique" && !it.name && it.base_type && <BaseUniques base={it.base_type} divine={divine} />}
 
       {check.map && <MapCheck map={check.map} rarity={it.rarity} corrupted={/\nCorrupted/.test(setup?.raw ?? "")} />}

@@ -143,15 +143,12 @@ pub fn slug(name: &str) -> String {
 
 impl Store {
     pub fn load(path: &Path) -> Self {
-        fs::read_to_string(path).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
+        crate::keep::load(path).unwrap_or_default()
     }
 
     /// Writes to a temp file then swaps it in, so a crash never leaves a half file.
     pub fn save(&self, path: &Path) -> io::Result<()> {
-        if let Some(dir) = path.parent() { fs::create_dir_all(dir)?; }
-        let tmp = path.with_extension("tmp");
-        fs::write(&tmp, serde_json::to_string_pretty(self)?)?;
-        fs::rename(tmp, path)
+        crate::keep::save(path, self, true)
     }
 
     pub fn create(&mut self, name: &str, game: Game, base_file: &str) -> String {
@@ -287,7 +284,7 @@ pub fn render_profile(store: &Store, id: &str, filter_dir: &Path, prices: Option
     let rules = store.resolved_rules(id);
     let extra = match (&p.prices, prices) {
         (Some(settings), Some(file)) => {
-            let mut x = price_blocks(settings, file, nl) + &crate::prices::section_hide_blocks(&segs, &settings.section_hide, &settings.section_stack, file, nl);
+            let mut x = price_blocks(settings, file, nl) + &crate::bases::blocks(settings, file, nl) + &crate::prices::section_hide_blocks(&segs, &settings.section_hide, &settings.section_stack, file, nl);
             if settings.groups.iter().any(|g| g.group == crate::prices::Group::DivinationCards && g.hide_below.is_some()) {
                 let mut changed = segs.clone();
                 apply_with_extra(&mut changed, &rules, "", nl);

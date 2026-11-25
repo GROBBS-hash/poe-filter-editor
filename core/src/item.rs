@@ -36,6 +36,13 @@ pub struct Item {
     /// "Shaper", "Elder", "Crusader"… from the copied text's "Shaper Item" lines.
     #[serde(default)]
     pub influences: Vec<String>,
+    /// Corrupted a second time (3.30: "Twice Corrupted"); `corrupted` is true as well.
+    #[serde(default)]
+    pub twice_corrupted: bool,
+    /// What the copied text says it is, by the filter's names: "FracturedItem", "SynthesisedItem", "Replica", "Foulborn",
+    /// "TransfiguredGem", "Vestigial", "Fated", "ElderMap", "ShapedMap".
+    #[serde(default)]
+    pub kinds: Vec<String>,
     /// Has an implicit mod (maps: "Map contains Drox's Citadel"), NeverSink's `HasImplicitMod`.
     #[serde(default)]
     pub has_implicit: bool,
@@ -141,7 +148,7 @@ pub fn parse_item(text: &str) -> Option<Item> {
             item.item_tier = num(v);
         } else if let Some(v) = line.strip_prefix("Memory Strands: ") {
             item.memory_strands = num(v);
-        } else if let Some(v) = line.strip_prefix("Map Tier: ") {
+        } else if let Some(v) = line.strip_prefix("Map Tier: ").or_else(|| line.strip_prefix("Waystone Tier: ")) {
             item.map_tier = num(v);
         } else if let Some(inf) = line.strip_suffix(" Item").filter(|i| ["Shaper", "Elder", "Crusader", "Hunter", "Redeemer", "Warlord"].contains(i)) {
             item.influences.push(inf.to_string());
@@ -152,16 +159,34 @@ pub fn parse_item(text: &str) -> Option<Item> {
             if item.occupied_by.is_none() { item.occupied_by = map_occupant(line); }
         } else if let Some(who) = map_occupant(line).filter(|_| item.occupied_by.is_none()) {
             item.occupied_by = Some(who);
-        } else if *line == "Corrupted" {
+        } else if *line == "Corrupted" || *line == "Twice Corrupted" {
             item.corrupted = true;
+            item.twice_corrupted |= *line == "Twice Corrupted";
+        } else if let Some(k) = line.strip_suffix(" Item").filter(|k| ["Fractured", "Synthesised"].contains(k)) {
+            item.kinds.push(format!("{k}Item"));
         } else if *line == "Mirrored" {
             item.mirrored = true;
         } else if *line == "Unidentified" || line.starts_with("Unidentified (") {
             // "Unidentified (Tier 4)" on newer unidentified items.
             item.unidentified = true;
+            if line.len() > "Unidentified".len() { item.item_tier = num(line).or(item.item_tier); }
         }
     }
+    item.kinds.extend(name_kinds(&item));
     Some(item)
+}
+
+/// Kinds told by the name: "Replica Headhunter", "Foulborn Mageblood", a Synthesised base, a transfigured gem.
+fn name_kinds(item: &Item) -> Vec<String> {
+    let mut k = Vec::new();
+    let name = item.name.as_deref().unwrap_or(&item.base_type);
+    if item.rarity == "Unique" {
+        for (w, kind) in [("Replica ", "Replica"), ("Foulborn ", "Foulborn")] { if name.starts_with(w) { k.push(kind.to_string()); } }
+    }
+    if item.base_type.starts_with("Synthesised ") && !item.kinds.iter().any(|x| x == "SynthesisedItem") { k.push("SynthesisedItem".into()); }
+    for (w, kind) in [("Vestigial ", "Vestigial"), ("Fated ", "Fated")] { if item.base_type.starts_with(w) { k.push(kind.to_string()); } }
+    if item.item_class.contains("Gem") && crate::gear::is_transfigured(&item.base_type) { k.push("TransfiguredGem".into()); }
+    k
 }
 
 /// Magic items show "Prefix Base of Suffix" as one line. Given every base
@@ -237,6 +262,22 @@ pub fn max_links(sockets: &str) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 3.30's lines (25 Nov): "Twice Corrupted" was read as not corrupted, "Unidentified (Tier 4)" lost its tier.
+    #[test]
+    fn new_item_lines() {
+        let i = parse_item("Item Class: Belts\nRarity: Unique\nMageblood\nHeavy Belt\n--------\nItem Level: 85\n--------\nTwice Corrupted\n").unwrap();
+        assert!(i.corrupted && i.twice_corrupted);
+        let i = parse_item("Item Class: Rings\nRarity: Rare\nComposite Ring\n--------\nItem Level: 85\n--------\nUnidentified (Tier 4)\n").unwrap();
+        assert!(i.unidentified && i.item_tier == Some(4));
+        assert_eq!(parse_item("Item Class: Rings\nRarity: Rare\nComposite Ring\n--------\nItem Level: 85\n--------\nUnidentified\n").unwrap().item_tier, None);
+        let kinds = |t: &str| parse_item(t).unwrap().kinds;
+        assert_eq!(kinds("Item Class: Boots\nRarity: Rare\nDoom Pace\nTwo-Toned Boots\n--------\nItem Level: 85\n--------\n+60 to maximum Life (fractured)\n--------\nFractured Item\n"), ["FracturedItem"]);
+        assert_eq!(kinds("Item Class: Belts\nRarity: Unique\nReplica Headhunter\nLeather Belt\n--------\nItem Level: 85\n"), ["Replica"]);
+        assert_eq!(kinds("Item Class: Skill Gems\nRarity: Gem\nFireball of Radiation\n--------\nSpell\n"), ["TransfiguredGem"]);
+        assert!(kinds("Item Class: Skill Gems\nRarity: Gem\nHerald of Ash\n--------\nSpell\n").is_empty());
+        assert_eq!(parse_item("Item Class: Waystones\nRarity: Rare\nGrim Path\nWaystone (Tier 15)\n--------\nWaystone Tier: 15\n--------\nItem Level: 80\n").unwrap().map_tier, Some(15));
+    }
 
     #[test]
     fn unique() {

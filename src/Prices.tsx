@@ -3,12 +3,13 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { ProfileInfo } from "./types";
+import BasesCard from "./Bases";
 import StyleEditor, { CustomStyle, LookButton, Preview } from "./StyleEditor";
 
 type Group = "Uniques" | "DivinationCards" | "Currency" | "Other";
 type Tier = { min: number; style: CustomStyle };
 type GroupSettings = { group: Group; enabled: boolean; tiers: Tier[]; hide_below?: number | null };
-type Settings = { enabled: boolean; groups: GroupSettings[] };
+type Settings = { enabled: boolean; groups: GroupSettings[]; bases_min?: number | null; bases_influenced?: boolean };
 type Page = { settings: Settings; info?: { league: string; updated: string; unit: string; count: number } | null };
 
 const TITLES: Record<Group, string> = {
@@ -64,6 +65,9 @@ export default function Prices({ profile }: { profile: ProfileInfo }) {
       setMsg(w[0] ?? (s.enabled ? "Saved. Press F4 in game to reload your filter." : "Saved. Price tiers are off for this filter."));
     } catch (e) { setMsg(String(e)); }
   };
+  // The bases card saves by itself: keep its choice, so "Save" here doesn't undo it.
+  const keepBases = () => invoke<Page>("get_price_settings", { id: profile.id })
+    .then((p) => setS((o) => o && { ...o, bases_min: p.settings.bases_min, bases_influenced: p.settings.bases_influenced })).catch(() => {});
   const refresh = async () => {
     setMsg("Checking for new prices…");
     const changed = await invoke<boolean>("refresh_prices").catch(() => false);
@@ -151,6 +155,8 @@ export default function Prices({ profile }: { profile: ProfileInfo }) {
           )}
         </div>
       ))}
+
+      <BasesCard profileId={profile.id} onSaved={keepBases} />
 
       <div className="save-bar">
         {msg && <span className="note">{msg}</span>}

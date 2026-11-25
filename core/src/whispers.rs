@@ -172,15 +172,20 @@ pub fn item_worth(item: &str, items: &[crate::prices::PriceItem]) -> Option<f64>
     }
     // A unique: its name starts the text and its base is in it; the longest name wins.
     items.iter().filter(|i| i.cat.starts_with("Unique") && !i.name.is_empty() && item.starts_with(&i.name) && item.contains(&i.base))
-        .max_by_key(|i| i.name.len()).map(|i| i.value)
+        .max_by_key(|i| i.name.len()).and_then(|best| {
+            // Its version isn't in the whisper: no verdict when the versions' prices are far apart.
+            let u = items.iter().filter(|i| i.name == best.name && i.base == best.base && i.cat.starts_with("Unique")).map(|i| i.value);
+            let (lo, hi) = u.fold((f64::INFINITY, 0.0f64), |(l, h), v| (l.min(v), h.max(v)));
+            (hi <= lo * 1.5).then_some(lo)
+        })
         .or_else(|| items.iter().filter(|i| i.name.eq_ignore_ascii_case(item) && i.cat != "SkillGem").map(|i| i.value).reduce(f64::max))
 }
 
-/// Your asking price against poe.ninja. `rates`: chaos per currency id.
-pub fn check_price(item: &str, price: &str, items: &[crate::prices::PriceItem], rates: &std::collections::HashMap<String, f64>) -> Option<PriceCheck> {
+/// Your asking price against poe.ninja. `rates`: chaos per currency id; `unit`: chaos per unit of the prices.
+pub fn check_price(item: &str, price: &str, items: &[crate::prices::PriceItem], rates: &std::collections::HashMap<String, f64>, unit: f64) -> Option<PriceCheck> {
     let (amount, cur) = read_price(price)?;
     let asking = amount * rates.get(&cur)?;
-    let worth = item_worth(item, items)?;
+    let worth = item_worth(item, items)? * unit;
     if worth <= 0.0 { return None; }
     let r = asking / worth;
     let verdict = if r < 0.7 { "low" } else if r > 1.3 { "high" } else { "fair" };
@@ -202,10 +207,13 @@ mod price_tests {
         let rates: std::collections::HashMap<String, f64> = [("chaos".to_string(), 1.0), ("divine".to_string(), 180.0)].into_iter().collect();
         assert_eq!(read_price("2.5 divine"), Some((2.5, "divine".into())));
         assert_eq!(read_price("360 Chaos Orb"), Some((360.0, "chaos".into())));
-        let c = check_price("Tabula Rasa Simple Robe", "5 chaos", &items, &rates).unwrap();
+        let c = check_price("Tabula Rasa Simple Robe", "5 chaos", &items, &rates, 1.0).unwrap();
         assert_eq!((c.asking, c.worth, c.verdict.as_str()), (5.0, 20.0, "low"));
-        let c = check_price("2 Divine Orb", "360 Chaos Orb", &items, &rates).unwrap();
+        let c = check_price("2 Divine Orb", "360 Chaos Orb", &items, &rates, 1.0).unwrap();
         assert_eq!(c.verdict, "fair");
-        assert!(check_price("Doom Grip Titan Gauntlets", "1 divine", &items, &rates).is_none());
+        assert!(check_price("Doom Grip Titan Gauntlets", "1 divine", &items, &rates, 1.0).is_none());
+        // Versions far apart (Voices): no telling whether the offer is fair.
+        let voices = vec![it("Voices", "Large Cluster Jewel", "UniqueJewel", 185396.0), it("Voices", "Large Cluster Jewel", "UniqueJewel", 0.86)];
+        assert!(check_price("Voices Large Cluster Jewel", "1 divine", &voices, &rates, 1.0).is_none());
     }
 }

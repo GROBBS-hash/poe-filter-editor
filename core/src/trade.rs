@@ -394,7 +394,7 @@ pub fn mods(text: &str) -> Vec<ModLine> {
     // A Wickerman body part's own mod is an implicit on the trade site, but the copy doesn't mark it.
     let body_part = sections[0].contains(&"Item Class: Viscera");
     for sec in &sections[start + 1..] {
-        if sec.iter().any(|l| l.starts_with("Note:") || *l == "Corrupted" || *l == "Unidentified" || *l == "Mirrored"
+        if sec.iter().any(|l| l.starts_with("Note:") || *l == "Corrupted" || *l == "Twice Corrupted" || *l == "Unidentified" || *l == "Mirrored"
             || l.starts_with("Place into") || l.starts_with("Right click") || l.starts_with("Travel to")) {
             continue;
         }
@@ -813,6 +813,7 @@ pub fn query(s: &TradeSetup) -> Value {
     if let Some(n) = s.gem_level { misc["gem_level"] = json!({ "min": n }); }
     if foulborn { misc["mutated"] = json!({ "option": "true" }); }
     if let Some(c) = s.corrupted { misc["corrupted"] = json!({ "option": if c { "true" } else { "false" } }); }
+    if it.rarity == "Unique" && it.twice_corrupted && s.corrupted == Some(true) { misc["twice_corrupted"] = json!({ "option": "true" }); }
     for k in &s.misc { misc[k.as_str()] = json!({ "option": "true" }); }
     if it.item_class.contains("Gem") {
         if let Some(qual) = it.quality { misc["quality"] = json!({ "min": qual }); }
@@ -1013,7 +1014,7 @@ pub const CURRENCY_NAMES: &[(&str, &str)] = &[
     ("divine", "Divine Orb"), ("exalted", "Exalted Orb"), ("alch", "Orb of Alchemy"), ("fusing", "Orb of Fusing"),
     ("alt", "Orb of Alteration"), ("jewellers", "Jeweller's Orb"), ("chrome", "Chromatic Orb"), ("chance", "Orb of Chance"),
     ("regal", "Regal Orb"), ("vaal", "Vaal Orb"), ("scour", "Orb of Scouring"), ("gcp", "Gemcutter's Prism"),
-    ("mirror", "Mirror of Kalandra"), ("annul", "Orb of Annulment"), ("regret", "Orb of Regret"), ("blessed", "Blessed Orb"),
+    ("mirror", "Mirror of Kalandra"), ("annul", "Orb of Annulment"), ("aug", "Orb of Augmentation"), ("transmute", "Orb of Transmutation"), ("regret", "Orb of Regret"), ("blessed", "Blessed Orb"),
 ];
 
 /// Chaos value of each trade currency, from poe.ninja prices.

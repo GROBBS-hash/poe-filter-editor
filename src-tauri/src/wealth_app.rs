@@ -105,8 +105,10 @@ pub(crate) fn with_lookup<T>(app: &AppHandle, f: impl FnOnce(wealth::Lookup) -> 
     let prices = state.prices.lock().unwrap();
     let f_ = f;
     let Some(f) = prices.get(&game) else { return None };
+    // Money is in chaos everywhere in the app (PoE 2's file is in exalted).
+    let k = filter_core::prices::chaos_per_unit(f);
     let look = |name: Option<&str>, base: &str, kind: &str| -> Option<f64> {
-        match kind {
+        (match kind {
             // An unidentified unique (no name yet) could be any unique on its base: count the cheapest one that drops on
             // the ground, not the best (23 Nov: an unidentified Legion Sword counted as 2 div in the map tracker).
             "unique" if name.map_or(true, str::is_empty) => filter_core::prices::uniques_on_base(f, base).last().map(|u| u.1)
@@ -114,13 +116,17 @@ pub(crate) fn with_lookup<T>(app: &AppHandle, f: impl FnOnce(wealth::Lookup) -> 
             // The most it could be, for "8c – 2 div" on the map tracker.
             "unique-max" => price_of(f, None, base, "Unique"),
             "unique" => price_of(f, name, base, "Unique"),
+            k if k.starts_with("unique|") => match name.filter(|n| !n.is_empty()) {
+                Some(n) => filter_core::prices::unique_price(f, n, base, k.strip_prefix("unique|")).map(|u| u.value),
+                None => filter_core::prices::uniques_on_base(f, base).last().map(|u| u.1),
+            },
             // Gems come in many levels/qualities: count the cheapest, so totals don't run away.
             "gem" => f.items.iter().filter(|i| i.name == base && i.cat.contains("Gem")).map(|i| i.value).reduce(f64::min),
             // A card hardly anyone trades (under 5 sold, under 50c) isn't worth its poe.ninja number: not counted
             // (21 Nov: Assassin's Favour "2.25c", about 1 sold, no exchange stock).
             _ if f.items.iter().any(|i| i.name == base && filter_core::prices::thin_card(i)) => None,
             _ => price_of(f, None, base, ""),
-        }
+        }).map(|v| v * k)
     };
     Some(f_(&look))
 }

@@ -93,7 +93,7 @@ fn clean(s: &str) -> String {
 }
 
 /// How to price one thing: (unique name, base / item name, kind) -> chaos each.
-/// kind: "unique", "gem" or "" (currency, fragments, cards, maps…).
+/// kind: "unique" (or "unique|<lines that tell its version>"), "gem" or "" (currency, fragments, cards, maps…).
 pub type Lookup<'a> = &'a dyn Fn(Option<&str>, &str, &str) -> Option<f64>;
 
 /// One stash item's worth, if poe.ninja prices it (rares and plain gear aren't).
@@ -123,6 +123,12 @@ pub struct Valued {
     pub note: String,
 }
 
+/// An item's own lines, as the site sends them (plain strings or { description }).
+fn mod_lines(item: &Value) -> String {
+    ["implicitMods", "explicitMods"].iter().flat_map(|k| item[*k].as_array().into_iter().flatten())
+        .filter_map(|m| m.as_str().or(m["description"].as_str())).collect::<Vec<_>>().join("\n")
+}
+
 pub fn value_item(item: &Value, tab: &str, lookup: Lookup) -> Option<Valued> {
     let frame = item["frameType"].as_u64().unwrap_or(0);
     let name = clean(item["name"].as_str().unwrap_or(""));
@@ -130,7 +136,11 @@ pub fn value_item(item: &Value, tab: &str, lookup: Lookup) -> Option<Valued> {
     let base = item["baseType"].as_str().map(clean).unwrap_or_else(|| type_line.clone());
     let stack = item["stackSize"].as_u64().unwrap_or(1).max(1) as u32;
     let each = match frame {
-        3 | 9 => lookup(Some(&name), &base, "unique")?,
+        // Uniques with versions (passives, abyssal sockets, flasks, charges): the lines that tell which, after a bar.
+        3 | 9 => match crate::prices::version_lines(&mod_lines(item)) {
+            Some(l) => lookup(Some(&name), &base, &format!("unique|{l}"))?,
+            None => lookup(Some(&name), &base, "unique")?,
+        },
         4 => lookup(None, &type_line, "gem")?,
         0..=2 if item["frameType"].is_number() && is_gear(item) => return None,
         _ => if base == "Chaos Orb" { 1.0 } else { lookup(None, &base, "").or_else(|| lookup(None, &type_line, ""))? },
@@ -491,12 +501,10 @@ pub fn save_profile(s: &mut WealthStore, name: &str, tabs: Vec<usize>, old: Opti
 
 impl WealthStore {
     pub fn load(path: &std::path::Path) -> WealthStore {
-        std::fs::read_to_string(path).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default()
+        crate::keep::load(path).unwrap_or_default()
     }
     pub fn save(&self, path: &std::path::Path) -> Result<(), String> {
-        let tmp = path.with_extension("tmp");
-        std::fs::write(&tmp, serde_json::to_string(self).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
-        std::fs::rename(&tmp, path).map_err(|e| e.to_string())
+        crate::keep::save(path, self, false).map_err(|e| e.to_string())
     }
     /// Keeps the history from growing forever (newest 400 scans).
     pub fn add_snapshot(&mut self, s: Snapshot) {

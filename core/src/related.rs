@@ -135,7 +135,7 @@ mod tests {
         let it = |name: &str, cat: &str, value: f64| PriceItem {
             name: name.into(), base: name.into(), cat: cat.into(), value, variant: None, listings: Some(10), trend: None, change: None, volume: None };
         PriceFile {
-            game: "poe1".into(), league: "Covens".into(), league_name: None, updated: "now".into(), unit: "chaos".into(),
+            game: "poe1".into(), league: "Covens".into(), league_name: None, updated: "now".into(), unit: "chaos".into(), bases: vec![],
             items: vec![
                 it("The Maven's Writ", "Fragment", 40.0), it("Crescent Splinter", "Fragment", 6.0),
                 it("Fragment of the Minotaur", "Fragment", 18.0), it("Fragment of the Chimera", "Fragment", 20.0),

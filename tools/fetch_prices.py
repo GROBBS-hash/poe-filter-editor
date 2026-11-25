@@ -181,13 +181,24 @@ def stash_items(game, league, typ):
     return out
 
 
-def base_type_icons(game, league):
-    """Pictures for every base type (poe.ninja's base type list); prices not used."""
+INFLUENCES = {"", "Shaper", "Elder", "Crusader", "Hunter", "Redeemer", "Warlord"}
+
+
+def base_types(game, league):
+    """Pictures for every base type, and what plain (or single-influence) bases list at: [base, item level, influence,
+    chaos, listings]. Only ones worth 10 chaos or more with at least 10 listed: fewer says nothing (one listing at
+    999999c), and the whole list is 19,000 lines."""
     if game != "poe1":
-        return
+        return []
     data = get(f"/{game}/api/economy/stash/current/item/overview", league=league, type="BaseType")
+    out = []
     for line in (data or {}).get("lines") or []:
-        add_icon(game, line.get("baseType") or line.get("name"), line.get("icon"))
+        name = line.get("baseType") or line.get("name")
+        add_icon(game, name, line.get("icon"))
+        value, listed, inf = num(line.get("chaosValue")), line.get("listingCount") or 0, line.get("variant") or ""
+        if name and value is not None and value >= 10 and listed >= 10 and inf in INFLUENCES:
+            out.append([name, line.get("levelRequired") or 0, inf, round(value, 1), listed])
+    return out
 
 
 def fetch_json(url):
@@ -241,7 +252,8 @@ def run(game, exchange_types, stash_types):
         got = stash_items(game, league_id, t)
         items += got
         print(f"  {t}: {len(got)}")
-    base_type_icons(game, league_id)
+    bases = base_types(game, league_id)
+    print(f"  bases: {len(bases)}")
     extra_icons(game)
     if game == "poe1" and core_seen and core_seen.get("primary"):
         unit = str(core_seen["primary"])
@@ -252,6 +264,7 @@ def run(game, exchange_types, stash_types):
         "updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "unit": unit,
         "items": items,
+        "bases": bases,
     }
 
 

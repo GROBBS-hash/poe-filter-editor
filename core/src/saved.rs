@@ -28,13 +28,11 @@ pub struct Saved {
 
 impl Saved {
     pub fn load(path: &Path) -> Saved {
-        std::fs::read_to_string(path).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default()
+        crate::keep::load(path).unwrap_or_default()
     }
 
     pub fn save(&self, path: &Path) -> Result<(), String> {
-        let tmp = path.with_extension("tmp");
-        std::fs::write(&tmp, serde_json::to_string_pretty(self).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
-        std::fs::rename(&tmp, path).map_err(|e| e.to_string())
+        crate::keep::save(path, self, true).map_err(|e| e.to_string())
     }
 
     pub fn add(&mut self, name: &str, setup: TradeSetup) -> u64 {

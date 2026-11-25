@@ -75,7 +75,9 @@ pub fn parse_line(line: &str) -> Option<PlayEvent> {
 /// ("Synthesis_MapGuardian4" = Rewritten Distant Memory, 23 Nov), conquerors and Sirus, the Maven,
 /// breachstones and league bosses. Not the Maven's Crucible hub or sub-areas inside a map.
 const DEVICE_AREAS: &[&str] = &["Synthesis_Map", "AtlasExilesBoss", "MavenBoss", "BreachBoss", "AbyssLeagueBoss",
-    "AzmeriLeagueBoss", "FaridunLeagueBoss", "ChayulaLeagueTowerBoss"];
+    "AzmeriLeagueBoss", "FaridunLeagueBoss", "ChayulaLeagueTowerBoss",
+    // The Simulacrum: "AfflictionTown…" (poedb, 25 Nov). Not in his log yet.
+    "AfflictionTown"];
 
 /// Map areas (PoE 1 "MapWorlds…", PoE 2 "Map…", plus [`DEVICE_AREAS`]); not hideouts, towns or the campaign.
 pub fn is_map_area(id: &str) -> bool {
@@ -85,7 +87,7 @@ pub fn is_map_area(id: &str) -> bool {
 
 /// Hideouts and towns (the places you go between maps).
 pub fn is_rest_area(id: &str) -> bool {
-    id.contains("Hideout") || id.ends_with("_town") || id.contains("Town") || id == "HeistHub"
+    id.contains("Hideout") || id.ends_with("_town") || (id.contains("Town") && !is_map_area(id)) || id == "HeistHub"
 }
 
 // ---------- map runs ----------
@@ -803,7 +805,7 @@ mod tests {
 
     #[test]
     fn map_areas() {
-        for id in ["MapWorldsStrand", "Synthesis_MapGuardian4", "Synthesis_MapBoss", "AtlasExilesBoss5", "MavenBoss", "MapAtziri"] {
+        for id in ["MapWorldsStrand", "Synthesis_MapGuardian4", "Synthesis_MapBoss", "AtlasExilesBoss5", "MavenBoss", "MapAtziri", "AfflictionTown4"] {
             assert!(is_map_area(id), "{id}");
         }
         for id in ["HideoutSpace", "MapWorldsHideout", "MavenHub", "2_11_endgame_town", "KalguuranSettlersLeague", "DeepwaterEncounter"] {

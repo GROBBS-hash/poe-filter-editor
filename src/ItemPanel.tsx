@@ -7,6 +7,7 @@ import { JewelMod, JewelRule, jewelModList, readJewelRule, saveJewelRule } from 
 import { ItemIcon } from "./icons";
 import { mapItemIcon } from "./mapIcons";
 import BaseUniques from "./BaseUniques";
+import { BaseWorth } from "./Bases";
 
 export type Picked = { item: Item; from_screen: boolean; screen_text?: string | null; confidence: number; rarity_unsure?: boolean };
 
@@ -218,9 +219,9 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
     }
   }, []);
   useEffect(() => { refresh(start); }, [refresh, start]);
-  const [price, setPrice] = useState<[number, string] | null>(null);
+  const [price, setPrice] = useState<[number, string, number | null] | null>(null);
   useEffect(() => {
-    invoke<[number, string] | null>("item_price", { item: picked.item }).then(setPrice).catch(() => setPrice(null));
+    invoke<[number, string, number | null] | null>("item_price", { item: picked.item }).then(setPrice).catch(() => setPrice(null));
   }, [picked.item]);
 
   const setRarity = (rarity: string) => {
@@ -444,6 +445,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
           <div className="qm-price">
             ≈ {price[0] >= 100 ? Math.round(price[0]).toLocaleString() : +price[0].toFixed(price[0] < 1 ? 2 : 1)}
             {({ chaos: "c", exalted: "ex", divine: "div" } as Record<string, string>)[price[1]] ?? price[1]}
+            {price[2] != null && <> to {Math.round(price[2]).toLocaleString()}{({ chaos: "c", exalted: "ex", divine: "div" } as Record<string, string>)[price[1]] ?? price[1]}, by version</>}
             <span> on poe.ninja{item.rarity === "Unique" && !item.name ? " (best ground unique on this base)" : ""}</span>
           </div>
         )}
@@ -452,6 +454,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
         )}
         </div>
       </div>
+      <BaseWorth item={item} offer onDone={(m) => afterChange(m)} />
       {item.rarity === "Unique" && !item.name && item.base_type && <BaseUniques base={item.base_type} />}
 
       {picked.from_screen && picked.rarity_unsure && isGear && (

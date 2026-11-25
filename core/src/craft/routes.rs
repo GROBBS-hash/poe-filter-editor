@@ -43,6 +43,26 @@ pub struct Route {
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct Routes { pub routes: Vec<Route>, pub ilvl_needed: u32, pub note: String, pub divine: Option<f64> }
 
+/// Rerolls with a lock on: the lock is a mod on the side being rerolled, so it's crafted again for every try (25 Nov: it
+/// was charged once). The "Lock" step itself then costs nothing extra.
+fn with_lock(mut ways: Vec<Way>, lock: &Way) -> Vec<Way> {
+    for w in &mut ways {
+        let tries = if w.chance > 0.0 { 1.0 / w.chance } else { 0.0 };
+        w.average = plus(w.average, lock.cost_each.map(|l| l * tries));
+        w.cost_each = plus(w.cost_each, lock.cost_each);
+        w.note = format!("{}. Each try needs the lock crafted again (counted): about {} in all", w.note, if tries < 1.5 { "one".to_string() } else { format!("{:.0}", tries) });
+        w.tries *= 2.0;
+    }
+    sort_ways(&mut ways);
+    ways
+}
+/// The lock's own step, when every reroll after it pays for its own lock.
+fn lock_step(mut lock: Way) -> Way {
+    lock.average = lock.average.map(|_| 0.0);
+    lock.note = format!("{}. Its cost is counted in each reroll below", lock.note);
+    lock
+}
+
 const CHECK_LOCK: &str = "The 1–2 mod bench locks are new in 3.30: check that a Harvest reforge or Orb of Scouring keeps the locked mods.";
 const CHECK_ELDRITCH: &str = "Eldritch Chaos Orb: how many new mods it adds (1–3) is a guess here. One Eldritch implicit is assumed to make its side dominant.";
 const CHECK_HARVEST: &str = "Harvest reforge with a lock on the item: check it keeps the locked mods.";
@@ -164,11 +184,11 @@ impl Ctx<'_> {
             let (extra, k) = if self.weapon() { ("Sacred Orb", 1.0) } else if self.jewellery() { ("Exalted Orb", 8.0) } else { ("Blessed Orb", 4.0) };
             let each = plus(self.div().map(|d| d * 4.0), self.c(extra).map(|e| e * k));
             return way("Guaranteed", format!("Bench: {}es Cannot Be Changed", if prefix { "Prefix" } else { "Suffix" }), 1.0, each, each,
-                format!("Meta-craft (4 Divine + {k} {extra}). It sits in a {} slot and survives an Orb of Scouring", if prefix { "suffix" } else { "prefix" }), 1.0, 0, None);
+                format!("Meta-craft (4 Divine + {k} {extra}). It sits in a {} slot, so rerolling or scouring that side takes it off again", if prefix { "suffix" } else { "prefix" }), 1.0, 0, None);
         }
         let each = self.div().map(|d| d * n as f64);
         way("Guaranteed", format!("Bench: lock {}", side_word(prefix, n)), 1.0, each, each,
-            format!("\"{n} {} Modifier{} cannot be changed\" ({n} Divine). It sits in a {} slot", if prefix { "Prefix" } else { "Suffix" }, if n == 1 { "" } else { "s" },
+            format!("\"{n} {} Modifier{} cannot be changed\" ({n} Divine). It sits in a {} slot, so each reroll of that side takes it off again", if prefix { "Prefix" } else { "Suffix" }, if n == 1 { "" } else { "s" },
                 if prefix { "suffix" } else { "prefix" }), 1.0, 0, Some(CHECK_LOCK))
     }
     fn bench_cost(&self, f: &Family) -> Option<f64> { f.bench.first()?.cost.iter().map(|(c, n)| self.c(c).map(|v| v * *n as f64)).sum() }
@@ -328,10 +348,11 @@ impl Ctx<'_> {
             let (fp, fs) = if x.prefix { (pre + 1, suf) } else { (pre, suf + 1) };
             let p = add_one(&self.roll, &used, fp, fs, 3, &is_t);
             let sc = self.c("Orb of Scouring");
-            let avg = (|| Some(lock.average? + (ex? + sc?) / p - sc?))().filter(|_| p > 0.0);
+            // Every try: the lock (the scour takes it off), the Exalt, and the scour on a miss.
+            let avg = (|| Some((lock.average? + ex? + sc?) / p - sc?))().filter(|_| p > 0.0);
             out.push(way("Add a mod", format!("Lock the {}es + Exalted Orb + Scouring", if x.prefix { "suffix" } else { "prefix" }), p, ex, avg,
-                format!("{}, then Exalt; on a miss an Orb of Scouring clears it and you try again. Nothing you want is lost", lock.method),
-                if p > 0.0 { 2.0 / p } else { 0.0 }, 0, lock.check.as_deref()));
+                format!("{}, then Exalt; on a miss an Orb of Scouring clears it (and the lock): lock again and try again. Nothing you want is lost", lock.method),
+                if p > 0.0 { 3.0 / p } else { 0.0 }, 0, lock.check.as_deref()));
         }
         out.retain(|w| w.chance > 0.0 && !w.tries.is_nan());
         sort_ways(&mut out);
@@ -496,15 +517,15 @@ pub fn routes(base: &str, ilvl: u32, influences: &[String], targets: &[(String, 
         let cap_a = 3 - res_room(a_pre);
         let ways = cx.spam(&a, &cx.fixed, if a_pre { (cap_a, 3) } else { (3, cap_a) }, false, false);
         b.step(format!("Roll the {side}: {}", names(&a)), format!("Only the {side} matter here; the {other} get rerolled later."), ways);
-        b.step(format!("Lock the {side}"), "Keeps them through the next rerolls.", vec![cx.lock(a_pre, a.len() + cx.fixed.side(a_pre) as usize)]);
+        b.step(format!("Lock the {side}"), "Keeps them through the next rerolls.", vec![lock_step(cx.lock(a_pre, a.len() + cx.fixed.side(a_pre) as usize))]);
         b.crafted = true;
         let mut seed = cx.seed_with(&a);
         if a_pre { seed.suf += 1 } else { seed.pre += 1 }
         // The lock's slot frees up when it comes off, for the next mod.
         let cap_b = (3 - res_room(!a_pre) - later.len() as i32 + 1).min(3);
         let cap = if a_pre { (cap_a, cap_b) } else { (cap_b, cap_a) };
-        let ways = cx.spam(&now, &seed, cap, true, false);
-        b.step(format!("Reroll the {other}: {}", names(&now)), format!("Harvest reforges keep the locked {side}. Stop when these are on with room for the rest."), ways);
+        let ways = with_lock(cx.spam(&now, &seed, cap, true, false), &cx.lock(a_pre, a.len() + cx.fixed.side(a_pre) as usize));
+        b.step(format!("Reroll the {other}: {}", names(&now)), format!("Harvest reforges keep the locked {side}; lock them again before each one. Stop when these are on with room for the rest."), ways);
         // The lock comes off before adding anything else; stray mods may sit in the free slots up to the caps.
         let mut good: Vec<usize> = a.iter().chain(now.iter()).copied().collect();
         let mut seed = cx.seed_with(&good);
@@ -701,12 +722,12 @@ pub fn routes(base: &str, ilvl: u32, influences: &[String], targets: &[(String, 
                 let mut b = Build::new(base, ilvl_needed);
                 b.steps[0] = Step { title: "Start from your item".into(), detail: format!("It already has {}.", names(&keep)), ways: vec![] };
                 let side = if a_pre { "prefixes" } else { "suffixes" };
-                b.step(format!("Lock your {side}"), "Keeps them through the rerolls.", vec![cx.lock(a_pre, keep.len() + cx.fixed.side(a_pre) as usize)]);
+                b.step(format!("Lock your {side}"), "Keeps them through the rerolls.", vec![lock_step(cx.lock(a_pre, keep.len() + cx.fixed.side(a_pre) as usize))]);
                 b.crafted = true;
                 let mut seed = cx.seed_with(&keep);
                 if a_pre { seed.suf += 1 } else { seed.pre += 1 }
-                let ways = cx.spam(&want, &seed, cap_for(&[]), true, false);
-                b.step(format!("Reroll for {}", names(&want)), format!("Harvest reforges keep the locked {side}."), ways);
+                let ways = with_lock(cx.spam(&want, &seed, cap_for(&[]), true, false), &cx.lock(a_pre, keep.len() + cx.fixed.side(a_pre) as usize));
+                b.step(format!("Reroll for {}", names(&want)), format!("Harvest reforges keep the locked {side}; lock them again before each one."), ways);
                 bench_finish(&mut b);
                 if let Some(r) = b.done("keep", "Keep what your item has", format!("Your item's {side} stay; the rest gets rerolled.")) { out.push(r) }
             }

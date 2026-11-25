@@ -74,6 +74,9 @@ pub struct PriceFile {
     /// "chaos" (PoE 1) or "exalted" (PoE 2).
     pub unit: String,
     pub items: Vec<PriceItem>,
+    /// Bases to craft on (PoE 1).
+    #[serde(default)]
+    pub bases: Vec<crate::bases::BasePrice>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -148,6 +151,14 @@ pub struct PriceSettings {
     /// "sometimes they drop in stacks").
     #[serde(default)]
     pub section_stack: BTreeMap<String, u32>,
+    /// Make bases listed at this much or more stand out (None = off; works with price tiers off).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bases_min: Option<f64>,
+    /// Influenced ones too.
+    #[serde(default)]
+    pub bases_influenced: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bases_style: Option<CustomStyle>,
 }
 
 /// The Threads page's key in section_hide / section_stack. NeverSink has no Threads section (they sit in Fragments
@@ -195,6 +206,9 @@ pub fn default_settings(unit: &str) -> PriceSettings {
         }).collect(),
         section_hide: BTreeMap::new(),
         section_stack: BTreeMap::new(),
+        bases_min: None,
+        bases_influenced: false,
+        bases_style: None,
     }
 }
 
@@ -261,7 +275,8 @@ fn cheapest_unique_by_base(file: &PriceFile) -> BTreeMap<String, f64> {
     for it in file.items.iter().filter(|i| i.cat.starts_with("Unique") && drops_on_ground(&i.name)) {
         by.entry(it.base.clone()).or_default().push((&it.name, it.value));
     }
-    by.into_iter().filter(|(_, l)| l.iter().any(|(n, _)| *n != l[0].0))
+    // Versions of one unique count too (Voices).
+    by.into_iter().filter(|(_, l)| l.iter().any(|(n, v)| *n != l[0].0 || *v != l[0].1))
         .map(|(b, l)| (b, l.iter().map(|x| x.1).fold(f64::INFINITY, f64::min))).collect()
 }
 
@@ -409,13 +424,18 @@ pub fn card_show_blocks(settings: &PriceSettings, file: &PriceFile, segs: &[crat
     out
 }
 
+/// What to multiply this file's prices by to get chaos: 1 for PoE 1; PoE 2's are in exalted (25 Nov: they were shown as
+/// chaos, with a Chaos Orb counted as 1 exalted while it was worth 27).
+pub fn chaos_per_unit(file: &PriceFile) -> f64 {
+    if file.unit == "chaos" { return 1.0; }
+    price_of(file, None, "Chaos Orb", "Currency").filter(|v| *v > 0.0).map_or(1.0, |v| 1.0 / v)
+}
+
 /// The price of one item, if poe.ninja has it (for the in-game pop-up).
 pub fn price_of(file: &PriceFile, name: Option<&str>, base: &str, rarity: &str) -> Option<f64> {
     if rarity == "Unique" {
         if let Some(n) = name {
-            if let Some(v) = file.items.iter().filter(|i| i.name == n && i.cat.starts_with("Unique")).map(|i| i.value).reduce(f64::max) {
-                return Some(v);
-            }
+            if let Some(u) = unique_price(file, n, base, None) { return Some(u.value); }
         }
         return values_by_base(file, Group::Uniques).get(base).copied();
     }
@@ -423,12 +443,82 @@ pub fn price_of(file: &PriceFile, name: Option<&str>, base: &str, rarity: &str) 
     file.items.iter().filter(|i| i.name == base && !i.cat.starts_with("Unique") && i.cat != "SkillGem").map(|i| i.value).reduce(f64::max)
 }
 
+/// A named unique's price. Some have versions worth wildly different amounts (25 Nov: Voices 0.86c to 1,030 div, and
+/// every one counted as the dearest). `text`: the item's lines, to tell which version it is; unknown, it counts as the
+/// cheapest and `high` says what it could be.
+#[derive(Debug, Clone, PartialEq)]
+pub struct UniquePrice { pub value: f64, pub high: Option<f64> }
+
+pub fn unique_price(file: &PriceFile, name: &str, base: &str, text: Option<&str>) -> Option<UniquePrice> {
+    let mut all: Vec<&PriceItem> = file.items.iter().filter(|i| i.name == name && i.cat.starts_with("Unique")).collect();
+    // The same name on several bases (Grand Spectrum, Precursor's Emblem): its own base.
+    if all.iter().any(|i| i.base == base) { all.retain(|i| i.base == base); }
+    if let (Some(t), true) = (text, all.len() > 1) {
+        let fits: Vec<&PriceItem> = all.iter().copied().filter(|i| version_fits(i.variant.as_deref(), &all, t)).collect();
+        if !fits.is_empty() { all = fits; }
+    }
+    let low = all.iter().map(|i| i.value).reduce(f64::min)?;
+    let high = all.iter().map(|i| i.value).reduce(f64::max).filter(|h| *h > low * 1.5);
+    Some(UniquePrice { value: low, high })
+}
+
+/// The whole number right before `after` in the text, or right after `before`.
+fn number_between(text: &str, before: &str, after: &[&str]) -> Option<u32> {
+    let l = text.to_lowercase();
+    let mut from = 0;
+    while let Some(i) = l[from..].find(before) {
+        let rest = &l[from + i + before.len()..];
+        let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
+        if !digits.is_empty() && after.iter().any(|a| rest[digits.len()..].starts_with(a)) { return digits.parse().ok(); }
+        from += i + before.len();
+    }
+    None
+}
+
+/// Whether an item with these lines is poe.ninja's version ("3 passives", "2 Jewels", "4 Flasks", "Frenzy"). Versions we
+/// can't read off the item (Foulborn mods) never fit, so the item keeps its whole range.
+fn version_fits(variant: Option<&str>, all: &[&PriceItem], text: &str) -> bool {
+    let num = |v: &str| v.split_whitespace().next().and_then(|n| n.parse::<u32>().ok());
+    let word = |v: &str| v.split_whitespace().nth(1).unwrap_or("").trim_end_matches('s').to_lowercase();
+    let on_item = |kind: &str| match kind {
+        "passive" => number_between(text, "adds ", &[" passive skill", " small passive skill"]),
+        "jewel" => number_between(text, "has ", &[" abyssal socket"]),
+        "flask" => number_between(text, "leftmost ", &[" magic utility flask", " utility flask"]),
+        _ => None,
+    };
+    match variant {
+        Some(v) if num(v).is_some() => on_item(&word(v)).is_some() && on_item(&word(v)) == num(v),
+        Some(v) if matches!(v, "Endurance" | "Frenzy" | "Power") => text.contains(&format!("{v} Charges")),
+        Some(_) => false,
+        // The unnamed version next to numbered ones (Voices with 1 passive): the number none of the others have.
+        None => {
+            let numbered: Vec<&str> = all.iter().filter_map(|i| i.variant.as_deref()).filter(|v| num(v).is_some()).collect();
+            let Some(kind) = numbered.first().map(|v| word(v)) else { return false };
+            on_item(&kind).is_some_and(|n| numbered.iter().all(|v| num(v) != Some(n)))
+        }
+    }
+}
+
+/// The lines of an item that tell a unique's version, if it has any (see `unique_price`).
+pub fn version_lines(text: &str) -> Option<String> {
+    let l: Vec<&str> = text.lines().filter(|l| {
+        let l = l.to_lowercase();
+        l.contains("passive skill") || l.contains("abyssal socket") || l.contains("leftmost") || l.contains(" charges")
+    }).collect();
+    (!l.is_empty()).then(|| l.join("\n"))
+}
+
 /// The week's trend for the same item `price_of` prices (uniques by name, others by base; not gems, which are kept at
 /// their cheapest version). The dearest listing wins, like the price.
 pub fn trend_of(file: &PriceFile, name: Option<&str>, base: &str, rarity: &str) -> Option<Trend> {
     let pick = |i: &&PriceItem| if rarity == "Unique" { name.is_some_and(|n| i.name == n) && i.cat.starts_with("Unique") }
         else { i.name == base && !i.cat.starts_with("Unique") && i.cat != "SkillGem" };
-    let it = file.items.iter().filter(pick).max_by(|a, b| a.value.total_cmp(&b.value))?;
+    // A unique's version isn't known here: no line when its versions differ (it would be some other one's).
+    let mut all = file.items.iter().filter(pick);
+    let first = all.next()?;
+    let rest: Vec<&PriceItem> = all.collect();
+    if rarity == "Unique" && rest.iter().any(|i| i.base == first.base && i.variant != first.variant) { return None; }
+    let it = std::iter::once(first).chain(rest).max_by(|a, b| a.value.total_cmp(&b.value))?;
     Some(Trend { points: it.trend.clone()?, change: it.change? })
 }
 
@@ -441,7 +531,7 @@ mod tests {
         let it = |name: &str, base: &str, cat: &str, value: f64| PriceItem {
             name: name.into(), base: base.into(), cat: cat.into(), value, variant: None, listings: Some(10), trend: None, change: None, volume: None };
         PriceFile {
-            game: "poe1".into(), league: "Covens".into(), league_name: None, updated: "now".into(), unit: "chaos".into(),
+            game: "poe1".into(), league: "Covens".into(), league_name: None, updated: "now".into(), unit: "chaos".into(), bases: vec![],
             items: vec![
                 it("Headhunter", "Leather Belt", "UniqueAccessory", 29584.0),
                 it("Wurm's Molt", "Leather Belt", "UniqueAccessory", 1.0),
@@ -499,7 +589,7 @@ mod tests {
 
     #[test]
     fn card_stacks_worth_the_line_show() {
-        let f = PriceFile { items: vec![
+        let f = PriceFile { bases: vec![], items: vec![
             // Over 5 sold each, so the prices count.
             PriceItem { volume: Some(6.7), ..it_card("The Master Artisan", 1.18) }, PriceItem { volume: Some(100.0), ..it_card("Rain of Chaos", 0.02) },
             PriceItem { volume: Some(900.0), ..it_card("Worth It", 4.5) }, PriceItem { volume: Some(9000.0), ..it_card("Shown Already", 4.5) },
@@ -624,7 +714,7 @@ mod tests {
         // From poe.ninja 21 Nov: The Calling "3c" with 6c traded (2 sold); Rain of Chaos busy; Father's Love rare but 8497c.
         let card = |name: &str, value: f64, volume: f64| PriceItem { name: name.into(), base: name.into(), cat: "DivinationCard".into(),
             value, variant: None, listings: None, trend: None, change: None, volume: Some(volume) };
-        let f = PriceFile { game: "poe1".into(), league: "Covens".into(), league_name: None, updated: String::new(), unit: "chaos".into(),
+        let f = PriceFile { game: "poe1".into(), league: "Covens".into(), league_name: None, updated: String::new(), unit: "chaos".into(), bases: vec![],
             items: vec![card("The Calling", 3.08, 6.17), card("Rain of Chaos", 0.3, 900.0), card("Father's Love", 8497.0, 21000.0),
                 card("A Dab of Ink", 14.9, 300.0)] };
         let v = values_by_base(&f, Group::DivinationCards);
@@ -632,6 +722,45 @@ mod tests {
         assert_eq!(v["Rain of Chaos"], 0.3);
         assert_eq!(v["Father's Love"], 8497.0, "rare but valuable keeps its price");
         assert_eq!(v["A Dab of Ink"], 14.9, "20 sold is a real price");
+    }
+
+    #[test]
+    fn exalted_file_in_chaos() {
+        let mut f = file();
+        assert_eq!(chaos_per_unit(&f), 1.0);
+        f.unit = "exalted".into();
+        let it = |name: &str, value: f64| PriceItem { name: name.into(), base: name.into(), cat: "Currency".into(), value, variant: None, listings: None, trend: None, change: None, volume: None };
+        f.items = vec![it("Chaos Orb", 26.7), it("Divine Orb", 432.54), it("Exalted Orb", 1.0)];
+        let k = chaos_per_unit(&f);
+        let r = crate::trade::rates(|n| price_of(&f, None, n, "Currency").map(|v| v * k));
+        assert_eq!((r["chaos"], (r["divine"] * 10.0).round() / 10.0, (r["exalted"] * 1000.0).round() / 1000.0), (1.0, 16.2, 0.037));
+    }
+
+    #[test]
+    fn versions_of_a_unique() {
+        let it = |name: &str, base: &str, variant: Option<&str>, value: f64| PriceItem {
+            name: name.into(), base: base.into(), cat: "UniqueJewel".into(), value, variant: variant.map(String::from), listings: Some(10), trend: None, change: None, volume: None };
+        let mut f = file();
+        f.items.extend([it("Voices", "Large Cluster Jewel", None, 185396.0), it("Voices", "Large Cluster Jewel", Some("3 passives"), 40118.0),
+            it("Voices", "Large Cluster Jewel", Some("5 passives"), 58.0), it("Voices", "Large Cluster Jewel", Some("7 passives"), 0.86),
+            it("Bubonic Trail", "Murder Boots", Some("2 Jewels"), 718.8), it("Bubonic Trail", "Murder Boots", Some("1 Jewel"), 2.0),
+            it("Mageblood", "Stygian Belt", Some("4 Flasks"), 44218.0), it("Mageblood", "Stygian Belt", Some("2 Flasks"), 13907.0),
+            it("Ralakesh's Impatience", "Riveted Boots", Some("Endurance"), 179.7), it("Ralakesh's Impatience", "Riveted Boots", Some("Power"), 30.0),
+            it("Grand Spectrum", "Cobalt Jewel", None, 178.0), it("Grand Spectrum", "Viridian Jewel", None, 40.0),
+            it("Foulborn Rathpith Globe", "Titanium Spirit Shield", Some("DOT per Life"), 26793.0), it("Foulborn Rathpith Globe", "Titanium Spirit Shield", Some("Ailment per Life"), 20.0)]);
+        let p = |n: &str, b: &str, t: Option<&str>| unique_price(&f, n, b, t).map(|u| (u.value, u.high));
+        assert_eq!(price_of(&f, Some("Voices"), "Large Cluster Jewel", "Unique"), Some(0.86));
+        assert_eq!(p("Voices", "Large Cluster Jewel", None), Some((0.86, Some(185396.0))));
+        assert_eq!(p("Voices", "Large Cluster Jewel", Some("Adds 5 Small Passive Skills which grant nothing")), Some((58.0, None)));
+        assert_eq!(p("Voices", "Large Cluster Jewel", Some("Adds 1 Small Passive Skill which grants nothing")), Some((185396.0, None)));
+        assert_eq!(p("Bubonic Trail", "Murder Boots", Some("Has 2 Abyssal Sockets")), Some((718.8, None)));
+        assert_eq!(p("Mageblood", "Stygian Belt", Some("Leftmost 4 Magic Utility Flasks constantly apply their Flask Effects to you")), Some((44218.0, None)));
+        assert_eq!(p("Ralakesh's Impatience", "Riveted Boots", Some("Count as having maximum number of Power Charges")), Some((30.0, None)));
+        assert_eq!(p("Grand Spectrum", "Viridian Jewel", None), Some((40.0, None)));
+        // Foulborn mods can't be told apart: the cheapest, and what it could be.
+        assert_eq!(p("Foulborn Rathpith Globe", "Titanium Spirit Shield", Some("Adds 9 to 12 Cold Damage")), Some((20.0, Some(26793.0))));
+        assert_eq!(version_lines("Rarity: Unique\nVoices\nAdds 7 Small Passive Skills which grant nothing").as_deref(), Some("Adds 7 Small Passive Skills which grant nothing"));
+        assert!(trend_of(&f, Some("Voices"), "Large Cluster Jewel", "Unique").is_none());
     }
 
     #[test]
@@ -649,7 +778,7 @@ mod trend_tests {
         let it = |name: &str, cat: &str, value: f64, trend: Option<Vec<f64>>| PriceItem {
             name: name.into(), base: name.into(), cat: cat.into(), value, variant: None, listings: Some(10),
             change: trend.as_ref().and_then(|t| t.last().copied()), trend, volume: None };
-        let f = PriceFile { game: "poe1".into(), league: "Covens".into(), league_name: None, updated: String::new(), unit: "chaos".into(),
+        let f = PriceFile { game: "poe1".into(), league: "Covens".into(), league_name: None, updated: String::new(), unit: "chaos".into(), bases: vec![],
             items: vec![it("Accelerating Catalyst", "Currency", 0.49, Some(vec![0.0, -43.1, -61.9, -76.0, -72.9, -84.4, -60.9])),
                 it("Arcane Surge Support", "SkillGem", 1.0, Some(vec![0.0, 5.0])), it("Chaos Orb", "Currency", 1.0, None)] };
         let t = trend_of(&f, None, "Accelerating Catalyst", "Currency").unwrap();

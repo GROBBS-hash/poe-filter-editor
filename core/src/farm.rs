@@ -635,7 +635,7 @@ mod tests {
         PriceItem { name: name.into(), base: name.into(), cat: cat.into(), value, variant: None, listings, trend: None, change: Some(10.0), volume }
     }
     fn file() -> PriceFile {
-        PriceFile { game: "poe1".into(), league: "Covens".into(), league_name: None, updated: "now".into(), unit: "chaos".into(), items: vec![
+        PriceFile { game: "poe1".into(), league: "Covens".into(), league_name: None, updated: "now".into(), unit: "chaos".into(), bases: vec![], items: vec![
             item("Divine Orb", "Currency", 200.0, Some(1e6), None),
             item("Essence of Horror", "Essence", 10.0, Some(400_000.0), None),
             item("Prismatic Oil", "Oil", 1400.0, Some(90_000.0), None), item("Silver Oil", "Oil", 37.0, Some(28_000.0), None),
