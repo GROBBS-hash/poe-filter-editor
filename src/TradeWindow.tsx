@@ -8,6 +8,7 @@ import { CurrencyIcon, ItemIcon } from "./icons";
 import BaseUniques from "./BaseUniques";
 import RelatedItems from "./RelatedItems";
 import { BaseWorth } from "./Bases";
+import { useDeathMods } from "./Deaths";
 import WornCompare, { Resists, type Comparison } from "./WornCompare";
 import { Item, RARITY_COLOUR, itemTitle } from "./types";
 import { CRAFT_ITEM_KEY } from "./Craft";
@@ -488,6 +489,7 @@ function ModList({ title, lines, cls, mark }: { title: string; lines: string[]; 
 /** Ctrl+D on a map: its mods, the ones you can't run in red. */
 function MapCheck({ map, rarity, corrupted }: { map: MapInfo; rarity: string; corrupted: boolean }) {
   const bad = map.mods.filter((m) => m.warn);
+  const died = useDeathMods(map.mods.map((m) => m.text));
   const [copied, setCopied] = useState("");
   // The one-word answer first (22 Nov): run it or not, and what to do if not.
   const fix = map.no_sale ? "" : corrupted ? "It's corrupted: put it aside (or sell it)."
@@ -507,7 +509,7 @@ function MapCheck({ map, rarity, corrupted }: { map: MapInfo; rarity: string; co
       {map.stats.length > 0 && <div className="muted small tw-map-stats">{map.stats.join(" · ")}</div>}
       <ul className="tw-map-mods">
         {map.mods.map((m, i) => (
-          <li key={i} className={m.warn ? "bad" : ""}>{m.text}{m.warn && <span className="tw-map-tag">{m.warn}</span>}</li>
+          <li key={i} className={m.warn ? "bad" : ""}>{m.text}{m.warn && <span className="tw-map-tag">{m.warn}</span>}{died[i] && <span className="dn-map-tag">{died[i]}</span>}</li>
         ))}
       </ul>
       {!map.no_sale && <div className="row">

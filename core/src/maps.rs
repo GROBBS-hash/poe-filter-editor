@@ -225,25 +225,27 @@ pub fn suggest(build: &Build) -> Vec<Suggestion> {
     out
 }
 
+/// A map mod without its numbers, to tell whether two lines are the same mod. poe.re writes ranges "(20-40)%" where the
+/// map says "40%": each "(a-b)" counts as one number.
+pub fn shape(text: &str) -> String {
+    let low = text.replace(" — Unscalable Value", "").to_lowercase();
+    let mut out = String::new();
+    let mut rest = low.as_str();
+    while let Some(i) = rest.find('(') {
+        let Some(j) = rest[i..].find(')').map(|j| i + j) else { break };
+        let inner = &rest[i + 1..j];
+        let numeric = !inner.is_empty() && inner.chars().all(|c| c.is_ascii_digit() || c == '-' || c == '.');
+        out.push_str(&rest[..i]);
+        if numeric { out.push('1') } else { out.push_str(&rest[i..=j]) }
+        rest = &rest[j + 1..];
+    }
+    out.push_str(rest);
+    crate::trade::template(&out).0.replace('+', "").split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
 /// The Ctrl+D map check against the one list of mods you can't run (the Maps page's ticks, poe.re's mod list):
 /// a map mod line is flagged when it matches any line of a ticked mod, numbers ignored.
 pub fn map_info_bad(text: &str, mods: &[crate::mapregex::MapModEntry], bad: &[i64]) -> MapInfo {
-    // poe.re writes ranges "(20-40)%"; the map says "40%": turn each "(a-b)" into one number before comparing.
-    let unrange = |s: &str| -> String {
-        let mut out = String::new();
-        let mut rest = s;
-        while let Some(i) = rest.find('(') {
-            let Some(j) = rest[i..].find(')').map(|j| i + j) else { break };
-            let inner = &rest[i + 1..j];
-            let numeric = !inner.is_empty() && inner.chars().all(|c| c.is_ascii_digit() || c == '-' || c == '.');
-            out.push_str(&rest[..i]);
-            if numeric { out.push('1') } else { out.push_str(&rest[i..=j]) }
-            rest = &rest[j + 1..];
-        }
-        out.push_str(rest);
-        out
-    };
-    let shape = |s: &str| crate::trade::template(&unrange(&s.to_lowercase())).0.replace('+', "").split_whitespace().collect::<Vec<_>>().join(" ");
     let ticked: Vec<(String, String)> = mods.iter().filter(|m| bad.contains(&m.id)).flat_map(|m| {
         let name = m.danger.clone().unwrap_or_else(|| "can't run".into());
         m.text.split(" / ").map(move |part| (shape(part), name.clone())).collect::<Vec<_>>()

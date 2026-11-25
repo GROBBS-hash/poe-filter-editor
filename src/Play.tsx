@@ -1,3 +1,4 @@
+import Deaths from "./Deaths";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -885,6 +886,8 @@ export default function PlayTools() {
         ))}</div>
         <button onClick={addSheets}>Add pictures…</button>
       </div>
+
+      <Deaths />
 
       <div className="card">
         <div className="pw-row between"><h2>Map runs</h2>

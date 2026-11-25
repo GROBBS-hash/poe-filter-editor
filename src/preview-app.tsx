@@ -336,6 +336,12 @@ mockIPC((cmd, args) => {
   }
   // Its cards: real drops per theme (dev: dump his with THEME_CARDS_OUT=.claude/theme-cards.json, see preview.rs).
   if (cmd === "theme_cards") return fetch("/.claude/theme-cards.json").then((r) => r.json());
+  if (cmd === "deaths_get" || cmd === "deaths_avoid") {
+    const r = (name: string, runs: number, bad_runs: number, deaths: number, stands_out = false) => ({ name, runs, bad_runs, deaths, other_runs: 50 - runs, other_bad: 8 - bad_runs, stands_out });
+    return { recent: [{ time: now - 4000, map: "City Square", area: "MapWorldsCitySquare", level: 83, char_level: 94, secs: 312, mods: ["Players are Cursed with Enfeeble", "38% increased Monster Attack Speed"] }, { time: now - 90000, map: "Strand", area: "MapWorldsStrand", level: 83, char_level: 93, secs: 95, mods: [] }],
+      patterns: { runs: 50, deaths: 14, bad_runs: 8, with_mods: 22, maps: [r("Colonnade", 6, 4, 7, true), r("City Square", 20, 2, 3), r("Strand", 9, 2, 4)],
+        mods: [r("Players are Cursed with Enfeeble", 7, 4, 6, true), r("38% increased Monster Attack Speed", 9, 3, 4), r("Monsters fire 2 additional Projectiles", 8, 1, 1)] }, avoid: ["can", "on", "can"] };
+  }
   // "Farm this": a farm in use, its Threads and what it made.
   if (cmd === "farm_start") { farmOn = true; (window as unknown as { farmArgs: unknown }).farmArgs = args; }
   if (cmd === "farm_stop") { farmOn = false; return null; }

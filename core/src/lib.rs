@@ -10,6 +10,7 @@ pub mod conds;
 pub mod choices;
 pub mod craft;
 pub mod ask;
+pub mod deaths;
 pub mod evaluate;
 pub mod farm;
 pub mod farming;

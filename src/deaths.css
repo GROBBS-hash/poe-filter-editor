@@ -1,0 +1,14 @@
+/* Death notes */
+.dn-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 24px; margin: 8px 0 14px; }
+@media (max-width: 860px) { .dn-cols { grid-template-columns: minmax(0, 1fr); } }
+.dn-row { display: grid; grid-template-columns: 30px minmax(0, 1fr) 90px 56px; gap: 8px; align-items: center; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.05); min-height: 34px; }
+.dn-row > .item-icon:first-child { justify-self: center; }
+.dn-row.mod { grid-template-columns: minmax(0, 1fr) 70px 50px 92px; }
+.dn-hot { color: var(--gold); font-weight: 600; }
+.dn-bar { height: 8px; border-radius: 4px; background: rgba(255,255,255,0.08); overflow: hidden; }
+.dn-bar i { display: block; height: 100%; background: #c06a5a; }
+.dn-bar i.hot { background: var(--gold); }
+.dn-death { display: grid; grid-template-columns: 30px minmax(0, 1.4fr) 70px 80px 120px 110px; gap: 10px; align-items: center; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid rgba(255,255,255,0.05); border-radius: 0; padding: 5px 0; color: inherit; cursor: pointer; }
+.dn-death:disabled { cursor: default; opacity: 1; }
+.dn-mods { margin: 4px 0 8px 40px; padding: 0 0 0 14px; font-size: 12.5px; color: var(--text-2); }
+.dn-map-tag { font-size: 11px; color: #ffb08a; margin-left: 6px; white-space: nowrap; }

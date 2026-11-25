@@ -150,6 +150,7 @@ fn catch_up(app: &AppHandle, log: &str) {
                 }
                 MapChange::Resumed => if fresh { queue_loot(app, LootJob::Enter(key, t)); } else { loot_missed(app, &key); },
                 MapChange::Left => if fresh { queue_loot(app, LootJob::Leave(key, t)); } else { loot_missed(app, &key); },
+                MapChange::Death => note_death(app, t),
                 _ => {}
             }
         }
@@ -365,7 +366,8 @@ pub fn on_line(app: &AppHandle, line: &str) {
                 });
                 save = true;
             }
-            MapChange::Left | MapChange::Resumed | MapChange::Death => save = true,
+            MapChange::Death => { note_death(app, unix()); save = true; }
+            MapChange::Left | MapChange::Resumed => save = true,
             MapChange::None => {}
         }
     }
@@ -773,6 +775,17 @@ pub fn maps_done(app: AppHandle) -> PlayView {
 /// All your runs (the Play tools page's table).
 #[tauri::command]
 pub fn maps_history(app: AppHandle) -> Vec<MapRun> { with_store(&app, |s| s.maps.history.clone()) }
+
+/// Your runs, and the one you're in once you've died in it (until then it isn't over).
+pub fn maps_with_current(app: &AppHandle) -> Vec<MapRun> {
+    with_store(app, |s| s.maps.history.iter().chain(s.maps.current.iter().filter(|c| c.deaths > 0)).cloned().collect())
+}
+
+/// Death notes: where you just died.
+fn note_death(app: &AppHandle, time: i64) {
+    let level = with_live(|l| l.character.as_ref().map(|c| c.2).or(l.site_char.as_ref().map(|c| c.1))).filter(|l| *l > 0);
+    if let Some(d) = with_store(app, |s| s.maps.current.as_ref().map(|c| filter_core::deaths::Death::of(c, time, level))) { deaths_app::note(app, d); }
+}
 
 #[tauri::command]
 pub fn maps_clear(app: AppHandle) -> PlayView {
