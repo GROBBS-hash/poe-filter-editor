@@ -1,0 +1,1110 @@
+{
+ "_readme": [
+  "The atlas builder's numbers (core/src/atlas_model.rs). Income of a source = unit x how many x product of (1 + weight x channel).",
+  "Channels are the ones in atlas_effects.json ('@side' added at run time), or shared amounts: E pack drops rarity magic rare rmods mix altar juice hard thrB mapB threadmods shrineN bossN altarboss.",
+  "conf: official / measured / creator / guess. Units are only compared with each other; the app shows percentages, never chaos per hour.",
+  "Reasons and sources: ATLAS_KNOWLEDGE.md."
+ ],
+ "checked": "2026-11-25",
+ "per": {
+  "prior Pit": 1.5,
+  "fed Soul": 1,
+  "completed Ritual": 1.5,
+  "Incursion completed": 2,
+  "Unstable Breach already opened": 2,
+  "Breach already opened": 2,
+  "Remnant detonated": 6,
+  "Flammable Burrow destroyed": 6,
+  "Essence Modifier": 2,
+  "stolen Divination Card": 10,
+  "1% Map Pack Size": 1,
+  "additional Reward": 1,
+  "Round": 8,
+  "Lane": 4
+ },
+ "maps": {
+  "plain": {
+   "mods": 4,
+   "pack": 15,
+   "drops": 40,
+   "rarity": 25,
+   "currency": 0
+  },
+  "rolled": {
+   "mods": 6,
+   "pack": 33,
+   "drops": 90,
+   "rarity": 60,
+   "currency": 35
+  },
+  "juiced": {
+   "mods": 8,
+   "pack": 45,
+   "drops": 120,
+   "rarity": 80,
+   "currency": 80
+  }
+ },
+ "globals": {
+  "rareBase": 25,
+  "addedRareWeight": 1,
+  "rareMods": 3,
+  "lootPerRareMod": 0.12,
+  "shareNormal": 0.25,
+  "shareMagic": 0.3,
+  "shareRare": 0.45,
+  "influencedShare": 0.5,
+  "rarityPower": 0.55,
+  "altarBase": 0.25,
+  "altarPlayerPick": 1.45,
+  "altarsPerMap": 1,
+  "extraModQuality": 0.5,
+  "shrineSpeed": 0.006,
+  "shrineCap": 5,
+  "hardPacks": 0.4,
+  "altarsBase": 4
+ },
+ "thread_prices": {
+  "Abyss": 5.2,
+  "Bestiary": 2.67,
+  "Betrayal": 0.33,
+  "Breach": 0.41,
+  "Blight": 0.38,
+  "Expedition": 0.34,
+  "Incursion": 0.33,
+  "Ritual": 0.38,
+  "Ultimatum": 1.29,
+  "Legion": 5.54
+ },
+ "juice": {
+  "mirage": {
+   "base": 0.045,
+   "uplift": 0.8,
+   "src": "6 of 40 and 6 of 100 maps",
+   "conf": "measured"
+  },
+  "delirium": {
+   "base": 0.06,
+   "uplift": 0.6,
+   "src": "guess",
+   "conf": "guess"
+  },
+  "wildwood": {
+   "base": 0.05,
+   "uplift": 0.8,
+   "src": "bawloch: biggest multiplier",
+   "conf": "creator"
+  },
+  "beyond": {
+   "base": 0.05,
+   "uplift": 0.3,
+   "src": "guess",
+   "conf": "guess"
+  },
+  "sentinel": {
+   "base": 0.04,
+   "uplift": 0.1,
+   "src": "creators: dead",
+   "conf": "creator"
+  }
+ },
+ "danger": {
+  "altars.downside@eater": 0.04,
+  "altars.downside@exarch": 0.08,
+  "harvest.toughness": 0.04,
+  "harvest.wisps_rares": 0.06,
+  "exiles.toughness": 0.04,
+  "bosses.toughness": 0.06,
+  "map.toughness": 0.15,
+  "rares.rare_mods": 0.04,
+  "bosses.boss_mods": 0.03,
+  "explicit.effect": 0.08,
+  "map.random_notables": 0.2,
+  "map.extra_map_mods": 0.12,
+  "breach.diff_reward@unstable": 0.03,
+  "blight.diff_reward": 0.03
+ },
+ "goals": {
+  "currency": {
+   "label": "Raw currency",
+   "pick": [
+    "monsters"
+   ],
+   "prior": [],
+   "boost": {
+    "monsters": 2
+   }
+  },
+  "threads": {
+   "label": "Threads",
+   "pick": [
+    "threads"
+   ],
+   "prior": [],
+   "boost": {
+    "threads": 4
+   }
+  },
+  "maps": {
+   "label": "Map drops",
+   "pick": [
+    "maps"
+   ],
+   "prior": [],
+   "boost": {
+    "maps": 5
+   }
+  },
+  "terror": {
+   "label": "Many bosses (Terror Shrines)",
+   "pick": [
+    "bosses",
+    "shrines"
+   ],
+   "prior": [
+    "conquerors",
+    "shrines"
+   ],
+   "terror": true,
+   "boost": {
+    "bossmaps": 3
+   }
+  },
+  "destructive": {
+   "label": "Many bosses (Destructive Play)",
+   "pick": [
+    "bosses"
+   ],
+   "prior": [
+    "conquerors",
+    "mirage"
+   ],
+   "maven": true,
+   "boost": {
+    "bossmaps": 4,
+    "chisels": 2
+   },
+   "lock": [
+    34384
+   ]
+  },
+  "rush": {
+   "label": "Boss rush",
+   "pick": [
+    "bosses",
+    "anomalies"
+   ],
+   "prior": [
+    "mirage"
+   ],
+   "rush": true,
+   "boost": {}
+  }
+ },
+ "mechanics": {
+  "rogue exiles": [
+   "exiles"
+  ],
+  "divination cards": [
+   "cards"
+  ],
+  "bosses": [
+   "bosses"
+  ],
+  "rare monsters": [
+   "monsters"
+  ],
+  "magic monsters": [
+   "monsters"
+  ],
+  "mirage": [
+   "monsters"
+  ],
+  "pack size": [
+   "monsters"
+  ],
+  "explicit effect": [
+   "monsters"
+  ],
+  "rarity": [
+   "monsters"
+  ],
+  "maps found": [
+   "maps"
+  ]
+ },
+ "shares_as": {
+  "bosses": "conquerors"
+ },
+ "wants": {
+  "rare monsters": [
+   "rares.rare",
+   "rares.dup_rares",
+   "rares.mirrored_rares",
+   "rares.rare_mods"
+  ],
+  "magic monsters": [
+   "magics.magic",
+   "magics.magic_pack",
+   "magics.magic_packs"
+  ],
+  "pack size": [
+   "pack.pack"
+  ],
+  "explicit effect": [
+   "explicit.effect",
+   "explicit.effect_prefix",
+   "explicit.per_mod",
+   "explicit.per_kind"
+  ],
+  "threads": [
+   "threads.found"
+  ],
+  "maps found": [
+   "mapdrops.found",
+   "mapdrops.found_per_mod"
+  ],
+  "rarity": [
+   "rarity.rarity"
+  ],
+  "mirage": [
+   "mirage.spawn"
+  ],
+  "gold": [
+   "gold.rewards"
+  ]
+ },
+ "juice_use": { "legion": 1, "breach": 1, "abyss": 1, "bestiary": 1, "delirium": 1, "monsters": 1, "threads": 1, "maps": 1, "harvest": 0.8, "blight": 0.7, "ritual": 0.8, "expedition": 0.8, "cards": 0.8, "shrines": 0.5, "bosses": 0.3, "incursion": 0.25, "essence": 0.25, "betrayal": 0.25, "settlers": 0.25, "strongboxes": 0.25, "mercenaries": 0.2, "ultimatum": 0.1, "exiles": 0.25, "torment": 0.25, "memories": 0.2, "gold": 0.5 },
+ "primaries": [
+  "abyss",
+  "bestiary",
+  "betrayal",
+  "blight",
+  "breach",
+  "expedition",
+  "incursion",
+  "legion",
+  "ritual",
+  "ultimatum"
+ ],
+ "cheap_threads": [
+  "incursion",
+  "expedition",
+  "ritual",
+  "breach",
+  "blight"
+ ],
+ "eater_threads": [
+  "breach",
+  "legion",
+  "blight",
+  "ritual",
+  "incursion"
+ ],
+ "modes": [
+  {
+   "when": "breach",
+   "node": 19729,
+   "option": 5397,
+   "label": "Unstable Breaches"
+  },
+  {
+   "when": "breach",
+   "node": 19729,
+   "option": 22188,
+   "label": "Breach Hives"
+  }
+ ],
+ "clash": [
+  [
+   65225,
+   30266,
+   "Unwavering Vision allows one kind of Thread, Multiplying Modifiers wants three"
+  ]
+ ],
+ "never": {
+  "9856": "nobody farming Abyss takes it",
+  "10029": "splinters are worth next to nothing now",
+  "14402": "nobody farming Breach takes it",
+  "20960": "cards come from two random other maps",
+  "30545": "no anomalies in ordinary maps",
+  "32750": "nobody farming Mercenaries takes it",
+  "34389": "can make a map unplayable (corrupted maps only)",
+  "37011": "slow ore",
+  "40045": "Sentinels aren't worth the points",
+  "40046": "Sentinels aren't worth the points",
+  "40503": "removes the Memories worth most",
+  "52359": "random notables, often ones you avoid",
+  "57163": "earns less lifeforce than normal Sacred Flora",
+  "57913": "makes Mercenaries harder, pays nothing",
+  "60125": "broken since 3.30",
+  "62654": "stops spirits possessing monsters"
+ },
+ "defaults": {
+  "712": 8618,
+  "5138": 27227,
+  "23538": 3497,
+  "27261": 62580,
+  "28029": 36379,
+  "28477": 49076,
+  "37454": 32542,
+  "42725": 14502,
+  "45404": 5301,
+  "48364": 64808,
+  "61620": 57958,
+  "61698": 9590,
+  "63533": 57043,
+  "64980": 8451
+ },
+ "option_items": {
+  "12826": {
+   "10181": "Vivid Crystallised Lifeforce",
+   "13897": "Primal Crystallised Lifeforce",
+   "47548": "Wild Crystallised Lifeforce"
+  },
+  "39977": {
+   "34298": "Timeless Eternal Emblem",
+   "35281": "Timeless Templar Emblem",
+   "35722": "Timeless Vaal Emblem",
+   "61534": "Timeless Karui Emblem",
+   "64739": "Timeless Maraketh Emblem"
+  },
+  "41332": {
+   "6505": "Deafening Essence of Suffering",
+   "31550": "Deafening Essence of Zeal",
+   "39523": "Deafening Essence of Anguish",
+   "45357": "Deafening Essence of Loathing",
+   "46511": "Deafening Essence of Torment",
+   "50056": "Deafening Essence of Fear"
+  },
+  "42092": {
+   "2272": "Deafening Essence of Envy",
+   "3743": "Deafening Essence of Dread",
+   "30259": "Deafening Essence of Scorn",
+   "42547": "Deafening Essence of Misery"
+  },
+  "50917": {
+   "13246": "Deafening Essence of Wrath",
+   "22534": "Deafening Essence of Contempt",
+   "53191": "Deafening Essence of Anger",
+   "56739": "Deafening Essence of Hatred"
+  },
+  "56429": {
+   "5899": "Deafening Essence of Woe",
+   "13574": "Deafening Essence of Doubt",
+   "22483": "Deafening Essence of Spite",
+   "41971": "Deafening Essence of Sorrow",
+   "52262": "Deafening Essence of Greed",
+   "53137": "Deafening Essence of Rage"
+  }
+ },
+ "tips": [
+  [
+   [
+    "abyss",
+    "bestiary"
+   ],
+   "Abyss revives beasts you killed on it, so you can catch them again."
+  ],
+  [
+   [
+    "legion"
+   ],
+   "Click every altar first, open the Legions last."
+  ],
+  [
+   [
+    "expedition"
+   ],
+   "Altars first, then the Expedition."
+  ],
+  [
+   [
+    "harvest"
+   ],
+   "Roll the Sacred Flora before you start it: Rich Soil makes every roll 50% stronger."
+  ],
+  [
+   [
+    "harvest",
+    "ritual"
+   ],
+   "Start the Sacred Flora before the Ritual next to it."
+  ],
+  [
+   [
+    "blight",
+    "strongboxes"
+   ],
+   "Open strongboxes inside the Blight: they reopen for every reward their lane gets."
+  ],
+  [
+   [
+    "bestiary"
+   ],
+   "Kill the best beasts last: every beast makes the next one pay more."
+  ],
+  [
+   [
+    "delirium"
+   ],
+   "Stop at 7 rewards, kill the boss and leave."
+  ],
+  [
+   [
+    "breach"
+   ],
+   "Click the Genesis Sapling: most of the Hiveblood is in it."
+  ],
+  [
+   [
+    "betrayal"
+   ],
+   "Speed only: pack size and rarity do nothing for safehouses."
+  ]
+ ],
+ "sources": {
+  "monsters": {
+   "label": "Map monsters",
+   "unit": 25,
+   "always": true,
+   "factors": [
+    ["pack", 1],
+    ["mix", 1],
+    ["rarity", 1],
+    ["altar", 1],
+    ["juice", 1],
+    ["hard", 1]
+   ],
+   "conf": "guess"
+  },
+  "threads": {
+   "label": "Threads found",
+   "unit": 8,
+   "always": true,
+   "thread_steer": true,
+   "factors": [
+    ["thrB", 1],
+    ["pack", 0.6],
+    ["rare", 0.35],
+    ["threadmods", 0.2],
+    ["juice", 0.4],
+    ["threads.boss_extra", 0.4],
+    ["threads.found_unique", 0.03],
+    ["threads.to_gold", -0.9]
+   ],
+   "conf": "guess"
+  },
+  "maps": {
+   "label": "Maps found",
+   "unit": 10,
+   "always": true,
+   "factors": [
+    ["mapB", 1],
+    ["pack", 0.5],
+    ["bosses.boss_extra", 0.3],
+    ["memory.map_influence", 0.1]
+   ],
+   "conf": "guess"
+  },
+  "gold": {
+   "label": "Gold",
+   "unit": 2,
+   "always": true,
+   "factors": [
+    ["gold.rewards", 1],
+    ["gold.unique", 0.1],
+    ["gold.volatile", 0.2],
+    ["pack", 0.7]
+   ],
+   "conf": "guess"
+  },
+  "cards": {
+   "label": "Divination cards",
+   "unit": 4,
+   "always": true,
+   "factors": [
+    ["cards.rewards", 1],
+    ["cards.packs", 0.06],
+    ["cards.dup", 1],
+    ["pack", 0.7],
+    ["mix", 0.5],
+    ["cards.scrying", 2]
+   ],
+   "conf": "guess"
+  },
+  "harvest": {
+   "label": "Harvest",
+   "unit": 30,
+   "min": 0.35,
+   "spawn": {
+    "base": 0.1,
+    "ch": "harvest.spawn",
+    "mode": "surpass"
+   },
+   "factors": [
+    ["pack", 1],
+    ["drops", 1],
+    ["magic", 0.2],
+    ["rare", 0.25],
+    ["harvest.flora_effect", 0.5],
+    ["harvest.flora_rare", -0.15],
+    ["harvest.dup", 1],
+    ["harvest.rewards", 1],
+    ["harvest.tier_up", 0.45],
+    ["harvest.specimen", 0],
+    ["harvest.steer", 0.08],
+    ["harvest.crops", 0.1],
+    ["juice", 0.1],
+    ["harvest.wisps_rares", 0.04]
+   ],
+   "conf": "guess"
+  },
+  "breach_u": {
+   "mech": "breach",
+   "label": "Unstable Breaches",
+   "unit": 22,
+   "min": 0.5,
+   "thread": "breach",
+   "side": "unstable",
+   "count": 2,
+   "factors": [
+    ["breach.extra@unstable", 0.5],
+    ["pack", 1],
+    ["breach.pack", 1],
+    ["breach.magic", 0.4],
+    ["breach.rare", 0.5],
+    ["magic", 0.35],
+    ["rare", 0.35],
+    ["rmods", 0.4],
+    ["rarity", 0.5],
+    ["drops", 0.4],
+    ["altar", 0.35],
+    ["breach.speed@unstable", 0.1],
+    ["breach.diff_reward@unstable", 0.06],
+    ["breach.rare_add@unstable", 0.08],
+    ["breach.wombgifts", 0.1],
+    ["breach.hiveblood", 0.2],
+    ["breach.boss_dup", 0.15],
+    ["breach.steer", 0.1],
+    ["juice", 0.5],
+    ["bismuth", 0.3],
+    ["breach.collapse@unstable", 0.012],
+    ["breach.speed", 0.4],
+    ["breach.rewards", 0.12]
+   ],
+   "conf": "guess"
+  },
+  "breach_h": {
+   "mech": "breach",
+   "label": "Breach Hives",
+   "unit": 45,
+   "min": 1.2,
+   "thread": "breach",
+   "side": "hive",
+   "count": 1,
+   "factors": [
+    ["breach.extra@hive", 0.12],
+    ["pack", 0.8],
+    ["breach.pack", 1],
+    ["breach.magic", 0.3],
+    ["breach.rare", 0.4],
+    ["drops", 0.5],
+    ["rmods", 0.25],
+    ["breach.ailith@hive", 0],
+    ["breach.burrows@hive", 0.15],
+    ["breach.rewards@hive", 0.3],
+    ["breach.wombgifts", 0.15],
+    ["breach.hiveblood", 0.35],
+    ["breach.fortress@hive", 0.3],
+    ["breach.boss_dup", 0.25],
+    ["breach.steer", 0.12],
+    ["juice", 0.2],
+    ["breach.speed", 0.15],
+    ["breach.rewards", 0.15]
+   ],
+   "conf": "guess"
+  },
+  "abyss": {
+   "label": "Abyss",
+   "unit": 45,
+   "min": 1,
+   "thread": "abyss",
+   "count": 1,
+   "factors": [
+    ["abyss.extra", 0.25],
+    ["abyss.pits_twice", 0.3],
+    ["abyss.pack", 1],
+    ["abyss.rare_add", 0.06],
+    ["abyss.magic", 0.3],
+    ["abyss.item_rarity", 0.5],
+    ["pack", 0.7],
+    ["magic", 0.25],
+    ["rare", 0.4],
+    ["rmods", 0.6],
+    ["rarity", 0.6],
+    ["altar", 0.6],
+    ["juice", 0.8],
+    ["abyss.depths", 0.01],
+    ["abyss.jewels", 0.03],
+    ["abyss.rewards", 0.02],
+    ["abyss.crystal", 0.03],
+    ["hard", 0.1],
+    ["abyss.chasm", 0.1],
+    ["abyss.weavings", 0.12],
+    ["abyss.double_rewards", 0.06]
+   ],
+   "conf": "guess"
+  },
+  "legion": {
+   "label": "Legion",
+   "unit": 70,
+   "min": 1,
+   "thread": "legion",
+   "count": 1,
+   "factors": [
+    ["legion.pack", 1],
+    ["legion.war_hoard", 0.1],
+    ["legion.chests", 0.08],
+    ["legion.chest_spread", 0.3],
+    ["legion.rewards", 0.5],
+    ["legion.more_sergeants", 0.06],
+    ["legion.sergeants", 0.8],
+    ["legion.generals", 0.01],
+    ["legion.dup", 0.02],
+    ["legion.speed", 0.05],
+    ["legion.power", 0.03],
+    ["drops", 0.7],
+    ["rmods", 0.4],
+    ["altar", 0.6],
+    ["rarity", 0.5],
+    ["juice", 0.8],
+    ["legion.steer", 0]
+   ],
+   "conf": "guess"
+  },
+  "ritual": {
+   "label": "Ritual",
+   "unit": 40,
+   "min": 1.2,
+   "thread": "ritual",
+   "count": 1,
+   "factors": [
+    ["ritual.rewards", 1],
+    ["ritual.penalty", 0.5],
+    ["ritual.favours", 0.6],
+    ["ritual.special", 0.2],
+    ["ritual.splinters", 0.05],
+    ["ritual.bosstribute", 0.1],
+    ["ritual.rerolls", 0.1],
+    ["ritual.pack", 0.4],
+    ["pack", 0.8],
+    ["magic", 0.3],
+    ["rare", 0.3],
+    ["ritual.jackpot", 0.1],
+    ["ritual.wisps", 0.15],
+    ["juice", 0.1],
+    ["ritual.four", 0.11],
+    ["ritual.reroll_cost", 0.1]
+   ],
+   "conf": "guess"
+  },
+  "bestiary": {
+   "label": "Beasts",
+   "unit": 30,
+   "min": 0.8,
+   "thread": "bestiary",
+   "count": 1,
+   "factors": [
+    ["bestiary.extra", 0.14],
+    ["bestiary.yellow", 0.05],
+    ["bestiary.convert", 0.6],
+    ["bestiary.dup", 1],
+    ["bestiary.copy", 0.7],
+    ["bestiary.diff_reward", 0.2],
+    ["bestiary.extra_mods", 0.1],
+    ["bestiary.tier_up", 0.15],
+    ["altar", 0.6],
+    ["rmods", 0.1],
+    ["rarity", 0.4],
+    ["juice", 0.6],
+    ["bestiary.cunning", 0.3],
+    ["bestiary.steer", 0.12]
+   ],
+   "conf": "guess"
+  },
+  "blight": {
+   "label": "Blight",
+   "unit": 45,
+   "min": 3,
+   "thread": "blight",
+   "count": 1,
+   "factors": [
+    ["blight.extra", 0.12],
+    ["blight.rewards", 0.55],
+    ["blight.magic", 0.12],
+    ["blight.pack", 0.4],
+    ["drops", 0.9],
+    ["blight.tier_up", 0.04],
+    ["blight.speed", 0.1],
+    ["blight.diff_reward", 0.04],
+    ["blight.item_rarity", 0.3]
+   ],
+   "conf": "guess"
+  },
+  "betrayal": {
+   "label": "Betrayal",
+   "unit": 30,
+   "min": 1.2,
+   "thread": "betrayal",
+   "count": 1,
+   "factors": [
+    ["betrayal.rewards", 0.3],
+    ["betrayal.item_rarity", 0.05],
+    ["betrayal.packs", 0.3],
+    ["betrayal.jackpot", 2],
+    ["betrayal.safehouse", 6],
+    ["betrayal.rank_up", 0.3],
+    ["betrayal.keep_rank", 0.15]
+   ],
+   "conf": "guess"
+  },
+  "incursion": {
+   "label": "Incursion",
+   "unit": 35,
+   "min": 1.5,
+   "thread": "incursion",
+   "count": 1,
+   "factors": [
+    ["incursion.pack", 1],
+    ["incursion.magic", 0.4],
+    ["incursion.item_rarity", 0.3],
+    ["incursion.packs", 0.06],
+    ["incursion.extra_mods", 0.06],
+    ["incursion.possess", 0],
+    ["pack", 0.8],
+    ["altar", 0.3],
+    ["juice", 0.3],
+    ["incursion.four", 0.08],
+    ["incursion.upgrade", 0.2]
+   ],
+   "conf": "guess"
+  },
+  "expedition": {
+   "label": "Expedition",
+   "unit": 45,
+   "min": 2,
+   "thread": "expedition",
+   "count": 1,
+   "factors": [
+    ["expedition.extra", 0.4],
+    ["expedition.rewards", 0.35],
+    ["expedition.remnant_mods", 0.2],
+    ["expedition.item_rarity", 0.3],
+    ["expedition.diff_reward", 0.05],
+    ["expedition.tier_up", 0.03],
+    ["expedition.speed", 0.15],
+    ["expedition.steer", 0.1],
+    ["drops", 0.6]
+   ],
+   "conf": "guess"
+  },
+  "ultimatum": {
+   "label": "Ultimatum",
+   "unit": 45,
+   "min": 2.5,
+   "thread": "ultimatum",
+   "count": 1,
+   "factors": [
+    ["ultimatum.dup", 1],
+    ["ultimatum.rounds", 0],
+    ["ultimatum.boss_chance", 0.25],
+    ["ultimatum.rewards", 0.02],
+    ["ultimatum.tier_up", 0.2],
+    ["ultimatum.steer", 0.1],
+    ["ultimatum.pack", 0.02],
+    ["ultimatum.rare", 0.02],
+    ["ultimatum.item_rarity", 0.03],
+    ["drops", 0.1],
+    ["ultimatum.free_round", 0.12],
+    ["ultimatum.oversoul", 0.15],
+    ["ultimatum.inscribed", 0.12]
+   ],
+   "conf": "guess"
+  },
+  "delirium": {
+   "label": "Delirium",
+   "unit": 80,
+   "min": 0.3,
+   "maphas": "delirium",
+   "factors": [
+    ["pack", 1],
+    ["mix", 0.5],
+    ["magic", 0.5],
+    ["drops", 0.6],
+    ["rarity", 0.3],
+    ["abyss.pack", 0.35],
+    ["abyss.extra", 0.08],
+    ["shrineN", 0.01],
+    ["hard", 0.6],
+    ["altar", 0.2]
+   ],
+   "conf": "guess"
+  },
+  "shrines": {
+   "label": "Shrines (guards)",
+   "unit": 2.2,
+   "min": 0.07,
+   "countOf": "shrineN",
+   "factors": [
+    ["shrines.packs", 0.8],
+    ["shrines.magic", 0.3],
+    ["shrines.possess", 0.05],
+    ["pack", 1],
+    ["magic", 0.4],
+    ["altar", 0.5],
+    ["juice", 0.4],
+    ["shrines.steer", 0.1],
+    ["shrines.extra_effect", 0.15]
+   ],
+   "conf": "guess"
+  },
+  "bosses": {
+   "label": "Bosses",
+   "unit": 14,
+   "min": 0.4,
+   "countOf": "bossN",
+   "always": true,
+   "factors": [
+    ["bosses.item_rarity", 0.4],
+    ["bosses.boss_mods", 0.06],
+    ["threads.found_unique", 0.02],
+    ["gold.volatile", 0.1],
+    ["altarboss", 0.4],
+    ["drops", 0.6],
+    ["rarity", 0.3],
+    ["juice", 0.25],
+    ["bosses.rarity_per_pack", 0.3]
+   ],
+   "conf": "guess"
+  },
+  "essence": {
+   "label": "Essences",
+   "unit": 12,
+   "min": 0.25,
+   "spawn": {
+    "base": 0.15,
+    "ch": "essence.spawn",
+    "mode": "surpass"
+   },
+   "factors": [
+    ["essence.rewards", 0.9],
+    ["essence.tier_up", 1.6],
+    ["essence.steer", 0.04],
+    ["essence.possess", 0.1],
+    ["essence.top_tier", 0.12],
+    ["essence.corrupt_again", 0.15],
+    ["essence.lattice", 0.35],
+    ["essence.calcified", 2],
+    ["essence.commensurate", -0.1],
+    ["drops", 0.15]
+   ],
+   "conf": "guess"
+  },
+  "strongboxes": {
+   "label": "Strongboxes",
+   "unit": 2,
+   "min": 0.2,
+   "spawn": {
+    "base": 0.3,
+    "ch": "strongboxes.spawn",
+    "mode": "surpass"
+   },
+   "factors": [
+    ["strongboxes.rewards", 0.8],
+    ["strongboxes.box_effect", 0.3],
+    ["strongboxes.tier_up", 0.2],
+    ["strongboxes.dup", 1],
+    ["strongboxes.packs", 0.15],
+    ["strongboxes.magic", 0.1],
+    ["strongboxes.rare", 0.15],
+    ["strongboxes.jackpot", 0.5],
+    ["strongboxes.steer", 0.15],
+    ["drops", 0.2]
+   ],
+   "conf": "guess"
+  },
+  "exiles": {
+   "label": "Rogue Exiles",
+   "unit": 5,
+   "min": 0.15,
+   "spawn": {
+    "base": 0.2,
+    "ch": "exiles.spawn",
+    "mode": "surpass"
+   },
+   "factors": [
+    ["exiles.extra", 1],
+    ["exiles.dup", 1],
+    ["exiles.rewards", 0.4],
+    ["exiles.item_rarity", 0.5],
+    ["exiles.possess", 0.3],
+    ["exiles.jackpot", 0.5],
+    ["exiles.bodyguards", 0.5],
+    ["exiles.packs", 0.3],
+    ["rarity", 0.4]
+   ],
+   "conf": "guess"
+  },
+  "torment": {
+   "label": "Tormented Spirits",
+   "unit": 6,
+   "min": 0.15,
+   "spawn": {
+    "base": 0.1,
+    "ch": "torment.spawn",
+    "mode": "surpass"
+   },
+   "factors": [
+    ["torment.tier_up", 0.3],
+    ["torment.steer", 0.25],
+    ["torment.speed", 0.2],
+    ["torment.jackpot", 0.5],
+    ["torment.packs", 0.3],
+    ["rare", 0.4],
+    ["rmods", 0.3]
+   ],
+   "conf": "guess"
+  },
+  "settlers": {
+   "label": "Ore deposits",
+   "unit": 8,
+   "min": 0.2,
+   "spawn": {
+    "base": 0.08,
+    "ch": "settlers.spawn",
+    "mode": "chance",
+    "cap": 1
+   },
+   "factors": [
+    ["settlers.multi", 1],
+    ["settlers.rewards", 0.4],
+    ["settlers.tier_up", 0.25],
+    ["settlers.dup", 0.4],
+    ["settlers.steer", 0.1],
+    ["settlers.extra_mods", 0.1],
+    ["settlers.magic", 0.1],
+    ["settlers.shipment", 6],
+    ["settlers.verisium", 0.12],
+    ["settlers.slow_ore", 0]
+   ],
+   "conf": "guess"
+  },
+  "mercenaries": {
+   "label": "Mercenaries",
+   "unit": 9,
+   "min": 0.5,
+   "spawn": {
+    "base": 0.15,
+    "ch": "mercenaries.spawn",
+    "mode": "chance",
+    "cap": 1
+   },
+   "factors": [
+    ["mercenaries.tier_up", 0.12],
+    ["mercenaries.rewards", 0.25],
+    ["mercenaries.packs", 0.2],
+    ["mercenaries.steer", 0.05]
+   ],
+   "conf": "guess"
+  },
+  "finalboss": {
+   "label": "Final map boss (once a map)",
+   "unit": 8,
+   "min": 0,
+   "always": true,
+   "mech": "bosses",
+   "factors": [
+    ["threads.boss_extra", 0.3],
+    ["bosses.wisps", 0.2],
+    ["cards.to_boss", 0.1],
+    ["bosses.item_rarity", 0.4],
+    ["altarboss", 0.4],
+    ["drops", 0.15]
+   ],
+   "conf": "guess"
+  },
+  "bossmaps": {
+   "label": "Boss maps",
+   "unit": 1.15,
+   "countOf": "bossN",
+   "always": true,
+   "mech": "bosses",
+   "factors": [
+    ["juice", 1],
+    ["bosses.conqueror_maps", 0.7],
+    ["bosses.guardian_maps", 4.8],
+    ["bosses.synthesis_maps", 4]
+   ],
+   "src": "3.30 reminder text + Milkybk 48 maps; prices 25 Nov",
+   "conf": "measured"
+  },
+  "chisels": {
+   "label": "Maven's chisels",
+   "unit": 3.2,
+   "countOf": "bossN",
+   "needs": "maven",
+   "always": true,
+   "mech": "bosses",
+   "factors": [
+    ["juice", 1],
+    ["maven.chisels", 0.77]
+   ],
+   "src": "WITCH 40 maps, prices 25 Nov",
+   "conf": "creator"
+  },
+  "evolving": {
+   "label": "Terror Shrine maps",
+   "unit": 119,
+   "countOf": "evolve",
+   "always": true,
+   "mech": "shrines",
+   "factors": [],
+   "src": "10% a map (Milkybk 6 in 48), asks 119c",
+   "conf": "creator"
+  },
+  "anomalies": {
+   "label": "Vaults",
+   "unit": 75,
+   "spawn": {
+    "base": 0.35,
+    "ch": "anomalies.spawn",
+    "mode": "inc",
+    "cap": 1
+   },
+   "needs": "rush",
+   "mech": "anomalies",
+   "always": true,
+   "factors": [],
+   "src": "Sheepishly 33 of 48, others every 2-3 maps",
+   "conf": "creator"
+  },
+  "memories": {
+   "label": "Memories",
+   "unit": 8,
+   "mech": "memories",
+   "spawn": {
+    "base": 0.15,
+    "ch": "memory.spawn",
+    "mode": "inc",
+    "cap": 1
+   },
+   "factors": [
+    ["memory.rewards", 0.3],
+    ["memory.steer", -0.2]
+   ],
+   "src": "guess",
+   "conf": "guess"
+  }
+ }
+}

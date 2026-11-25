@@ -167,19 +167,37 @@ pub fn hide_atlas_window(app: AppHandle) {
 }
 
 /// Atlas optimiser: a tree for the picked strategies (see core atlas_opt.rs). No network.
-#[tauri::command]
-pub fn atlas_optimise(ask: filter_core::atlas_opt::Ask) -> filter_core::atlas_opt::Plan {
-    filter_core::atlas_opt::optimise(&ask)
+#[tauri::command(async)]
+pub fn atlas_optimise(app: AppHandle, ask: filter_core::atlas_opt::Ask) -> filter_core::atlas_opt::Plan {
+    filter_core::atlas_opt::optimise(&priced(&app, ask))
 }
+
+/// With today's prices, for the choices that follow them (Thread steering, essence types, lifeforce colour…).
+fn priced(app: &AppHandle, mut ask: filter_core::atlas_opt::Ask) -> filter_core::atlas_opt::Ask {
+    if let Some(p) = app.state::<AppState>().prices.lock().unwrap().get(&Game::Poe1) {
+        ask.prices = p.items.iter().filter(|i| i.name.ends_with(" Thread") || i.name.contains("Essence") || i.name.ends_with("Lifeforce") || i.name.ends_with("Emblem"))
+            .map(|i| (i.name.clone(), i.value)).collect();
+    }
+    ask
+}
+
+/// The goals the builder knows besides mechanics: (key, label).
+#[tauri::command]
+pub fn atlas_goals() -> Vec<(String, String)> { filter_core::atlas_opt::goals() }
 
 /// Saves the optimiser's tree as one of My strategies (and the one shown in game).
 #[tauri::command]
 pub fn atlas_save_plan(app: AppHandle, ask: filter_core::atlas_opt::Ask, name: String) -> Result<AtlasStore, String> {
     use filter_core::atlas::{NoteLine, Notes, Variant};
+    let ask = priced(&app, ask);
     let plan = filter_core::atlas_opt::optimise(&ask);
-    let mechs: Vec<String> = ask.mechanics.iter().map(|m| { let mut c = m.chars(); c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default() }).collect();
+    let goals = filter_core::atlas_opt::goals();
+    let mut mechs: Vec<String> = ask.goals.iter().filter_map(|g| goals.iter().find(|x| &x.0 == g).map(|x| x.1.clone())).collect();
+    mechs.extend(ask.mechanics.iter().map(|m| filter_core::atlas_model::cap(m)));
     let how = match ask.priority { filter_core::atlas_opt::Priority::Profit => "most profit", filter_core::atlas_opt::Priority::Balanced => "balanced", filter_core::atlas_opt::Priority::Fewest => "fewest points" };
-    let mut lines = vec![NoteLine { kind: "p".into(), depth: 0, text: format!("Built by the optimiser for {} ({how}), {} points, from {} creator trees.", mechs.join(" + "), plan.points, plan.trees_used) }];
+    let mut lines = vec![NoteLine { kind: "p".into(), depth: 0, text: format!("Built for {} ({how}), {} points.", mechs.join(" + "), plan.points) }];
+    if !plan.threads.is_empty() { lines.push(NoteLine { kind: "li".into(), depth: 0, text: format!("Threads: {}", plan.threads.iter().map(|(t, n)| format!("{n} {}", filter_core::atlas_model::cap(t))).collect::<Vec<_>>().join(", ")) }); }
+    lines.extend(plan.notes.iter().chain(&plan.tips).map(|t| NoteLine { kind: "li".into(), depth: 0, text: t.clone() }));
     lines.extend(plan.top.iter().take(8).map(|w| NoteLine { kind: "li".into(), depth: 0, text: format!("{}: {}", w.name, w.why) }));
     let variant = Variant { name: "Optimised tree".into(), nodes: plan.nodes, choices: plan.choices, steps: plan.steps,
         notes: vec![Notes { title: "How it was built".into(), lines }] };

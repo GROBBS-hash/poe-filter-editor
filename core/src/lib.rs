@@ -1,6 +1,8 @@
 pub mod area;
 pub mod atlas;
+pub mod atlas_model;
 pub mod atlas_opt;
+pub mod atlas_search;
 pub mod bulk;
 pub mod compare;
 pub mod conds;

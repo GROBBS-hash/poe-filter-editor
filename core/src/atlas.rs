@@ -48,6 +48,7 @@ pub fn graph() -> &'static Graph {
 }
 
 impl Graph {
+    pub fn ids(&self) -> Vec<u32> { self.info.keys().copied().collect() }
     pub fn has(&self, id: u32) -> bool { self.info.contains_key(&id) }
     pub fn kind(&self, id: u32) -> u8 { self.info.get(&id).map(|i| i.0).unwrap_or(0) }
     pub fn name(&self, id: u32) -> &str { self.info.get(&id).map(|i| i.1.as_str()).unwrap_or("") }

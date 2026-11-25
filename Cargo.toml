@@ -3,3 +3,7 @@
 [workspace]
 members = ["src-tauri", "core"]
 resolver = "2"
+
+# The atlas builder searches a lot: keep it quick in `npm run tauri dev` too.
+[profile.dev.package.filter-core]
+opt-level = 2
