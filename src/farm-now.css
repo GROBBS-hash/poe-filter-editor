@@ -12,7 +12,9 @@
 .fn-pic { display: flex; justify-content: center; min-height: 30px; align-items: center; }
 .fn-key { font-weight: 700; font-size: 13px; padding: 4px 7px; border: 1px solid var(--gold); border-radius: 5px; color: var(--gold); }
 .fn-plan { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
-.fn-thread { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 2px 0; }
+.fn-thread { display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: center; padding: 2px 0; }
+.fn-ti { width: 22px; display: flex; }
+.fn-thread > span:nth-child(2) { flex: 1 1 150px; }
 .fn-btns { gap: 12px; margin-top: 2px; }
 .fn-profit { padding: 12px 14px; border-radius: 10px; background: rgba(255,255,255,0.04); }
 .fn-sum { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-variant-numeric: tabular-nums; }

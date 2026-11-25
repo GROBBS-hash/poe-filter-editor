@@ -18,10 +18,10 @@ export type FarmView = { farm: FarmData; threads: ThreadNeed[]; threads_now: num
 const c = (v: number) => (Math.abs(v) >= 10 ? Math.round(v).toLocaleString() : +v.toFixed(1));
 const perHour = (v: number, div: number | null) => (div ? `${(v / div).toFixed(Math.abs(v / div) >= 10 ? 0 : 1)} div` : `${c(v)}c`);
 
-function Step({ done, icon, title, children }: { done: boolean; icon: ReactNode; title: string; children: ReactNode }) {
+function Step({ done, icon, title, children }: { done?: boolean; icon: ReactNode; title: string; children: ReactNode }) {
   return (
     <div className="fn-step">
-      <span className={`fn-tick ${done ? "on" : ""}`}>{done ? "✓" : ""}</span>
+      {done == null ? <span /> : <span className={`fn-tick ${done ? "on" : ""}`}>{done ? "✓" : ""}</span>}
       <span className="fn-pic">{icon}</span>
       <div><b>{title}</b><div className="small">{children}</div></div>
     </div>
@@ -105,7 +105,7 @@ export default function FarmNow({ view, setView, go }: { view: FarmView; setView
               <div className="fn-plan">For <Num value={f.plan} onSave={(plan) => costs({ plan })} width={56} /> maps:</div>
               {view.threads.map((t) => (
                 <div key={t.name} className="fn-thread">
-                  <ItemIcon name={t.name} size={22} /><span>{t.each_map} × {t.name} a map</span>
+                  <span className="fn-ti"><ItemIcon name={t.name} size={22} /></span><span>{t.each_map} × {t.name} a map</span>
                   <span className="muted">{t.have == null ? `need ${t.need}` : `have ${Math.min(t.have, t.need)} of ${t.need}`}</span>
                   {t.buy > 0 && t.bulk && <button className="link small" onClick={() => sellers(t)}>Buy {t.buy}{t.each != null && <> (≈ {c(t.buy * t.each)}c)</>}</button>}
                 </div>
@@ -114,7 +114,7 @@ export default function FarmNow({ view, setView, go }: { view: FarmView; setView
               {view.scanned == null && <div className="muted">Scan your stash (Stash worth) and it knows what you already have.</div>}
             </>}
           </Step>
-          <Step done={false} icon={<ItemIcon name={f.maps[0] ?? "Map (Tier 16)"} size={30} />} title="Maps">
+          <Step icon={<ItemIcon name={f.maps[0] ?? "Map (Tier 16)"} size={30} />} title="Maps">
             {f.maps.length > 0 ? <>{f.maps.map((m) => m.replace(/ Map$/, "")).join(", ")}</> : "Any map you run well."}
             {f.rolls && <div className="muted">Creators roll for: {f.rolls}</div>}
             <div className="row fn-btns">
