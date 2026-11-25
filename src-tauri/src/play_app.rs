@@ -776,6 +776,9 @@ pub fn maps_done(app: AppHandle) -> PlayView {
 #[tauri::command]
 pub fn maps_history(app: AppHandle) -> Vec<MapRun> { with_store(&app, |s| s.maps.history.clone()) }
 
+/// Seconds from one map's start to the next, over all your runs (0 = none yet).
+pub fn avg_cycle(app: &AppHandle) -> i64 { with_store(app, |s| journey::map_stats(&s.maps.history, 0).avg_cycle) }
+
 /// Your runs, and the one you're in once you've died in it (until then it isn't over).
 pub fn maps_with_current(app: &AppHandle) -> Vec<MapRun> {
     with_store(app, |s| s.maps.history.iter().chain(s.maps.current.iter().filter(|c| c.deaths > 0)).cloned().collect())

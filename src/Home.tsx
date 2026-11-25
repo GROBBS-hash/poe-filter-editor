@@ -4,6 +4,7 @@ import { ProfileInfo, STRICTNESS_NAMES } from "./types";
 import type { PobState } from "./BuildView";
 import { currentStrategy, type AtlasStore } from "./AtlasTreeView";
 import KeyList from "./KeyList";
+import Tonight from "./Tonight";
 
 type Change = { index: number; at: number; what: string };
 type PriceInfo = { settings: { enabled: boolean }; info?: { league?: string; updated?: string | null } };
@@ -62,6 +63,8 @@ export default function Home({ profile, keys, go, search }: {
         <span>Search items, pages and help</span>
         <kbd>Ctrl+F</kbd>
       </button>
+
+      <Tonight go={go} />
 
       <div className="home-grid">
         <Tile title="Your filter" action="Filters" onAction={() => go("profiles")}>

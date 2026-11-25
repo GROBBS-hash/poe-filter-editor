@@ -38,6 +38,7 @@ pub mod shop;
 pub mod search;
 pub mod share;
 pub mod themes;
+pub mod tonight;
 pub mod tiers;
 pub mod wealth;
 pub mod whispers;

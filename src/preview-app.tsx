@@ -342,6 +342,10 @@ mockIPC((cmd, args) => {
       patterns: { runs: 50, deaths: 14, bad_runs: 8, with_mods: 22, maps: [r("Colonnade", 6, 4, 7, true), r("City Square", 20, 2, 3), r("Strand", 9, 2, 4)],
         mods: [r("Players are Cursed with Enfeeble", 7, 4, 6, true), r("38% increased Monster Attack Speed", 9, 3, 4), r("Monsters fire 2 additional Projectiles", 8, 1, 1)] }, avoid: ["can", "on", "can"] };
   }
+  if (cmd === "tonight_get") { const m = (args as { minutes: number }).minutes; return [
+    { kind: "sell", title: "Sell 10 things you haven't listed", reason: "Most valuable: 50 × Blight Thread, 18 × Legion Thread, The Nurse", worth: [262, 262], items: [["Blight Thread", ""], ["Legion Thread", ""], ["Bestiary Thread", ""], ["The Nurse", ""]], mechs: [], action: "highlight", button: "Highlight in stash", as_of: now - 9000 },
+    { kind: "run", title: `Run ${Math.floor(m / 6)} Ritual + Harvest maps`, reason: "23 of your maps made about 89c each after costs. First buy 64 Ritual Threads", worth: [m * 18, m * 41], items: [], mechs: ["ritual", "harvest"], action: "tab:atlas", button: "Show the plan", as_of: null },
+    { kind: "fix", title: "Skip maps with “Players are Cursed with Enfeeble”", reason: "You died in 4 of 7 maps with it, and in 2 of 15 without", worth: null, items: [], mechs: [], action: "avoid:x", button: "Put it on my can't-run list", as_of: null }]; }
   // "Farm this": a farm in use, its Threads and what it made.
   if (cmd === "farm_start") { farmOn = true; (window as unknown as { farmArgs: unknown }).farmArgs = args; }
   if (cmd === "farm_stop") { farmOn = false; return null; }

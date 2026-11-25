@@ -61,6 +61,18 @@ pub struct FarmView {
     in_filter: bool,
 }
 
+impl FarmView {
+    pub fn thread_names(&self) -> Vec<String> { self.threads.iter().map(|t| t.name.clone()).collect() }
+    /// "Tonight": as many maps of it as fit in this long.
+    pub fn run_card(&self, app: &AppHandle, minutes: u32) -> filter_core::tonight::Card {
+        let mine = made(app, self.farm.strategy);
+        let cycle = if mine.len() >= 3 { mine.iter().map(|r| r.secs).sum::<f64>() / mine.len() as f64 }
+            else { match play_app::avg_cycle(app) { 0 => 420.0, s => s as f64 } };
+        let buy: Vec<(String, u32)> = self.threads.iter().filter(|t| t.have.is_some_and(|h| h < t.each_map)).map(|t| (t.name.clone(), t.buy)).collect();
+        filter_core::tonight::run(&self.farm, self.profit.as_ref(), cycle, minutes, &buy)
+    }
+}
+
 /// Your ordinary maps on the farm's tree (boss fights and other special areas don't count).
 fn made(app: &AppHandle, tree: u64) -> Vec<farming::RunMade> {
     let runs: Vec<_> = play_app::maps_history(app.clone()).iter().map(|r| (r.start, (r.left - r.start).max(r.in_map),

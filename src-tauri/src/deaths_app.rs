@@ -56,6 +56,13 @@ fn bad_list(state: &AppState, mods: &[filter_core::mapregex::MapModEntry]) -> Ve
     s.map_tool.bad.clone().unwrap_or_else(|| filter_core::mapregex::default_bad(mods, s.map_avoid.as_deref()))
 }
 
+/// Already on your can't-run list (or not on any list, so nothing to add).
+pub fn avoided(app: &AppHandle, text: &str) -> bool {
+    let st = app.state::<AppState>();
+    let (mods, _) = map_mods(&st);
+    mod_id(&mods, text).is_none_or(|id| bad_list(&st, &mods).contains(&id))
+}
+
 #[tauri::command(async)]
 pub fn deaths_get(app: AppHandle) -> DeathView {
     let mut recent = all(&app);
