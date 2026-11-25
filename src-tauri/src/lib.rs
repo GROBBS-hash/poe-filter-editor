@@ -14,6 +14,7 @@ mod bases_app;
 mod phone_app;
 mod win_place;
 mod updates;
+mod price_tick;
 
 use filter_core::{
     evaluate::{status_with_fallback, Status},
@@ -269,17 +270,22 @@ fn rebuilt_filters(seen: bool) -> Vec<String> {
     r.clone()
 }
 
+/// Fetches the prices; new ones rebuild the filters that use them and can set off price alerts.
+fn take_new_prices(app: &AppHandle) {
+    let changed = fetch_prices(app);
+    if !changed.is_empty() {
+        rebuild_priced(app, &changed);
+        let _ = app.emit("prices-updated", ());
+    }
+    play_app::check_alerts(app);
+}
+
 /// Hourly price updates, and NeverSink updates every 6 hours, in the background.
 fn start_price_updates(app: AppHandle) {
     thread::spawn(move || {
         let mut hour = 0u32;
         loop {
-            let changed = fetch_prices(&app);
-            if !changed.is_empty() {
-                rebuild_priced(&app, &changed);
-                let _ = app.emit("prices-updated", ());
-            }
-            play_app::check_alerts(&app);
+            take_new_prices(&app);
             if hour % 6 == 0 {
                 update_neversink(&app);
             }
@@ -3168,6 +3174,7 @@ pub fn run() {
             let _ = APP.set(app.handle().clone());
             let settings = app.state::<AppState>().store.lock().unwrap().settings.clone();
             start_price_updates(app.handle().clone());
+            price_tick::start(app.handle().clone());
             start_rebuild_old(app.handle().clone());
             if register_hotkeys(app.handle(), &settings).is_err() {
                 // Fall back to the standard keys if saved ones can't be used.

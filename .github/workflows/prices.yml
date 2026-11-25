@@ -8,7 +8,12 @@ on:
     # GitHub drops most scheduled runs (25 Nov: two or three a day got through), so it asks more often; a run within
     # 50 minutes of the last prices fetches nothing, so poe.ninja is still asked at most once an hour.
     - cron: "3,13,23,33,43,53 * * * *"
+  # The owner's editor asks while it is open (src-tauri/src/price_tick.rs); tick "force" to fetch anyway.
   workflow_dispatch:
+    inputs:
+      force:
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths: ["tools/fetch_prices.py", ".github/workflows/prices.yml"]
@@ -30,7 +35,7 @@ jobs:
         id: due
         run: |
           due=yes
-          if [ "${{ github.event_name }}" = "schedule" ]; then
+          if [ "${{ github.event_name }}" != "push" ] && [ "${{ inputs.force }}" != "true" ]; then
             at=$(curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/prices/poe1.json" | head -c 400 | grep -o '"updated":"[^"]*"' | cut -d'"' -f4 || true)
             if [ -n "$at" ] && [ $(( $(date -u +%s) - $(date -u -d "$at" +%s) )) -lt 3000 ]; then due=no; fi
           fi
