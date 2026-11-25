@@ -813,6 +813,13 @@ body.overlay.scroll::-webkit-scrollbar-thumb { background: #3a404c; border-radiu
 .w-prof { font-size: 12.5px; padding: 3px 10px; border-radius: 14px; border: 1px solid var(--line); background: transparent; color: var(--text-2); cursor: pointer; }
 .w-prof:hover { color: #fff; border-color: #555c6a; }
 .w-prof.on { border-color: var(--gold); color: var(--gold); background: rgba(240,200,90,0.08); }
+.w-prof-chip { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.w-prof-chip .w-prof { border: 0; border-radius: 0; padding-right: 8px; }
+.w-prof-chip.on { border-color: var(--gold); background: rgba(240,200,90,0.08); }
+.w-prof-chip.on .w-prof { color: var(--gold); }
+.w-prof-chip.editing { border-color: #6aa8ff; }
+.w-prof-pen { font-size: 12px; padding: 3px 10px 3px 8px; border: 0; border-left: 1px solid var(--line); border-radius: 0; background: transparent; color: var(--muted, #9aa3b2); cursor: pointer; }
+.w-prof-pen:hover:not(:disabled) { color: #fff; background: rgba(255,255,255,0.06); }
 .w-prof-edit { margin-top: 8px; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.03); border: 1px solid var(--line); }
 .danger-text { color: #ff9090 !important; }
 /* Uniques that drop on a base. */

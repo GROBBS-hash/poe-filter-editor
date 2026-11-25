@@ -523,20 +523,15 @@ pub fn wealth_count_rares(app: AppHandle, count: bool) -> WealthView {
     view(&app)
 }
 
-/// Saves a scan profile (a named set of tabs); `old` renames an existing one. The saved one becomes the one in use.
+/// Saves a scan profile (a named set of tabs); `old` = the one being edited (maybe renamed). A new one becomes the one
+/// in use; editing one leaves the one in use as it was.
 #[tauri::command]
 pub fn wealth_profile_save(app: AppHandle, name: String, tabs: Vec<usize>, old: Option<String>) -> Result<WealthView, String> {
     let name = name.trim().to_string();
     if name.is_empty() { return Err("Give the profile a name".into()); }
     let state = app.state::<AppState>();
-    with_store(&state, |s| {
-        let from = old.unwrap_or_else(|| name.clone());
-        s.profiles.retain(|p| p.name != from && p.name != name);
-        // Its history follows a rename.
-        for snap in s.snapshots.iter_mut().filter(|x| x.profile == from) { snap.profile = name.clone(); }
-        s.profiles.push(ScanProfile { name: name.clone(), tabs });
-        s.active = Some(name);
-    });
+    let taken = with_store(&state, |s| wealth::save_profile(s, &name, tabs, old.as_deref()).is_err());
+    if taken { return Err(format!("You already have a profile called “{name}”")); }
     Ok(view(&app))
 }
 

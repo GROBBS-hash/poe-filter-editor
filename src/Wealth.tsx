@@ -8,7 +8,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CurrencyIcon } from "./icons";
 
-export type Tab = { index: number; name: string; kind: string; colour: string };
+export type Tab = { index: number; name: string; kind: string; colour: string; id?: string };
 export type Snapshot = { time: number; league: string; total: number; divine: number | null; tabs: [string, number][]; profile?: string };
 export type Valued = { tab: string; name: string; stack: number; value: number; x: number; y: number; listed: boolean; icon: string; places?: number; rare?: boolean };
 export type ScanProfile = { name: string; tabs: number[] };
@@ -190,40 +190,70 @@ function Profiles({ v, setV, setErr, busy }: { v: WealthView; setV: (w: WealthVi
   const list = v.profiles ?? [];
   const call = (cmd: string, args: Record<string, unknown>) => invoke<WealthView>(cmd, args).then((w) => { setV(w); setErr(""); return w; });
   const active = list.find((p) => p.name === v.active) ?? null;
+  const set = (tabs: number[]) => setEdit((e) => e && [e[0], tabs, e[2]]);
+  /** Reads the tab list again. The ticks follow their tabs: by the saved profile when it was just opened, else by the tab itself. */
+  const refresh = async (opened: string | null) => {
+    setRefreshing(true);
+    try {
+      const before = v.tabs;
+      const w = await invoke<WealthView>("wealth_tabs_refresh");
+      setV(w);
+      const saved = opened ? (w.profiles ?? []).find((p) => p.name === opened) : undefined;
+      const key = (t: Tab) => t.id || `${t.name}|${t.kind}`;
+      setEdit((e) => {
+        if (!e) return e;
+        if (saved) return [e[0], saved.tabs, e[2]];
+        const keys = before.filter((t) => e[1].includes(t.index)).map(key);
+        return [e[0], w.tabs.filter((t) => keys.includes(key(t))).map((t) => t.index), e[2]];
+      });
+    } catch (e) { setErr(friendly(e)); }
+    setRefreshing(false);
+  };
+  const open = (p: ScanProfile | null) => {
+    setEdit(p ? [p.name, p.tabs, p.name] : ["", [], null]);
+    refresh(p?.name ?? null);
+  };
+  // Two tabs with the same name: their place in the stash tells them apart.
+  const twice = (t: Tab) => v.tabs.some((o) => o.index !== t.index && o.name === t.name);
   return (
     <div className="w-profiles">
       <div className="w-prof-row">
         <span className="muted small">Scan</span>
         <button className={`w-prof ${!active ? "on" : ""}`} disabled={busy} onClick={() => call("wealth_profile_use", { name: null })}>Whole stash</button>
         {list.map((p) => (
-          <button key={p.name} className={`w-prof ${active?.name === p.name ? "on" : ""}`} disabled={busy}
-            title={`${p.tabs.length} tab${p.tabs.length === 1 ? "" : "s"}`} onClick={() => call("wealth_profile_use", { name: p.name })}>{p.name}</button>
+          <span key={p.name} className={`w-prof-chip ${active?.name === p.name ? "on" : ""} ${edit?.[2] === p.name ? "editing" : ""}`}>
+            <button className="w-prof" disabled={busy}
+              title={`Use this profile (${p.tabs.length} tab${p.tabs.length === 1 ? "" : "s"})`} onClick={() => call("wealth_profile_use", { name: p.name })}>{p.name}</button>
+            <button className="w-prof-pen" disabled={busy || refreshing} onClick={() => open(p)}>Edit tabs</button>
+          </span>
         ))}
-        <button className="link small" disabled={busy} onClick={() => setEdit(["", [], null])}>+ New profile</button>
-        {active && <button className="link small" disabled={busy} onClick={() => setEdit([active.name, active.tabs, active.name])}>Edit</button>}
+        <button className="link small" disabled={busy || refreshing} onClick={() => open(null)}>+ New profile</button>
       </div>
       {edit && (
         <div className="w-prof-edit">
           <div className="row">
             <input className="text" autoFocus value={edit[0]} placeholder="Profile name, e.g. Dump tabs" onChange={(e) => setEdit([e.target.value, edit[1], edit[2]])} />
-            <button className="link small" disabled={refreshing} onClick={() => { setRefreshing(true);
-              invoke<WealthView>("wealth_tabs_refresh").then(setV).catch((e) => setErr(friendly(e))).finally(() => setRefreshing(false)); }}>
-              {refreshing ? "Reading tabs…" : "Refresh tab list"}</button>
+            <button className="link small" disabled={refreshing} onClick={() => refresh(null)}>
+              {refreshing ? "Reading your tabs…" : "Refresh tab list"}</button>
+            {!refreshing && v.tabs.length > 0 && <>
+              <button className="link small" onClick={() => set(v.tabs.map((t) => t.index))}>Tick all</button>
+              <button className="link small" disabled={edit[1].length === 0} onClick={() => set([])}>Untick all</button>
+            </>}
           </div>
           <p className="muted small">Tick the tabs this profile scans. Its worth and history are kept apart from the whole stash's.</p>
           <div className="w-tabpick">
             {v.tabs.map((t) => (
               <label key={t.index} className={`w-tabchip ${edit[1].includes(t.index) ? "on" : ""}`} style={{ borderColor: t.colour }}>
-                <input type="checkbox" checked={edit[1].includes(t.index)}
-                  onChange={() => setEdit([edit[0], edit[1].includes(t.index) ? edit[1].filter((x) => x !== t.index) : [...edit[1], t.index], edit[2]])} />
-                {t.name || `Tab ${t.index + 1}`}
+                <input type="checkbox" checked={edit[1].includes(t.index)} disabled={refreshing}
+                  onChange={() => set(edit[1].includes(t.index) ? edit[1].filter((x) => x !== t.index) : [...edit[1], t.index])} />
+                {t.name || `Tab ${t.index + 1}`}{t.name && twice(t) && <span className="muted small"> (tab {t.index + 1})</span>}
               </label>
             ))}
           </div>
           <div className="row">
-            <button className="primary" disabled={!edit[0].trim() || edit[1].length === 0}
+            <button className="primary" disabled={refreshing || !edit[0].trim() || edit[1].length === 0}
               onClick={() => call("wealth_profile_save", { name: edit[0], tabs: edit[1], old: edit[2] }).then(() => setEdit(null)).catch((e) => setErr(friendly(e)))}>
-              Save profile</button>
+              {edit[2] ? "Save changes" : "Save profile"}</button>
             <button className="link small" onClick={() => setEdit(null)}>Cancel</button>
             {edit[2] && <button className="link small danger-text" onClick={() => call("wealth_profile_delete", { name: edit[2] }).then(() => setEdit(null))}>Delete profile</button>}
             <span className="muted small">{edit[1].length} tab{edit[1].length === 1 ? "" : "s"} ticked</span>

@@ -17,7 +17,7 @@ const now = Math.floor(Date.now() / 1000);
 const snap = (t: number, total: number) => ({ time: t, league: "Covens", total, divine: 217, tabs: [["Frags", total * 0.6], ["GEM", total * 0.2]], profile: "Dump tabs" });
 const wealth = {
   account: "Exile#1234", has_sessid: true, league: "Covens", min: 10, minutes: 3, divine: 217, now,
-  tabs: ["Frags", "BREACH", "DELI", "Div", "GEM", "Dump 1", "Dump 2"].map((name, index) => ({ index, name, kind: "PremiumStash", colour: "#c9a94a" })),
+  tabs: ["Frags", "BREACH", "DELI", "Div", "GEM", "Dump 1", "Dump 2", "~price 55 chaos", "~price 55 chaos"].map((name, index) => ({ index, name, kind: "PremiumStash", colour: "#c9a94a" })),
   tracked: [5, 6], profiles: [{ name: "Dump tabs", tabs: [0, 1, 4] }], active: "Dump tabs", rares: 12, rares_priced: 0, rares_todo: 12,
   snapshots: [snap(now - 7200, 160), snap(now - 3600, 141), snap(now - 60, 584)],
   missed: [["Blight Thread", 50, 133], ["Legion Thread", 18, 65.7], ["Bestiary Thread", 29, 47.8], ["Summon Carrion Golem of Hordes", 1, 21]]
@@ -167,7 +167,14 @@ mockIPC((cmd, args) => {
     return { rows, total, total_text: txt(total), post };
   }
   if (cmd === "bulk_live") return new Promise((r) => setTimeout(() => r({ chaos: (args as { each: number }).each * ((args as { name: string }).name.includes("Lifeforce") ? 50 : 0.92), offers: 20, url: "", fair: !(args as { name: string }).name.includes("Lifeforce") }), 400));
-  if (cmd === "wealth_get") return wealth;
+  if (cmd === "wealth_get" || cmd === "wealth_tabs_refresh") return { ...wealth };
+  if (cmd === "wealth_profile_use") return { ...Object.assign(wealth, { active: (args as { name: string }).name }) };
+  if (cmd === "wealth_profile_save") { const a = args as { name: string; tabs: number[]; old: string | null };
+    const p = { name: a.name, tabs: a.tabs };
+    const i = wealth.profiles.findIndex((x) => x.name === a.old);
+    if (i >= 0) wealth.profiles[i] = p; else wealth.profiles.push(p);
+    return { ...wealth };
+  }
   if (cmd === "buy_base_item") return { total: 3480, ilvl: 75, notables: [["Doryani's Lesson", 68], ["Inspired Oppression", 75], ["Overshock", 50]] };
   if (cmd === "get_price_settings") return { settings: { enabled: false, groups: [{ group: "DivinationCards", enabled: true, tiers: [], hide_below: null }, { group: "Uniques", enabled: true, tiers: [], hide_below: null }] }, info: { unit: "chaos", league: "Keepers", updated: new Date().toISOString(), count: 18432 } };
   if (cmd === "price_count_below") return [Math.round(Math.min(480, (args as { limit: number }).limit * 60)), 512];

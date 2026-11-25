@@ -473,6 +473,22 @@ pub struct ScanProfile {
     pub tabs: Vec<usize>,
 }
 
+/// Saves a scan profile. `old` = the one being edited, kept in its place (its history follows a rename); none = a new
+/// one, which becomes the one in use. Errs when another profile has that name.
+pub fn save_profile(s: &mut WealthStore, name: &str, tabs: Vec<usize>, old: Option<&str>) -> Result<(), ()> {
+    if s.profiles.iter().any(|p| p.name == name && Some(name) != old) { return Err(()); }
+    let new = ScanProfile { name: name.into(), tabs };
+    match old.and_then(|o| s.profiles.iter().position(|p| p.name == o)) {
+        Some(i) => {
+            let from = std::mem::replace(&mut s.profiles[i], new).name;
+            for snap in s.snapshots.iter_mut().filter(|x| x.profile == from) { snap.profile = name.into(); }
+            if s.active.as_deref() == Some(&from) { s.active = Some(name.into()); }
+        }
+        None => { s.profiles.push(new); s.active = Some(name.into()); }
+    }
+    Ok(())
+}
+
 impl WealthStore {
     pub fn load(path: &std::path::Path) -> WealthStore {
         std::fs::read_to_string(path).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default()
@@ -511,6 +527,23 @@ mod guild_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn editing_a_profile() {
+        let mut s = WealthStore::default();
+        save_profile(&mut s, "Dump", vec![1], None).unwrap();
+        save_profile(&mut s, "Currency", vec![2], None).unwrap();
+        assert_eq!(s.active.as_deref(), Some("Currency"));
+        s.snapshots.push(Snapshot { profile: "Dump".into(), ..snapshot(0, "L", None, &[]) });
+        // Other tabs and a new name: same place, its history comes along, the one in use stays.
+        save_profile(&mut s, "Dumps", vec![1, 5], Some("Dump")).unwrap();
+        assert_eq!(s.profiles[0], ScanProfile { name: "Dumps".into(), tabs: vec![1, 5] });
+        assert_eq!((s.snapshots[0].profile.as_str(), s.active.as_deref()), ("Dumps", Some("Currency")));
+        save_profile(&mut s, "Money", vec![2], Some("Currency")).unwrap();
+        assert_eq!(s.active.as_deref(), Some("Money"));
+        assert!(save_profile(&mut s, "Money", vec![], Some("Dumps")).is_err() && save_profile(&mut s, "Dumps", vec![], None).is_err());
+        assert_eq!(s.profiles.len(), 2);
+    }
 
     #[test]
     fn tabs_that_moved() {

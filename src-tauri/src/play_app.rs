@@ -868,9 +868,11 @@ fn start_panel_watch(app: AppHandle) {
                 for (left, a, b) in [(true, rect.0, rect.0 + pw), (false, rect.0 + rect.2 - pw, rect.0 + rect.2)] {
                     if !open && on(a, b) { 
                         open = read(journey::panel_title_box(rect, left)).is_ok_and(|l| journey::panel_open(&l, left));
-                        // The tracker may sit right on the stash's name.
+                        // Not read: the search row under it. The tracker may sit right on the name, or an effect behind it
+                        // spoil it (in the hideout always looked for, in a map now and then).
                         let mid = rect.0 + pw / 2;
-                        if left && !open && p.y < rect.1 + rect.3 * 75 / 1000 && p.x < mid + pw / 7 && p.x + size.width as i32 > mid - pw / 7 {
+                        let covers = p.y < rect.1 + rect.3 * 75 / 1000 && p.x < mid + pw / 7 && p.x + size.width as i32 > mid - pw / 7;
+                        if left && !open && (covers || hid || looks % 4 == 0 || !with_store(&app, |s| s.maps.inside)) {
                             open = read(journey::stash_search_box(rect)).is_ok_and(|l| journey::panel_open(&l, true));
                         }
                     }

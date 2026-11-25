@@ -331,17 +331,18 @@ pub fn info_box(rect: (i32, i32, i32, i32)) -> (i32, i32, i32, i32) {
     (x + w - bw, y, bw, (h as f64 * 0.24) as i32)
 }
 
-/// The game's side panels (stash on the left, inventory on the right) are 370 wide at 600 tall.
+/// The game's side panels (stash or merchant tabs on the left, inventory on the right) are 370 wide at 600 tall.
 pub fn panel_width(h: i32) -> i32 { (h as f64 * 370.0 / 600.0).round() as i32 }
 
-/// Where a side panel's name ("Stash", "Inventory") is: x, y, w, h.
+/// Where a side panel's name ("Stash", "Merchant", "Inventory") is: x, y, w, h.
 pub fn panel_title_box(rect: (i32, i32, i32, i32), left: bool) -> (i32, i32, i32, i32) {
     let (x, y, w, h) = rect;
     let pw = panel_width(h);
     (if left { x } else { x + w - pw }, y + h * 25 / 1000, pw, h * 50 / 1000)
 }
 
-/// The stash's "Highlight Items" search row, for when the tracker itself covers the stash's name.
+/// The stash's and merchant tabs' "Highlight Items" search row, for when their name can't be read (the tracker itself
+/// may cover it).
 pub fn stash_search_box(rect: (i32, i32, i32, i32)) -> (i32, i32, i32, i32) { (rect.0, rect.1 + rect.3 * 795 / 1000, panel_width(rect.3), rect.3 * 50 / 1000) }
 
 /// The Atlas / map device screen's name and "Highlight Maps" row, top middle.
@@ -377,7 +378,7 @@ pub fn ritual_open(top: &[String], low: &[String], was: bool) -> bool {
 pub fn panel_open(lines: &[String], left: bool) -> bool {
     lines.iter().any(|l| {
         let t: String = l.chars().filter(|c| c.is_ascii_alphabetic()).collect::<String>().to_uppercase();
-        if left { t.contains("STASH") || t.contains("HIGHLIGHTITEMS") } else { t.contains("INVENTORY") || t.contains("COSMETICS") }
+        if left { t.contains("STASH") || t.contains("MERCHANT") || t.contains("HIGHLIGHTITEMS") } else { t.contains("INVENTORY") || t.contains("COSMETICS") }
     })
 }
 
@@ -933,6 +934,7 @@ mod tests {
         assert!(ritual_open(&l("FAVOURS*"), &[], false) && ritual_open(&l("27,127 TRIBUTE REMAINING"), &[], false));
         assert!(ritual_open(&l("The House"), &l("4 ITEM FILTER"), true) && !ritual_open(&[], &l("4 ITEM FILTER"), false) && !ritual_open(&l("Cost: 2,305x Tribute"), &[], true));
         assert!(panel_open(&l("Highlight Items Type keywords here..."), true));
+        assert!(panel_open(&l("MERCHANT"), true) && !panel_open(&l("MERCHANT"), false), "his merchant tabs, 25 Nov");
         assert!(panel_open(&l("STASH"), true) && panel_open(&l("Inventory Cosmetics"), false));
         assert!(!panel_open(&l("City Square"), false) && !panel_open(&l("Inventory"), true));
         // His 3840x2160: the names sit at about (653, 109) and (3177, 109).
