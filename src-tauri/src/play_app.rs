@@ -735,13 +735,12 @@ fn tracker_view(app: &AppHandle) -> TrackerView {
             let mut loot_maps = 0;
             let looted: Vec<&MapRun> = runs.iter().chain(current.iter().filter(|c| c.start >= l.sess_start)).filter(|r| !r.loot.is_empty()).collect();
             for r in &looted { loot_maps += 1; loot::merge(&mut sess_loot, r.loot.clone()); }
-            let loot_secs = match (looted.first(), looted.last()) {
-                (Some(a), Some(b)) => {
-                    let still_going = current.as_ref().is_some_and(|c| c.start == b.start && c.area == b.area);
-                    (if still_going { now } else { b.left.max(b.start + b.in_map) }) - a.start
-                }
-                _ => 0,
-            }.max(0);
+            // Time inside those maps only, not the hideout or breaks between them (26 Nov: he wants div an hour for
+            // the mapping itself; it used to run from the first map's start to the last one's end).
+            let loot_secs: i64 = looted.iter().map(|r| {
+                let is_current = current.as_ref().is_some_and(|c| c.start == r.start && c.area == r.area);
+                (if is_current { current_inside } else { r.in_map }) as i64
+            }).sum::<i64>().max(0);
             SessionSummary {
                 start: l.sess_start, played: (l.sess_last - l.sess_start).max(now - l.sess_start).max(0), maps: runs.len(),
                 map_time: runs.iter().map(|r| r.in_map).sum(), per_hour: st.per_hour, deaths: l.sess_deaths, levels: l.sess_levels,
