@@ -1157,21 +1157,21 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
-- [ ] (next) Ctrl+D a map, then open a *different* map: the tracker shows no mods (it used to show the checked map's). Open the checked one: its mods show.
-- [ ] (next) Map tracker "Today … per hour" (maps an hour) doesn't drop after a long hideout break (now time inside + usual turnaround, like div / hour).
+- [ ] (0.2.87) Ctrl+D a map, then open a *different* map: the tracker shows no mods (it used to show the checked map's). Open the checked one: its mods show.
+- [ ] (0.2.87) Map tracker "Today … per hour" (maps an hour) doesn't drop after a long hideout break (now time inside + usual turnaround, like div / hour).
 - [ ] (0.2.86) Ctrl+D on a quality gem: "Gem level" and "Quality" rows, ticked; untick quality and Search again: more results (any quality).
 - [ ] (0.2.86) Ctrl+D on a Mercenary Warrant: its skills and supports are listed, Tier 3 supports ticked; the price is for warrants with those supports, not 1c.
 - [ ] (0.2.85) After a break in the hideout, the tracker's "div / hour", Farm this's profit an hour and Atlas "Your trees so far" don't drop; past trees' numbers changed a bit (now steady-mapping hours).
 - [ ] (0.2.85) Map tracker: run two maps with a long hideout break between: "This session … div / hour" stays about the same as after the first map, not lower. (now: time inside plus his usual turnaround)
 - [ ] (0.2.85) Alt+F: drag the window by its bottom line or the edges of the search bar; close and open it: it comes back where you left it.
-- [ ] (next) In game press ` (the key left of 1): the editor comes to the front; alt-tab back to the game. Typing ` in the editor still works.
-- [ ] (next) In game press Alt+F: a search box opens in the top middle, ready to type. Type "mageb": Mageblood shows with 4 versions, the 4-flask one first; ←→ picks another; Enter opens the trade site and the box goes; Alt+F again, Esc: back in the game with the keyboard working. Try "divine", "doctor", "enlighten". Ctrl+F in the stash still does the game's own search.
-- [ ] (next) Atlas tree > What to farm today: "Proven farms, best first" lists six farms (Vaal Temple rush first), Sanctuary and Catarina say Needs a big sample; click a row: the receipt adds up. Farm this on Reverence: a "Farm: Reverence memory chain" tree is saved and used, the panel shows a Memory of Reverence line under costs and "The creator's pace… about 23 div an hour".
-- [ ] (next) Atlas tree page: press Compare on one of your strategies: the page jumps to Compare two trees with it as A; pick another in "with": red points only in A, green only in B, the notables listed under each (click one to find it), Totals say what changes from A to B; ⇄ swaps them.
+- [ ] (0.2.87) In game press ` (the key left of 1): the editor comes to the front; alt-tab back to the game. Typing ` in the editor still works.
+- [ ] (0.2.87) In game press Alt+F: a search box opens in the top middle, ready to type. Type "mageb": Mageblood shows with 4 versions, the 4-flask one first; ←→ picks another; Enter opens the trade site and the box goes; Alt+F again, Esc: back in the game with the keyboard working. Try "divine", "doctor", "enlighten". Ctrl+F in the stash still does the game's own search.
+- [ ] (0.2.87) Atlas tree > What to farm today: "Proven farms, best first" lists six farms (Vaal Temple rush first), Sanctuary and Catarina say Needs a big sample; click a row: the receipt adds up. Farm this on Reverence: a "Farm: Reverence memory chain" tree is saved and used, the panel shows a Memory of Reverence line under costs and "The creator's pace… about 23 div an hour".
+- [ ] (0.2.87) Atlas tree page: press Compare on one of your strategies: the page jumps to Compare two trees with it as A; pick another in "with": red points only in A, green only in B, the notables listed under each (click one to find it), Totals say what changes from A to B; ⇄ swaps them.
 - [ ] (0.2.84) Ctrl+D on a Constrictor (or other guardian) and a Veritania (or other conqueror) map: each shows its own picture and price.
 - [ ] (0.2.84) Map tiers > Originator maps > "Your edit wins" > Remove it, use this look: the note says it was removed from Red-Maps; after F4 Originator maps show the Originator look (and rare T16s lose that edit's look everywhere).
-- [ ] (next) Farm this panel: "What a map costs you" has Rolling it and Vaal Orbs boxes; typing a number changes the profit. Loot a map now reads "sold" (maps and thinly traded items count a bit less than poe.ninja).
-- [ ] (next) Vaal Temple map boss: what is the ~8 div drop called? We price it as a Soul Core.
+- [ ] (0.2.87) Farm this panel: "What a map costs you" has Rolling it and Vaal Orbs boxes; typing a number changes the profit. Loot a map now reads "sold" (maps and thinly traded items count a bit less than poe.ninja).
+- [ ] (0.2.87) Vaal Temple map boss: what is the ~8 div drop called? We price it as a Soul Core.
 - [ ] (0.2.82) Ctrl+D on an Originator T16, a Drox and an Elder guardian map: each shows its own picture (Originator: silver-blue ring) and the conqueror/guardian map its own poe.ninja price.
 - [ ] (0.2.81) Map tracker loot: an Elder guardian or conqueror map you pick up shows on its own line ("Drox Map (Tier 16)") with its own price, not inside "Map (Tier 16)".
 - [ ] (0.2.81) Atlas tree > Build my own > Boss rush: the tree takes Lost in Transit, Emerging Realities and the Mirage nodes, not Phantom Anomalies; the coloured income bar shows Lost Shipments. Breach with 8 Threads says Hives become Fortresses; Abyss with a weak build says 3+ Abyss Threads are dangerous.
