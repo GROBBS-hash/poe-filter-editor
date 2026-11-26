@@ -735,11 +735,13 @@ fn tracker_view(app: &AppHandle) -> TrackerView {
             let mut loot_maps = 0;
             let looted: Vec<&MapRun> = runs.iter().chain(current.iter().filter(|c| c.start >= l.sess_start)).filter(|r| !r.loot.is_empty()).collect();
             for r in &looted { loot_maps += 1; loot::merge(&mut sess_loot, r.loot.clone()); }
-            // Time inside those maps only, not the hideout or breaks between them (26 Nov: he wants div an hour for
-            // the mapping itself; it used to run from the first map's start to the last one's end).
+            // Each map: its time inside plus your usual hideout turnaround, so breaks and AFK don't lower it (26 Nov, he
+            // picked this; it used to run from the first map's start to the last one's end).
+            let spans: Vec<(i64, i64)> = all_runs.iter().map(|r| (r.start, r.left.max(r.start + r.in_map))).collect();
+            let turn = journey::usual_turnaround(&spans);
             let loot_secs: i64 = looted.iter().map(|r| {
                 let is_current = current.as_ref().is_some_and(|c| c.start == r.start && c.area == r.area);
-                (if is_current { current_inside } else { r.in_map }) as i64
+                (if is_current { current_inside } else { r.in_map }) as i64 + turn
             }).sum::<i64>().max(0);
             SessionSummary {
                 start: l.sess_start, played: (l.sess_last - l.sess_start).max(now - l.sess_start).max(0), maps: runs.len(),

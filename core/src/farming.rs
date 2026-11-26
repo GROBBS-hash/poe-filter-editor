@@ -77,11 +77,13 @@ pub struct Profit {
 pub type Run = (i64, i64, Option<f64>, Option<u64>, Option<f64>);
 
 /// Your map runs as the runs on one tree.
-/// The time of a map goes on to the start of the next one (hideout time counts), up to an hour.
+/// A map's time is its time inside plus your usual hideout turnaround (`journey::usual_turnaround`): breaks don't count
+/// (26 Nov, he picked it; it used to run on to the next map's start, up to an hour).
 pub fn runs_on(runs: &[Run], tree: u64) -> Vec<RunMade> {
-    runs.iter().enumerate().filter(|(_, r)| r.3 == Some(tree)).filter_map(|(i, r)| {
-        let next = runs.get(i + 1).map(|n| n.0 - r.0).filter(|g| *g > 0 && *g < 3600).unwrap_or(r.1);
-        Some(RunMade { loot: r.2?, secs: next.max(60) as f64, divine: r.4 })
+    let spans: Vec<(i64, i64)> = runs.iter().map(|r| (r.0, r.0 + r.1)).collect();
+    let turn = crate::journey::usual_turnaround(&spans);
+    runs.iter().filter(|r| r.3 == Some(tree)).filter_map(|r| {
+        Some(RunMade { loot: r.2?, secs: (r.1 + turn).max(60) as f64, divine: r.4 })
     }).collect()
 }
 
@@ -150,8 +152,9 @@ mod tests {
     #[test]
     fn unread_loot_and_other_trees_are_left_out() {
         let runs = vec![(0, 250, None, Some(1), None), (300, 250, Some(10.0), Some(1), None), (600, 250, Some(99.0), Some(2), None), (9000, 100, Some(5.0), None, None)];
-        assert_eq!(runs_on(&runs, 1), vec![RunMade { loot: 10.0, secs: 300.0, divine: None }]);
-        assert_eq!(runs_on(&runs, 2), vec![RunMade { loot: 99.0, secs: 250.0, divine: None }], "an hour's break isn't map time");
+        // Two short gaps only: the usual turnaround is the 90 s default; the long break counts for nothing.
+        assert_eq!(runs_on(&runs, 1), vec![RunMade { loot: 10.0, secs: 340.0, divine: None }]);
+        assert_eq!(runs_on(&runs, 2), vec![RunMade { loot: 99.0, secs: 340.0, divine: None }], "an hour's break isn't map time");
     }
 
     #[test]

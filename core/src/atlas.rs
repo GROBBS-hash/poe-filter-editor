@@ -958,14 +958,16 @@ pub fn tree_results(runs: &[(i64, i64, Option<f64>, Option<u64>)], sessions: &[(
     let get = |out: &mut Vec<TreeResult>, id: u64| -> usize {
         match out.iter().position(|r| r.id == id) { Some(i) => i, None => { out.push(TreeResult { id, ..Default::default() }); out.len() - 1 } }
     };
-    // Maps: (start, seconds until the next map's start or its own end, loot).
+    // Maps: (start, seconds inside, loot). Each map counts its time inside plus your usual hideout turnaround, so breaks
+    // don't lower a tree's div an hour (26 Nov, he picked it; it used to run on to the next map's start, up to an hour).
+    let spans: Vec<(i64, i64)> = runs.iter().map(|r| (r.0, r.0 + r.1)).collect();
+    let turn = crate::journey::usual_turnaround(&spans);
     let mut by_tree: std::collections::HashMap<u64, (usize, f64, f64)> = Default::default();
-    for (i, (start, own, loot, tree)) in runs.iter().enumerate() {
+    for (_, own, loot, tree) in runs.iter() {
         // Loot that couldn't be read (login run out) isn't "no loot": the map doesn't count.
         let (Some(t), Some(loot)) = (tree, loot) else { continue };
-        let next = runs.get(i + 1).map(|r| r.0 - start).filter(|g| *g > 0 && *g < 3600).unwrap_or(*own);
         let e = by_tree.entry(*t).or_default();
-        e.0 += 1; e.1 += next.max(60) as f64; e.2 += loot;
+        e.0 += 1; e.1 += (own + turn).max(60) as f64; e.2 += loot;
     }
     for (t, (n, secs, loot)) in by_tree {
         let i = get(&mut out, t);
@@ -999,7 +1001,8 @@ mod result_tests {
         let r = super::tree_results(&runs, &[(2.0, 600.0, Some(2)), (1.0, 50.0, None)]);
         let t1 = r.iter().find(|x| x.id == 1).unwrap();
         assert_eq!(t1.maps, 2);
-        assert!((t1.loot_per_hour.unwrap() - 1200.0).abs() < 1.0, "{t1:?}");
+        // 280 s inside + the 90 s default turnaround (only two short gaps), twice: 200c in 740 s.
+        assert!((t1.loot_per_hour.unwrap() - 200.0 / (740.0 / 3600.0)).abs() < 1.0, "{t1:?}");
         let t2 = r.iter().find(|x| x.id == 2).unwrap();
         assert_eq!(t2.session_per_hour, Some(300.0));
         assert_eq!(r[0].id, 1);

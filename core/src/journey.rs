@@ -512,6 +512,17 @@ pub struct MapStats {
     pub avg_made: Option<f64>,
 }
 
+/// Your usual time in the hideout between one map and the next when you're mapping steadily (emptying bags, rolling the
+/// next map), in seconds. Div an hour counts each map as its time inside plus this, so breaks, alt-tabs and AFK never
+/// count against a strategy (26 Nov, he picked it: "I take breaks… sit afk in hideout").
+/// `spans`: each map's (start, end) in order. The middle of the gaps under 10 minutes; 90 s until there are 3 of them.
+pub fn usual_turnaround(spans: &[(i64, i64)]) -> i64 {
+    let mut gaps: Vec<i64> = spans.windows(2).map(|w| w[1].0 - w[0].1).filter(|g| *g > 0 && *g < 600).collect();
+    if gaps.len() < 3 { return 90; }
+    gaps.sort_unstable();
+    gaps[gaps.len() / 2].clamp(20, 300)
+}
+
 /// Stats over the runs that started since `since` (0 = all).
 pub fn map_stats(runs: &[MapRun], since: i64) -> MapStats {
     let rs: Vec<&MapRun> = runs.iter().filter(|r| r.start >= since).collect();
@@ -904,6 +915,14 @@ mod tests {
         let changes: Vec<MapChange> = late.iter().flat_map(|e| m.on_event(e)).collect();
         assert!(changes.contains(&MapChange::Left) && !m.inside);
         assert_eq!(m.current.as_ref().unwrap().in_map, 360, "09:55 to 10:01");
+    }
+
+    #[test]
+    fn usual_turnaround_ignores_breaks() {
+        // Gaps of 60, 80, 100 s and a 40-minute break: the middle of the short ones.
+        let spans = [(0, 300), (360, 660), (740, 1040), (1140, 1440), (3840, 4140)];
+        assert_eq!(usual_turnaround(&spans), 80);
+        assert_eq!(usual_turnaround(&spans[..2]), 90, "too few maps: the default");
     }
 
     #[test]

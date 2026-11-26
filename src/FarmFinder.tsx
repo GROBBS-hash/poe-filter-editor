@@ -239,7 +239,7 @@ export default function FarmFinder({ onBuild, go }: { onBuild: () => void; go?: 
         <Card key={f.title} f={f} best={i === 0} div={r.divine} onBuild={() => build(f)} onFarm={() => farmThis(f)} now={now?.farm.title === f.title} />
       ))}</div>}
       {r && r.own.length > 0 && <>
-        <div className="ap-step">Your trees so far <span className="ap-step-note">(loot in ordinary maps, hideout time included)</span></div>
+        <div className="ap-step">Your trees so far <span className="ap-step-note">(loot in ordinary maps; each map counts its time inside plus your usual hideout turnaround, breaks left out)</span></div>
         <div className="ff-own">{r.own.slice(0, 6).map((x) => (
           <div key={x.name}>
             {x.keys.map((k) => <MechArt key={k} m={k} size={28} />)}
