@@ -57,7 +57,7 @@ pub struct Item {
 
 /// "Map contains Drox's Citadel" → "Drox"; "Map is occupied by The Enslaver" → "The Enslaver";
 /// "Area is influenced by Veritania, the Redeemer" → "Veritania". (implicit) tags are dropped.
-fn map_occupant(line: &str) -> Option<String> {
+pub fn map_occupant(line: &str) -> Option<String> {
     let l = line.trim().trim_end_matches("(implicit)").trim();
     let who = if let Some(r) = l.strip_prefix("Map contains ") {
         r.strip_suffix("'s Citadel")?.to_string()

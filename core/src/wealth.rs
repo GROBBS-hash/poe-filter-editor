@@ -135,6 +135,28 @@ pub fn value_item(item: &Value, tab: &str, lookup: Lookup) -> Option<Valued> {
     let type_line = clean(item["typeLine"].as_str().unwrap_or(""));
     let base = item["baseType"].as_str().map(clean).unwrap_or_else(|| type_line.clone());
     let stack = item["stackSize"].as_u64().unwrap_or(1).max(1) as u32;
+    // Maps of a special kind are priced (and listed) apart from plain ones: poe.ninja has "The Eradicator Map (Tier 16)",
+    // "Drox Map (Tier 16)" (26 Nov: his Elder and conqueror drops all showed as plain 2c T16s in the map tracker).
+    // Originator maps have no price of their own: listed apart, at the plain map's price.
+    let is_map = base.contains("Map (Tier ") || base.ends_with(" Map");
+    let implicits = || item["implicitMods"].as_array().into_iter().flatten().filter_map(|m| m.as_str().or(m["description"].as_str()));
+    let special = if is_map && !matches!(frame, 3 | 9) {
+        // Elder maps also say "Area is influenced by The Elder": the guardian line is the one with a price.
+        const WHO: [&str; 8] = ["The Enslaver", "The Eradicator", "The Constrictor", "The Purifier", "Veritania", "Al-Hezmin", "Drox", "Baran"];
+        implicits().find_map(|m| crate::item::map_occupant(m).filter(|w| WHO.contains(&w.as_str()))).map(|who| format!("{who} {base}"))
+            .or_else(|| implicits().any(|m| m.contains("Originator")).then(|| format!("Originator {base}")))
+    } else { None };
+    if let Some(kind) = &special {
+        let each = lookup(None, kind, "").or_else(|| lookup(None, &base, ""))?;
+        if each <= 0.0 { return None; }
+        return Some(Valued {
+            tab: tab.to_string(), name: kind.clone(), stack, value: each * stack as f64,
+            x: item["x"].as_u64().unwrap_or(0) as u32, y: item["y"].as_u64().unwrap_or(0) as u32,
+            listed: [item["note"].as_str().unwrap_or(""), tab].iter().any(|n| n.starts_with("~price") || n.starts_with("~b/o")),
+            icon: item["icon"].as_str().unwrap_or("").to_string(), places: 1, rare: false, max_stack: None,
+            note: [item["note"].as_str().unwrap_or(""), tab].iter().find(|n| n.starts_with("~price") || n.starts_with("~b/o")).map(|n| n.to_string()).unwrap_or_default(),
+        });
+    }
     let each = match frame {
         // Uniques with versions (passives, abyssal sockets, flasks, charges): the lines that tell which, after a bar.
         3 | 9 => match crate::prices::version_lines(&mod_lines(item)) {
@@ -685,6 +707,20 @@ mod tests {
         assert_eq!(tabs, vec![Tab { index: 0, name: "Dump".into(), kind: "PremiumStash".into(), colour: "#ff0010".into(), id: String::new() }]);
     }
 
+
+    #[test]
+    fn elder_and_conqueror_maps_priced_apart() {
+        let f = |_: Option<&str>, b: &str, _: &str| match b { "The Eradicator Map (Tier 16)" => Some(5.0), "Drox Map (Tier 16)" => Some(32.0), "Map (Tier 16)" => Some(2.0), _ => None };
+        let map = |imp: Value| json!({ "frameType": 2, "identified": false, "typeLine": "Map (Tier 16)", "baseType": "Map (Tier 16)", "implicitMods": imp });
+        let elder = value_item(&map(json!(["Area is influenced by The Elder", "Map is occupied by The Eradicator"])), "", &f).unwrap();
+        assert_eq!((elder.name.as_str(), elder.value), ("The Eradicator Map (Tier 16)", 5.0));
+        let drox = value_item(&map(json!(["Map contains Drox's Citadel"])), "", &f).unwrap();
+        assert_eq!((drox.name.as_str(), drox.value), ("Drox Map (Tier 16)", 32.0));
+        let orig = value_item(&map(json!(["Area is Influenced by the Originator's Memories"])), "", &f).unwrap();
+        assert_eq!((orig.name.as_str(), orig.value), ("Originator Map (Tier 16)", 2.0));
+        let plain = value_item(&map(json!([])), "", &f).unwrap();
+        assert_eq!(plain.value, 2.0);
+    }
 
     #[test]
     fn rares_become_item_text() {
