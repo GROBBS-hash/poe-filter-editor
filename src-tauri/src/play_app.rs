@@ -958,6 +958,8 @@ fn panel_back(app: &AppHandle) -> bool {
 /// screen), and reads how many monsters are left from the map info in the game's top right corner.
 fn start_panel_watch(app: AppHandle) {
     let mut closed = 0;
+    // The game was in front last look (or one of our little windows over it).
+    let mut from_game = false;
     let (mut atlas, mut ritual, mut looks) = (false, false, 0u32);
     let mut info_at = std::time::Instant::now();
     let mut settle = journey::LeftSettle::default();
@@ -966,16 +968,24 @@ fn start_panel_watch(app: AppHandle) {
         thread::sleep(Duration::from_millis(350));
         let Some(w) = app.get_webview_window("tracker") else { continue };
         let hid = under_panel();
-        if !hid && !w.is_visible().unwrap_or(false) { continue; }
+        if !hid && !w.is_visible().unwrap_or(false) { from_game = false; continue; }
         if !game_in_front() {
             // Another program in front: put away until the game is back (26 Nov: it sat over his other programs when he
             // alt-tabbed, and a screenshot of the shop brought it back over the shop). One of ours: leave things as they are.
-            if !ours_in_front() && !hid && !PANEL_KEEP.load(Ordering::Relaxed) {
-                PANEL_HID.store(true, Ordering::Relaxed);
-                raw_show(&w, false);
+            // The editor's main window counts as another program (26 Nov, he asked): only our little windows over
+            // the game (the tracker itself, the price window) keep it.
+            // Only on leaving the game, so opening it from the editor's Play page still works.
+            let editor = app.get_webview_window("main").is_some_and(|m| m.is_focused().unwrap_or(false));
+            if editor || !ours_in_front() {
+                if from_game && !hid && !PANEL_KEEP.load(Ordering::Relaxed) {
+                    PANEL_HID.store(true, Ordering::Relaxed);
+                    raw_show(&w, false);
+                }
+                from_game = false;
             }
             continue;
         }
+        from_game = true;
         let Some(rect) = game_client_rect() else { continue };
         let read = |b: (i32, i32, i32, i32)| screen::read_lines_in(b.0, b.1, b.2, b.3);
         let mut open = false;
