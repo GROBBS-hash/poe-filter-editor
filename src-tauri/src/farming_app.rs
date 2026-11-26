@@ -49,6 +49,9 @@ pub struct FarmView {
     threads: Vec<ThreadNeed>,
     /// Threads a map at today's prices.
     threads_now: f64,
+    /// Vaal Orbs and entry items a run at today's prices.
+    vaal_now: f64,
+    entry_now: Vec<(String, f64, f64)>,
     cost: f64,
     profit: Option<Profit>,
     divine: Option<f64>,
@@ -73,11 +76,12 @@ impl FarmView {
     }
 }
 
-/// Your ordinary maps on the farm's tree (boss fights and other special areas don't count).
+/// Your ordinary maps on the farm's tree (boss fights and other special areas don't count), loot at what it sells for.
 fn made(app: &AppHandle, tree: u64) -> Vec<farming::RunMade> {
     let rate = wealth_app::run_rates(app);
+    let file = app.state::<AppState>().prices.lock().unwrap().get(&Game::Poe1).cloned();
     let runs: Vec<farming::Run> = play_app::maps_history(app.clone()).iter().map(|r| (r.start, (r.left - r.start).max(r.in_map),
-        (!r.loot_missed).then(|| r.loot.iter().map(|l| l.value).sum::<f64>()), r.atlas.filter(|_| r.area.starts_with("MapWorlds")), rate(r))).collect();
+        (!r.loot_missed).then(|| farming::sold(&r.loot, file.as_ref())), r.atlas.filter(|_| r.area.starts_with("MapWorlds")), rate(r))).collect();
     farming::runs_on(&runs, tree)
 }
 
@@ -93,14 +97,16 @@ fn view(app: &AppHandle) -> Option<FarmView> {
             bulk: statics.as_ref().and_then(|s| s.id(name)), name: name.clone() }
     }).collect();
     let threads_now = threads.iter().map(|t| t.each.unwrap_or(0.0) * t.each_map as f64).sum::<f64>();
-    let cost = farm.map_cost + farm.other_cost + farm.thread_cost.unwrap_or(threads_now);
+    let vaal_now = farm.vaal * price(app, "Vaal Orb").unwrap_or(1.0);
+    let entry_now: Vec<(String, f64, f64)> = farm.entry.iter().map(|(n, k)| (n.clone(), *k, price(app, n).unwrap_or(0.0) * k)).collect();
+    let cost = farm.map_cost + farm.roll_cost + farm.other_cost + farm.thread_cost.unwrap_or(threads_now) + vaal_now + entry_now.iter().map(|e| e.2).sum::<f64>();
     let store = atlas_app::atlas_list(app.clone()).ok();
     let in_filter = {
         let s = st.store.lock().unwrap();
         s.active.as_ref().and_then(|id| s.profiles.get(id)).is_some_and(|p| p.rules.iter().any(|r| !r.is_off() && rule_label(r).starts_with(farming::RULE_PREFIX)))
     };
     Some(FarmView {
-        profit: farming::profit(&made(app, farm.strategy), cost, currency_rates(app).get("divine").copied()), threads, threads_now, cost, in_filter,
+        profit: farming::profit(&made(app, farm.strategy), cost, currency_rates(app).get("divine").copied()), threads, threads_now, vaal_now, entry_now, cost, in_filter,
         divine: currency_rates(app).get("divine").copied(),
         tree_in_use: atlas_app::active_id(app) == Some(farm.strategy),
         tree_saved: store.is_some_and(|s| s.list.iter().any(|x| x.id == farm.strategy)),
@@ -122,7 +128,11 @@ pub fn farm_start(app: AppHandle, farm: FarmNow, thread_keys: Vec<(String, u32)>
         atlas_app::atlas_use(app.clone(), s.id, 0)?;
         farm.strategy = s.id;
     } else {
-        let ask = filter_core::atlas_opt::Ask { mechanics: farm.keys.clone(), threads: thread_keys, ..Default::default() };
+        // A creator farm asks for its own goals, altar and Threads; a mechanic card for its mechanics.
+        let ask = match farm.ask.clone() {
+            Some(mut a) => { if a.threads.is_empty() { a.threads = thread_keys; } a }
+            None => filter_core::atlas_opt::Ask { mechanics: farm.keys.clone(), threads: thread_keys, ..Default::default() },
+        };
         let after = atlas_app::atlas_save_plan(app.clone(), ask, name.clone())?;
         farm.strategy = after.active.ok_or("The tree couldn't be saved")?;
     }
@@ -130,9 +140,9 @@ pub fn farm_start(app: AppHandle, farm: FarmNow, thread_keys: Vec<(String, u32)>
     farm.started = unix();
     if farm.plan == 0 { farm.plan = 20; }
     // Keep your own costs when it's the same farm again.
-    if let Some(old) = current(&app).filter(|o| o.keys == farm.keys) {
-        (farm.map_cost, farm.other_cost, farm.thread_cost, farm.plan) = (old.map_cost, old.other_cost, old.thread_cost, old.plan);
-    } else {
+    if let Some(old) = current(&app).filter(|o| o.keys == farm.keys && o.title == farm.title) {
+        (farm.map_cost, farm.other_cost, farm.thread_cost, farm.plan, farm.roll_cost, farm.vaal) = (old.map_cost, old.other_cost, old.thread_cost, old.plan, old.roll_cost, old.vaal);
+    } else if farm.ask.is_none() {
         farm.map_cost = price(&app, "Map (Tier 16)").map(|v| (v * 10.0).round() / 10.0).unwrap_or(0.0);
     }
     drop_rule(&app)?;
@@ -142,9 +152,11 @@ pub fn farm_start(app: AppHandle, farm: FarmNow, thread_keys: Vec<(String, u32)>
 
 /// Your costs and how many maps you plan.
 #[tauri::command(async)]
-pub fn farm_costs(app: AppHandle, plan: u32, map_cost: f64, other_cost: f64, thread_cost: Option<f64>) -> Option<FarmView> {
+pub fn farm_costs(app: AppHandle, plan: u32, map_cost: f64, other_cost: f64, thread_cost: Option<f64>, roll_cost: Option<f64>, vaal: Option<f64>) -> Option<FarmView> {
     let mut f = current(&app)?;
     (f.plan, f.map_cost, f.other_cost, f.thread_cost) = (plan.clamp(1, 500), map_cost.max(0.0), other_cost.max(0.0), thread_cost.map(|t| t.max(0.0)));
+    if let Some(r) = roll_cost { f.roll_cost = r.max(0.0); }
+    if let Some(v) = vaal { f.vaal = v.max(0.0); }
     keep(&app, Some(f));
     view(&app)
 }

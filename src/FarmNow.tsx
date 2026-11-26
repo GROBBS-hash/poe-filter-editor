@@ -9,10 +9,11 @@ import { standOut } from "./Find";
 import "./farm-now.css";
 
 export type FarmPlan = { title: string; keys: string[]; threads: [string, number][]; maps: string[]; rolls: string | null; drops: string[] };
-type FarmData = FarmPlan & { strategy: number; strategy_name: string; started: number; plan: number; map_cost: number; other_cost: number; thread_cost: number | null };
+type FarmData = FarmPlan & { strategy: number; strategy_name: string; started: number; plan: number; map_cost: number; other_cost: number; thread_cost: number | null;
+  roll_cost: number; vaal: number; entry: [string, number][]; runs_hour: number | null; creator_div_hour: number | null; unit: string };
 type ThreadNeed = { name: string; each_map: number; need: number; have: number | null; buy: number; each: number | null; bulk: string | null };
 type Profit = { maps: number; loot: number; cost: number; net: number; hour: number; likely: [number, number] | null; hour_div: number | null; likely_div: [number, number] | null; few: boolean };
-export type FarmView = { farm: FarmData; threads: ThreadNeed[]; threads_now: number; cost: number; profit: Profit | null; divine: number | null;
+export type FarmView = { farm: FarmData; threads: ThreadNeed[]; threads_now: number; vaal_now: number; entry_now: [string, number, number][]; cost: number; profit: Profit | null; divine: number | null;
   tree_in_use: boolean; tree_saved: boolean; scanned: number | null; in_filter: boolean };
 
 const c = (v: number) => (Math.abs(v) >= 10 ? Math.round(v).toLocaleString() : +v.toFixed(1));
@@ -45,12 +46,15 @@ function Num({ value, onSave, width = 64, step = 1 }: { value: number; onSave: (
 /** Profit a map and an hour after maps and Threads. */
 export function ProfitBlock({ v }: { v: FarmView }) {
   const p = v.profit;
-  if (!p) return <div className="muted small">No maps on this tree yet. Run one with the map tracker on and what it made shows here.</div>;
+  const unit = v.farm.unit || "map";
+  const creator = v.farm.creator_div_hour != null && v.farm.runs_hour != null
+    && <div className="muted small fn-creator">The creator's pace, {v.farm.runs_hour} {unit}s an hour, makes about <b>{v.farm.creator_div_hour.toFixed(v.farm.creator_div_hour >= 10 ? 0 : 1)} div an hour</b> at today's prices.</div>;
+  if (!p) return <>{creator}<div className="muted small">No maps on this tree yet. Run one with the map tracker on and what it made shows here.</div></>;
   return (
     <div className="fn-profit">
       <div className="fn-sum">
-        <span>Loot a map</span><b>{c(p.loot)}<CurrencyIcon id="chaos" /></b>
-        <span>Maps and Threads</span><b className="ff-dn">−{c(p.cost)}<CurrencyIcon id="chaos" /></b>
+        <span title="What it sells for: slow sellers (maps, thinly traded items) count for less than poe.ninja's price">Loot a map, sold</span><b>{c(p.loot)}<CurrencyIcon id="chaos" /></b>
+        <span>What a map costs</span><b className="ff-dn">−{c(p.cost)}<CurrencyIcon id="chaos" /></b>
         <span className="fn-net">Profit a map</span><b className={`fn-net ${p.net >= 0 ? "ff-up" : "ff-dn"}`}>{p.net < 0 ? "−" : ""}{c(Math.abs(p.net))}<CurrencyIcon id="chaos" /></b>
       </div>
       <div className="fn-hour">
@@ -61,6 +65,7 @@ export function ProfitBlock({ v }: { v: FarmView }) {
           {p.likely && p.few && " (still early)"}
         </span>
       </div>
+      {creator}
     </div>
   );
 }
@@ -76,8 +81,9 @@ export default function FarmNow({ view, setView, go }: { view: FarmView; setView
     try { const v = await invoke<FarmView | null>(cmd, args); if (v !== undefined) setView(v); setNote(said); } catch (e) { setErr(friendly(e)); }
     setBusy(false);
   };
-  const costs = (x: Partial<{ plan: number; map: number; other: number; thread: number | null }>) => run("farm_costs", {
-    plan: Math.round(x.plan ?? f.plan), mapCost: x.map ?? f.map_cost, otherCost: x.other ?? f.other_cost, threadCost: x.thread !== undefined ? x.thread : f.thread_cost });
+  const costs = (x: Partial<{ plan: number; map: number; other: number; thread: number | null; roll: number; vaal: number }>) => run("farm_costs", {
+    plan: Math.round(x.plan ?? f.plan), mapCost: x.map ?? f.map_cost, otherCost: x.other ?? f.other_cost, threadCost: x.thread !== undefined ? x.thread : f.thread_cost,
+    rollCost: x.roll ?? f.roll_cost ?? 0, vaal: x.vaal ?? f.vaal ?? 0 });
   const sellers = async (t: ThreadNeed) => {
     setErr("");
     try {
@@ -137,7 +143,12 @@ export default function FarmNow({ view, setView, go }: { view: FarmView; setView
             <label title={f.thread_cost == null ? "At today's prices. Type your own if you get some free (Shaped Regions) or farm them." : "Your own number"}>
               <span>Threads {f.thread_cost == null ? "(today's price)" : <button className="link small" onClick={() => costs({ thread: null })}>use today's price</button>}</span>
               <Num value={+(f.thread_cost ?? view.threads_now).toFixed(1)} step={0.5} onSave={(thread) => costs({ thread })} /><CurrencyIcon id="chaos" /></label>
-            <label title="Rolling currency, invitations and so on"><span>Anything else</span><Num value={f.other_cost} step={0.5} onSave={(other) => costs({ other })} /><CurrencyIcon id="chaos" /></label>
+            <label title="Alchemy, chaos or scouring to roll the map"><span>Rolling it</span><Num value={f.roll_cost ?? 0} step={0.5} onSave={(roll) => costs({ roll })} /><CurrencyIcon id="chaos" /></label>
+            <label title={`Vaal Orbs a map, at today's price (≈ ${c(view.vaal_now ?? 0)}c)`}><span className="fn-ci"><ItemIcon name="Vaal Orb" size={18} /> Vaal Orbs</span><Num value={f.vaal ?? 0} step={1} onSave={(vaal) => costs({ vaal })} /><span className="muted small">×</span></label>
+            {(view.entry_now ?? []).map(([name, n, chaos]) => (
+              <label key={name} title="To start each run, at today's price"><span className="fn-ci"><ItemIcon name={name} size={18} /> {n !== 1 ? `${n} × ` : ""}{name}</span><b className="fn-ro">{c(chaos)}</b><CurrencyIcon id="chaos" /></label>
+            ))}
+            <label title="Invitations, chisels and so on"><span>Anything else</span><Num value={f.other_cost} step={0.5} onSave={(other) => costs({ other })} /><CurrencyIcon id="chaos" /></label>
             <div className="fn-total"><span>Altogether</span><Money chaos={view.cost} divine={view.divine} /></div>
           </div>
         </div>

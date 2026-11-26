@@ -1,0 +1,131 @@
+{
+  "_readme": [
+    "Creator farms for What to farm today (core/src/strategies.rs), from .claude/atlas-research/report_new_since_22nov.md (26 Nov 2026).",
+    "A run = one map (or one chain / one fight). loot: items priced live from poe.ninja (average of the names found), per run, times sell (what you get after selling slowly or under poe.ninja).",
+    "other_div: the creator's other loot per run in divines (gold, Lost Shipments, invitations…): their total minus the key items, so it stays put when prices move.",
+    "jackpot lines are rare big drops: shown apart, with a 'needs a big sample' badge instead of a plain div an hour.",
+    "costs: map (item name, or map_chaos), roll_chaos, threads [name, a run], vaal (Vaal Orbs a run), entry [item, a run].",
+    "ask: what Farm this asks the atlas builder for (atlas_opt::Ask)."
+  ],
+  "checked": "2026-11-26",
+  "strategies": [
+    {
+      "key": "vaal_temple",
+      "title": "Vaal Temple boss rush",
+      "pic": "Vaal Temple Map",
+      "mech": ["incursion"],
+      "how": "Buy Vaal Temple maps, run straight to the boss and leave. Lost in Transit and ore on the way, Exarch altars, Mirage copies the boss.",
+      "runs_hour": 37.8,
+      "unit": "map",
+      "loot": [
+        { "label": "Vaal boss fragment", "names": ["Soul Core of Might", "Soul Core of Finesse", "Soul Core of Intellect", "Soul Core of Instability"], "per_run": 0.15, "sell": 0.95,
+          "note": "Vascor: one ~8 div drop from about 15% of temples. We price it as a Soul Core, the ~8 div Vaal drop on poe.ninja; check the name in game." }
+      ],
+      "other_div": 0.94,
+      "costs": { "map": "Vaal Temple Map", "roll_chaos": 0, "threads": [], "vaal": 0, "entry": [] },
+      "one_item": true,
+      "source": { "who": "Vascor", "video": "_NVFw5tTzj8", "date": "25 Nov", "sample": "200 maps in 5 h 17 min", "trust": "high", "said": "about 70 div an hour after 9,000c of temples" },
+      "ask": { "goals": ["rush"], "altar": "exarch" },
+      "maps": ["Vaal Temple Map"],
+      "drops": ["Incandescent Invitation"]
+    },
+    {
+      "key": "sanctuary_vaults",
+      "title": "Sanctuary vault rush",
+      "pic": "Nightmare Map",
+      "mech": ["bosses"],
+      "how": "Rush Sanctuary Nightmare maps to the boss for its three fragments; the anomaly nodes open a vault (Atlas Anomaly) in about half of them. One Abyss, Bestiary and Ritual Thread only for Multiplying Modifiers.",
+      "runs_hour": 30,
+      "runs_guess": true,
+      "unit": "map",
+      "loot": [
+        { "label": "Vault jackpots", "names": ["Headhunter"], "per_run": 0.0025, "sell": 0.85, "jackpot": true },
+        { "label": "Vault jackpots", "names": ["Mageblood"], "per_run": 0.0025, "sell": 0.85, "jackpot": true },
+        { "label": "Vault jackpots", "names": ["House of Mirrors"], "per_run": 0.005, "sell": 0.9, "jackpot": true },
+        { "label": "Vaults", "names": ["Valdo's Puzzle Box"], "per_run": 0.1, "sell": 0.95 }
+      ],
+      "other_div": 0.85,
+      "costs": { "map": "Nightmare Map", "roll_chaos": 5, "threads": [["Abyss Thread", 1], ["Bestiary Thread", 1], ["Ritual Thread", 1]], "vaal": 0, "entry": [] },
+      "source": { "who": "SnooBAE85", "video": "TyRLbyZtXos", "date": "25 Nov", "sample": "29 vaults in 50 maps; Headhunter, Mageblood and 2 House of Mirrors in 100 maps (lucky)", "trust": "medium",
+        "said": "no div an hour; we count half his jackpots, and the fragments at about 44c each" },
+      "ask": { "goals": ["rush"], "threads": [["abyss", 1], ["bestiary", 1], ["ritual", 1]] },
+      "maps": ["Nightmare Map"],
+      "drops": ["Valdo's Puzzle Box"]
+    },
+    {
+      "key": "catarina",
+      "title": "Catarina medallions",
+      "pic": "Syndicate Medallion",
+      "mech": ["betrayal"],
+      "how": "Use Syndicate Medallions to fight Catarina again and again; her loot pays back the medallion and more. Rarity, explicit effect, shrines and Mirage on the tree.",
+      "runs_hour": 34,
+      "unit": "fight",
+      "loot": [],
+      "other_div": 4.2,
+      "costs": { "map_chaos": 0, "roll_chaos": 0, "threads": [], "vaal": 0, "entry": [["Syndicate Medallion", 1]] },
+      "jackpot": true,
+      "source": { "who": "Exile Mind", "video": "r22gBdSUGvk", "date": "22 Nov", "sample": "50 medallions: 20 returned 98 div (lucky), 30 more about 30 div an hour", "trust": "medium",
+        "said": "about 30 div an hour when medallions were 2.9 div; Hayura's Syndicate Nightmare maps made about 27 div an hour after costs" },
+      "ask": { "goals": ["rush"] },
+      "maps": [],
+      "drops": ["Syndicate Medallion"]
+    },
+    {
+      "key": "reverence",
+      "title": "Reverence memory chain",
+      "pic": "Echo of Reverence",
+      "mech": ["memories"],
+      "how": "A Memory of Reverence opens 4-6 maps to Theater of Lies, which drops an Echo of Reverence. Roll a guaranteed-Mirage mod on the last map for a second Echo. The Maven witnesses for invitations and chisels.",
+      "runs_hour": 4.5,
+      "unit": "chain",
+      "loot": [
+        { "label": "Echo of Reverence", "names": ["Echo of Reverence"], "per_run": 2, "sell": 0.95, "note": "One Echo, two with the Mirage on the last map." }
+      ],
+      "other_div": 2.5,
+      "costs": { "map_chaos": 0, "roll_chaos": 50, "threads": [], "vaal": 0, "entry": [["Memory of Reverence", 1]] },
+      "source": { "who": "Big Ducks", "video": "WwW4A6f4m1Y", "date": "23 Nov", "sample": "no itemised log, 4-5 chains an hour", "trust": "medium", "said": "15-30, about 20 div an hour" },
+      "ask": { "goals": ["destructive"] },
+      "maps": [],
+      "drops": ["Echo of Reverence", "Memory of Reverence"]
+    },
+    {
+      "key": "essence_resonance",
+      "title": "Essences + Crystal Resonance",
+      "pic": "Deafening Essence of Zeal",
+      "mech": ["essence"],
+      "how": "Alch-and-go T16 maps with every essence node: 6-7 essence monsters a map, and Crystal Resonance gives the boss a copy of each. Corrupt them with Vaal Orbs. Three cheapest Threads for Multiplying Modifiers.",
+      "runs_hour": 24,
+      "unit": "map",
+      "loot": [
+        { "label": "Zeal, Contempt, Rage, Scorn", "names": ["Deafening Essence of Zeal", "Deafening Essence of Contempt", "Deafening Essence of Rage", "Deafening Essence of Scorn"], "per_run": 8, "sell": 0.9 },
+        { "label": "Other Deafening essences", "names": ["Deafening Essence of Greed", "Deafening Essence of Misery", "Deafening Essence of Dread", "Deafening Essence of Envy", "Deafening Essence of Hatred", "Deafening Essence of Woe", "Deafening Essence of Fear", "Deafening Essence of Sorrow"], "per_run": 8, "sell": 0.85 },
+        { "label": "Corrupted essences", "names": ["Essence of Horror", "Essence of Delirium", "Essence of Hysteria", "Essence of Insanity"], "per_run": 3, "sell": 0.9 }
+      ],
+      "other_div": 0.35,
+      "costs": { "map": "Map (Tier 16)", "roll_chaos": 1, "threads": [["Incursion Thread", 1], ["Expedition Thread", 1], ["Ritual Thread", 1]], "vaal": 12, "entry": [] },
+      "source": { "who": "FGKorbyn21", "video": "H4xsYFChAEU", "date": "25 Nov", "sample": "24 maps in an hour", "trust": "medium", "said": "35 div, 33-34 after about 240c of costs" },
+      "ask": { "mechanics": ["essence"], "lock": [57336, 58439] },
+      "maps": [],
+      "drops": ["Deafening Essence of Zeal", "Deafening Essence of Scorn", "Deafening Essence of Contempt", "Essence of Horror"]
+    },
+    {
+      "key": "thread_farm",
+      "title": "1-Thread alch-and-go Threads",
+      "pic": "Legion Thread",
+      "mech": ["abyss"],
+      "how": "Alch-and-go Dunes with one Abyss Thread and every Thread node: rares drop Threads (Legion sells best), plus Fates. Cheap to run.",
+      "runs_hour": 25,
+      "unit": "map",
+      "loot": [
+        { "label": "Legion Threads", "names": ["Legion Thread"], "per_run": 3.9, "sell": 0.95 },
+        { "label": "Divine Orbs (Fates)", "names": ["Divine Orb"], "per_run": 0.2, "sell": 1 }
+      ],
+      "other_div": 0.4,
+      "costs": { "map": "Map (Tier 16)", "roll_chaos": 1, "threads": [["Abyss Thread", 1]], "vaal": 0, "entry": [] },
+      "source": { "who": "Squid RPG", "video": "oQijrjrED1E", "date": "25 Nov", "sample": "50 maps in about 2 h", "trust": "high", "said": "35 div, about 15 div an hour after 475c of costs; a third of it was Threads" },
+      "ask": { "goals": ["threads"], "threads": [["abyss", 1]] },
+      "maps": ["Dunes Map"],
+      "drops": ["Legion Thread", "Abyss Thread", "Bestiary Thread"]
+    }
+  ]
+}

@@ -247,6 +247,8 @@ pub struct Finder {
     /// Your trees with maps counted, best per hour first.
     pub own: Vec<OwnRow>,
     pub divine: f64,
+    /// Creator farms (Vaal Temple rush, Reverence chains…) at today's prices, best first (strategies.rs).
+    pub strategies: Vec<crate::strategies::Strat>,
 }
 
 /// Your map runs: (map name, seconds in it).
@@ -593,7 +595,7 @@ pub fn find(file: &PriceFile, temples: &Temples, runs: Runs, trees: &[OwnTree], 
     own.sort_by(|a, b| b.own.div_hour.total_cmp(&a.own.div_hour));
     let mut mechanics = worth;
     mechanics.sort_by(|a, b| (b.steady + b.jackpots * jack + b.raw).total_cmp(&(a.steady + a.jackpots * jack + a.raw)));
-    Finder { farms: farms_out, mechanics, trees_from: meta().updated.clone(), trees: meta().total, prices_from: file.updated.clone(), temples_from: temples.checked.clone(), own, divine: div }
+    Finder { farms: farms_out, mechanics, trees_from: meta().updated.clone(), trees: meta().total, prices_from: file.updated.clone(), temples_from: temples.checked.clone(), own, divine: div, strategies: crate::strategies::rank(file) }
 }
 
 /// Maps that suit these mechanics: each reason counts for how many of them it covers; a map to avoid for one is out

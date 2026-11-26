@@ -26,3 +26,7 @@
 .fn-costs { margin-top: 14px; display: grid; gap: 4px; font-size: 13px; }
 .fn-costs label { display: grid; grid-template-columns: minmax(0, 1fr) auto 22px; gap: 4px; align-items: center; }
 .fn-total { display: flex; justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 5px; margin-top: 2px; }
+.fn-ci { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.fn-ci .item-icon { object-fit: contain; }
+.fn-ro { text-align: right; font-weight: 500; font-variant-numeric: tabular-nums; }
+.fn-creator { margin-top: 6px; }

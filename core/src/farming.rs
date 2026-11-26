@@ -30,6 +30,24 @@ pub struct FarmNow {
     pub thread_cost: Option<f64>,
     /// Its drops stand out in your filter.
     pub in_filter: bool,
+    /// A creator farm (strategies.rs): what to ask the atlas builder for, instead of just its mechanics.
+    pub ask: Option<crate::atlas_opt::Ask>,
+    /// Rolling the map, chaos a run.
+    pub roll_cost: f64,
+    /// Vaal Orbs a run (corrupting essences) and entry items a run (Memory of Reverence, Syndicate Medallion…), priced live.
+    pub vaal: f64,
+    pub entry: Vec<(String, f64)>,
+    /// A creator farm: their runs an hour, and what that makes after costs at today's prices (divines an hour), next to yours.
+    pub runs_hour: Option<f64>,
+    pub creator_div_hour: Option<f64>,
+    /// "map", "chain" or "fight" ("" = map).
+    pub unit: String,
+}
+
+/// Loot a run after selling: each line at the share of its price you'd really get (`strategies::sell_through`).
+pub fn sold(loot: &[crate::loot::LootLine], file: Option<&crate::prices::PriceFile>) -> f64 {
+    let div = file.and_then(|f| crate::strategies::item(f, "Divine Orb")).map(|i| i.value).unwrap_or(1.0);
+    loot.iter().map(|l| l.value * file.and_then(|f| crate::strategies::item(f, &l.name)).map_or(1.0, |i| crate::strategies::sell_through(i, div))).sum()
 }
 
 /// One map run: chaos of loot, seconds until the next one began, and what a divine was worth then (None = not known).
@@ -142,6 +160,18 @@ mod tests {
         let (lo, hi) = profit(&runs, 20.0, None).unwrap().likely.unwrap();
         let mid = profit(&runs, 20.0, None).unwrap().hour;
         assert!(lo < mid && mid < hi && hi - lo > 300.0, "{lo} {mid} {hi}");
+    }
+
+    #[test]
+    fn slow_sellers_count_less() {
+        use crate::prices::{PriceFile, PriceItem};
+        let it = |n: &str, cat: &str, v: f64, vol: Option<f64>, lst: Option<u32>| PriceItem { name: n.into(), base: n.into(), cat: cat.into(), value: v, variant: None, listings: lst, trend: None, change: None, volume: vol };
+        let file = PriceFile { game: "poe1".into(), league: "Covens".into(), league_name: None, updated: "now".into(), unit: "chaos".into(), bases: vec![],
+            items: vec![it("Divine Orb", "Currency", 170.0, Some(1e7), None), it("Nightmare Map", "Map", 60.0, None, Some(60000))] };
+        let line = |n: &str, v: f64| crate::loot::LootLine { name: n.into(), cat: "other".into(), stack: 1, value: v, icon: String::new(), tier: None, high: None };
+        let loot = [line("Divine Orb", 170.0), line("Nightmare Map", 60.0), line("Unpriced", 10.0)];
+        assert_eq!(sold(&loot, Some(&file)), 170.0 + 45.0 + 10.0);
+        assert_eq!(sold(&loot, None), 240.0);
     }
 
     #[test]
