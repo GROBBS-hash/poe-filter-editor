@@ -72,6 +72,12 @@ pub fn sample_points(points: &[(i32, i32)]) -> Result<Vec<[u8; 3]>, String> { im
 #[cfg(not(windows))]
 pub fn sample_points(_points: &[(i32, i32)]) -> Result<Vec<[u8; 3]>, String> { Err("Only on Windows".into()) }
 
+/// Every line of text in a w x h box around the mouse, with its place on screen (the altar marks).
+#[cfg(windows)]
+pub fn read_placed_near_mouse(w: i32, h: i32) -> Result<Vec<(String, [f32; 4])>, String> { imp::read_placed(w, h).map_err(|e| e.to_string()) }
+#[cfg(not(windows))]
+pub fn read_placed_near_mouse(_w: i32, _h: i32) -> Result<Vec<(String, [f32; 4])>, String> { Err("Reading the screen only works on Windows".into()) }
+
 #[cfg(not(windows))]
 pub fn read_lines_near_mouse(_w: i32, _h: i32) -> Result<Vec<String>, String> {
     Err("Reading the screen only works on Windows".into())
@@ -487,9 +493,21 @@ mod imp {
     pub fn read_lines_at(cx: i32, cy: i32, w: i32, h: i32) -> windows::core::Result<Vec<String>> { read_around(cx, cy, w, h, h < 500) }
 
     fn read_around(cx: i32, cy: i32, w: i32, h: i32, enlarge: bool) -> windows::core::Result<Vec<String>> {
+        Ok(read_placed_around(cx, cy, w, h, enlarge)?.into_iter().map(|(t, _)| t).collect())
+    }
+
+    /// Every line of text in a w x h box around the mouse, with where it is on screen (x, y, width, height).
+    pub fn read_placed(w: i32, h: i32) -> windows::core::Result<Vec<(String, [f32; 4])>> {
+        let mut p = POINT::default();
+        unsafe { GetCursorPos(&mut p)? };
+        read_placed_around(p.x, p.y, w, h, true)
+    }
+
+    fn read_placed_around(cx: i32, cy: i32, w: i32, h: i32, enlarge: bool) -> windows::core::Result<Vec<(String, [f32; 4])>> {
         let max = OcrEngine::MaxImageDimension().unwrap_or(2600) as i32;
         let engine = OcrEngine::TryCreateFromUserProfileLanguages()?;
-        let (pic, _, _) = capture(cx, cy, w.min(max), h.min(max))?;
+        let (pic, mx, my) = capture(cx, cy, w.min(max), h.min(max))?;
+        let (ox, oy) = ((cx - mx) as f32, (cy - my) as f32);
         // Small game text reads better enlarged, when it still fits the engine's limit.
         let scale = if enlarge && pic.w * 2 <= max && pic.h * 2 <= max { 2 } else { 1 };
         let enlarged = upscale(&pic, 0, pic.w, scale);
@@ -497,10 +515,18 @@ mod imp {
         let bitmap = SoftwareBitmap::CreateCopyWithAlphaFromBuffer(
             &buffer, BitmapPixelFormat::Bgra8, pic.w * scale, pic.h * scale, BitmapAlphaMode::Ignore)?;
         let result = engine.RecognizeAsync(&bitmap)?.get()?;
+        let sf = scale as f32;
         let mut out = Vec::new();
         for line in result.Lines()? {
             let t = line.Text()?.to_string();
-            if !t.trim().is_empty() { out.push(t); }
+            if t.trim().is_empty() { continue; }
+            let (mut x0, mut y0, mut x1, mut y1) = (f32::MAX, f32::MAX, f32::MIN, f32::MIN);
+            for word in line.Words()? {
+                let r = word.BoundingRect()?;
+                x0 = x0.min(r.X); y0 = y0.min(r.Y); x1 = x1.max(r.X + r.Width); y1 = y1.max(r.Y + r.Height);
+            }
+            let place = if x0 <= x1 { [x0 / sf + ox, y0 / sf + oy, (x1 - x0) / sf, (y1 - y0) / sf] } else { [ox, oy, 0.0, 0.0] };
+            out.push((t, place));
         }
         Ok(out)
     }

@@ -233,6 +233,20 @@
         "visible": false,
         "shadow": false,
         "focus": false
+      },
+      {
+        "label": "altar",
+        "title": "Altar marks",
+        "width": 400,
+        "height": 200,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "visible": false,
+        "shadow": false,
+        "focus": false
       }
     ],
     "security": {

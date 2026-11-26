@@ -526,6 +526,24 @@ type Choice = { heading: string; lines: ChoiceLine[]; score: number; danger: boo
 type ChoiceRead = { kind: string; choices: Choice[]; pick: number | null; priced: [string, number][]; lines: string[] };
 type ChoiceView = { read: ChoiceRead | null; error: string | null; divine: number | null };
 
+type AltarMark = { x: number; y: number; w: number; h: number; verdict: "take" | "skip" | "either"; note: string | null };
+
+/** Marks drawn over an Eldritch altar in a map (he picked design B, 26 Nov): a green box and tick on the better
+ *  option, the other dimmed with a red cross (and its danger). The window never takes clicks. */
+export function AltarMarks() {
+  const [marks, setMarks] = useState<AltarMark[]>([]);
+  useEffect(() => {
+    const un = listen<AltarMark[]>("altar-marks", (e) => setMarks(e.payload));
+    return () => { un.then((f) => f()); };
+  }, []);
+  return <>{marks.map((m, i) => (
+    <div key={i} className={`altar-mark ${m.verdict}`} style={{ left: m.x, top: m.y, width: m.w, height: m.h }}>
+      <span className="altar-sign">{m.verdict === "take" ? "✔" : m.verdict === "skip" ? "✖" : ""}
+        {m.verdict === "skip" && m.note && <small>{m.note}</small>}</span>
+    </div>
+  ))}</>;
+}
+
 /** Alt+R over an Eldritch altar, an Expedition remnant or a reward screen: which to pick, what's dangerous, what's worth what. */
 export function ChoiceWindow() {
   const [v, setV] = useState<ChoiceView | null>(null);
@@ -776,12 +794,14 @@ export default function PlayTools() {
   const [msg, setMsg] = useState("");
   const [session, setSession] = useState<SessionSummary | null>(null);
   const [keepInMaps, setKeepInMaps] = useState(false);
+  const [altarAuto, setAltarAuto] = useState(true);
   const [prefs, setPrefs] = useState<LootPrefs | null>(null);
   const [divine, setDivine] = useState<number | null>(null);
   const [openRun, setOpenRun] = useState<number | null>(null);
   useEffect(() => {
     invoke<PlayView>("play_view").then((p) => { setSession(p.tracker.session); setPrefs(p.tracker.loot_prefs); setDivine(p.tracker.divine); }).catch(() => {});
     invoke<boolean>("play_prefs_get").then(setKeepInMaps).catch(() => {});
+    invoke<boolean>("altar_auto_get").then(setAltarAuto).catch(() => {});
     invoke<LevelView>("level_view").then(setLv).catch(() => {});
     invoke<SearchView>("searches_get").then((v) => setSearches(v.saved)).catch(() => {});
     invoke<Sheet[]>("sheets_list").then(setSheets).catch(() => {});
@@ -825,6 +845,8 @@ export default function PlayTools() {
         </div>
         <label className="check" style={{ marginTop: 10 }}><input type="checkbox" checked={!keepInMaps} onChange={(e) => { setKeepInMaps(!e.target.checked); invoke("play_prefs", { keepInMaps: !e.target.checked }); }} />
           <span>Hide the levelling, searches, cheat sheet and notes windows while I'm in a map (they come back in town)</span></label>
+        <label className="check" style={{ marginTop: 6 }}><input type="checkbox" checked={altarAuto} onChange={(e) => { setAltarAuto(e.target.checked); invoke("altar_auto_set", { on: e.target.checked }); }} />
+          <span>Mark Eldritch altars by themselves in maps: rest the mouse on an altar and the better option gets a green tick, the other a red cross (no key, no pausing)</span></label>
       </div>
 
       {session && <div className="card">

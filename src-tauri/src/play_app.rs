@@ -47,6 +47,8 @@ struct PlayStore {
     over_panels: bool,
     /// The loot breakdown per map (Settings).
     loot: LootPrefs,
+    /// Don't mark Eldritch altars by themselves in maps (Alt+R still works).
+    altar_off: bool,
 }
 
 /// "Tell me when Mageblood is under 150 divines".
@@ -817,7 +819,88 @@ pub fn start_watchers(app: AppHandle) {
     start_panel_watch(app.clone());
     start_level_watch(app.clone());
     start_pause_watch(app.clone());
+    start_altar_watch(app.clone());
     start_loot_worker(app);
+}
+
+/// Altar marks (26 Nov, he picked design B): in a map, when the mouse rests on an Eldritch altar, the better option
+/// gets a green box and tick and the other a red cross, drawn over the game in a window that never takes clicks.
+/// No key and no pausing: it only reads the screen, he still clicks the altar himself.
+fn start_altar_watch(app: AppHandle) {
+    thread::spawn(move || {
+        let mut last = (0.0f64, 0.0f64);
+        let mut shown_at: Option<(f64, f64)> = None;
+        let mut misses = 0;
+        let mut quiet = 0u32;
+        loop {
+            thread::sleep(Duration::from_millis(350));
+            let Some(w) = app.get_webview_window("altar") else { continue };
+            let hide = |w: &tauri::WebviewWindow| { if w.is_visible().unwrap_or(false) { let _ = w.hide(); } };
+            let on = with_store(&app, |s| !s.altar_off && s.maps.inside);
+            if !on || !game_in_front() { hide(&w); shown_at = None; continue; }
+            let Ok(p) = w.cursor_position() else { continue };
+            let moved = (p.x - last.0).hypot(p.y - last.1);
+            last = (p.x, p.y);
+            // Moved well away from the altar: the marks go.
+            if let Some(s) = shown_at { if (p.x - s.0).hypot(p.y - s.1) > 250.0 { hide(&w); shown_at = None; } }
+            // Read only while the mouse rests (hovering the altar), not while he's running about; resting on
+            // something that isn't an altar, look again only now and then (the reader takes some of the PC).
+            if moved > 25.0 { quiet = 0; continue; }
+            quiet += 1;
+            if shown_at.is_none() && quiet > 2 && quiet % 4 != 0 { continue; }
+            let visible = w.is_visible().unwrap_or(false);
+            if visible { out_of_pictures(&w, true); thread::sleep(Duration::from_millis(40)); }
+            let lines = screen::read_placed_near_mouse(1500, 1000);
+            if visible { out_of_pictures(&w, false); }
+            let Ok(lines) = lines else { continue };
+            let avoid = app.state::<AppState>().store.lock().unwrap().settings.map_avoid.clone().unwrap_or_default();
+            let placed: Vec<(String, Option<[f32; 4]>)> = lines.into_iter().map(|(t, b)| (t, Some(b))).collect();
+            let read = filter_core::choices::read_placed(&placed, &avoid, &|_| None);
+            match filter_core::choices::altar_marks(&read) {
+                Some(marks) => {
+                    misses = 0;
+                    shown_at = Some((p.x, p.y));
+                    show_altar_marks(&app, &w, marks);
+                }
+                // One missed read (the reader blinked) doesn't take the marks away.
+                None => { misses += 1; if misses >= 2 { hide(&w); shown_at = None; } }
+            }
+        }
+    });
+}
+
+#[derive(Serialize, Clone)]
+struct AltarMarkView { x: f32, y: f32, w: f32, h: f32, verdict: String, note: Option<String> }
+
+fn show_altar_marks(app: &AppHandle, w: &tauri::WebviewWindow, marks: Vec<filter_core::choices::AltarMark>) {
+    let (pad, side) = (8.0f32, 150.0f32);
+    let x0 = marks.iter().map(|m| m.area[0]).fold(f32::MAX, f32::min) - pad;
+    let y0 = marks.iter().map(|m| m.area[1]).fold(f32::MAX, f32::min) - pad;
+    let x1 = marks.iter().map(|m| m.area[0] + m.area[2]).fold(f32::MIN, f32::max) + pad + side;
+    let y1 = marks.iter().map(|m| m.area[1] + m.area[3]).fold(f32::MIN, f32::max) + pad;
+    let view: Vec<AltarMarkView> = marks.into_iter().map(|m| AltarMarkView {
+        x: m.area[0] - x0 - 4.0, y: m.area[1] - y0 - 4.0, w: m.area[2] + 8.0, h: m.area[3] + 8.0, verdict: m.verdict, note: m.note }).collect();
+    win_place::placing();
+    let _ = w.set_size(tauri::PhysicalSize::new((x1 - x0).max(10.0) as u32, (y1 - y0).max(10.0) as u32));
+    let _ = w.set_position(PhysicalPosition::new(x0 as i32, y0 as i32));
+    let _ = w.set_ignore_cursor_events(true);
+    let _ = w.emit("altar-marks", view);
+    if !w.is_visible().unwrap_or(false) {
+        let front = game_in_front();
+        let _ = w.show();
+        if front { focus_game(); }
+    }
+    let _ = app;
+}
+
+#[tauri::command]
+pub fn altar_auto_get(app: AppHandle) -> bool { with_store(&app, |s| !s.altar_off) }
+
+#[tauri::command]
+pub fn altar_auto_set(app: AppHandle, on: bool) {
+    with_store(&app, |s| s.altar_off = !on);
+    save_store(&app);
+    if !on { if let Some(w) = app.get_webview_window("altar") { let _ = w.hide(); } }
 }
 
 fn set_left(app: &AppHandle, m: Option<journey::MonstersLeft>) {

@@ -16,7 +16,8 @@
     "sheet",
     "notes",
     "stashbox",
-    "choice"
+    "choice",
+    "altar"
   ],
   "permissions": [
     "core:default",

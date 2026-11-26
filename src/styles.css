@@ -2438,3 +2438,11 @@ button.qm-rule:hover, .qm-rule.can-open:hover { border-color: var(--gold); backg
 .really-list { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 5px; max-height: 190px; overflow-y: auto; }
 .really-card { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border: 1px solid var(--line); border-radius: 999px; font-size: 12px; }
 .really-card b { color: var(--gold); }
+/* Altar marks over the game (Play.tsx AltarMarks): never take clicks, drawn in a see-through window. */
+.altar-mark { position: fixed; border-radius: 4px; pointer-events: none; }
+.altar-mark.take { border: 3px solid #4cc768; box-shadow: 0 0 0 2px rgba(0,0,0,.6), 0 0 12px rgba(76,199,104,.7); }
+.altar-mark.skip { border: 3px solid #d0504a; background: rgba(0,0,0,.45); box-shadow: 0 0 0 2px rgba(0,0,0,.6); }
+.altar-sign { position: absolute; left: calc(100% + 10px); top: 50%; transform: translateY(-50%); font-size: 34px; line-height: 1; text-shadow: 0 0 4px #000, 0 0 2px #000; white-space: nowrap; }
+.altar-mark.take .altar-sign { color: #7fe08f; }
+.altar-mark.skip .altar-sign { color: #ff7a6b; }
+.altar-sign small { display: block; font-size: 13px; margin-top: 4px; color: #ffd6d0; }
