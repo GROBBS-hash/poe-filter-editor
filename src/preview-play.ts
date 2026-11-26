@@ -1,3 +1,4 @@
+import psSample from "./preview-price-search.json";
 // Sample data for the play windows in the browser preview: preview-app.html?play=level (or tracker, searches,
 // sheet, notes, choice). Shapes mirror play_app.rs / journey.rs.
 const now = Math.floor(Date.now() / 1000);
@@ -95,4 +96,26 @@ export function playMock(cmd: string): unknown {
     case "sheets_list": return [];
     default: return undefined;
   }
+}
+
+// ---------- price search (?play=pricesearch) ----------
+type PsItem = { name: string; base: string; cat: string; value: number; variant?: string | null; listings?: number | null; volume?: number | null; trend?: number[] | null; change?: number | null };
+/** A rough copy of filter_core::price_search for the browser preview (versions grouped, name matches first). */
+export function previewPriceSearch(q: string) {
+  const query = q.trim().toLowerCase().replace(/'/g, "");
+  const groups = new Map<string, { name: string; base: string; cat: string; kind: string; versions: object[]; main: number; ninja: string; trade: string }>();
+  for (const it of psSample.items as PsItem[]) {
+    if (!query || !(it.name.toLowerCase().replace(/'/g, "").includes(query) || it.base.toLowerCase().includes(query))) continue;
+    const k = it.name + "|" + it.base + "|" + it.cat;
+    const g = groups.get(k) ?? { name: it.name, base: it.base, cat: it.cat, kind: it.cat.replace(/([a-z])([A-Z])/g, "$1 $2"), versions: [], main: 0, ninja: "https://poe.ninja", trade: "https://www.pathofexile.com/trade" };
+    g.versions.push({ label: it.variant ?? "", value: it.value, listings: it.listings ?? null, sold: it.volume ? Math.round(it.volume / it.value) : null, change: it.change ?? null, trend: it.trend ?? null });
+    groups.set(k, g);
+  }
+  const results = [...groups.values()].map((g) => {
+    const vs = (g.versions as { value: number; listings: number | null }[]).sort((a, b) => b.value - a.value);
+    const main = vs.reduce((best, v, i) => (v.listings ?? 0) > (vs[best].listings ?? 0) ? i : best, 0);
+    return { ...g, versions: vs, main };
+  }).sort((a, b) => Number(!a.name.toLowerCase().startsWith(query)) - Number(!b.name.toLowerCase().startsWith(query))
+    || (b.versions[b.main] as { value: number }).value - (a.versions[a.main] as { value: number }).value);
+  return { poe2: false, league: psSample.league, unit: "c", per_div: 171.7, updated: psSample.updated, results };
 }

@@ -26,6 +26,8 @@ export const HOTKEYS: Hotkey[] = [
     how: "Swaps to your next filter (e.g. League Start, then Strict) and loads it in the game. Handy when you want to hide more as you get stronger." },
   { setting: "key_price", def: "Ctrl+D", group: "lookup", name: "Price check",
     how: "Hover an item and press it to see what it sells for on the trade site. On a map it also warns you about mods your build can't run." },
+  { setting: "key_find", def: "Alt+F", group: "lookup", name: "Search a price",
+    how: "Press it anywhere in the game and type an item name: its poe.ninja price shows as you type, with every version and a link to the trade site. Not Ctrl+F, which is the game's own stash search." },
   { setting: "key_wiki", def: "Alt+W", group: "lookup", name: "Open on the wiki",
     how: "Hover an item and press it: its page on the Path of Exile wiki opens in your browser." },
   { setting: "key_read", def: "Alt+R", group: "lookup", name: "Which one should I pick?",

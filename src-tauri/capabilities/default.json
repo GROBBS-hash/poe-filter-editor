@@ -17,7 +17,8 @@
     "notes",
     "stashbox",
     "choice",
-    "altar"
+    "altar",
+    "pricesearch"
   ],
   "permissions": [
     "core:default",

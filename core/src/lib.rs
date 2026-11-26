@@ -31,6 +31,7 @@ pub mod neversink;
 pub mod pob;
 pub mod preview;
 pub mod prices;
+pub mod price_search;
 pub mod profiles;
 pub mod related;
 pub mod rules;

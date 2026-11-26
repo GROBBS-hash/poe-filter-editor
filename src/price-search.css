@@ -1,0 +1,44 @@
+/* Price search window (PriceSearch.tsx), mock-up B. */
+.ps { height: 100vh; display: flex; flex-direction: column; background: rgba(20, 22, 27, .97); border: 1px solid var(--line-2);
+  border-radius: 12px; overflow: hidden; color: var(--text); font-size: 14px; }
+.ps-search { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.ps-glass { font-size: 16px; opacity: .8; }
+.ps-search input { flex: 1; background: transparent; border: 0; outline: none; color: var(--text); font-size: 19px; padding: 2px 0; caret-color: var(--gold); }
+.ps-search input::placeholder { color: var(--muted); }
+.ps-league { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.ps-key { font-size: 11px; color: var(--muted); border: 1px solid var(--line-2); border-radius: 4px; padding: 1px 6px; background: transparent; cursor: pointer; }
+.ps-split { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 320px; }
+.ps-list { overflow-y: auto; min-height: 0; }
+.ps-list::-webkit-scrollbar { width: 6px; }
+.ps-list::-webkit-scrollbar-thumb { background: #3a404c; border-radius: 3px; }
+.ps-row { display: flex; align-items: center; gap: 11px; padding: 6px 14px; border-bottom: 1px solid #20242c; cursor: pointer; }
+.ps-row:hover { background: rgba(255, 255, 255, .03); }
+.ps-row.sel { background: var(--gold-bg); box-shadow: inset 3px 0 0 var(--gold); }
+.ps-row .item-icon { width: 36px; height: 36px; }
+.ps-nm { flex: 1; min-width: 0; }
+.ps-n { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ps-k { font-size: 12px; color: var(--muted); }
+.ps-nm .ps-k { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ps-u { color: #c8762f; } .ps-c { color: #d8d8a0; } .ps-dv { color: #9fd0ff; } .ps-gm { color: #2bb5ad; }
+.ps-vol { width: 92px; text-align: right; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.ps-pr { text-align: right; white-space: nowrap; min-width: 92px; }
+.ps-a { font-size: 15px; font-weight: 600; }
+.ps-b { font-size: 12px; color: var(--muted); }
+.ps-up { color: var(--green); } .ps-dn { color: var(--red); }
+.ps-empty { padding: 18px 16px; color: var(--muted); }
+.ps-detail { border-left: 1px solid var(--line); padding: 14px 16px; background: #181b21; overflow-y: auto; min-height: 0; }
+.ps-big { display: flex; gap: 12px; align-items: center; }
+.ps-big .item-icon { width: 64px; height: 64px; }
+.ps-big h3 { margin: 0; font-size: 18px; font-weight: 600; }
+.ps-price { font-size: 26px; font-weight: 700; margin: 12px 0 2px; }
+.ps-price small { font-size: 14px; color: var(--muted); font-weight: 400; }
+.ps-spark { width: 100%; height: 44px; margin: 8px 0 4px; display: block; }
+.ps-vers { margin: 8px 0 10px; display: flex; flex-direction: column; }
+.ps-vers button { display: flex; justify-content: space-between; gap: 8px; background: transparent; border: 0; border-bottom: 1px solid #262a33;
+  border-radius: 0; color: var(--text-2); font-size: 12.5px; padding: 5px 2px; text-align: left; cursor: pointer; }
+.ps-vers button.on { color: var(--gold); }
+.ps-vers button:hover { color: var(--text); }
+.ps-note { font-size: 12px; color: var(--muted); margin: 6px 0; }
+.ps-btns { display: flex; gap: 8px; margin-top: 10px; }
+.ps-foot { display: flex; gap: 16px; padding: 7px 14px; font-size: 12px; color: var(--muted); background: #15171c; border-top: 1px solid var(--line); }
+.ps-ago { margin-left: auto; }

@@ -247,6 +247,19 @@
         "visible": false,
         "shadow": false,
         "focus": false
+      },
+      {
+        "label": "pricesearch",
+        "title": "Price search",
+        "width": 860,
+        "height": 520,
+        "resizable": false,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "shadow": false
       }
     ],
     "security": {

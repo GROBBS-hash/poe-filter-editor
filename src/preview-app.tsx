@@ -10,7 +10,8 @@ import atlasData from "../public/atlas_poe1.json";
 import BuildOverlay from "./BuildOverlay";
 import "./styles.css";
 import { ChoiceWindow, LevelWindow, NotesWindow, SearchesWindow, SheetWindow, TrackerWindow } from "./Play";
-import { choiceView, playMock } from "./preview-play";
+import { choiceView, playMock, previewPriceSearch } from "./preview-play";
+import PriceSearch from "./PriceSearch";
 import { emit } from "@tauri-apps/api/event";
 
 const now = Math.floor(Date.now() / 1000);
@@ -201,6 +202,7 @@ mockIPC((cmd, args) => {
   if (cmd === "map_tool_regex") return "\"!s def\"";
   // Real icons when the editor is running (vite serves the app's icon list), else none.
   // public/_icons.json (git-ignored) when present: a picture list with the extra sources merged in, else his own.
+  if (cmd === "price_search") return previewPriceSearch((args as { q: string }).q);
   if (cmd === "get_icons") return fetch("/_icons.json").then((r) => r.ok ? r.json() : Promise.reject()).catch(() => fetch("/preview-data/icons").then((r) => r.json())).catch(() => ({}));
   if (cmd === "league_get" || cmd === "league_set") {
     const p = (args as { league?: string } | undefined)?.league ?? null;
@@ -413,6 +415,6 @@ if (sheetWin) document.body.classList.add("overlay");
 };
 if (buildWin) document.body.classList.add("overlay");
 if (atlasWindow) document.body.classList.add("overlay");
-const PLAY_WINS: Record<string, () => React.ReactElement> = { level: LevelWindow, tracker: TrackerWindow, searches: SearchesWindow, sheet: SheetWindow, notes: NotesWindow, choice: ChoiceWindow };
-function PlayPreview() { const W = PLAY_WINS[playWin ?? ""] ?? SheetWindow; if (playWin === "choice") setTimeout(() => emit("choice-read", choiceView), 300); const [w, h] = ({ level: [380, 440], tracker: [280, 360], searches: [320, 380], sheet: [900, 600], notes: [360, 420], choice: [380, 480] } as Record<string, number[]>)[playWin ?? ""] ?? [900, 600]; return <div style={{ width: w, height: h, position: "relative", transform: "translateZ(0)" }}><style>{`.bo{height:${h}px !important}`}</style><W /></div>; }
+const PLAY_WINS: Record<string, () => React.ReactElement> = { level: LevelWindow, tracker: TrackerWindow, searches: SearchesWindow, sheet: SheetWindow, notes: NotesWindow, choice: ChoiceWindow, pricesearch: PriceSearch };
+function PlayPreview() { const W = PLAY_WINS[playWin ?? ""] ?? SheetWindow; if (playWin === "choice") setTimeout(() => emit("choice-read", choiceView), 300); const [w, h] = ({ level: [380, 440], tracker: [280, 360], searches: [320, 380], sheet: [900, 600], notes: [360, 420], choice: [380, 480], pricesearch: [860, 520] } as Record<string, number[]>)[playWin ?? ""] ?? [900, 600]; return <div style={{ width: w, height: h, position: "relative", transform: "translateZ(0)" }}><style>{`.bo,.ps{height:${h}px !important}`}</style><W /></div>; }
 createRoot(document.getElementById("root")!).render(playWin ? <PlayPreview /> : atlasWindow ? <AtlasOverlay /> : buildWin ? <BuildOverlay /> : <App />);

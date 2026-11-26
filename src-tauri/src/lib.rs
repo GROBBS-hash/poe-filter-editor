@@ -16,6 +16,7 @@ mod phone_app;
 mod win_place;
 mod updates;
 mod price_tick;
+mod price_search_app;
 
 use filter_core::{
     evaluate::{status_with_fallback, Status},
@@ -67,7 +68,7 @@ struct AppState {
 }
 
 #[derive(Clone, Copy, PartialEq)]
-enum HotAction { QuickEdit, Batch, Reload, Cycle, Build, Price, Atlas, Chat(usize), Play(&'static str), Wiki, Read }
+enum HotAction { QuickEdit, Batch, Reload, Cycle, Build, Price, Atlas, Chat(usize), Play(&'static str), Wiki, Read, Find }
 
 /// The in-game keys are only held while Path of Exile (or one of our windows over it) is in front, like Awakened
 /// PoE Trade: elsewhere F5 refreshes the browser again (he asked 23 Nov). `KEYS_ON` = they're registered now.
@@ -128,9 +129,10 @@ fn register_hotkeys_now(app: &AppHandle, s: &Settings) -> Result<(), String> {
     }
     if !s.key_wiki.trim().is_empty() { wanted.push((s.key_wiki.as_str(), HotAction::Wiki)); }
     if !s.key_read.trim().is_empty() { wanted.push((s.key_read.as_str(), HotAction::Read)); }
+    if !s.key_find.trim().is_empty() { wanted.push((s.key_find.as_str(), HotAction::Find)); }
     let mut parsed = Vec::new();
     for (key, action) in wanted {
-        let soft = matches!(action, HotAction::Atlas | HotAction::Play(_) | HotAction::Wiki | HotAction::Read);
+        let soft = matches!(action, HotAction::Atlas | HotAction::Play(_) | HotAction::Wiki | HotAction::Read | HotAction::Find);
         let sc: Shortcut = match key.parse() {
             Ok(sc) => sc,
             Err(_) if soft => { let _ = warn(format!("“{key}” isn't a key the app understands: pick another in Settings")); continue; }
@@ -164,7 +166,7 @@ fn register_hotkeys_now(app: &AppHandle, s: &Settings) -> Result<(), String> {
             Err(e) if action == HotAction::Atlas => {
                 let _ = warn(format!("Atlas strategy key unavailable (another program may own it): {e}"));
             }
-            Err(e) if matches!(action, HotAction::Play(_) | HotAction::Wiki | HotAction::Read) => {
+            Err(e) if matches!(action, HotAction::Play(_) | HotAction::Wiki | HotAction::Read | HotAction::Find) => {
                 let _ = warn(format!("A play window key is unavailable (another program may own it): {e}"));
             }
             Err(e) if matches!(action, HotAction::Chat(_)) => {
@@ -3183,7 +3185,7 @@ pub fn run() {
         .plugin(tauri_plugin_window_state::Builder::default()
             .with_state_flags(tauri_plugin_window_state::StateFlags::SIZE | tauri_plugin_window_state::StateFlags::POSITION
                 | tauri_plugin_window_state::StateFlags::MAXIMIZED)
-            .with_denylist(&["overlay", "build", "trade", "trades", "earnings", "atlas", "batch", "level", "tracker", "searches", "sheet", "notes", "stashbox", "choice", "altar"]).build())
+            .with_denylist(&["overlay", "build", "trade", "trades", "earnings", "atlas", "batch", "level", "tracker", "searches", "sheet", "notes", "stashbox", "choice", "altar", "pricesearch"]).build())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(move |app, sc, ev| {
@@ -3221,6 +3223,8 @@ pub fn run() {
                         play_app::toggle(app, label);
                     } else if action == Some(HotAction::Wiki) {
                         play_app::wiki_lookup(app.clone());
+                    } else if action == Some(HotAction::Find) {
+                        price_search_app::toggle(app);
                     } else if action == Some(HotAction::Read) {
                         play_app::read_choice(app.clone());
                     } else if action == Some(HotAction::Build) {
@@ -3394,7 +3398,7 @@ pub fn run() {
             apply_level_preset,
             ask,
             get_history,
-            get_icons, apply_to_tier,
+            get_icons, apply_to_tier, price_search_app::price_search, price_search_app::price_search_hide,
             preview_drops,
             theme_cards,
             rebuilt_filters,

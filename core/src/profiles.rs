@@ -117,6 +117,8 @@ pub struct Settings {
     pub key_wiki: String,
     /// Read the league mechanic choice under the mouse (Eldritch altar, Expedition remnant, reward screen).
     pub key_read: String,
+    /// Price search box (26 Nov): type an item name, see its price. Not Ctrl+F: that is the game's own stash search.
+    pub key_find: String,
 }
 
 /// A hotkey that types one chat command in game.
@@ -135,7 +137,7 @@ impl Default for Settings {
             trade_helper: true, thanks_message: "thanks, good luck!".into(), chat_keys: vec![], map_tool: Default::default(),
             poe_account: String::new(), poesessid: String::new(), leagues: BTreeMap::new(), wealth_tabs: vec![], wealth_min: 10.0, earn_minutes: 3,
             price_compare: true, price_rolls: true, price_instant_all: false, price_buyout_only: true, build_with_tree: false, key_tree: "P".into(), key_atlas: "F7".into(),
-            key_level: "F8".into(), key_tracker: "F9".into(), key_searches: "F10".into(), key_sheet: "F11".into(), key_notes: String::new(), key_wiki: "Alt+W".into(), key_read: "Alt+R".into() }
+            key_level: "F8".into(), key_tracker: "F9".into(), key_searches: "F10".into(), key_sheet: "F11".into(), key_notes: String::new(), key_wiki: "Alt+W".into(), key_read: "Alt+R".into(), key_find: "Alt+F".into() }
     }
 }
 
