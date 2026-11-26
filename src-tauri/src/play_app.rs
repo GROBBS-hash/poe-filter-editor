@@ -847,6 +847,17 @@ fn raw_show(w: &tauri::WebviewWindow, on: bool) {
 #[cfg(not(windows))]
 fn raw_show(_w: &tauri::WebviewWindow, _on: bool) {}
 
+/// Leaves the window out of screen pictures (it stays on screen for him), so a read of the screen sees the game
+/// under it. 26 Nov: the tracker sat on the game's "More than 50 monsters remain" and monsters left never showed.
+#[cfg(windows)]
+fn out_of_pictures(w: &tauri::WebviewWindow, on: bool) {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::WindowsAndMessaging::{SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE, WDA_NONE};
+    if let Ok(h) = w.hwnd() { unsafe { let _ = SetWindowDisplayAffinity(HWND(h.0 as _), if on { WDA_EXCLUDEFROMCAPTURE } else { WDA_NONE }); } }
+}
+#[cfg(not(windows))]
+fn out_of_pictures(_w: &tauri::WebviewWindow, _on: bool) {}
+
 /// Back from under a panel (closed, switched off, or he pressed its key).
 fn panel_back(app: &AppHandle) -> bool {
     if !PANEL_HID.swap(false, Ordering::Relaxed) { return false; }
@@ -922,7 +933,15 @@ fn start_panel_watch(app: AppHandle) {
         if info_at.elapsed() < Duration::from_millis(1200) { continue; }
         info_at = std::time::Instant::now();
         if !with_store(&app, |s| s.maps.inside) { continue; }
-        let said = read(journey::info_box(rect)).ok().and_then(|l| l.iter().find_map(|x| journey::monsters_left(x)));
+        // The tracker on top of the map info: read what's under it (only for that moment, so his screenshots keep it).
+        let ib = journey::info_box(rect);
+        let over = match (w.outer_position(), w.outer_size()) {
+            (Ok(p), Ok(s)) => w.is_visible().unwrap_or(false) && p.x < ib.0 + ib.2 && p.x + s.width as i32 > ib.0 && p.y < ib.1 + ib.3 && p.y + s.height as i32 > ib.1,
+            _ => false,
+        };
+        if over { out_of_pictures(&w, true); thread::sleep(Duration::from_millis(60)); }
+        let said = read(ib).ok().and_then(|l| l.iter().find_map(|x| journey::monsters_left(x)));
+        if over { out_of_pictures(&w, false); }
         let here = with_store(&app, |s| s.maps.current.as_ref().map(|c| format!("{}{}{}", c.area, c.seed, c.last_enter))).unwrap_or_default();
         if here != area { area = here; settle.reset(); }
         match said.map(|m| settle.feed(m)) {
