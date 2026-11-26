@@ -7,6 +7,7 @@ import { MechArt } from "./mechArt";
 import { Tip } from "./Help";
 import "./farm.css";
 import FarmNow, { useFarmNow, type FarmView } from "./FarmNow";
+import FarmBoard, { type Strat } from "./FarmBoard";
 
 type Drop = { name: string; pic?: string; chaos: number; sold_div: number; change: number | null; jackpot: boolean };
 type Why = { text: string; src: string };
@@ -20,7 +21,7 @@ type Own = { div_hour: number; chaos_map: number; maps: number; few: boolean; tr
 type OwnRow = { name: string; keys: string[]; title: string; own: Own };
 type Worth = { key: string; label: string; pic: string; share: number; steady: number; jackpots: number; raw: number; change: number | null;
   drops: Drop[]; unseen: string | null; estimate: boolean; blind: boolean };
-type Finder = { farms: Farm[]; mechanics: Worth[]; trees_from: string; trees: number; prices_from: string; temples_from: string; own: OwnRow[]; divine: number };
+type Finder = { farms: Farm[]; mechanics: Worth[]; trees_from: string; trees: number; prices_from: string; temples_from: string; own: OwnRow[]; divine: number; strategies?: Strat[] };
 type Ask = { count: "all" | "steady"; max_cost: number | null; size: number; want: string[] };
 
 const SRC: Record<string, string> = { maxroll: "maxroll", "poe.ninja": "players' trees", guides: "guide sites", community: "community tree", "patch notes": "patch notes", "trade site": "trade site" };
@@ -185,6 +186,18 @@ export default function FarmFinder({ onBuild, go }: { onBuild: () => void; go?: 
       window.setTimeout(() => document.querySelector(".fn")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
     } catch (e) { setErr(friendly(e)); }
   };
+  /** A creator farm: its own tree ask (goals, altar, Threads), costs and drops. */
+  const farmStrat = async (s: Strat) => {
+    setErr("");
+    try {
+      const v = await invoke<FarmView | null>("farm_start", {
+        farm: { title: s.title, keys: s.mech, threads: s.threads, maps: s.maps, rolls: null, drops: s.drops, ask: s.ask, map_cost: Math.round(s.map_cost * 10) / 10,
+          roll_cost: s.roll_cost, vaal: s.vaal, entry: s.entry, runs_hour: s.runs_hour, creator_div_hour: s.div_hour, unit: s.unit },
+        threadKeys: s.thread_keys });
+      setNow(v ?? null);
+      window.setTimeout(() => document.querySelector(".fn")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+    } catch (e) { setErr(friendly(e)); }
+  };
   const rest = r?.farms.slice(3) ?? [];
   // Every mechanic by name, so each is always in the same place.
   const all = [...(r?.mechanics ?? [])].sort((a, b) => a.label.localeCompare(b.label));
@@ -219,6 +232,8 @@ export default function FarmFinder({ onBuild, go }: { onBuild: () => void; go?: 
       {err && <div className="small at-msg">{err}</div>}
       {!r && !err && <div className="muted small">Comparing prices and trees…</div>}
       {r && r.farms.length === 0 && <div className="muted small">Nothing fits those choices.</div>}
+      {r && want.length === 0 && <FarmBoard list={r.strategies ?? []} div={r.divine} steadyOnly={ask.count === "steady"} now={now?.farm.title ?? null} onFarm={farmStrat} />}
+      {r && want.length === 0 && (r.strategies ?? []).length > 0 && <div className="ap-step">By mechanic</div>}
       {r && want.length > 0 && <div className="ap-step">Your pick, and what goes with it</div>}
       {r && <div className="ff-cards">{r.farms.slice(0, 3).map((f, i) => (
         <Card key={f.title} f={f} best={i === 0} div={r.divine} onBuild={() => build(f)} onFarm={() => farmThis(f)} now={now?.farm.title === f.title} />

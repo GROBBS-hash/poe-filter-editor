@@ -163,6 +163,16 @@ mod tests {
     }
 
     #[test]
+    fn reads_a_creator_farm_from_the_page() {
+        // What FarmBoard.tsx sends for the Reverence chain.
+        let f: FarmNow = serde_json::from_str(r#"{"title":"Reverence memory chain","keys":["memories"],"threads":[],"maps":[],"rolls":null,"drops":["Echo of Reverence"],
+            "ask":{"mechanics":[],"goals":["destructive"],"priority":"profit","budget":0,"lock":[],"block":[],"threads":[],"altar":"","map_has":[],"map":"","build":""},
+            "map_cost":0,"roll_cost":50,"vaal":0,"entry":[["Memory of Reverence",1]],"runs_hour":4.5,"creator_div_hour":22.9,"unit":"chain"}"#).unwrap();
+        assert_eq!(f.ask.unwrap().goals, ["destructive"]);
+        assert_eq!((f.roll_cost, f.entry.len(), f.unit.as_str()), (50.0, 1, "chain"));
+    }
+
+    #[test]
     fn slow_sellers_count_less() {
         use crate::prices::{PriceFile, PriceItem};
         let it = |n: &str, cat: &str, v: f64, vol: Option<f64>, lst: Option<u32>| PriceItem { name: n.into(), base: n.into(), cat: cat.into(), value: v, variant: None, listings: lst, trend: None, change: None, volume: vol };
