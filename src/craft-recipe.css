@@ -72,3 +72,26 @@
 .rc-verdict.warn { border-color: #7a5a25; } .rc-verdict.warn b { color: #ffcf8a; }
 .rc-verdict.bad { border-color: #7a3030; } .rc-verdict.bad b { color: var(--red); }
 .rc-verdict.ok b { color: var(--gold); }
+
+/* Craft: what now? (26 Nov, look A) */
+.cn { display: flex; flex-direction: column; gap: 8px; margin: 0 0 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.cn-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.cn-head b { font-size: 15px; }
+.cn-warn { border: 1px solid color-mix(in srgb, #e0a040 55%, transparent); background: rgba(224, 160, 64, .1); color: #f0c878; border-radius: 6px; padding: 6px 9px; }
+.cn-next { border: 1px solid var(--gold); background: color-mix(in srgb, var(--gold) 8%, var(--raised, #22262f)); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
+.cn-next.done { border-color: var(--green); background: rgba(98, 207, 128, .1); }
+.cn-title { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+.cn-why { color: var(--text-2, #c2c7d1); font-size: 13px; }
+.cn-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.cn-tag { font-size: 11px; font-weight: 700; border-radius: 4px; padding: 1px 7px; background: var(--raised, #22262f); color: var(--muted); }
+.cn-tag.g { background: rgba(98, 207, 128, .15); color: var(--green); }
+.cn-tag.y { background: var(--gold-bg); color: var(--gold); cursor: help; }
+.cn-tag.r { background: rgba(239, 107, 107, .15); color: #ef6b6b; }
+.cn-alt { border: 1px solid var(--line); background: var(--raised, #22262f); border-radius: 8px; padding: 7px 10px; }
+.cn-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
+.cn-stat { display: flex; flex-direction: column; gap: 2px; background: var(--raised, #22262f); border-radius: 8px; padding: 7px 10px; min-width: 0; }
+.cn-stat b { font-size: 15px; }
+.cn-stat .gold { color: var(--gold); }
+.cn-verdict.good b { color: var(--green); }
+.cn-verdict.warn b { color: var(--gold); }
+.cn-verdict.bad b { color: #ef6b6b; }

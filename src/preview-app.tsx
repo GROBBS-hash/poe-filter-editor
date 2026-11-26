@@ -255,6 +255,14 @@ mockIPC((cmd, args) => {
   if (cmd === "craft_plan") return fetch("/_craft_ways.json").then((r) => r.ok ? r.json() : []).catch(() => []);
   // public/_craft_routes.json: cargo run --example routesof with CRAFT_JSON=public.
   if (cmd === "craft_routes") return fetch("/_craft_routes.json").then((r) => r.ok ? r.json() : null).catch(() => null);
+  if (cmd === "craft_now") return { name: "Kraken Shell", mods: [["+112 to maximum Life", "ok"], ["+44% to Fire Resistance", "ok"], ["+28 to Strength", "junk"]],
+    missing: ["+#% to Cold Resistance", "+#% to Lightning Resistance"], left: 1650, unlucky: 4300, done: false, note: "",
+    warnings: ["It already has a bench mod: only one is allowed unless you add \"Can have up to 3 Crafted Modifiers\" (2 Divine). Remove it at the bench before crafting another."],
+    options: [{ title: "Lock your prefixes, then Orb of Annulment", why: "The bench lock keeps your prefixes safe. It sits in a suffix slot, so the Annul picks from 3: 1 junk, 1 you want (it can take those too).",
+      icon: "Orb of Annulment", chance: 1 / 3, cost_each: 75, average: 450, risk: 2, check: "The 1–2 mod bench locks are new in 3.30: check the lock shows on the item before you annul." },
+      { title: "Exalted Orb for +#% to Cold Resistance", why: "", icon: "Exalted Orb", chance: 0.09, cost_each: 1, average: 11, risk: 1, check: null },
+      { title: "Bench craft: +#% to Lightning Resistance", why: "", icon: "Orb of Alteration", chance: 1, cost_each: 4, average: 4, risk: 0, check: null }] };
+  if (cmd === "craft_buy_plan") return new Promise((ok) => setTimeout(() => ok({ summary: [2400, 3100], total: 6, url: "https://www.pathofexile.com/trade", divine: 221, listings: [] }), 600));
   if (cmd === "craft_buy") return new Promise((ok) => setTimeout(() => ok({ summary: [380, 520], total: 37, url: "https://www.pathofexile.com/trade", divine: 221, listings: [] }), 600));
   // Tiers sections: public/_tiers.json when present (tierdump --json from a real filter), else none.
   if (cmd === "get_tiers") return tiersCache ? JSON.parse(JSON.stringify(tiersCache))

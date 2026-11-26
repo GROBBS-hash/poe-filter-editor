@@ -222,6 +222,9 @@ export default function Craft() {
               <p className="muted small">Press Ctrl+D on an item in game and click "Craft this", or Ctrl+C it and click "Use a copied item".</p>
             </div>
           )}
+          {itemText && pool && routePlan.length > 0 && <WhatNowCard text={itemText} div={routes.r?.divine ?? null}
+            plan={{ base, ilvl, infl, targets: routePlan.map((t) => [t.key, t.tier] as [string, number]) }}
+            onRecheck={async () => { try { const t = await navigator.clipboard.readText(); if (t.includes("Item Class:")) { fromText(t); return; } } catch { /* fall back */ } setPaste(true); }} />}
           <PlanBox plan={plan} setPlan={setPlan} fam={fam} base={base} ilvl={ilvl} infl={infl} onPick={setPick} />
           <RouteSummary plan={routePlan} r={routes.r} err={routes.err} open={showRoutes} onOpen={() => setShowRoutes(!showRoutes)} />
         </div>
@@ -578,6 +581,83 @@ function RouteCard({ x, div, open, onToggle }: { x: Route; div: number | null; o
         {x.checks.length > 0 && <div className="rc-checks"><b>Check in game:</b><ul>{x.checks.map((c) => <li key={c}>{c}</li>)}</ul></div>}
       </div>}
     </section>
+  );
+}
+
+type NowOption = { title: string; why: string; icon: string; chance: number; cost_each: number | null; average: number | null; risk: number; check: string | null };
+type WhatNow = { name: string; mods: [string, string][]; missing: string[]; options: NowOption[]; left: number | null; unlucky: number | null;
+  done: boolean; warnings: string[]; note: string };
+const nowOdds = (p: number) => p >= 0.995 ? "Sure thing" : p >= 0.5 ? `${Math.round(p * 100)}%` : `1 in ${Math.round(1 / p)}`;
+
+/** Craft: what now? (26 Nov, look A): the copied item against the plan: the best next click, two other choices, what's
+ *  left to spend against buying one, and selling it as it is. Same maths as the routes; `core/src/craft/now.rs`. */
+function WhatNowCard({ text, plan, div, onRecheck }: { text: string; plan: PlanRef; div: number | null; onRecheck: () => void }) {
+  const [n, setN] = useState<WhatNow | null>(null);
+  const [err, setErr] = useState("");
+  const [buy, setBuy] = useState<BuyResult | null>(null);
+  const [sell, setSell] = useState<BuyResult | null>(null);
+  const [busy, setBusy] = useState("");
+  useEffect(() => {
+    let live = true;
+    setErr("");
+    invoke<WhatNow | null>("craft_now", { text, targets: plan.targets }).then((x) => live && setN(x)).catch((e) => live && setErr(friendly(e)));
+    return () => { live = false; };
+  }, [text, JSON.stringify(plan.targets)]);
+  useEffect(() => { setBuy(null); }, [JSON.stringify(plan)]);
+  useEffect(() => { setSell(null); }, [text]);
+  const look = async (what: "buy" | "sell") => {
+    setBusy(what);
+    try {
+      if (what === "buy") setBuy(await invoke<BuyResult>("craft_buy_plan", { base: plan.base, ilvl: plan.ilvl, influences: plan.infl, targets: plan.targets }));
+      else setSell(await invoke<BuyResult>("craft_buy", { text }));
+    } catch (e) { setErr(friendly(e)); } finally { setBusy(""); }
+  };
+  if (err) return <div className="cn card"><b>What now?</b><p className="danger-text small">{err}</p></div>;
+  if (!n) return null;
+  const [next, ...alts] = n.options;
+  const buyAt = buy?.summary?.[1] ?? null;
+  const sellAt = sell?.summary?.[1] ?? null;
+  const verdict = n.done ? ["good", "Done"] : n.left == null ? null
+    : buyAt != null && buyAt < n.left * 0.8 ? ["bad", "Buy one instead"]
+    : buyAt != null && buyAt < n.left ? ["warn", "Close call"]
+    : ["good", "Keep going"];
+  return (
+    <div className="cn">
+      <div className="cn-head"><b>What now?</b>
+        <button className="link small" onClick={onRecheck} title="Copy the item again in game (Ctrl+C), then click">I clicked it, check again</button></div>
+      {n.warnings.map((w) => <div key={w} className="cn-warn small">{w}</div>)}
+      {n.done ? <div className="cn-next done"><b>It's done</b><div className="cn-why">{n.note}</div></div>
+        : next ? <div className="cn-next">
+          <div className="muted small">Next click</div>
+          <div className="cn-title"><ItemIcon name={next.icon} size={26} /><b>{next.title}</b></div>
+          <div className="cn-why">{next.why}</div>
+          <div className="cn-tags">
+            <span className={`cn-tag ${next.chance >= 0.2 ? "g" : ""}`}>{nowOdds(next.chance)}</span>
+            {next.cost_each != null && <span className="cn-tag">about <Cost c={next.cost_each} div={div} /> a try</span>}
+            {next.risk === 2 && <span className="cn-tag r">can take a mod you want</span>}
+            {next.check && <span className="cn-tag y" title={next.check}>check in game</span>}
+          </div>
+        </div>
+        : <div className="cn-next"><div className="cn-why">{n.note}</div></div>}
+      {alts.slice(0, 2).map((a) => (
+        <div key={a.title} className="cn-alt small"><b>Or:</b> {a.title} <span className="muted">({nowOdds(a.chance)}{a.cost_each != null ? <>, <Cost c={a.cost_each} div={div} /> a try</> : null})</span></div>
+      ))}
+      {!n.done && n.note && next && <div className="muted small">{n.note}</div>}
+      <div className="cn-stats">
+        <div className="cn-stat"><span className="muted small">Left to spend</span>
+          <b className="gold">{n.done ? "Nothing" : n.left != null ? <Cost c={n.left} div={div} /> : "—"}</b>
+          {!n.done && n.unlucky != null && <span className="muted small">unlucky: <Cost c={n.unlucky} div={div} /></span>}</div>
+        <div className="cn-stat"><span className="muted small">Buy a finished one</span>
+          {buy ? <><b>{buyAt != null ? <Cost c={buyAt} div={div} /> : "none listed"}</b>
+            <button className="link small" onClick={() => invoke("open_url", { url: buy.url })}>{buy.total} listed ↗</button></>
+            : <button className="small" onClick={() => look("buy")} disabled={busy === "buy"}>{busy === "buy" ? "Searching…" : "Check"}</button>}</div>
+        <div className="cn-stat"><span className="muted small">Sell it as it is</span>
+          {sell ? <><b>{sellAt != null ? <Cost c={sellAt} div={div} /> : "none like it"}</b>
+            <button className="link small" onClick={() => invoke("open_url", { url: sell.url })}>{sell.total} listed ↗</button></>
+            : <button className="small" onClick={() => look("sell")} disabled={busy === "sell"}>{busy === "sell" ? "Searching…" : "Price it"}</button>}</div>
+        {verdict && <div className={`cn-stat cn-verdict ${verdict[0]}`}><span className="muted small">Verdict</span><b>{verdict[1]}</b></div>}
+      </div>
+    </div>
   );
 }
 

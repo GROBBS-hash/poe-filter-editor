@@ -2701,6 +2701,14 @@ async fn craft_routes(state: State<'_, AppState>, base: String, ilvl: u32, influ
     tauri::async_runtime::spawn_blocking(move || filter_core::craft::routes::routes(&base, ilvl, &influences, &targets, &have, &price)).await.map_err(|e| e.to_string())
 }
 
+/// Crafting page, "What now?": the copied item against the plan: the next click, what's left to spend, warnings.
+#[tauri::command]
+async fn craft_now(state: State<'_, AppState>, text: String, targets: Vec<(String, u32)>) -> Result<Option<filter_core::craft::now::WhatNow>, String> {
+    let f = state.prices.lock().unwrap().get(&Game::Poe1).cloned();
+    let price = move |n: &str| f.as_ref().and_then(|f| price_of(f, None, n, ""));
+    tauri::async_runtime::spawn_blocking(move || filter_core::craft::now::what_now(&text, &targets, &price)).await.map_err(|e| e.to_string())
+}
+
 /// Crafting page: a stash search that lights up the item when a planned mod rolls (craft in your stash tab).
 #[tauri::command]
 async fn craft_search(state: State<'_, AppState>, base: String, ilvl: u32, influences: Vec<String>, targets: Vec<(String, u32)>, all: bool) -> Result<Option<filter_core::craft::search::CraftSearch>, String> {
@@ -3281,7 +3289,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             price_build_item, buy_build_item, buy_base_item, trade_untick_one, trade_hidden, overview,
-            craft_bases, craft_start, craft_pool, craft_ways, craft_plan, craft_routes, craft_buy, craft_search, craft_buy_plan, jewel_mods,
+            craft_bases, craft_start, craft_pool, craft_ways, craft_plan, craft_routes, craft_now, craft_buy, craft_search, craft_buy_plan, jewel_mods,
             create_profile,
             list_filters,
             set_active,
