@@ -1309,6 +1309,7 @@ fn start_loot_worker(app: AppHandle) {
                         emit_all(&app);
                         continue;
                     };
+                    learn_icons(&app, lines.iter().map(|l| (l.name.clone(), l.icon.clone())).collect());
                     with_store(&app, |s| {
                         let run = match s.maps.current.as_mut() {
                             Some(c) if run_key(c) == key => Some(c),

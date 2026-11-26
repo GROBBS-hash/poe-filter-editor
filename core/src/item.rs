@@ -58,7 +58,12 @@ pub struct Item {
 /// "Map contains Drox's Citadel" → "Drox"; "Map is occupied by The Enslaver" → "The Enslaver";
 /// "Area is influenced by Veritania, the Redeemer" → "Veritania". (implicit) tags are dropped.
 pub fn map_occupant(line: &str) -> Option<String> {
-    let l = line.trim().trim_end_matches("(implicit)").trim();
+    // The advanced copy adds " — Unscalable Value" (26 Nov: his Elder map's owner was read as "The Elder — Unscalable
+    // Value", so the price window showed the plain map's picture).
+    let l = line.trim().replace(" — Unscalable Value", "");
+    let l = l.trim_end_matches("(implicit)").trim();
+    // "Area is influenced by The Elder / The Shaper" says what kind of map it is, not whose: the guardian line follows.
+    if l.starts_with("Area is influenced by The ") { return None; }
     let who = if let Some(r) = l.strip_prefix("Map contains ") {
         r.strip_suffix("'s Citadel")?.to_string()
     } else if let Some(r) = l.strip_prefix("Map is occupied by ") {
@@ -300,6 +305,9 @@ mod tests {
         let z = map("Area is influenced by the Originator's Memories (implicit)");
         assert_eq!(z.occupied_by, None);
         assert!(z.zana_memory);
+        // His Elder map (advanced copy): the guardian, not "The Elder — Unscalable Value".
+        let e = map("{ Implicit Modifier }\nArea is influenced by The Elder — Unscalable Value\nMap is occupied by The Eradicator — Unscalable Value");
+        assert_eq!(e.occupied_by.as_deref(), Some("The Eradicator"));
     }
 
     #[test]

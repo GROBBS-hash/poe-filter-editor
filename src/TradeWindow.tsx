@@ -5,6 +5,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import React, { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { CurrencyIcon, ItemIcon } from "./icons";
+import { mapItemIcon } from "./mapIcons";
 import BaseUniques from "./BaseUniques";
 import RelatedItems from "./RelatedItems";
 import { BaseWorth } from "./Bases";
@@ -831,7 +832,7 @@ export default function TradeWindow() {
     <div className="qm tw">
       {style === "price" && <div className="tw-pf">{hero}<PriceSpread res={res} divine={divine} />{trend}</div>}
       <div className="qm-head with-icon">
-        <ItemIcon name={it.rarity === "Unique" ? it.name : null} base={it.base_type || null} size={36} />
+        <ItemIcon name={it.rarity === "Unique" ? it.name : mapItemIcon(it)} base={it.base_type || null} size={36} />
         <div className="qm-head-text">
           <div className="qm-name" style={{ color: RARITY_COLOUR[it.rarity] ?? "#ddd" }}>{itemTitle(it)}</div>
           <div className="qm-sub">{["Rare", "Magic"].includes(it.rarity) && it.base_type && it.name ? it.base_type : it.item_class}{it.item_level ? ` · ilvl ${it.item_level}` : ""}{setup.links_min ? ` · ${setup.links_min}-link` : ""}</div>

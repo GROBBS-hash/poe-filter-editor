@@ -703,7 +703,11 @@ fn ninja_price(app: &AppHandle, item: &Item) -> Option<(f64, String)> {
     let game = active_game(&state);
     let prices = state.prices.lock().unwrap();
     let f = prices.get(&game)?;
-    price_of(f, item.name.as_deref(), &item.base_type, &item.rarity).map(|v| (v * chaos_per_unit(f), "chaos".into()))
+    // Conqueror and Elder guardian maps have poe.ninja prices of their own ("Drox Map (Tier 16)"; 26 Nov: his Drox map
+    // showed the plain T16's 2c).
+    let special = item.occupied_by.as_ref().filter(|_| item.item_class == "Maps")
+        .and_then(|who| price_of(f, None, &format!("{who} {}", item.base_type), ""));
+    special.or_else(|| price_of(f, item.name.as_deref(), &item.base_type, &item.rarity)).map(|v| (v * chaos_per_unit(f), "chaos".into()))
 }
 
 /// Ctrl+D: copies the hovered item (advanced copy: mod tiers too) and opens the price window.
@@ -2380,7 +2384,31 @@ fn theme_cards(state: State<AppState>, id: String) -> Result<filter_core::previe
 #[tauri::command]
 fn get_icons(state: State<AppState>) -> std::collections::HashMap<String, String> {
     let game = active_game(&state);
-    state.icons.lock().unwrap().get(&game).cloned().unwrap_or_default()
+    let mut m = state.icons.lock().unwrap().get(&game).cloned().unwrap_or_default();
+    if game == Game::Poe1 { for (k, v) in learned_icons(&state) { m.entry(k).or_insert(v); } }
+    m
+}
+
+/// Pictures poe.ninja doesn't have: Originator maps (the game marks their picture; 26 Nov he asked the price window to
+/// show it). The T16 one is from his own map; other tiers are learnt from his bags as he picks them up.
+const ORIGINATOR_T16: &str = "https://web.poecdn.com/gen/image/WzI4LDE0LHsiZiI6IjJESXRlbXMvTWFwcy9BdGxhczJNYXBzL05ldy9NYXBOdW1iZXJzMTYiLCJ3IjoxLCJoIjoxLCJzY2FsZSI6MSwibW4iOjI0LCJtdCI6MCwibW0iOnRydWV9XQ/29434e838e/MapNumbers16.png";
+
+fn learned_icons(state: &AppState) -> std::collections::HashMap<String, String> {
+    let mut m: std::collections::HashMap<String, String> = std::fs::read_to_string(state.data_dir.join("learned_icons.json")).ok()
+        .and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
+    m.entry("Originator Map (Tier 16)".into()).or_insert_with(|| ORIGINATOR_T16.into());
+    m
+}
+
+/// Remembers the pictures of special maps seen in his bags ("Originator Map (Tier 14)" → its URL).
+pub(crate) fn learn_icons(app: &AppHandle, seen: Vec<(String, String)>) {
+    let state = app.state::<AppState>();
+    let mut m = learned_icons(&state);
+    let mut changed = false;
+    for (name, url) in seen {
+        if name.starts_with("Originator ") && url.starts_with("https://") && m.get(&name) != Some(&url) { m.insert(name, url); changed = true; }
+    }
+    if changed { if let Ok(t) = serde_json::to_string(&m) { let _ = std::fs::write(state.data_dir.join("learned_icons.json"), t); } }
 }
 
 /// Files of the app that were damaged when it started, and what was done about it.

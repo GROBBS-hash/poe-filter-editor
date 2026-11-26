@@ -26,9 +26,11 @@ export function tierMapIcons(typePath: string[], tier: string): string[] {
   return ["Map (Tier 16)"];
 }
 
-type MapItem = { class?: string; base_type?: string; blighted?: boolean; uber_blighted?: boolean; occupied_by?: string | null };
+type MapItem = { class?: string; base_type?: string; blighted?: boolean; uber_blighted?: boolean; occupied_by?: string | null; zana_memory?: boolean };
 
-/** The picture name for a map item (F2, price window): blighted, conqueror or Elder guardian art when it has it. */
+/** The picture name for a map item (F2, price window): blighted, conqueror, Elder guardian or Originator art when it
+ *  has it. "Originator Map (Tier N)" pictures come from his own maps (the game marks them; 26 Nov he asked for them):
+ *  a tier the editor hasn't seen yet shows the plain map. */
 export function mapItemIcon(item: MapItem): string | null {
   const base = item.base_type ?? "";
   if (!/Map\b/.test(base)) return null;
@@ -36,5 +38,6 @@ export function mapItemIcon(item: MapItem): string | null {
   if (item.blighted) return `Blighted ${base}`;
   const who = item.occupied_by ?? "";
   if (who && (CONQUERORS.includes(who) || ELDER_GUARDIANS.includes(who))) return `${who} ${base}`;
+  if (item.zana_memory) return `Originator ${base}`;
   return base;
 }
