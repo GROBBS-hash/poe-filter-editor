@@ -60,7 +60,8 @@ pub struct Item {
 pub fn map_occupant(line: &str) -> Option<String> {
     // The advanced copy adds " — Unscalable Value" (26 Nov: his Elder map's owner was read as "The Elder — Unscalable
     // Value", so the price window showed the plain map's picture).
-    let l = line.trim().replace(" — Unscalable Value", "");
+    // ...and "(...)" after a name it can explain ("The Constrictor(...)", "Veritania's Citadel(...)"; 26 Nov, same bug).
+    let l = line.trim().replace(" — Unscalable Value", "").replace("(...)", "");
     let l = l.trim_end_matches("(implicit)").trim();
     // "Area is influenced by The Elder / The Shaper" says what kind of map it is, not whose: the guardian line follows.
     if l.starts_with("Area is influenced by The ") { return None; }
@@ -308,6 +309,10 @@ mod tests {
         // His Elder map (advanced copy): the guardian, not "The Elder — Unscalable Value".
         let e = map("{ Implicit Modifier }\nArea is influenced by The Elder — Unscalable Value\nMap is occupied by The Eradicator — Unscalable Value");
         assert_eq!(e.occupied_by.as_deref(), Some("The Eradicator"));
+        let c = map("{ Implicit Modifier }\nArea is influenced by The Elder — Unscalable Value\nMap is occupied by The Constrictor(...) — Unscalable Value");
+        assert_eq!(c.occupied_by.as_deref(), Some("The Constrictor"));
+        let v = map("{ Implicit Modifier }\nMap contains Veritania's Citadel(...) — Unscalable Value");
+        assert_eq!(v.occupied_by.as_deref(), Some("Veritania"));
     }
 
     #[test]

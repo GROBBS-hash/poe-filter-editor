@@ -52,9 +52,11 @@ export default function MapTiers({ profileId, onChange, onOpen, focus }: { profi
   const removeEdit = async (w: Win) => {
     setBusy(true);
     try {
-      const [id, index] = await invoke<[string, number, unknown]>("get_rule", { id: null, index: null, label: w.label });
+      // Also in the filter this one is built on (26 Nov: his "Rare Map (Tier 16)" is in Red-Maps, he plays Blasting, and
+      // the button did nothing).
+      const [id, index, , home] = await invoke<[string, number, unknown, string | null]>("get_rule", { id: null, index: null, label: w.label, inherited: true });
       await invoke("delete_rule", { id, index });
-      setMsg(`Removed your edit “${w.label}”: the look here shows in game now. Press F4 in game.`); onChange(); await load();
+      setMsg(`Removed your edit “${w.label}”${home ? ` from ${home} (this filter is built on it)` : ""}: the look here shows in game now. Press F4 in game.`); onChange(); await load();
     } catch (e) { setMsg(String(e)); }
     setBusy(false);
   };
