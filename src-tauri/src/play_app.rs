@@ -968,8 +968,12 @@ fn start_panel_watch(app: AppHandle) {
         let hid = under_panel();
         if !hid && !w.is_visible().unwrap_or(false) { continue; }
         if !game_in_front() {
-            // Another program in front: back where it was. One of ours: leave things as they are.
-            if !ours_in_front() { panel_back(&app); }
+            // Another program in front: put away until the game is back (26 Nov: it sat over his other programs when he
+            // alt-tabbed, and a screenshot of the shop brought it back over the shop). One of ours: leave things as they are.
+            if !ours_in_front() && !hid && !PANEL_KEEP.load(Ordering::Relaxed) {
+                PANEL_HID.store(true, Ordering::Relaxed);
+                raw_show(&w, false);
+            }
             continue;
         }
         let Some(rect) = game_client_rect() else { continue };

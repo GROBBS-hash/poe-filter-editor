@@ -1157,6 +1157,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
+- [ ] (next) Alt-tab out of the game: the map tracker goes away; back in the game it returns (not if the stash/shop is still open). Then: shop open, tracker over the inventory, it hides? (26 Nov his screenshot showed it up over the shop, but switching to the screenshot tool used to bring it back, so unclear.)
 - [ ] (0.2.87) Ctrl+D a map, then open a *different* map: the tracker shows no mods (it used to show the checked map's). Open the checked one: its mods show.
 - [ ] (0.2.87) Map tracker "Today … per hour" (maps an hour) doesn't drop after a long hideout break (now time inside + usual turnaround, like div / hour).
 - [ ] (0.2.86) Ctrl+D on a quality gem: "Gem level" and "Quality" rows, ticked; untick quality and Search again: more results (any quality).
