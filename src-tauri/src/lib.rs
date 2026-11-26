@@ -1280,6 +1280,13 @@ fn open_editor(app: AppHandle, tab: Option<String>) {
     if let Some(t) = tab { let _ = app.emit_to("main", "open-tab", t); }
 }
 
+/// The "Open the editor" key pressed in the editor: minimise it and put the game back in front (26 Nov, he asked).
+#[tauri::command]
+fn editor_to_game(app: AppHandle) {
+    if let Some(w) = app.get_webview_window("main") { let _ = w.minimize(); }
+    focus_game();
+}
+
 #[tauri::command]
 fn copy_text(app: AppHandle, text: String) -> Result<(), String> {
     app.clipboard().write_text(text).map_err(err)
@@ -3371,7 +3378,7 @@ pub fn run() {
             list_farm_presets,
             apply_farm_preset,
             list_level_presets,
-            get_tiers, only_show_stack, get_threads, reset_item, get_rule_section, get_map_tiers, set_tiers, build_tree_opt, set_build_tree, trade_search, trade_bulk, map_dangers, map_suggest, map_tool_get, map_tool_save, map_tool_regex, map_tool_stats, file_trouble, map_regex_copy, map_tool_trade, trade_action, hide_trades_window, wealth_app::wealth_get, bulk_app::bulk_get, bulk_app::bulk_basket, bulk_app::bulk_live, wealth_app::wealth_setup, wealth_app::wealth_prefs, wealth_app::wealth_scan, wealth_app::wealth_profile_save, wealth_app::wealth_profile_delete, wealth_app::wealth_profile_use, wealth_app::wealth_tabs_refresh, wealth_app::wealth_price_rares, wealth_app::wealth_find, wealth_app::wealth_count_rares, wealth_app::wealth_guild, updates::update_status, open_editor, price_count_below, price_thin_cards, updates::update_install, wealth_app::session_start, wealth_app::session_check, wealth_app::session_pause, wealth_app::session_stop, wealth_app::session_delete, wealth_app::earnings_overlay, saved_list, saved_add, saved_delete, saved_live, report_problem, send_whisper, copy_text, hide_trade_window, keep_on_screen,
+            get_tiers, only_show_stack, get_threads, reset_item, get_rule_section, get_map_tiers, set_tiers, build_tree_opt, set_build_tree, trade_search, trade_bulk, map_dangers, map_suggest, map_tool_get, map_tool_save, map_tool_regex, map_tool_stats, file_trouble, map_regex_copy, map_tool_trade, trade_action, hide_trades_window, wealth_app::wealth_get, bulk_app::bulk_get, bulk_app::bulk_basket, bulk_app::bulk_live, wealth_app::wealth_setup, wealth_app::wealth_prefs, wealth_app::wealth_scan, wealth_app::wealth_profile_save, wealth_app::wealth_profile_delete, wealth_app::wealth_profile_use, wealth_app::wealth_tabs_refresh, wealth_app::wealth_price_rares, wealth_app::wealth_find, wealth_app::wealth_count_rares, wealth_app::wealth_guild, updates::update_status, open_editor, editor_to_game, price_count_below, price_thin_cards, updates::update_install, wealth_app::session_start, wealth_app::session_check, wealth_app::session_pause, wealth_app::session_stop, wealth_app::session_delete, wealth_app::earnings_overlay, saved_list, saved_add, saved_delete, saved_live, report_problem, send_whisper, copy_text, hide_trade_window, keep_on_screen,
             move_tier_item,
             stack_choices,
             gear_setup,

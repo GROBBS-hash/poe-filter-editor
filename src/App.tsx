@@ -28,7 +28,7 @@ import Craft from "./Craft";
 import Home from "./Home";
 import Search from "./Search";
 import PriceCheck from "./PriceCheck";
-import { HOTKEYS, keyOf } from "./hotkeys";
+import { HOTKEYS, keyOf, pressed } from "./hotkeys";
 
 /** Where the main window's look is kept (Settings writes it too). */
 export const APP_LOOK_KEY = "app.look";
@@ -309,6 +309,12 @@ export default function App() {
       } else if (e.altKey && e.key === "ArrowLeft" && prevTab.current) {
         e.preventDefault();
         setTab(prevTab.current);
+      } else if (pressed(e, keyOf(keys, "key_editor"))) {
+        // The "Open the editor" key again: back to the game (26 Nov, he asked). Not while typing in a box.
+        const t = e.target as HTMLElement | null;
+        if (t && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName))) return;
+        e.preventDefault();
+        invoke("editor_to_game").catch(() => {});
       }
     };
     window.addEventListener("keydown", onKey);

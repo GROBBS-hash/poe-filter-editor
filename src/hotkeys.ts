@@ -33,7 +33,7 @@ export const HOTKEYS: Hotkey[] = [
   { setting: "key_read", def: "Alt+R", group: "lookup", name: "Which one should I pick?",
     how: "When the game makes you choose (an Eldritch altar, an Expedition remnant, a reward screen), hover it and press: it tells you the best pick for your build and what's dangerous." },
   { setting: "key_editor", def: "`", group: "windows", name: "Open the editor",
-    how: "Brings this editor to the front over the game, so you can change things without alt-tabbing. Alt-tab or click the game to go back." },
+    how: "Brings this editor to the front over the game, so you can change things without alt-tabbing. Press it again (or alt-tab) to go back to the game." },
   { setting: "key_build", def: "F6", group: "windows", name: "Your build",
     how: "Shows your Path of Building build over the game: which gems, gear and passive points to aim for." },
   { setting: "key_atlas", def: "F7", group: "windows", name: "Atlas plan",
@@ -55,6 +55,17 @@ export const HOTKEY_GROUPS: { id: Hotkey["group"]; name: string; note?: string }
   { id: "lookup", name: "Look up an item" },
   { id: "windows", name: "Windows over the game", note: "press the key again to hide it" },
 ];
+
+/** Is this key press the saved key ("`", "F9", "Alt+F")? */
+export const pressed = (e: KeyboardEvent, key: string) => {
+  if (!key.trim()) return false;
+  const parts = key.split("+").map((p) => p.trim().toLowerCase());
+  const main = parts.pop() ?? "";
+  const mods = (m: string) => parts.includes(m);
+  if (e.ctrlKey !== (mods("ctrl") || mods("control")) || e.altKey !== mods("alt") || e.shiftKey !== mods("shift")) return false;
+  const k = e.key.toLowerCase();
+  return k === main || (main === "`" && e.code === "Backquote") || (main === "backquote" && e.code === "Backquote");
+};
 
 /** One hotkey by its setting. */
 export const hotkey = (setting: string) => HOTKEYS.find((h) => h.setting === setting)!;
