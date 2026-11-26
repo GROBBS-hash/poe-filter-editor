@@ -445,7 +445,10 @@ pub fn mods(text: &str) -> Vec<ModLine> {
             let kind = if body_part && kind == "explicit" { "implicit".to_string() } else { kind };
             let t = clean(l);
             // Under a "{ … Modifier }" heading every line is a mod, numbers or not ("…is Lucky while on Low Life").
-            let numberless_ok = header_kind.is_some() || t.contains("Cannot") || t.contains("Has ") || t.starts_with("Allocates ");
+            // ...and so is a line the copy marks itself (26 Nov: "Area is dominated by Terror Shrines (enchant)" on his
+            // Originator map was dropped, so it couldn't be searched).
+            let marked = ["(implicit)", "(crafted)", "(enchant)", "(fractured)", "(mutated)"].iter().any(|s| l.ends_with(s));
+            let numberless_ok = header_kind.is_some() || marked || t.contains("Cannot") || t.contains("Has ") || t.starts_with("Allocates ");
             if t.is_empty() || !t.chars().any(|c| c.is_ascii_digit()) && !numberless_ok { continue; }
             let (_, values) = template(&t);
             let (roll, range) = (roll_of(l, &values), range_text(l));
@@ -589,6 +592,11 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
         if cluster && !unique && m.kind == "enchant" {
             if t.starts_with("Adds # Passive Skills") { enabled = true; max = min; }
             if t.starts_with("Added Small Passive Skills grant") { enabled = true; }
+        }
+        // Maps: what kind of map it is (Elder guardian, conqueror, Shaper, Originator) and its enchants (Terror Shrines)
+        // set the price far more than its mods: ticked (26 Nov: his Elder and Originator maps priced as plain T16s).
+        if is_map(&item) && (m.kind == "enchant" || m.kind == "implicit" && ["influenced by", "occupied by", "Citadel", "Originator"].iter().any(|k| m.text.contains(k))) {
+            enabled = true;
         }
         // Wickerman body parts: the one mod is what you pay for.
         if item.item_class == "Viscera" { enabled = true; }
@@ -1609,6 +1617,21 @@ Note: ~b/o 1 alch
         let f = s.filters.iter().find(|f| f.id == "explicit.stat_corpse").unwrap();
         assert_eq!(f.value, 3.0, "{}", f.label);
         assert!(s.filters.iter().any(|f| f.id == "explicit.stat_mana"));
+    }
+
+    #[test]
+    fn map_kind_and_enchants_are_ticked() {
+        // 26 Nov: his Originator map's second enchant was dropped, and Elder / Originator lines came unticked.
+        let text = "Item Class: Maps\nRarity: Rare\nCryptic Inscription\nMap (Tier 16)\n--------\nItem Level: 85\n--------\nMonster Level: 83\n--------\nArea contains 8 additional Shrines (enchant)\nArea is dominated by Terror Shrines (enchant)\n--------\n{ Implicit Modifier }\nArea is Influenced by the Originator's Memories — Unscalable Value\n--------\n{ Suffix Modifier \"of Endurance\" }\nMonsters gain an Endurance Charge on Hit\n";
+        let idx = StatIndex::from_json(&json!({ "result": [
+            { "label": "Implicit", "entries": [ { "id": "implicit.stat_2696470877", "text": "Area is Influenced by the Originator's Memories", "type": "implicit" } ] },
+            { "label": "Enchant", "entries": [ { "id": "enchant.stat_667284445", "text": "Area is dominated by Terror Shrines", "type": "enchant" } ] },
+            { "label": "Explicit", "entries": [ { "id": "explicit.stat_687813731", "text": "Monsters gain an Endurance Charge on Hit", "type": "explicit" } ] } ] }));
+        let s = setup(text, &idx).unwrap();
+        let on = |id: &str| s.filters.iter().find(|f| f.id == id).map(|f| f.enabled);
+        assert_eq!(on("enchant.stat_667284445"), Some(true));
+        assert_eq!(on("implicit.stat_2696470877"), Some(true));
+        assert_eq!(on("explicit.stat_687813731"), Some(false), "ordinary map mods stay unticked");
     }
 
     #[test]

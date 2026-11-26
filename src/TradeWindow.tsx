@@ -781,8 +781,11 @@ export default function TradeWindow() {
   const showStats = !check.map || mapMods;
   // Maps: their drop bonuses (quantity, atlas drops, pack size…) always; the map mods behind a link.
   // "As a base": only the rows the base search uses (the rest come back on "This item").
-  const shown = (x: StatFilter) => (!asBase || !!setup.base_item?.ids.includes(x.id)) && (showStats || x.kind === "property" || x.kind === "pseudo");
-  const mapModCount = setup.filters.filter((x) => !(x.kind === "property" || x.kind === "pseudo")).length;
+  // ...and what kind of map it is (Elder guardian, conqueror, Originator) and its enchants: they set the price, so they
+  // show (and come ticked) without opening the map mods (26 Nov: his Elder map priced as a plain T16).
+  const mapKind = (x: StatFilter) => !!check.map && (x.kind === "enchant" || (x.kind === "implicit" && /influenced by|occupied by|Citadel|Originator/i.test(x.label)));
+  const shown = (x: StatFilter) => (!asBase || !!setup.base_item?.ids.includes(x.id)) && (showStats || x.kind === "property" || x.kind === "pseudo" || mapKind(x));
+  const mapModCount = setup.filters.filter((x) => !(x.kind === "property" || x.kind === "pseudo" || mapKind(x))).length;
   const patch = (i: number, p: Partial<StatFilter>) => { if ("min" in p) setPreset(null); return setSetup({ ...setup, filters: setup.filters.map((f, j) => (j === i ? { ...f, ...p } : f)) }); };
   const divine = res?.divine ?? bulk?.divine ?? check?.divine ?? null;
   const stack = it.stack_size ?? 1;
