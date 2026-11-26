@@ -188,6 +188,21 @@ pub struct Plan {
     pub parts: Vec<Part>,
 }
 
+/// What to know about these Threads (3.30.0c and creators' logs, 22-26 Nov).
+pub fn thread_notes(threads: &[(String, u32)], build: &str) -> Vec<String> {
+    let mut out = vec![];
+    for (t, n) in threads {
+        let name = atlas_model::cap(t);
+        match (t.as_str(), *n) {
+            ("breach", 3..) => out.push(format!("{n} Breach Threads turn most Hives into Fortresses, so Hives count for little here")),
+            ("abyss", 3..) if build == "weak" => out.push(format!("{n} Abyss Threads are dangerous for a weaker build for not much more loot: 1 or 2 is safer")),
+            (_, 2 | 4 | 5 | 7) => out.push(format!("{n} {name} Threads: its league bonus steps up at 3, 6 and 8, so {} pays more", match n { 2 => 3, 4 | 5 => 6, _ => 8 })),
+            _ => {}
+        }
+    }
+    out
+}
+
 /// The goals there are: (key, label).
 pub fn goals() -> Vec<(String, String)> { model().goals.iter().map(|(k, g)| (k.clone(), g.label.clone())).collect() }
 
@@ -321,6 +336,7 @@ fn optimise_with(ask: &Ask, shares: &Shares) -> Plan {
         _ => {}
     }
     if let Some(x) = mode { notes.push(format!("{}: a map has Unstable Breaches or Hives, never both", x.label)); }
+    notes.extend(thread_notes(&p.setup.threads, &ask.build));
     let mut fams: HashSet<&str> = p.setup.mechs.iter().map(|x| x.as_str()).collect();
     fams.extend(ask.mechanics.iter().map(|x| x.as_str()));
     let mut left_out: Vec<(String, String)> = m.never.iter().filter(|(id, _)| !nodes.contains(id) && atlas_model::family().get(id).is_some_and(|f| fams.contains(f))).map(|(id, why)| (g.name(*id).to_string(), why.clone())).collect();
@@ -424,6 +440,35 @@ mod tests {
         let q = optimise(&d);
         assert!(!q.nodes.contains(&15324) && !q.nodes.contains(&42605));
         assert_eq!(optimise(&ask(&["legion"], Priority::Fewest)).threads[0], ("legion".to_string(), 8));
+    }
+
+    /// The 26 Nov research: Lost in Transit, Mirage copying bosses, Thread steps, Breach / Abyss Thread trouble, vaults.
+    #[test]
+    fn research_26_nov() {
+        let mut a = Ask::default();
+        a.goals = vec!["rush".into()];
+        let rush = optimise(&a);
+        assert!(rush.nodes.contains(&17982), "Lost in Transit pays on a rush");
+        assert!(!rush.nodes.contains(&30545), "Phantom Anomalies moves vaults to objectives a rush skips");
+        assert!(rush.parts.iter().any(|p| p.key == "shipments"));
+        assert!(rush.nodes.contains(&20929) || rush.nodes.contains(&14203), "Mirage copies the boss");
+        // Without Lost in Transit there are no Lost Shipments.
+        a.block = vec![17982];
+        assert!(!optimise(&a).parts.iter().any(|p| p.key == "shipments"));
+
+        let breach = optimise(&ask(&["breach"], Priority::Profit));
+        assert!(breach.notes.iter().any(|n| n.contains("Unstable")), "8 Breach Threads: Hives become Fortresses {:?}", breach.notes);
+        assert!(breach.notes.iter().any(|n| n.contains("Fortresses")));
+        let mut weak = ask(&["abyss"], Priority::Profit);
+        weak.build = "weak".into();
+        assert!(optimise(&weak).notes.iter().any(|n| n.contains("dangerous")));
+        assert!(thread_notes(&[("legion".into(), 5)], "normal")[0].contains("6 pays more"));
+
+        let steps = [0.09, 0.09, 0.10];
+        let g = |n: f64| atlas_model::thread_gain(n, &steps);
+        assert!(g(3.0) - g(2.0) > 2.0 * (g(2.0) - g(1.0)), "a step at 3");
+        assert!((g(8.0) - 1.21).abs() < 1e-9, "8 Threads worth what they were");
+        assert_eq!([1.0, 3.0, 4.0, 7.0, 8.0, 10.0].map(atlas_model::thread_mods), [1.0, 1.0, 2.0, 2.0, 3.0, 3.0]);
     }
 
     #[test]

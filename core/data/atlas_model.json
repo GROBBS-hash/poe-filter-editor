@@ -3,9 +3,10 @@
   "The atlas builder's numbers (core/src/atlas_model.rs). Income of a source = unit x how many x product of (1 + weight x channel).",
   "Channels are the ones in atlas_effects.json ('@side' added at run time), or shared amounts: E pack drops rarity magic rare rmods mix altar juice hard thrB mapB threadmods shrineN bossN altarboss.",
   "conf: official / measured / creator / guess. Units are only compared with each other; the app shows percentages, never chaos per hour.",
-  "Reasons and sources: ATLAS_KNOWLEDGE.md."
+  "Reasons and sources: ATLAS_KNOWLEDGE.md.",
+  "thread_steps: league bonus steps at 3 / 6 / 8 Threads of a kind (3.30.0c; Ultimatum gets an extra round at 6 and 8, Legion / Abyss +1/2/3 encounters). shipments: Lost in Transit, flat per map, gated on its node. mirage (shared amount) = 1 + chance of a Mirage, which copies the whole map, boss included."
  ],
- "checked": "2026-11-25",
+ "checked": "2026-11-26",
  "per": {
   "prior Pit": 1.5,
   "fed Soul": 1,
@@ -62,7 +63,9 @@
   "shrineSpeed": 0.006,
   "shrineCap": 5,
   "hardPacks": 0.4,
-  "altarsBase": 4
+  "altarsBase": 4,
+  "mirageBase": 0.045,
+  "abyssDanger": 0.5
  },
  "thread_prices": {
   "Abyss": 5.2,
@@ -564,7 +567,8 @@
     ["cards.dup", 1],
     ["pack", 0.7],
     ["mix", 0.5],
-    ["cards.scrying", 2]
+    ["cards.scrying", 2],
+    ["rarity", 1]
    ],
    "conf": "guess"
   },
@@ -783,7 +787,8 @@
     ["blight.tier_up", 0.04],
     ["blight.speed", 0.1],
     ["blight.diff_reward", 0.04],
-    ["blight.item_rarity", 0.3]
+    ["blight.item_rarity", 0.3],
+    ["rarity", 1]
    ],
    "conf": "guess"
   },
@@ -917,9 +922,10 @@
     ["gold.volatile", 0.1],
     ["altarboss", 0.4],
     ["drops", 0.15],
-    ["rarity", 0.1],
+    ["rarity", 1],
     ["juice", 0.25],
-    ["bosses.rarity_per_pack", 0.3]
+    ["bosses.rarity_per_pack", 0.3],
+    ["mirage", 1]
    ],
    "conf": "guess"
   },
@@ -942,7 +948,9 @@
     ["essence.lattice", 0.35],
     ["essence.calcified", 2],
     ["essence.commensurate", -0.1],
-    ["drops", 0.15]
+    ["drops", 0.6],
+    ["essence.boss_mods", 0.9],
+    ["essence.from_exiles", 0.5]
    ],
    "conf": "guess"
   },
@@ -1029,11 +1037,31 @@
     ["settlers.steer", 0.1],
     ["settlers.extra_mods", 0.1],
     ["settlers.magic", 0.1],
-    ["settlers.shipment", 6],
+    ["settlers.shipment", 0],
     ["settlers.verisium", 0.12],
     ["settlers.slow_ore", 0]
    ],
    "conf": "guess"
+  },
+  "shipments": {
+   "label": "Lost Shipments",
+   "unit": 250,
+   "min": 0.1,
+   "mech": "settlers",
+   "always": true,
+   "spawn": {
+    "base": 0.08,
+    "ch": "settlers.spawn",
+    "mode": "chance",
+    "cap": 1
+   },
+   "gate": "settlers.shipment",
+   "factors": [
+    ["settlers.multi", 1],
+    ["mirage", 1]
+   ],
+   "src": "Lost in Transit 6% of ore deposits; Ragnivar: about half his raw currency; GRINDING CURRENCY: Divines / Exalts",
+   "conf": "creator"
   },
   "mercenaries": {
    "label": "Mercenaries",
@@ -1065,7 +1093,9 @@
     ["cards.to_boss", 0.1],
     ["bosses.item_rarity", 0.4],
     ["altarboss", 0.4],
-    ["drops", 0.05]
+    ["drops", 0.05],
+    ["mirage", 1],
+    ["rarity", 1]
    ],
    "conf": "guess"
   },
@@ -1079,7 +1109,8 @@
     ["juice", 1],
     ["bosses.conqueror_maps", 0.7],
     ["bosses.guardian_maps", 4.8],
-    ["bosses.synthesis_maps", 4]
+    ["bosses.synthesis_maps", 4],
+    ["mirage", 1]
    ],
    "src": "3.30 reminder text + Milkybk 48 maps; prices 25 Nov",
    "conf": "measured"
@@ -1093,7 +1124,8 @@
    "mech": "bosses",
    "factors": [
     ["juice", 1],
-    ["maven.chisels", 0.77]
+    ["maven.chisels", 0.77],
+    ["mirage", 1]
    ],
    "src": "WITCH 40 maps, prices 25 Nov",
    "conf": "creator"
@@ -1117,11 +1149,11 @@
     "mode": "inc",
     "cap": 1
    },
-   "needs": "rush",
+   "needs": "boss",
    "mech": "anomalies",
    "always": true,
    "factors": [],
-   "src": "Sheepishly 33 of 48, others every 2-3 maps",
+   "src": "Sheepishly 33 of 48, others every 2-3 maps; Phantom Anomalies left out for boss maps (vaults from objectives a rush walks past)",
    "conf": "creator"
   },
   "memories": {
@@ -1141,5 +1173,13 @@
    "src": "guess",
    "conf": "guess"
   }
+ },
+ "thread_steps": {
+  "default": [0.09, 0.09, 0.1],
+  "ultimatum": [0.05, 0.16, 0.16],
+  "legion": [0.12, 0.12, 0.12],
+  "abyss": [0.12, 0.12, 0.12],
+  "bestiary": [0.12, 0.07, 0.07],
+  "incursion": [0.06, 0.05, 0.05]
  }
 }

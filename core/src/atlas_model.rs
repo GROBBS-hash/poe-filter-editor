@@ -20,6 +20,8 @@ const SHARES: &str = include_str!("../data/atlas_shares.json");
 const LAMBDA: f64 = 6.0;
 /// Celestial Presence: which altars you get, so nothing without altars.
 const CELESTIAL: u32 = 27261;
+/// Phantom Anomalies: vaults from Shaped Region objectives instead of the map's end.
+const PHANTOM: u32 = 30545;
 
 #[derive(Debug, Deserialize)]
 struct Effect {
@@ -40,7 +42,8 @@ struct Effects { nodes: HashMap<u32, NodeFx> }
 pub struct MapStats { pub mods: f64, pub pack: f64, pub drops: f64, pub rarity: f64, pub currency: f64 }
 
 #[derive(Debug, Deserialize)]
-struct Spawn { base: f64, ch: String, mode: String, cap: Option<f64> }
+struct Spawn { base: f64, ch: String, mode: String, cap: Option<f64>, #[serde(default = "one")] scale: f64 }
+fn one() -> f64 { 1.0 }
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Source {
@@ -55,6 +58,8 @@ struct Source {
     count: Option<f64>,
     count_of: Option<String>,
     spawn: Option<Spawn>,
+    /// A channel the count is multiplied by straight away: nothing without its node (Lost in Transit).
+    gate: Option<String>,
     maphas: Option<String>,
     needs: Option<String>,
     #[serde(default)]
@@ -112,6 +117,8 @@ pub struct Model {
     pub defaults: HashMap<u32, u32>,
     pub option_items: HashMap<u32, HashMap<u32, String>>,
     pub tips: Vec<(Vec<String>, String)>,
+    /// League bonus steps at 3 / 6 / 8 Threads of a kind (3.30.0c), per mechanic ("default" for the rest).
+    thread_steps: HashMap<String, [f64; 3]>,
     sources: BTreeMap<String, Source>,
 }
 
@@ -174,19 +181,22 @@ pub struct Setup {
 }
 
 // Amounts many sources share.
-const DER: [&str; 18] = ["E", "pack", "drops", "rarity", "magic", "rare", "rmods", "mix", "altar", "juice", "hard", "thrB", "mapB", "threadmods", "shrineN", "bossN", "altarboss", "evolve"];
+const NDER: usize = 19;
+const DER: [&str; NDER] = ["E", "pack", "drops", "rarity", "magic", "rare", "rmods", "mix", "altar", "juice", "hard", "thrB", "mapB", "threadmods", "shrineN", "bossN", "altarboss", "evolve", "mirage"];
 const E: usize = 0; const PACK: usize = 1; const DROPS: usize = 2; const RARITY: usize = 3; const MAGIC: usize = 4; const RARE: usize = 5; const RMODS: usize = 6; const MIX: usize = 7;
 const ALTAR: usize = 8; const JUICE: usize = 9; const HARD: usize = 10; const THRB: usize = 11; const MAPB: usize = 12; const THREADMODS: usize = 13; const SHRINES: usize = 14; const BOSSES: usize = 15;
 const ALTARBOSS: usize = 16; const EVOLVE: usize = 17;
+/// 1 + the chance of a Mirage: it copies the whole map, boss included (3.30, Vascor / Hayura / Big Ducks).
+const MIRAGE: usize = 18;
 /// Said in plain words; "" = not worth saying by itself.
-const DER_SAID: [&str; 18] = ["", "more monsters", "more drops that follow the map's bonuses", "better drops", "more magic monsters", "more rare monsters", "rares with an extra modifier", "",
-    "stronger altars", "a better chance of a bonus mechanic", "tougher, richer packs", "", "", "rares drop more Threads", "more shrines", "more bosses", "altars that pay on bosses", ""];
+const DER_SAID: [&str; NDER] = ["", "more monsters", "more drops that follow the map's bonuses", "better drops", "more magic monsters", "more rare monsters", "rares with an extra modifier", "",
+    "stronger altars", "a better chance of a bonus mechanic", "tougher, richer packs", "", "", "rares drop more Threads", "more shrines", "more bosses", "altars that pay on bosses", "", "Mirages that copy the boss"];
 
 /// One way to take a node: its option (0 = none) and what it adds.
 #[derive(Debug, Clone)]
 pub struct Alt { pub id: u32, pub d: Vec<(usize, f64)> }
 
-enum How { Fixed(f64), Surpass(f64, usize), Inc(f64, usize), Chance(f64, usize, f64), Count(usize) }
+enum How { Fixed(f64), Surpass(f64, usize), Inc(f64, usize), Chance(f64, usize, f64, f64), Count(usize) }
 struct Src {
     key: &'static str,
     label: &'static str,
@@ -199,6 +209,9 @@ struct Src {
     steer: bool,
     der: Vec<(usize, f64)>,
     ch: Vec<(usize, f64)>,
+    gate: Option<usize>,
+    /// League bonus steps at 3 / 6 / 8 of its Thread.
+    steps: [f64; 3],
     quick: bool,
     guess: bool,
 }
@@ -207,7 +220,7 @@ struct Src {
 #[derive(Debug, Clone)]
 pub struct SrcOut { pub key: &'static str, pub label: &'static str, pub income: f64, pub n: f64, pub guess: bool }
 #[derive(Debug, Clone, Default)]
-pub struct Detail { pub src: Vec<SrcOut>, pub total: f64, pub q: [f64; 18] }
+pub struct Detail { pub src: Vec<SrcOut>, pub total: f64, pub q: [f64; NDER] }
 
 #[derive(Default)]
 struct Chans { ix: HashMap<String, usize> }
@@ -215,7 +228,7 @@ impl Chans { fn get(&mut self, n: &str) -> usize { if let Some(i) = self.ix.get(
 
 struct C { per_kind: usize, per_mod: usize, eff: usize, pre: usize, suf: usize, xmods: usize, pack: usize, hard: usize, eld: usize, rarity: usize, magic: usize, mpack: usize, mpk: usize, rare: usize, rdup: usize,
     rmir: usize, rmods: usize, a_eater: usize, a_exarch: usize, a_up: usize, a_extra: usize, pick_p: usize, pick_b: usize, sh: usize, shapp: usize, shbuff: usize, shextra: usize, maven: usize, mode_u: usize,
-    mode_h: usize, t_found: usize, m_found: usize, m_per: usize, t_lim: usize, keep: usize, per_rm: usize, evolve: usize, prior: usize }
+    mode_h: usize, t_found: usize, m_found: usize, m_per: usize, t_lim: usize, keep: usize, per_rm: usize, evolve: usize, prior: usize, mirage: usize }
 
 /// A plan ready to score trees: every node's effects resolved for it.
 pub struct Problem {
@@ -287,6 +300,11 @@ impl Problem {
                 else { n.o.iter().map(|o| { let mut d = base.clone(); d.extend(deltas(&o.e, &mut ch)); Alt { id: o.id, d } }).collect() }
             }
         }).collect();
+        // Phantom Anomalies moves vaults to the Shaped Region objectives, which a boss rush walks past.
+        if setup.rush || setup.pick.contains("bosses") {
+            let an = ch.get("anomalies.spawn");
+            if let Some(i) = ids.iter().position(|x| *x == PHANTOM) { for o in alts[i].iter_mut() { o.d.retain(|(k, _)| *k != an); } }
+        }
         for (i, a) in alts.iter_mut().enumerate() {
             // Nodes of a side that isn't in play get nothing from popularity either.
             let dead = effects().nodes.get(&ids[i]).is_some_and(|n| !n.e.is_empty() && n.e.iter().all(|e| !e.need.iter().all(|x| need_met(x, &setup))));
@@ -300,13 +318,20 @@ impl Problem {
             a_eater: ch.get("altars.chance@eater"), a_exarch: ch.get("altars.chance@exarch"), a_up: ch.get(&format!("altars.upside@{side}")), a_extra: ch.get(&format!("altars.extra_upside@{side}")),
             pick_p: ch.get("altars.pick_players"), pick_b: ch.get("altars.pick_bosses"), sh: ch.get("shrines.spawn"), shapp: ch.get("shrines.apparition"), shbuff: ch.get("shrines.buff"), shextra: ch.get("shrines.extra_effect"),
             maven: ch.get("maven.extra"), mode_u: ch.get("breach.mode@unstable"), mode_h: ch.get("breach.mode@hive"), t_found: ch.get("threads.found"), m_found: ch.get("mapdrops.found"), m_per: ch.get("mapdrops.found_per_mod"),
-            t_lim: ch.get("threads.thread_limit"), keep: ch.get("threads.thread_keep"), per_rm: ch.get("threads.per_mod"), evolve: ch.get("shrines.evolving"), prior: prior_ch };
+            t_lim: ch.get("threads.thread_limit"), keep: ch.get("threads.thread_keep"), per_rm: ch.get("threads.per_mod"), evolve: ch.get("shrines.evolving"), prior: prior_ch,
+            mirage: ch.get("mirage.spawn") };
         let price = |t: &str| -> f64 { let k = cap(t); setup.prices.get(&k).or(m.thread_prices.get(&k)).copied().unwrap_or(0.35) };
         let thr: Vec<(&'static str, f64, f64)> = setup.threads.iter().map(|(t, n)| (leak(t), *n as f64, price(t))).collect();
         let juiced = setup.pick.iter().filter_map(|p| m.juice_use.get(p)).copied().fold(0.0f64, f64::max).max(if setup.pick.is_empty() { 1.0 } else { 0.1 });
         let src = m.sources.iter().filter_map(|(key, s)| {
             let mech = s.mech.as_deref().unwrap_or(key);
-            match s.needs.as_deref() { Some("maven") if !setup.maven => return None, Some("rush") if !setup.rush => return None, _ => {} }
+            match s.needs.as_deref() {
+                Some("maven") if !setup.maven => return None,
+                Some("rush") if !setup.rush => return None,
+                // Vaults spawn off Nightmare / boss kills: a boss rush or a boss farm.
+                Some("boss") if !setup.rush && !setup.pick.contains("bosses") => return None,
+                _ => {}
+            }
             if let Some(h) = &s.maphas { if !setup.map_has.contains(h) && !setup.pick.contains(mech) { return None; } }
             // A filler (one or two Threads of something he isn't farming) is walked past: no income, no time.
             if let Some(t) = &s.thread { if !thr.iter().any(|x| x.0 == t && (x.1 >= 3.0 || setup.pick.contains(mech))) { return None; } }
@@ -314,15 +339,17 @@ impl Problem {
             let weight = if picked { 1.0 } else if key == "monsters" { 0.8 * juiced } else if s.always && mech == "bosses" { 0.3 } else if ["threads", "maps", "gold", "cards"].contains(&key.as_str()) { 0.6 } else if s.always { 0.6 } else { 0.1 };
             let how = if let Some(sp) = &s.spawn {
                 let i = ch.get(&sp.ch);
-                match sp.mode.as_str() { "surpass" => How::Surpass(sp.base, i), "inc" => How::Inc(sp.base, i), _ => How::Chance(sp.base, i, sp.cap.unwrap_or(1.0)) }
+                match sp.mode.as_str() { "surpass" => How::Surpass(sp.base, i), "inc" => How::Inc(sp.base, i), _ => How::Chance(sp.base, i, sp.cap.unwrap_or(1.0), sp.scale) }
             } else if let Some(q) = &s.count_of { How::Count(DER.iter().position(|d| d == q).expect("known amount")) } else { How::Fixed(s.count.unwrap_or(1.0)) };
             let (mut der, mut chans) = (vec![], vec![]);
             for (f, w) in &s.factors {
                 if *w == 0.0 { continue; }
                 match DER.iter().position(|d| d == f) { Some(i) => der.push((i, *w)), None => chans.push((ch.get(f), *w)) }
             }
+            let steps = m.thread_steps.get(mech).or(m.thread_steps.get("default")).copied().unwrap_or([0.0; 3]);
             Some(Src { key: leak(key), label: leak(&s.label), unit: s.unit * setup.boost.get(key).copied().unwrap_or(1.0), weight, min: s.min, how,
-                side: s.side.as_deref().map(|x| x == "unstable"), thread: s.thread.as_deref().map(leak), steer: s.thread_steer, der, ch: chans, quick: picked || s.always, guess: s.conf == "guess" })
+                side: s.side.as_deref().map(|x| x == "unstable"), thread: s.thread.as_deref().map(leak), steer: s.thread_steer, der, ch: chans,
+                gate: s.gate.as_deref().map(|g| ch.get(g)), steps, quick: picked || s.always, guess: s.conf == "guess" })
         }).collect();
         let juice = m.juice.iter().map(|(k, j)| (ch.get(&format!("{k}.spawn")), j.base, j.uplift, setup.map_has.contains(k))).collect();
         let danger = m.danger.iter().map(|(k, w)| (ch.get(k), *w)).collect();
@@ -361,11 +388,13 @@ impl Problem {
             kinds = kinds.min(1.0);
             only = self.thr.iter().find(|t| s.pick.contains(t.0)).map(|t| t.0);
         }
-        let mods = m.mods + x[c.xmods];
+        // Threads bring their own map mods: 1 for 1-3 Threads, 2 for 4-7, 3 for 8 or more (3.30.0c).
+        let all_threads: f64 = self.thr.iter().filter(|t| only.is_none_or(|o| o == t.0)).map(|t| t.1).sum::<f64>() + if x[c.t_lim] > 0.0 { 2.0 } else { 0.0 };
+        let mods = m.mods + x[c.xmods] + thread_mods(all_threads);
         let eff = x[c.eff] + x[c.pre] * glob_c().prefix + x[c.suf] * (1.0 - glob_c().prefix) + x[c.per_kind] * kinds + x[c.per_mod] * mods;
         let g = glob_c();
         let mm = (1.0 + x[c.xmods] * g.extra_mod / m.mods.max(1.0)) * (1.0 + eff);
-        let mut q = [0.0f64; 18];
+        let mut q = [0.0f64; NDER];
         q[E] = 1.0 + eff;
         let side = if s.eldritch.is_some() { g.influenced } else { 0.0 };
         q[PACK] = (1.0 + m.pack / 100.0 * mm + x[c.pack] + x[c.eld] * side) / (1.0 + m.pack / 100.0);
@@ -388,6 +417,7 @@ impl Problem {
         let mut j = 1.0;
         for (k, base, up, has) in &self.juice { j *= 1.0 + if *has { 1.0 } else { (base * (1.0 + x[*k])).min(1.0) } * up; }
         q[JUICE] = j;
+        q[MIRAGE] = 1.0 + if s.map_has.iter().any(|h| h == "mirage") { 1.0 } else { (glob("mirageBase") * (1.0 + x[c.mirage])).min(1.0) };
         q[THREADMODS] = 1.0 + x[c.per_rm] * (g.rare_mods + x[c.rmods]);
         q[SHRINES] = 0.6 + x[c.sh] + x[c.shapp] + if s.terror { 8.0 } else { 0.0 };
         q[BOSSES] = 1.0 + if s.maven { x[c.maven] } else { 0.0 } + if s.terror { q[SHRINES] } else { 0.0 };
@@ -400,16 +430,19 @@ impl Problem {
                 How::Fixed(n) => n,
                 How::Surpass(b, i) => b + x[i],
                 How::Inc(b, i) => (b * (1.0 + x[i])).min(1.0),
-                How::Chance(b, i, cap) => (b + x[i]).min(cap),
+                How::Chance(b, i, cap, k) => (b + k * x[i]).min(cap),
                 How::Count(d) => q[d],
             };
             if let Some(th) = sr.thread {
                 if only.is_some_and(|o| o != th) { continue; }
-                let have = self.thr.iter().find(|y| y.0 == th).map(|y| y.1).unwrap_or(0.0);
-                n *= 0.65 + 0.07 * have.min(8.0);
+                let have = self.thr.iter().find(|y| y.0 == th).map(|y| y.1).unwrap_or(0.0) + if only == Some(th) { 2.0 } else { 0.0 };
+                n *= thread_gain(have, &sr.steps);
+                // 3+ Breach Threads turn 90-95% of Hives into Fortresses (Ragnivar, 22 Nov).
+                if th == "breach" && sr.side == Some(false) && have >= 3.0 { n *= 0.1; }
                 if only.is_some() { n *= 1.02; }
             }
             if let Some(u) = sr.side { n *= if u { unstable } else { 1.0 - unstable }; }
+            if let Some(g) = sr.gate { n *= x[g]; }
             if n <= 0.0 { continue; }
             let mut inc = sr.unit * n;
             if s.rush { match sr.how { How::Count(_) => {} How::Fixed(_) => inc *= if sr.thread.is_some() && sr.weight >= 1.0 { 0.8 } else { 0.3 }, _ => inc *= if sr.quick { 0.7 } else { 0.2 } } }
@@ -428,7 +461,9 @@ impl Problem {
         let keep = x[c.keep].min(1.0);
         let bill: f64 = self.thr.iter().filter(|y| only.is_none_or(|o| o == y.0)).map(|y| y.1 * y.2).sum();
         v = (v - bill * (1.0 - keep)).max(1.0);
-        let danger: f64 = self.danger.iter().map(|(k, w)| w * x[*k]).sum();
+        let mut danger: f64 = self.danger.iter().map(|(k, w)| w * x[*k]).sum();
+        // Three or more Abyss Threads: dangerous for little more loot (Master Jedi Skyewalker, Squid RPG).
+        if self.thr.iter().any(|t| t.0 == "abyss" && t.1 >= 3.0) { danger += glob("abyssDanger"); }
         t /= 1.0 + g.shrine_speed * q[SHRINES].min(g.shrine_cap) * (1.0 + x[c.shbuff] + x[c.shextra] * 0.5);
         let u = v.ln() - danger * (1.0 - s.strength) - t.ln();
         if let Some(d) = det { d.total = v; d.q = q; }
@@ -442,12 +477,22 @@ impl Problem {
 
 /// What changed between a tree with a node and without it, in plain words ("more monsters, better drops").
 pub fn said(with: &Detail, without: &Detail) -> Vec<&'static str> {
-    let mut v: Vec<(f64, &'static str)> = (0..18).filter(|i| !DER_SAID[*i].is_empty() && without.q[*i] != 0.0)
+    let mut v: Vec<(f64, &'static str)> = (0..NDER).filter(|i| !DER_SAID[*i].is_empty() && without.q[*i] != 0.0)
         .map(|i| (with.q[i] / without.q[i] - 1.0, DER_SAID[i])).filter(|(d, _)| *d > 0.003).collect();
     if with.q[ALTARBOSS] > 0.0 && without.q[ALTARBOSS] == 0.0 { v.push((1.0, DER_SAID[ALTARBOSS])); }
     v.sort_by(|a, b| b.0.total_cmp(&a.0));
     v.into_iter().map(|x| x.1).collect()
 }
+
+/// How much of a Thread mechanic a map has at this many of its Threads: a little more for each, and a step at 3, 6 and 8
+/// where the league bonus goes up (3.30.0c). Worth about the old straight line at 3, 6 and 8.
+pub fn thread_gain(have: f64, steps: &[f64; 3]) -> f64 {
+    let h = have.min(10.0);
+    0.65 + 0.035 * h.min(8.0) + [3.0, 6.0, 8.0].iter().zip(steps).filter(|(at, _)| h >= **at).map(|(_, s)| s).sum::<f64>()
+}
+
+/// Map mods the Threads bring themselves: 1 for 1-3 Threads, 2 for 4-7, 3 for 8 or more (3.30.0c).
+pub fn thread_mods(threads: f64) -> f64 { match threads.round() as u32 { 0 => 0.0, 1..=3 => 1.0, 4..=7 => 2.0, _ => 3.0 } }
 
 pub fn cap(s: &str) -> String { let mut c = s.chars(); c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default() }
 
