@@ -42,3 +42,6 @@
 .ps-btns { display: flex; gap: 8px; margin-top: 10px; }
 .ps-foot { display: flex; gap: 16px; padding: 7px 14px; font-size: 12px; color: var(--muted); background: #15171c; border-top: 1px solid var(--line); }
 .ps-ago { margin-left: auto; }
+/* Drag the window by its search bar or bottom line (26 Nov: he couldn't move it). */
+.ps-search, .ps-foot { cursor: move; }
+.ps-search input, .ps-search button { cursor: auto; }

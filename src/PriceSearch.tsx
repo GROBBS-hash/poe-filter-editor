@@ -98,11 +98,11 @@ export default function PriceSearch() {
 
   return (
     <div className="ps" onKeyDown={onKey}>
-      <div className="ps-search">
-        <span className="ps-glass">🔍</span>
+      <div className="ps-search" data-tauri-drag-region>
+        <span className="ps-glass" data-tauri-drag-region>🔍</span>
         <input ref={input} value={q} spellCheck={false} placeholder="Type an item name…"
           onChange={(e) => { setQ(e.target.value); run(e.target.value); }} />
-        {r?.league && <span className="ps-league">{r.league} · PoE {r.poe2 ? 2 : 1}</span>}
+        {r?.league && <span className="ps-league" data-tauri-drag-region>{r.league} · PoE {r.poe2 ? 2 : 1}</span>}
         <button className="ps-key" title="Close (Esc)" onClick={() => hide(true)}>Esc</button>
       </div>
       <div className="ps-split">
@@ -154,7 +154,7 @@ export default function PriceSearch() {
           </> : <div className="ps-empty">Prices come from poe.ninja.</div>}
         </div>
       </div>
-      <div className="ps-foot"><span>↑↓ choose</span>{cur && cur.versions.length > 1 && <span>←→ version</span>}<span>Enter: trade site</span><span>Ctrl+Enter: poe.ninja</span>
+      <div className="ps-foot" data-tauri-drag-region title="Drag here to move the window"><span>↑↓ choose</span>{cur && cur.versions.length > 1 && <span>←→ version</span>}<span>Enter: trade site</span><span>Ctrl+Enter: poe.ninja</span>
         <span className="ps-ago">{r?.updated ? ago(r.updated) : ""}</span></div>
     </div>
   );
