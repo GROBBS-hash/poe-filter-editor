@@ -38,8 +38,10 @@ const fill = (key: string, values: number[]) => { let i = 0; return key.replace(
  * "Totals": what all your points add up to, grouped by mechanic with its picture (like poe atlas planners:
  * "+265% Surpassing Chance to contain Sacred Flora"). With `base`, each line shows how an edit changes it.
  */
-export default function AtlasTotals({ nodes, choices, base }: {
+export default function AtlasTotals({ nodes, choices, base, label }: {
   nodes: number[]; choices: [number, number][]; base?: { nodes: number[]; choices: [number, number][] };
+  /** Replaces the line under "Totals" (Compare: "What changes going from A to B"). */
+  label?: string;
 }) {
   const [tree, setTree] = useState<AtlasData | null>(null);
   const [open, setOpen] = useState<Record<string, boolean>>({});
@@ -67,7 +69,7 @@ export default function AtlasTotals({ nodes, choices, base }: {
   if (!tree || groups.length === 0) return null;
   return (
     <div className="att">
-      <div className="att-head"><b>Totals</b><span className="muted small">What all your points add up to{base ? ", and what your changes do" : ""}.</span></div>
+      <div className="att-head"><b>Totals</b><span className="muted small">{label ?? `What all your points add up to${base ? ", and what your changes do" : ""}.`}</span></div>
       <div className="att-grid">
         {groups.map(({ g, label, item, rows, changed }) => {
           const big = rows.length > 6 && !open[g];

@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
 import AtlasTreeView, { AtlasStore, AtlasStrategy, ChoiceList, StepBar, StepList, StrategyNotes, useStep } from "./AtlasTreeView";
 import AtlasTotals from "./AtlasTotals";
+import AtlasCompare from "./AtlasCompare";
 import TreeEditor from "./AtlasEditor";
 import { PageLoading } from "./Loading";
 import AtlasPicks from "./AtlasPicks";
@@ -23,6 +24,8 @@ export default function Atlas({ go }: { go?: (tab: string) => void }) {
   /** Bumped by the farm finder's "Build this tree", so Build my own opens with those mechanics. */
   const [build, setBuild] = useState(0);
   const [results, setResults] = useState<TreeResult[]>([]);
+  /** "Compare" on a strategy: it becomes tree A in Compare two trees. */
+  const [cmp, setCmp] = useState<{ id: number; n: number } | null>(null);
 
   useEffect(() => {
     invoke<TreeResult[] | null>("atlas_results").then((r) => setResults(r ?? [])).catch(() => {});
@@ -83,11 +86,13 @@ export default function Atlas({ go }: { go?: (tab: string) => void }) {
                   onSelect={() => setSel(s.id)}
                   onUse={() => run("atlas_use", { id: s.id, variant: store.active === s.id ? store.variant : 0 })}
                   onRename={(n) => run("atlas_rename", { id: s.id, name: n })}
-                  onDelete={() => { if (confirm(`Delete “${s.name}”?`)) run("atlas_delete", { id: s.id }); }} />
+                  onDelete={() => { if (confirm(`Delete “${s.name}”?`)) run("atlas_delete", { id: s.id }); }}
+                  onCompare={store.list.length > 1 || s.variants.length > 1 ? () => setCmp((c) => ({ id: s.id, n: (c?.n ?? 0) + 1 })) : undefined} />
               ))}
             </div>
           </div>
           {shown && <Preview key={shown.id} s={shown} store={store} run={run} onSel={setSel} />}
+          {store.list.reduce((n, s) => n + s.variants.length, 0) > 1 && <AtlasCompare store={store} shown={shown?.id ?? null} pick={cmp} />}
         </>
       )}
     </div>
@@ -110,9 +115,9 @@ function Earned({ r, best }: { r: TreeResult; best: boolean }) {
   );
 }
 
-function StrategyRow({ s, active, selected, onSelect, onUse, onRename, onDelete, result, best }: {
+function StrategyRow({ s, active, selected, onSelect, onUse, onRename, onDelete, onCompare, result, best }: {
   s: AtlasStrategy; active: boolean; selected: boolean; onSelect: () => void; onUse: () => void; onRename: (n: string) => void; onDelete: () => void;
-  result?: TreeResult; best?: boolean;
+  onCompare?: () => void; result?: TreeResult; best?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [n, setN] = useState(s.name);
@@ -134,6 +139,7 @@ function StrategyRow({ s, active, selected, onSelect, onUse, onRename, onDelete,
         </div>
       )}
       <span className="grow" />
+      {onCompare && <button className="link small" title="See it side by side with another tree: what you gain and lose" onClick={(e) => { e.stopPropagation(); onCompare(); }}>Compare</button>}
       <button className="link small" onClick={(e) => { e.stopPropagation(); setN(s.name); setEditing(true); }}>Rename</button>
       <button className="link small" onClick={(e) => { e.stopPropagation(); onDelete(); }}>Delete</button>
     </div>
