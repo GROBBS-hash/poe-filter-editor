@@ -23,6 +23,8 @@ export type LevelView = {
 export type MapRun = {
   name: string; area: string; level: number; seed: number; start: number; last_enter: number; in_map: number; left: number;
   deaths: number; portals: number; mods: string[]; made: number | null; paused?: number; loot?: LootLine[]; loot_missed?: boolean;
+  /** The atlas strategy it was run on (Atlas page id). */
+  atlas?: number | null;
 };
 /** One thing a map gave you (loot.rs). cat: currency, cards, uniques, maps, scarabs, fragments, gems, gear, other. */
 export type LootLine = { name: string; cat: string; stack: number; value: number; icon: string; tier?: number | null; high?: number | null };
@@ -35,6 +37,7 @@ type TrackerView = {
   current: MapRun | null; inside: boolean; current_inside: number; paused: boolean; recent: MapRun[]; today: MapStats; all: MapStats;
   char_name: string | null; char_level: number | null; watch_ms: number; watch_running: boolean; laps: number[]; now: number;
   session: SessionSummary | null; pause: PauseInfo; loot_prefs: LootPrefs; loot_note: string; loot_reading?: boolean; left?: Left | null; over_panels?: boolean; divine: number | null; has_account?: boolean;
+  strategies?: [number, string][]; strategy?: number | null;
 };
 type SessionSummary = { start: number; played: number; maps: number; map_time: number; per_hour: number; deaths: number; levels: number;
   made: number | null; best: MapRun | null; loot: LootLine[]; loot_value: number; loot_maps: number; loot_secs: number };
@@ -87,6 +90,7 @@ export const mmss = (secs: number) => {
   return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}` : `${m}:${String(r).padStart(2, "0")}`;
 };
 const big = (n: number) => n >= 1e9 ? `${(n / 1e9).toFixed(2)}B` : n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(0)}k` : `${Math.round(n)}`;
+const runKey = (r: MapRun) => `${r.area} ${r.start}`;
 const tier = (r: MapRun) => r.level >= 68 ? `T${r.level - 67}` : `lvl ${r.level}`;
 
 /** Esc hides the window (and gives the game back its focus). */
@@ -282,6 +286,13 @@ export function TrackerWindow() {
           {(c.deaths > 0 || c.portals > 0) && <div className="pw-small">{c.deaths > 0 ? `${c.deaths} death${c.deaths > 1 ? "s" : ""}` : ""}{c.deaths > 0 && c.portals > 0 ? " · " : ""}{c.portals > 0 ? `${c.portals} portal${c.portals > 1 ? "s" : ""} back in` : ""}</div>}
           {c.mods.length > 0 && <div className="trk-mods" title={c.mods.join("\n")}>{c.mods.join(" · ")}</div>}
         </> : <div className="pw-small">Open a map: the timer starts by itself.</div>}
+        {(v.strategies ?? []).length > 0 && <div className="trk-strat" title="Switched atlas tree in game? Pick it here: this map and the next ones count for it">
+          <span>Strategy</span>
+          <select value={c?.atlas ?? v.strategy ?? ""} onChange={(e) => invoke<PlayView>("tracker_use_atlas", { id: +e.target.value }).then((p) => setV(p.tracker))}>
+            {(c?.atlas ?? v.strategy) == null && <option value="">None picked</option>}
+            {v.strategies!.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+          </select>
+        </div>}
         {v.today.runs > 0 && <div className="trk-grid">
           <span>Today <b>{v.today.runs}</b> maps</span><span><b>{v.today.per_hour.toFixed(1)}</b> per hour</span>
           <span>Avg <b>{mmss(v.today.avg_inside)}</b> in map</span>
@@ -798,15 +809,18 @@ export default function PlayTools() {
   const [prefs, setPrefs] = useState<LootPrefs | null>(null);
   const [divine, setDivine] = useState<number | null>(null);
   const [openRun, setOpenRun] = useState<number | null>(null);
+  const [strats, setStrats] = useState<[number, string][]>([]);
+  // Maps ticked to say which strategy they were really run on ("area start" keys).
+  const [picked, setPicked] = useState<Set<string>>(new Set());
   useEffect(() => {
-    invoke<PlayView>("play_view").then((p) => { setSession(p.tracker.session); setPrefs(p.tracker.loot_prefs); setDivine(p.tracker.divine); }).catch(() => {});
+    invoke<PlayView>("play_view").then((p) => { setSession(p.tracker.session); setPrefs(p.tracker.loot_prefs); setDivine(p.tracker.divine); setStrats(p.tracker.strategies ?? []); }).catch(() => {});
     invoke<boolean>("play_prefs_get").then(setKeepInMaps).catch(() => {});
     invoke<boolean>("altar_auto_get").then(setAltarAuto).catch(() => {});
     invoke<LevelView>("level_view").then(setLv).catch(() => {});
     invoke<SearchView>("searches_get").then((v) => setSearches(v.saved)).catch(() => {});
     invoke<Sheet[]>("sheets_list").then(setSheets).catch(() => {});
     invoke<MapRun[]>("maps_history").then(setRuns).catch(() => {});
-    const un = listen<PlayView>("play-update", (e) => { setSession(e.payload.tracker.session); setPrefs(e.payload.tracker.loot_prefs); invoke<MapRun[]>("maps_history").then(setRuns); });
+    const un = listen<PlayView>("play-update", (e) => { setSession(e.payload.tracker.session); setPrefs(e.payload.tracker.loot_prefs); setStrats(e.payload.tracker.strategies ?? []); invoke<MapRun[]>("maps_history").then(setRuns); });
     return () => { un.then((f) => f()); };
   }, []);
   const setOpts = (o: Partial<RouteOptions>, manual?: boolean) => {
@@ -914,21 +928,40 @@ export default function PlayTools() {
       <div className="card">
         <div className="pw-row between"><h2>Map runs</h2>
           {runs.length > 0 && <button className="link" onClick={() => { if (confirm("Forget every map run?")) invoke("maps_clear").then(() => setRuns([])); }}>Clear</button>}</div>
+        {strats.length > 0 && recent.length > 0 && (picked.size === 0
+          ? <p className="muted small">Ran some on another atlas tree than the Strategy column says? Tick them and pick the right one.</p>
+          : <div className="row pt-fix">
+              <b>{picked.size} map{picked.size > 1 ? "s" : ""}</b><span className="muted small">were run on</span>
+              <select defaultValue="" onChange={(e) => {
+                if (e.target.value === "") return;
+                const id = e.target.value === "none" ? null : +e.target.value;
+                const list = recent.filter((r) => picked.has(runKey(r))).map((r) => [r.area, r.start]);
+                invoke<MapRun[]>("maps_set_atlas", { runs: list, id }).then((rs) => { setRuns(rs); setPicked(new Set()); }).catch((er) => setMsg(String(er)));
+              }}>
+                <option value="">Pick a strategy…</option>
+                {strats.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+                <option value="none">None (leave them out)</option>
+              </select>
+              <button className="link" onClick={() => setPicked(new Set())}>Cancel</button>
+            </div>)}
         {recent.length === 0 ? <p className="muted small">None yet: open a map and the tracker counts it.</p> :
-          <table className="pt-table"><thead><tr><th>Map</th><th>Tier</th><th>In map</th><th>Deaths</th><th>Where the loot came from</th><th className="n">Loot</th><th>Best drop</th><th>When</th></tr></thead>
+          <table className="pt-table"><thead><tr>{strats.length > 0 && <th title="Tick maps to change their strategy" />}<th>Map</th><th>Tier</th><th>In map</th><th>Deaths</th><th>Where the loot came from</th><th className="n">Loot</th><th>Best drop</th>{strats.length > 0 && <th>Strategy</th>}<th>When</th></tr></thead>
             <tbody>{recent.map((r, i) => {
               const loot = r.loot ?? [];
               const best = loot.find((l) => !(prefs?.hide ?? []).includes(l.cat)) ?? loot[0];
               return (<Fragment key={i}>
                 <tr title={r.mods.join("\n")} className={loot.length ? "pt-click" : ""} onClick={() => loot.length && setOpenRun(openRun === i ? null : i)}>
+                  {strats.length > 0 && <td onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={picked.has(runKey(r))}
+                    onChange={(e) => setPicked((s) => { const n = new Set(s); if (e.target.checked) n.add(runKey(r)); else n.delete(runKey(r)); return n; })} /></td>}
                   <td>{r.name}</td><td>{tier(r)}</td>
                   <td>{mmss(r.in_map)}{r.paused ? <span className="muted small" title="Time with the Escape menu or skill tree open, not counted"> (+{mmss(r.paused)} paused)</span> : null}</td>
                   <td>{r.deaths || ""}</td>
                   <td>{loot.length ? <LootBar loot={loot} thin /> : r.loot_missed ? <span className="muted small" title="Your bags couldn't be read (usually the pathofexile.com login had run out), so this map isn't counted in the averages">loot not read</span> : r.made != null ? <span className="muted small">earnings ≈ {Math.round(r.made)}c</span> : ""}</td>
                   <td className="n">{loot.length ? <b>{chaosOrDiv(lootTotal(loot), divine)}</b> : ""}</td>
                   <td>{best ? <span className="loot-name"><TierTag t={best.tier} />{best.stack > 1 ? `${best.stack}× ` : ""}{best.name}</span> : ""}</td>
+                  {strats.length > 0 && <td className="muted small">{strats.find(([id]) => id === r.atlas)?.[1] ?? "—"}</td>}
                   <td className="muted">{new Date(r.start * 1000).toISOString().slice(5, 16).replace("T", " ")}</td></tr>
-                {openRun === i && <tr key={`${i}-loot`} className="pt-loot"><td colSpan={8}><LootList loot={loot} prefs={prefs} divine={divine} /></td></tr>}
+                {openRun === i && <tr key={`${i}-loot`} className="pt-loot"><td colSpan={strats.length > 0 ? 10 : 8}><LootList loot={loot} prefs={prefs} divine={divine} /></td></tr>}
               </Fragment>);
             })}</tbody></table>}
         {recent.some((r) => (r.loot ?? []).length > 0) && <div className="loot-legend" style={{ marginTop: 8 }}>

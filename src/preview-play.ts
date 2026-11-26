@@ -60,7 +60,7 @@ export const playView = {
       loot: parkLoot.map((l, i) => ({ ...l, stack: l.stack * (i % 3 + 2), value: l.value * (i % 3 + 2) })), loot_value: 2140, loot_maps: 5, loot_secs: 3000 },
     pause: { on: true, ready: true, esc_ready: false, note: "" },
     loot_prefs: { on: true, hide: ["gear"], min_chaos: 2 },
-    loot_note: "", left: { n: 12, more: false, fresh: true }, over_panels: false,
+    loot_note: "", left: { n: 12, more: false, fresh: true }, over_panels: false, strategies: [[1, "Ritual + Harvest"], [2, "Vaal Temple rush"]], strategy: 1,
     divine: 212,
   },
 };

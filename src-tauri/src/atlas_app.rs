@@ -212,6 +212,16 @@ pub fn atlas_save_tree(app: AppHandle, id: u64, variant: usize, nodes: Vec<u32>,
     with_store(&app, true, |s| s.set_tree(id, variant, &nodes, &choices, (!name.is_empty()).then_some(name.as_str()), now()).map(|_| s.clone()))?
 }
 
+/// Your saved strategies by name (for the map tracker's strategy switch).
+pub(crate) fn names(app: &AppHandle) -> Vec<(u64, String)> {
+    with_store(app, false, |s| s.list.iter().map(|x| (x.id, x.name.clone())).collect()).unwrap_or_default()
+}
+
+/// Puts a strategy in use from outside the Atlas page (the map tracker), keeping its tree if it's in use already.
+pub(crate) fn use_strategy(app: &AppHandle, id: u64) {
+    let _ = with_store(app, true, |s| { let v = if s.active == Some(id) { s.variant } else { 0 }; s.use_one(id, v); });
+}
+
 /// The atlas tree in use now (the one F7 shows), for tagging map runs and earnings sessions.
 pub(crate) fn active_id(app: &AppHandle) -> Option<u64> {
     with_store(app, false, |s| s.active).ok().flatten()

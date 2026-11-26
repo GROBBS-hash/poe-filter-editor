@@ -667,6 +667,9 @@ pub struct TrackerView {
     pub divine: Option<f64>,
     /// Logged in to pathofexile.com (account + POESESSID saved).
     pub has_account: bool,
+    /// Your atlas strategies (id, name) and the one in use: the tracker's strategy switch.
+    pub strategies: Vec<(u64, String)>,
+    pub strategy: Option<u64>,
 }
 
 /// Monsters left: the number, "more than" it, and whether the game said so just now.
@@ -728,6 +731,7 @@ fn tracker_view(app: &AppHandle) -> TrackerView {
     });
     let divine = currency_rates(app).get("divine").copied();
     let has_account = account(app).is_some();
+    let (strategies, strategy) = (atlas_app::names(app), atlas_app::active_id(app));
     with_live(|l| {
         let watch_ms = l.watch_acc + l.watch_since.map(|t| unix_ms() - t).unwrap_or(0);
         let session = (l.sess_start > 0).then(|| {
@@ -764,8 +768,33 @@ fn tracker_view(app: &AppHandle) -> TrackerView {
             char_name: l.site_char.as_ref().map(|c| c.0.clone()), char_level: l.site_char.as_ref().map(|c| c.1),
             watch_ms, watch_running: l.watch_since.is_some(), laps: l.laps.clone(), now, session,
             pause, loot_prefs: prefs, loot_note: l.loot_note.clone(), loot_reading: l.loot_reading > 0, left: if inside { left_view(l) } else { None }, over_panels, divine, has_account,
+            strategies, strategy,
         }
     })
+}
+
+/// Switched atlas tree in game: that strategy goes in use, and the map you're in counts for it (26 Nov, he
+/// switches trees in game and the editor couldn't know).
+#[tauri::command]
+pub fn tracker_use_atlas(app: AppHandle, id: u64) -> PlayView {
+    atlas_app::use_strategy(&app, id);
+    with_store(&app, |s| if let Some(c) = s.maps.current.as_mut() { c.atlas = Some(id); });
+    save_store(&app);
+    emit_all(&app);
+    play_view(app)
+}
+
+/// Past maps were really run on another strategy: `runs` are (area, start) of each.
+#[tauri::command]
+pub fn maps_set_atlas(app: AppHandle, runs: Vec<(String, i64)>, id: Option<u64>) -> Vec<MapRun> {
+    let hit = |r: &MapRun| runs.iter().any(|(a, t)| *a == r.area && *t == r.start);
+    with_store(&app, |s| {
+        for r in s.maps.history.iter_mut().filter(|r| hit(r)) { r.atlas = id; }
+        if let Some(c) = s.maps.current.as_mut().filter(|c| hit(c)) { c.atlas = id; }
+    });
+    save_store(&app);
+    emit_all(&app);
+    maps_history(app)
 }
 
 /// Done with this map (it otherwise ends when you open the next one).

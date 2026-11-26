@@ -165,3 +165,9 @@
 .trk-left.few { color: var(--gold); }
 .trk-left.done { color: var(--green); }
 .trk-left.old { opacity: .5; }
+
+/* The tracker's atlas strategy switch (26 Nov). */
+.trk-strat { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 11.5px; color: var(--muted); }
+.trk-strat select { flex: 1; min-width: 0; font-size: 11.5px; padding: 1px 4px; background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: 6px; }
+.trk-strat select option { background: var(--bg, #1b1d22); }
+
