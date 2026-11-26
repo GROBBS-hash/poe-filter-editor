@@ -164,23 +164,31 @@ pub struct BaseItem {
 #[derive(Debug, Default)]
 pub struct StatIndex {
     by_text: HashMap<(String, String), String>,
+    /// Every id for a text, where the site lists the same words more than once (Mercenary supports: two
+    /// "Gilded Extra Targets (Tier 3)").
+    all: HashMap<(String, String), Vec<String>>,
 }
 
 impl StatIndex {
     pub fn from_json(v: &Value) -> StatIndex {
         let mut by_text = HashMap::new();
+        let mut all: HashMap<(String, String), Vec<String>> = HashMap::new();
         for group in v["result"].as_array().into_iter().flatten() {
             for e in group["entries"].as_array().into_iter().flatten() {
                 let (Some(id), Some(text), Some(kind)) = (e["id"].as_str(), e["text"].as_str(), e["type"].as_str()) else { continue };
                 // Stats with a fixed option list ("Allocates #") are searched differently: skip.
                 // (Temple rooms are open / closed: searched as open, see temple_rows.)
                 if e.get("option").is_some() && !id.starts_with("pseudo.pseudo_temple_") { continue; }
-                by_text.entry((kind.to_string(), text.replace('\n', " ").to_lowercase())).or_insert_with(|| id.to_string());
+                let key = (kind.to_string(), text.replace('\n', " ").to_lowercase());
+                all.entry(key.clone()).or_default().push(id.to_string());
+                by_text.entry(key).or_insert_with(|| id.to_string());
             }
         }
-        StatIndex { by_text }
+        StatIndex { by_text, all }
     }
     pub fn len(&self) -> usize { self.by_text.len() }
+    /// Every trade id listed with exactly these words under this kind.
+    pub fn ids(&self, kind: &str, text: &str) -> Vec<String> { self.all.get(&(kind.to_string(), text.to_lowercase())).cloned().unwrap_or_default() }
     /// The trade id of a total ("pseudo") stat by its text, e.g. "+# total maximum Life".
     pub fn pseudo_id(&self, text: &str) -> Option<String> { self.by_text.get(&("pseudo".to_string(), text.to_lowercase())).cloned() }
     pub fn is_empty(&self) -> bool { self.by_text.is_empty() }
@@ -606,6 +614,7 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
     // Heist contracts and blueprints: area level, wings, the job they need.
     filters.splice(0..0, crate::trade_rules::heist_props(text, &item));
     filters.extend(temple_rows(text, index));
+    filters.extend(mercenary_rows(text, index));
     filters.extend(vessel_rows(text));
     // Influences ("Has Shaper Influence"), there to tick: the mods they bring are usually what's ticked.
     for inf in &item.influences {
@@ -750,6 +759,39 @@ pub fn same_monsters(ls: &mut [Listing], names: &[String]) -> usize {
 }
 
 /// A Chronicle of Atzoatl's open rooms: the ones worth something ticked.
+/// A Mercenary Warrant's skills and supports, as the trade site's "Mercenary" stats ("Greater Multiple Projectiles
+/// (Tier 3)"). 26 Nov: warrants were searched by name only and all came out at 1c, though some sell for a fortune.
+/// Tier 3 supports come ticked: they set the price (26 Nov, live: his Cicero warrant's five Tier 3 supports matched 7 for
+/// sale at 35c to 1 div+, its name alone 10,000 at 1c). Skills and lower tiers are there to tick. Words listed twice on the site are
+/// searched as "either of them" (`any_of:`).
+fn mercenary_rows(text: &str, index: &StatIndex) -> Vec<StatFilter> {
+    let text = text.replace('\r', "");
+    if !text.contains("Mercenary Level:") { return vec![] }
+    let mut out = vec![];
+    let mut after = false;
+    for sec in text.split("--------") {
+        let lines: Vec<&str> = sec.lines().map(str::trim).filter(|l| !l.is_empty()).collect();
+        if lines.iter().any(|l| l.starts_with("Mercenary Level:")) { after = true; continue; }
+        if !after { continue; }
+        if lines.iter().any(|l| l.starts_with("Right click") || l.starts_with("Open a portal")) { break; }
+        for l in lines {
+            let (name, tier) = match l.rsplit_once(" (Tier: ") {
+                Some((n, t)) => (n, t.trim_end_matches(')').trim().parse::<u32>().ok()),
+                None => (l, None),
+            };
+            let label = match tier { Some(t) => format!("{name} (Tier {t})"), None => name.to_string() };
+            // A support on two skills ("Critical Chance (Tier 2)" twice) is one row.
+            if out.iter().any(|f: &StatFilter| f.label == label) { continue; }
+            let ids = index.ids("mercenary", &label);
+            if ids.is_empty() { continue; }
+            let id = if ids.len() == 1 { ids[0].clone() } else { format!("any_of:{}", ids.join(",")) };
+            out.push(StatFilter { id, label, kind: "mercenary".into(), enabled: tier == Some(3), tier,
+                junk: tier.is_some_and(|t| t < 3), ..Default::default() });
+        }
+    }
+    out
+}
+
 fn temple_rows(text: &str, index: &StatIndex) -> Vec<StatFilter> {
     let Some((rooms, level)) = crate::temple::read(text) else { return vec![] };
     let t = crate::temple::Temples::shipped();
@@ -851,13 +893,16 @@ pub fn query(s: &TradeSetup) -> Value {
     let seed = |v: f64| json!({ "min": v, "max": v });
     let mut groups: Vec<Value> = Vec::new();
     for f in s.filters.iter().filter(|f| f.enabled) {
+        if let Some(ids) = f.id.strip_prefix("any_of:") {
+            groups.push(json!({ "type": "count", "value": { "min": 1 }, "filters": ids.split(',').map(|id| json!({ "id": id })).collect::<Vec<_>>() }));
+        }
         if let Some(ids) = f.id.strip_prefix("timeless_any:") {
             let v = f.min.unwrap_or(f.value);
             groups.push(json!({ "type": "count", "value": { "min": 1 },
                 "filters": ids.split(',').map(|id| json!({ "id": id, "value": seed(v) })).collect::<Vec<_>>() }));
         }
     }
-    let stats: Vec<Value> = s.filters.iter().filter(|f| f.enabled && !f.id.starts_with("prop.") && !f.id.starts_with("timeless_any:")).map(|f| {
+    let stats: Vec<Value> = s.filters.iter().filter(|f| f.enabled && !f.id.starts_with("prop.") && !f.id.starts_with("timeless_any:") && !f.id.starts_with("any_of:")).map(|f| {
         let id = match f.id.strip_prefix("fractured.") { Some(rest) if !as_base => format!("explicit.{rest}"), _ => f.id.clone() };
         let mut v = stat_json(&id);
         if let (Some(m), None) = (f.min, v.get("value")) { v["value"] = json!({ "min": m }); }
@@ -1617,6 +1662,38 @@ Note: ~b/o 1 alch
         let f = s.filters.iter().find(|f| f.id == "explicit.stat_corpse").unwrap();
         assert_eq!(f.value, 3.0, "{}", f.label);
         assert!(s.filters.iter().any(|f| f.id == "explicit.stat_mana"));
+    }
+
+    #[test]
+    fn mercenary_warrant_supports() {
+        let text = "Item Class: Map Fragments
+Rarity: Normal
+Mercenary Warrant
+--------
+Cicero, the Abyssal
+--------
+Build: Chaplain of the Well
+Mercenary Level: 83
+--------
+Vaal Smite
+Cooldown Recovery (Tier: 2)
+Gilded Extra Targets (Tier: 3)
+--------
+Flame Dash
+Cooldown Recovery (Tier: 2)
+--------
+Right click this item to view Mercenary details.
+";
+        let idx = StatIndex::from_json(&json!({ "result": [ { "label": "Mercenary", "entries": [
+            { "id": "mercenary.skill_40606", "text": "Vaal Smite", "type": "mercenary" },
+            { "id": "mercenary.support_48875", "text": "Cooldown Recovery (Tier 2)", "type": "mercenary" },
+            { "id": "mercenary.support_58471", "text": "Gilded Extra Targets (Tier 3)", "type": "mercenary" },
+            { "id": "mercenary.support_37259", "text": "Gilded Extra Targets (Tier 3)", "type": "mercenary" } ] } ] }));
+        let s = setup(text, &idx).unwrap();
+        let rows: Vec<(&str, bool)> = s.filters.iter().filter(|f| f.kind == "mercenary").map(|f| (f.label.as_str(), f.enabled)).collect();
+        assert_eq!(rows, [("Vaal Smite", false), ("Cooldown Recovery (Tier 2)", false), ("Gilded Extra Targets (Tier 3)", true)]);
+        let q = query(&s).to_string();
+        assert!(q.contains("count") && q.contains("support_58471") && q.contains("support_37259"), "{q}");
     }
 
     #[test]

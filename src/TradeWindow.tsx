@@ -294,6 +294,7 @@ function rowTag(f: StatFilter): string {
   if (f.kind === "property") return f.id.startsWith("prop.map_") ? "map" : f.id === "prop.quality" ? "" : f.id.endsWith("_influence") ? "influence" : "20% quality";
   if (f.kind === "implicit") return "base mod";
   if (f.kind === "enchant") return "enchant";
+  if (f.kind === "mercenary") return f.tier ? `support T${f.tier}` : "skill";
   const how = f.kind === "crafted" ? "crafted " : f.kind === "fractured" ? "fractured " : f.kind === "mutated" ? "foulborn " : "";
   return f.affix ? how + f.affix : how.trim();
 }
@@ -318,6 +319,7 @@ function rowGroup(f: StatFilter, max: [number, number], used: [number, number] =
   if (f.id.includes("empty_suffix")) return ["Suffixes", `${used[1]} of ${max[1]} used`];
   if (f.kind === "pseudo") return ["Totals", "all mods added up"];
   if (f.kind === "enchant") return ["Enchant", ""];
+  if (f.kind === "mercenary") return ["Mercenary", "Tier 3 supports set the price"];
   if (f.kind === "implicit") return ["Base mods", "implicit, come with the item"];
   if (f.affix === "prefix") return ["Prefixes", `${used[0]} of ${max[0]} used`];
   if (f.affix === "suffix") return ["Suffixes", `${used[1]} of ${max[1]} used`];
