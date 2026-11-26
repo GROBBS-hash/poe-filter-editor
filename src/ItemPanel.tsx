@@ -19,7 +19,8 @@ export type RuleDetail = {
   look?: string | null; off?: boolean;
 };
 export type When = "always" | "levelling" | "maps";
-export type Replacing = { id: string; index: number; detail: RuleDetail };
+/** `home`: the filter the edit lives in, when it's the one the active filter is built on. */
+export type Replacing = { id: string; index: number; detail: RuleDetail; home?: string | null };
 
 /** The item a saved edit is about, so it can be shown in the same panel. */
 export function itemFromRule(d: RuleDetail): Item {
@@ -251,7 +252,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
           const [id, index, detail] = await invoke<[string, number, RuleDetail]>("get_rule", addedNew
             ? { id: replacing.id, index: null, label: follow ? r.label : replacing.detail.label }
             : { id: replacing.id, index: replacing.index, label: null });
-          setReplacing({ id, index, detail });
+          setReplacing({ id, index, detail, home: replacing.home });
           if (index !== replacing.index) onMoved?.(index, detail, `Updated “${r.label}”. Press F4 in game to reload.`);
         } catch { if (follow) { onChanged?.(); onClose(); return; } /* else keep the old details */ }
       }
@@ -331,8 +332,9 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
   };
   const openRule = async (label: string) => {
     try {
-      const [id, index, detail] = await invoke<[string, number, RuleDetail]>("get_rule", { id: null, index: null, label });
-      setReplacing({ id, index, detail });
+      // Also in the filter this one is built on (26 Nov: his map edit was in Red-Maps while he played Blasting).
+      const [id, index, detail, home] = await invoke<[string, number, RuleDetail, string | null]>("get_rule", { id: null, index: null, label, inherited: true });
+      setReplacing({ id, index, detail, home });
       setAnyRarity(!detail.rarity);
       setWhen(detail.when ?? "always");
       setOnlyCorrupted(!!detail.corrupted);
@@ -426,6 +428,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
       {replacing && (
         <div className="qm-editing">
           Editing your rule: <b>{replacing.detail.label}</b>. Buttons below change this rule.
+          {replacing.home && <> It's saved in <b>{replacing.home}</b>, so filters built on {replacing.home} change too.</>}
           <button className="qm-inline" onClick={removeRule}>Remove it</button>
           {inGame && <button className="qm-inline" onClick={() => setReplacing(null)}>Stop editing</button>}
         </div>
@@ -458,7 +461,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
       {item.rarity === "Unique" && !item.name && item.base_type && <BaseUniques base={item.base_type} />}
 
       {picked.from_screen && picked.rarity_unsure && isGear && (
-        <div className="qm-rarity-note">Your filter shows this as the same colours for every rarity, so the label can't say which it is.
+        <div className="qm-rarity-note">The label alone can't say which rarity this is (your filter colours it the same for several, or by mods the label doesn't show).
           Pick the rarity below, or hover the item until its info box shows, then press again.</div>
       )}
       {(picked.from_screen || replacing || !inGame) && isGear && (

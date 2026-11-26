@@ -34,6 +34,22 @@ pub struct TooltipRead {
     pub rarity: Option<String>,
     /// The name line(s) at the top, as read.
     pub header: String,
+    /// Maps: the Elder guardian or conqueror in it ("Map is occupied by The Enslaver"), for its picture.
+    pub occupied_by: Option<String>,
+}
+
+/// Labels this close to how the filter draws a rarity (text and background colour distance) are a real match.
+/// Further off, the filter's look for that rarity isn't what's on screen: e.g. cluster jewels, whose look depends
+/// on passives the label doesn't show, so the filter "hides" every rarity but unique (26 Nov: a magic Large
+/// Cluster Jewel was read and priced as The Voices).
+pub const LABEL_CLOSE: i32 = 30_000;
+
+/// The map's guardian or conqueror from a hover-box line ("MAP IS OCCUPIED BY THE ENSLAVER").
+fn occupant_in(line: &str) -> Option<String> {
+    let l = compact(line);
+    if !["occupiedby", "citadel", "influencedby"].iter().any(|k| l.contains(k)) { return None; }
+    ["The Enslaver", "The Eradicator", "The Constrictor", "The Purifier", "Veritania", "Al-Hezmin", "Drox", "Baran"]
+        .iter().find(|w| l.contains(&compact(w))).map(|w| w.to_string())
 }
 
 /// Does a piece of a label (what the reader caught: "CHOPP", "SUPERIOR") fit in
@@ -101,7 +117,8 @@ pub fn from_tooltip(lines: &[(String, Option<[u8; 3]>)], known: &HashSet<String>
             found.unique = unique_on_label(&format!("{} {}", lines[i - 1].0, lines[i].0), &found.base);
         }
         let header = if i > 0 { format!("{} {}", lines[i - 1].0, lines[i].0) } else { lines[i].0.clone() };
-        return Some(TooltipRead { found, item_level, unidentified, rarity, header });
+        let occupied_by = lines[il..].iter().take(12).find_map(|(t, _)| occupant_in(t));
+        return Some(TooltipRead { found, item_level, unidentified, rarity, header, occupied_by });
     }
     None
 }
@@ -110,6 +127,7 @@ pub fn from_tooltip(lines: &[(String, Option<[u8; 3]>)], known: &HashSet<String>
 /// bigger and clearer, so its rarity, item level and identified state win.
 pub fn apply_tooltip(item: &mut Item, t: &TooltipRead) {
     if t.item_level.is_some() { item.item_level = t.item_level; }
+    if item.item_class == "Maps" && item.occupied_by.is_none() { item.occupied_by = t.occupied_by.clone(); }
     if let Some(name) = &t.found.unique {
         item.rarity = "Unique".into();
         item.name = Some(name.clone());
@@ -424,7 +442,8 @@ pub fn apply_tooltip_checked(segs: &[Segment], item: &mut Item, t: &TooltipRead,
             let known = Item { item_level: t.item_level.or(item.item_level), ..item.clone() };
             let theirs = label_distance(segs, &known, seen, area_level, &r, None);
             let ours = label_distance(segs, &known, seen, area_level, &item.rarity, item.sockets.as_deref());
-            if theirs > ours + 25_000 { t.rarity = None; }
+            // Only when our own guess really fits the label (else the box knows better: 26 Nov, magic cluster jewel).
+            if theirs > ours + 25_000 && ours <= LABEL_CLOSE { t.rarity = None; }
         }
     }
     apply_tooltip(item, &t);
@@ -638,12 +657,45 @@ Map contains Baran's Citadel (implicit)
         let mut it = Item { base_type: "Piledriver".into(), rarity: "Normal".into(), ..Default::default() };
         let seen = LabelColours { text: [210, 210, 210], background: [10, 10, 10] };
         let found = GroundMatch { base: "Piledriver".into(), stack: None, tier: None, superior: false, confidence: 1.0, unique: None };
-        let t = TooltipRead { found, item_level: Some(70), unidentified: false, rarity: Some("Unique".into()), header: "PILEDRIVER".into() };
+        let t = TooltipRead { found, item_level: Some(70), unidentified: false, rarity: Some("Unique".into()), header: "PILEDRIVER".into(), occupied_by: None };
         apply_tooltip_checked(&segs, &mut it, &t, Some(seen), 70);
         assert_eq!((it.rarity.as_str(), it.item_level), ("Normal", Some(70)));
         // The frame's brown isn't a unique's name colour; plain white is normal.
         assert_eq!(rarity_from_colour_sure([200, 140, 80]), None);
         assert_eq!(rarity_from_colour_sure([250, 250, 245]), Some("Normal"));
+    }
+
+    #[test]
+    fn magic_cluster_jewel_isnt_a_unique() {
+        // 26 Nov: the filter's cluster jewel rules depend on passives the label doesn't show, so every rarity but
+        // unique counts as hidden; the label's purple isn't the unique look, so the box's blue name wins.
+        let f = "Show\n\tRarity Unique\n\tSetTextColor 255 255 255 255\n\tSetBackgroundColor 255 104 0 255\n\n\
+                 Show\n\tBaseType == \"Large Cluster Jewel\"\n\tEnchantmentPassiveNum 8\n\tSetTextColor 150 0 255 255\n\tSetBackgroundColor 34 0 67 255\n\n\
+                 Hide\n\tBaseType == \"Large Cluster Jewel\"\n";
+        let segs = parse_filter(f);
+        let found = GroundMatch { base: "Large Cluster Jewel".into(), stack: None, tier: None, superior: false, confidence: 1.0, unique: None };
+        let seen = LabelColours { text: [150, 0, 255], background: [34, 0, 67] };
+        let mut it = ground_item(&segs, &found, Some(seen), 83);
+        assert_eq!(it.rarity, "Unique", "the label alone still guesses unique");
+        let r = it.rarity.clone();
+        assert!(label_distance(&segs, &it, seen, 83, &r, None) > LABEL_CLOSE, "but it's a poor fit");
+        let t = TooltipRead { found, item_level: Some(83), unidentified: true, rarity: Some("Magic".into()), header: "LARGE CLUSTER JEWEL".into(), occupied_by: None };
+        apply_tooltip_checked(&segs, &mut it, &t, Some(seen), 83);
+        assert_eq!(it.rarity, "Magic");
+    }
+
+    #[test]
+    fn hover_box_names_the_maps_guardian() {
+        let mut k = known();
+        k.insert("Map (Tier 16)".into());
+        let l = |t: &str| (t.to_string(), None);
+        let tip = vec![("MAP (TIER 16)".to_string(), Some([255u8, 255, 119])), l("MONSTER LEVEL: 83"), l("ITEM LEVEL: 83"),
+            l("AREA IS INFLUENCED BY THE ELDER"), l("MAP IS OCCUPIED BY THE ENSLAVER"), l("UNIDENTIFIED")];
+        let t = from_tooltip(&tip, &k).unwrap();
+        assert_eq!((t.rarity.as_deref(), t.occupied_by.as_deref()), (Some("Rare"), Some("The Enslaver")));
+        let mut it = Item { item_class: "Maps".into(), base_type: "Map (Tier 16)".into(), rarity: "Normal".into(), ..Default::default() };
+        apply_tooltip(&mut it, &t);
+        assert_eq!((it.rarity.as_str(), it.occupied_by.as_deref()), ("Rare", Some("The Enslaver")));
     }
 
     #[test]

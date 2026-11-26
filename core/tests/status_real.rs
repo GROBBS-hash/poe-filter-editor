@@ -202,7 +202,7 @@ fn ground_rare_isnt_read_as_its_unique() {
     let m = GroundMatch { base: "Twilight Regalia".into(), stack: None, tier: None, superior: false, confidence: 1.0, unique: None };
     let mut it = ground_item(&segs, &m, Some(seen), 83);
     assert_ne!(it.rarity, "Unique", "label {seen:?} drawn by {}", v.decided_by);
-    let t = TooltipRead { found: m.clone(), item_level: Some(86), unidentified: true, rarity: Some("Rare".into()), header: "Twilight Regalia".into() };
+    let t = TooltipRead { found: m.clone(), item_level: Some(86), unidentified: true, rarity: Some("Rare".into()), header: "Twilight Regalia".into(), occupied_by: None };
     apply_tooltip_checked(&segs, &mut it, &t, Some(seen), 83);
     assert_eq!((it.rarity.as_str(), it.item_level), ("Rare", Some(86)));
 }

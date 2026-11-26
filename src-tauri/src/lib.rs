@@ -491,8 +491,14 @@ fn read_from_ground(app: &AppHandle) -> Result<Picked, String> {
     let colours = read.colours.map(|(text, background)| LabelColours { text, background });
     let mut item = ground_item(&live, &m, colours, area_level(app).unwrap_or_else(|| fallback_area_level(app)));
     let area = area_level(app).unwrap_or_else(|| fallback_area_level(app));
-    let mut rarity_unsure = filter_core::item::is_gear(&item) && item.rarity != "Unique"
-        && filter_core::ground::rarity_ambiguous(&live, &item, colours, area);
+    // Also unsure when the guess doesn't really look like the label (26 Nov: a magic cluster jewel guessed as unique,
+    // because the filter's cluster jewel looks depend on passives the label doesn't show).
+    let poor_fit = item.name.is_none() && colours.is_some_and(|c|
+        filter_core::ground::label_distance(&live, &item, c, area, &item.rarity, item.sockets.as_deref()) > filter_core::ground::LABEL_CLOSE);
+    // A label that doesn't look like your filter's unique look isn't a unique (it was priced as The Voices).
+    if poor_fit && item.rarity == "Unique" { item.rarity = "Normal".into(); }
+    let mut rarity_unsure = filter_core::item::is_gear(&item)
+        && ((item.rarity != "Unique" && filter_core::ground::rarity_ambiguous(&live, &item, colours, area)) || poor_fit);
     if let Some(t) = &tip {
         filter_core::ground::apply_tooltip_checked(&live, &mut item, t, colours, area);
         // The hover box's name colour settles it.
@@ -2413,23 +2419,40 @@ fn delete_rule(state: State<AppState>, id: String, index: usize) -> Result<(), S
     if index < p.rules.len() {
         p.rules.remove(index);
     }
-    save_and_build(&state, &store, &id).map(|_| ())
+    store.save(&state.store_path).map_err(err)?;
+    rebuild_with_children(&state, &store, &[id]);
+    Ok(())
 }
 
 /// Opens a saved edit for changing. With no index, finds the active
 /// profile's newest edit with this label (used by the in-game pop-up).
+/// `inherited`: also look in the filters this one is built on (Modify this rule, 26 Nov: his map edit was in
+/// Red-Maps while he played Blasting, and it said "That edit lives in another profile"). The 4th value is the
+/// name of the filter the edit was found in, when that isn't the one asked about.
 #[tauri::command]
-fn get_rule(state: State<AppState>, id: Option<String>, index: Option<usize>, label: Option<String>) -> Result<(String, usize, RuleDetail), String> {
+fn get_rule(state: State<AppState>, id: Option<String>, index: Option<usize>, label: Option<String>, inherited: Option<bool>)
+    -> Result<(String, usize, RuleDetail, Option<String>), String> {
     let store = state.store.lock().unwrap();
     let id = id.or_else(|| store.active.clone()).ok_or("Set up a profile first")?;
     let p = store.profiles.get(&id).ok_or("Profile not found")?;
-    let index = match (index, label) {
-        (Some(i), _) => i,
-        (None, Some(l)) => p.rules.iter().rposition(|r| rule_label(r) == l).ok_or("That edit lives in another profile")?,
+    let (home, index) = match (index, label) {
+        (Some(i), _) => (p, i),
+        (None, Some(l)) => {
+            let mut cur = Some(p);
+            let mut found = None;
+            for _ in 0..20 {
+                let Some(c) = cur else { break };
+                if let Some(i) = c.rules.iter().rposition(|r| rule_label(r) == l) { found = Some((c, i)); break; }
+                if !inherited.unwrap_or(false) { break; }
+                cur = c.parent.as_deref().and_then(|pid| store.profiles.get(pid));
+            }
+            found.ok_or("That edit lives in another profile")?
+        }
         _ => return Err("Which edit?".into()),
     };
-    let detail = p.rules.get(index).and_then(rule_detail).ok_or("This edit can't be opened")?;
-    Ok((id, index, detail))
+    let detail = home.rules.get(index).and_then(rule_detail).ok_or("This edit can't be opened")?;
+    let other = (home.id != id).then(|| home.name.clone());
+    Ok((home.id.clone(), index, detail, other))
 }
 
 /// Saves changes to an edit, keeping its place in the list.
@@ -2443,7 +2466,9 @@ fn update_rule(state: State<AppState>, id: String, index: usize, edit: RuleEdit)
     remember(&state, &store, &id, &format!("Changed: {label}"));
     let p = store.profiles.get_mut(&id).ok_or("Profile not found")?;
     p.rules[index] = new;
-    let warnings = save_and_build(&state, &store, &id)?;
+    store.save(&state.store_path).map_err(err)?;
+    // Filters built on this one take the change too (the edit may be in the filter the active one is built on).
+    let warnings = rebuild_with_children(&state, &store, &[id]);
     Ok(ActionResult { label, warnings })
 }
 
