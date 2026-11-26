@@ -261,7 +261,7 @@ pub fn property_query(id: &str) -> Option<(&'static str, &'static str)> {
     Some(match id {
         "prop.ar" => ("armour_filters", "ar"), "prop.ev" => ("armour_filters", "ev"), "prop.es" => ("armour_filters", "es"),
         "prop.ward" => ("armour_filters", "ward"), "prop.pdps" => ("weapon_filters", "pdps"), "prop.edps" => ("weapon_filters", "edps"),
-        "prop.dps" => ("weapon_filters", "dps"), "prop.quality" => ("misc_filters", "quality"),
+        "prop.dps" => ("weapon_filters", "dps"), "prop.quality" => ("misc_filters", "quality"), "prop.gem_level" => ("misc_filters", "gem_level"),
         "prop.map_iiq" => ("map_filters", "map_iiq"), "prop.map_iir" => ("map_filters", "map_iir"),
         "prop.map_bonus" => ("map_filters", "map_bonus"), "prop.map_packsize" => ("map_filters", "map_packsize"),
         "prop.area_level" => ("map_filters", "area_level"),

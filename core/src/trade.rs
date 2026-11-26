@@ -663,6 +663,15 @@ pub fn setup(text: &str, index: &StatIndex) -> Option<TradeSetup> {
     let base_item = base_item(text, &item, &lines, &filters);
     let base = plain_base(&item);
     let affix_max = Some(crate::trade_rules::affix_limits(text, &item));
+    // Gems: their level and quality as rows he can untick or change (26 Nov: "I can't click the 23% quality"; they were
+    // fixed parts of the search, shown only as "Gem level 1+" / "Quality 23+%").
+    let mut filters = filters;
+    if item.item_class.contains("Gem") {
+        let mut rows = vec![];
+        if let Some(l) = gem_level { rows.push(StatFilter { id: "prop.gem_level".into(), label: format!("Gem level: {l}"), value: l as f64, min: Some(l as f64), enabled: true, kind: "property".into(), ..Default::default() }); }
+        if let Some(q) = item.quality.filter(|q| *q > 0) { rows.push(StatFilter { id: "prop.quality".into(), label: format!("Quality: {q}%"), value: q as f64, min: Some(q as f64), enabled: true, kind: "property".into(), ..Default::default() }); }
+        filters.splice(0..0, rows);
+    }
     Some(TradeSetup {
         category: category(&item.item_class).map(|c| if item.base_type.ends_with("Cluster Jewel") { "jewel.cluster" } else { c }).map(String::from),
         // Flasks and tinctures: a Quicksilver Flask's price has nothing to do with a Diamond Flask's, so always this base.
@@ -860,13 +869,11 @@ pub fn query(s: &TradeSetup) -> Value {
     if let Some(n) = s.ilvl_min { misc["ilvl"] = json!({ "min": n }); }
     if let (Some(_), Some(m)) = (s.ilvl_min, s.ilvl_max) { misc["ilvl"]["max"] = json!(m); }
     if it.unidentified && it.rarity != "Unique" { misc["identified"] = json!({ "option": "false" }); }
-    if let Some(n) = s.gem_level { misc["gem_level"] = json!({ "min": n }); }
     if foulborn { misc["mutated"] = json!({ "option": "true" }); }
     if let Some(c) = s.corrupted { misc["corrupted"] = json!({ "option": if c { "true" } else { "false" } }); }
     if it.rarity == "Unique" && it.twice_corrupted && s.corrupted == Some(true) { misc["twice_corrupted"] = json!({ "option": "true" }); }
     for k in &s.misc { misc[k.as_str()] = json!({ "option": "true" }); }
     if it.item_class.contains("Gem") {
-        if let Some(qual) = it.quality { misc["quality"] = json!({ "min": qual }); }
         misc["corrupted"] = json!({ "option": if it.corrupted { "true" } else { "false" } });
     }
     if misc.as_object().map(|o| !o.is_empty()).unwrap_or(false) { filters["misc_filters"] = json!({ "filters": misc }); }
@@ -1662,6 +1669,28 @@ Note: ~b/o 1 alch
         let f = s.filters.iter().find(|f| f.id == "explicit.stat_corpse").unwrap();
         assert_eq!(f.value, 3.0, "{}", f.label);
         assert!(s.filters.iter().any(|f| f.id == "explicit.stat_mana"));
+    }
+
+    #[test]
+    fn gem_level_and_quality_are_rows() {
+        let text = "Item Class: Skill Gems
+Rarity: Gem
+Mirror Arrow
+--------
+Attack, Minion
+Level: 1
+Quality: +23% (augmented)
+--------
+Requires Level 10
+--------
+Corrupted
+";
+        let mut s = setup(text, &StatIndex::default()).unwrap();
+        let rows: Vec<(&str, bool)> = s.filters.iter().filter(|f| f.kind == "property").map(|f| (f.label.as_str(), f.enabled)).collect();
+        assert_eq!(rows, [("Gem level: 1", true), ("Quality: 23%", true)]);
+        assert!(query(&s)["query"]["filters"]["misc_filters"]["filters"]["quality"]["min"] == 23.0, "{}", query(&s));
+        s.filters.iter_mut().for_each(|f| f.enabled = false);
+        assert!(!query(&s).to_string().contains("quality"), "unticked: any quality");
     }
 
     #[test]

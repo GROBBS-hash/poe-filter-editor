@@ -313,7 +313,8 @@ function rowGroup(f: StatFilter, max: [number, number], used: [number, number] =
   if (f.id.startsWith("prop.map_")) return ["Map", "at least this much"];
   if (f.id === "prop.area_level" || f.id.startsWith("prop.heist_")) return ["Heist", "at least this much"];
   if (f.id.endsWith("_influence")) return ["Influence", "tick to only find items with it"];
-  if (f.id === "prop.quality") return ["Quality", "above the usual 20%"];
+  if (f.id === "prop.gem_level") return ["Gem", "at least this"];
+  if (f.id === "prop.quality") return ["Quality", "at least this"];
   if (f.id.startsWith("prop.")) return [f.id.includes("dps") ? "Damage" : "Defences", "at 20% quality"];
   if (f.id.includes("empty_prefix")) return ["Prefixes", `${used[0]} of ${max[0]} used`];
   if (f.id.includes("empty_suffix")) return ["Suffixes", `${used[1]} of ${max[1]} used`];
