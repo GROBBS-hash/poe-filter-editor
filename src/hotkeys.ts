@@ -32,6 +32,8 @@ export const HOTKEYS: Hotkey[] = [
     how: "Hover an item and press it: its page on the Path of Exile wiki opens in your browser." },
   { setting: "key_read", def: "Alt+R", group: "lookup", name: "Which one should I pick?",
     how: "When the game makes you choose (an Eldritch altar, an Expedition remnant, a reward screen), hover it and press: it tells you the best pick for your build and what's dangerous." },
+  { setting: "key_editor", def: "`", group: "windows", name: "Open the editor",
+    how: "Brings this editor to the front over the game, so you can change things without alt-tabbing. Alt-tab or click the game to go back." },
   { setting: "key_build", def: "F6", group: "windows", name: "Your build",
     how: "Shows your Path of Building build over the game: which gems, gear and passive points to aim for." },
   { setting: "key_atlas", def: "F7", group: "windows", name: "Atlas plan",

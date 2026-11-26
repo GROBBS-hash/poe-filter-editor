@@ -68,7 +68,7 @@ struct AppState {
 }
 
 #[derive(Clone, Copy, PartialEq)]
-enum HotAction { QuickEdit, Batch, Reload, Cycle, Build, Price, Atlas, Chat(usize), Play(&'static str), Wiki, Read, Find }
+enum HotAction { QuickEdit, Batch, Reload, Cycle, Build, Price, Atlas, Chat(usize), Play(&'static str), Wiki, Read, Find, Editor }
 
 /// The in-game keys are only held while Path of Exile (or one of our windows over it) is in front, like Awakened
 /// PoE Trade: elsewhere F5 refreshes the browser again (he asked 23 Nov). `KEYS_ON` = they're registered now.
@@ -130,9 +130,10 @@ fn register_hotkeys_now(app: &AppHandle, s: &Settings) -> Result<(), String> {
     if !s.key_wiki.trim().is_empty() { wanted.push((s.key_wiki.as_str(), HotAction::Wiki)); }
     if !s.key_read.trim().is_empty() { wanted.push((s.key_read.as_str(), HotAction::Read)); }
     if !s.key_find.trim().is_empty() { wanted.push((s.key_find.as_str(), HotAction::Find)); }
+    if !s.key_editor.trim().is_empty() { wanted.push((s.key_editor.as_str(), HotAction::Editor)); }
     let mut parsed = Vec::new();
     for (key, action) in wanted {
-        let soft = matches!(action, HotAction::Atlas | HotAction::Play(_) | HotAction::Wiki | HotAction::Read | HotAction::Find);
+        let soft = matches!(action, HotAction::Atlas | HotAction::Play(_) | HotAction::Wiki | HotAction::Read | HotAction::Find | HotAction::Editor);
         let sc: Shortcut = match key.parse() {
             Ok(sc) => sc,
             Err(_) if soft => { let _ = warn(format!("“{key}” isn't a key the app understands: pick another in Settings")); continue; }
@@ -141,7 +142,7 @@ fn register_hotkeys_now(app: &AppHandle, s: &Settings) -> Result<(), String> {
         if parsed.iter().any(|(p, _): &(Shortcut, HotAction)| p.id() == sc.id()) {
             // The newer keys: if one clashes with a key he already uses, skip it rather than lose his other keys.
             if soft {
-                let _ = warn(format!("The atlas strategy key “{key}” is already used for something else: pick another in Settings"));
+                let _ = warn(format!("The key “{key}” is set for two things: pick another in Settings → Hotkeys"));
                 continue;
             }
             return Err(format!("“{key}” is used for two things"));
@@ -166,7 +167,7 @@ fn register_hotkeys_now(app: &AppHandle, s: &Settings) -> Result<(), String> {
             Err(e) if action == HotAction::Atlas => {
                 let _ = warn(format!("Atlas strategy key unavailable (another program may own it): {e}"));
             }
-            Err(e) if matches!(action, HotAction::Play(_) | HotAction::Wiki | HotAction::Read | HotAction::Find) => {
+            Err(e) if matches!(action, HotAction::Play(_) | HotAction::Wiki | HotAction::Read | HotAction::Find | HotAction::Editor) => {
                 let _ = warn(format!("A play window key is unavailable (another program may own it): {e}"));
             }
             Err(e) if matches!(action, HotAction::Chat(_)) => {
@@ -3223,6 +3224,8 @@ pub fn run() {
                         play_app::toggle(app, label);
                     } else if action == Some(HotAction::Wiki) {
                         play_app::wiki_lookup(app.clone());
+                    } else if action == Some(HotAction::Editor) {
+                        open_editor(app.clone(), None);
                     } else if action == Some(HotAction::Find) {
                         price_search_app::toggle(app);
                     } else if action == Some(HotAction::Read) {

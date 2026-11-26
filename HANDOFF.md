@@ -44,6 +44,9 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 - **Ctrl+D** price check (new, own window `trade`). Changeable in Settings; skipped quietly if another app owns it.
 - **Alt+F** price search (26 Nov, window `pricesearch`): type an item name, see its price. Not Ctrl+F on purpose: that is
   the game's own stash/inventory search (he asked for Ctrl+F; ask him before switching it). Changeable in Settings → Hotkeys.
+- **` (backtick)** brings the editor's main window to the front (26 Nov, he asked; `key_editor`, clearable). Like every key it's
+  only held while the game or one of our windows is in front, so ` types normally in the editor and other programs; in
+  the game's chat it can't be typed while the key is set.
 - **Play windows (22 Nov):** **F8** levelling route, **F9** map tracker + XP/h + stopwatch, **F10** saved searches,
   **F11** cheat sheets (Syndicate, blight oils + his pictures), notes (no key by default), **Alt+W** wiki page of the hovered
   item, **Alt+R** read the altar / remnant / reward screen under the mouse.
@@ -1148,6 +1151,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
+- [ ] (next) In game press ` (the key left of 1): the editor comes to the front; alt-tab back to the game. Typing ` in the editor still works.
 - [ ] (next) In game press Alt+F: a search box opens in the top middle, ready to type. Type "mageb": Mageblood shows with 4 versions, the 4-flask one first; ←→ picks another; Enter opens the trade site and the box goes; Alt+F again, Esc: back in the game with the keyboard working. Try "divine", "doctor", "enlighten". Ctrl+F in the stash still does the game's own search.
 - [ ] (next) Atlas tree > What to farm today: "Proven farms, best first" lists six farms (Vaal Temple rush first), Sanctuary and Catarina say Needs a big sample; click a row: the receipt adds up. Farm this on Reverence: a "Farm: Reverence memory chain" tree is saved and used, the panel shows a Memory of Reverence line under costs and "The creator's pace… about 23 div an hour".
 - [ ] (next) Atlas tree page: press Compare on one of your strategies: the page jumps to Compare two trees with it as A; pick another in "with": red points only in A, green only in B, the notables listed under each (click one to find it), Totals say what changes from A to B; ⇄ swaps them.

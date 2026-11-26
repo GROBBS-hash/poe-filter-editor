@@ -13,7 +13,7 @@ type Settings = {
   cycle_enabled: boolean; fallback_area_level: number; claude_api_key: string; map_avoid?: string[] | null;
   trade_helper?: boolean; thanks_message?: string; chat_keys?: { key: string; command: string }[];
   price_compare?: boolean; price_rolls?: boolean; price_instant_all?: boolean; price_buyout_only?: boolean; build_with_tree?: boolean; key_tree?: string;
-  key_level?: string; key_tracker?: string; key_searches?: string; key_sheet?: string; key_notes?: string; key_wiki?: string; key_read?: string; key_find?: string;
+  key_level?: string; key_tracker?: string; key_searches?: string; key_sheet?: string; key_notes?: string; key_wiki?: string; key_read?: string; key_find?: string; key_editor?: string;
 };
 const CHAT_IDEAS = ["/hideout", "/kingsmarch", "/menagerie", "/delve", "/exit", "/invite", "/kick", "/afk", "/remaining"];
 
@@ -115,6 +115,7 @@ export default function SettingsPage() {
           <KeyLabel id="key_find" /><ClearableKey value={s.key_find ?? "Alt+F"} onChange={(k) => set({ key_find: k })} />
           <KeyLabel id="key_wiki" /><ClearableKey value={s.key_wiki ?? "Alt+W"} onChange={(k) => set({ key_wiki: k })} />
           <KeyLabel id="key_read" /><ClearableKey value={s.key_read ?? "Alt+R"} onChange={(k) => set({ key_read: k })} />
+          <KeyLabel id="key_editor" /><ClearableKey value={s.key_editor ?? "`"} onChange={(k) => set({ key_editor: k })} />
           <KeyLabel id="key_build" /><KeyBox value={s.key_build ?? "F6"} onChange={(k) => set({ key_build: k })} />
           <KeyLabel id="key_atlas" /><KeyBox value={s.key_atlas ?? "F7"} onChange={(k) => set({ key_atlas: k })} />
           <KeyLabel id="key_level" /><ClearableKey value={s.key_level ?? "F8"} onChange={(k) => set({ key_level: k })} />
