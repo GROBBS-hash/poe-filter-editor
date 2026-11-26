@@ -504,7 +504,7 @@ pub struct MapStats {
     pub runs: usize,
     /// Average seconds inside a map.
     pub avg_inside: i64,
-    /// Average seconds from one map's start to the next (includes hideout time).
+    /// Average seconds a map takes: time inside plus the usual hideout turnaround (breaks left out).
     pub avg_cycle: i64,
     pub per_hour: f64,
     pub deaths: u32,
@@ -523,19 +523,22 @@ pub fn usual_turnaround(spans: &[(i64, i64)]) -> i64 {
     gaps[gaps.len() / 2].clamp(20, 300)
 }
 
+/// Is the map item you checked (its name and base, "Doom Trail Vaal Temple Map") the area you opened ("Vaal Temple")?
+pub fn same_map(item_names: &str, area: &str) -> bool {
+    let area = area.trim().to_lowercase();
+    !area.is_empty() && item_names.to_lowercase().contains(&area)
+}
+
 /// Stats over the runs that started since `since` (0 = all).
 pub fn map_stats(runs: &[MapRun], since: i64) -> MapStats {
     let rs: Vec<&MapRun> = runs.iter().filter(|r| r.start >= since).collect();
     if rs.is_empty() { return MapStats::default(); }
     let n = rs.len() as i64;
     let avg_inside = rs.iter().map(|r| r.in_map).sum::<i64>() / n;
-    // Cycle: start-to-start where the next run follows within an hour; else the run's own span.
-    let mut cycles = vec![];
-    for w in rs.windows(2) {
-        let gap = w[1].start - w[0].start;
-        if gap > 0 && gap < 3600 { cycles.push(gap); }
-    }
-    let avg_cycle = if cycles.is_empty() { rs.iter().map(|r| (r.left - r.start).max(r.in_map)).sum::<i64>() / n } else { cycles.iter().sum::<i64>() / cycles.len() as i64 };
+    // Cycle: time inside plus the usual hideout turnaround, so breaks and AFK don't lower maps an hour (26 Nov, same
+    // rule as div an hour: "We only want to calculate how much ... we actually make in our maps").
+    let spans: Vec<(i64, i64)> = rs.iter().map(|r| (r.start, r.left.max(r.start + r.in_map))).collect();
+    let avg_cycle = avg_inside + usual_turnaround(&spans);
     let made: Vec<f64> = rs.iter().filter_map(|r| r.made).collect();
     MapStats {
         runs: rs.len(), avg_inside, avg_cycle,
@@ -864,8 +867,17 @@ mod tests {
         assert_eq!((s.runs, s.avg_inside, s.deaths), (1, 160, 1));
         m.finish(400);
         let s = map_stats(&m.history, 0);
-        assert_eq!(s.avg_cycle, 250);
-        assert!((s.per_hour - 14.4).abs() < 0.01);
+        // 160 s and 140 s inside, plus the 90 s turnaround it assumes before it has 3 gaps to go on.
+        assert_eq!(s.avg_cycle, 240);
+        assert!((s.per_hour - 15.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn map_check_only_for_that_map() {
+        assert!(same_map("Doom Trail Vaal Temple Map", "Vaal Temple"));
+        assert!(same_map(" Blighted City Square Map", "City Square"));
+        assert!(!same_map("Doom Trail Vaal Temple Map", "City Square"));
+        assert!(!same_map("Vaal Temple Map", ""));
     }
 
     #[test]

@@ -342,8 +342,13 @@ pub fn on_line(app: &AppHandle, line: &str) {
         }
         match c {
             MapChange::Started => {
-                // A Ctrl+D map check in the last 10 minutes: that's the map you just opened.
-                let check = with_live(|l| l.map_check.take()).filter(|(t, ..)| unix() - t < 600);
+                // A Ctrl+D map check in the last 10 minutes of this same map: its mods are the ones you just opened
+                // (26 Nov: a Vaal Temple's mods showed on the City Square he opened next).
+                let opened = with_store(app, |s| s.maps.current.as_ref().map(|c| c.name.clone())).unwrap_or_default();
+                let check = with_live(|l| {
+                    let ok = l.map_check.as_ref().is_some_and(|(t, names, _)| unix() - t < 600 && journey::same_map(names, &opened));
+                    if ok { l.map_check.take() } else { None }
+                });
                 let value = session_value(app);
                 let atlas = atlas_app::active_id(app);
                 with_store(app, |s| if let Some(cur) = s.maps.current.as_mut() {

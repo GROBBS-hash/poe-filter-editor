@@ -892,7 +892,9 @@ fn show_price(app: &AppHandle, payload: PriceCheck, text: &str, compare: bool) {
             }
             // The map tracker shows these mods on the next map you open.
             if let Some(m) = payload.map.as_ref() {
-                play_app::note_map_check(it.name.as_deref().unwrap_or(&it.base_type), m.mods.iter().map(|x| x.text.clone()).collect());
+                // Name and base both: a unique map's area is its name, any other map's area is in its base.
+                let names = format!("{} {}", it.name.as_deref().unwrap_or(""), it.base_type);
+                play_app::note_map_check(&names, m.mods.iter().map(|x| x.text.clone()).collect());
             }
         }
     }

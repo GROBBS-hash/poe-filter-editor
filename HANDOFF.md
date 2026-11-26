@@ -1157,6 +1157,8 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
+- [ ] (next) Ctrl+D a map, then open a *different* map: the tracker shows no mods (it used to show the checked map's). Open the checked one: its mods show.
+- [ ] (next) Map tracker "Today … per hour" (maps an hour) doesn't drop after a long hideout break (now time inside + usual turnaround, like div / hour).
 - [ ] (0.2.86) Ctrl+D on a quality gem: "Gem level" and "Quality" rows, ticked; untick quality and Search again: more results (any quality).
 - [ ] (0.2.86) Ctrl+D on a Mercenary Warrant: its skills and supports are listed, Tier 3 supports ticked; the price is for warrants with those supports, not 1c.
 - [ ] (0.2.85) After a break in the hideout, the tracker's "div / hour", Farm this's profit an hour and Atlas "Your trees so far" don't drop; past trees' numbers changed a bit (now steady-mapping hours).
