@@ -81,6 +81,9 @@ pub struct Build {
     pub stages: Vec<Stage>,
     /// The stage PoB had open.
     pub active: usize,
+    /// Items in the build that no stage wears and no tree socket holds: the guide's alternatives and upgrades.
+    #[serde(default)]
+    pub alternatives: Vec<Gear>,
 }
 
 fn colours() -> &'static HashMap<String, String> {
@@ -364,7 +367,18 @@ pub fn parse(xml: &str) -> Result<Build, String> {
         let title = if shown.is_empty() { format!("Setup {}", i + 1) } else { shown };
         stages.push(Stage { title, tree, groups, gear, jewels });
     }
+    // Items no gear set slot and no tree socket points at (27 Nov: he wanted a guide's alternatives shown too).
+    let mut used: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for n in root.descendants() {
+        if n.has_tag_name("Slot") || n.has_tag_name("Socket") { used.insert(attr(&n, "itemId").to_string()); }
+    }
+    let alternatives: Vec<Gear> = child(root, "Items").map(|items| items.children().filter(|c| c.has_tag_name("Item"))
+        .filter(|i| !used.contains(attr(i, "id")))
+        .map(|i| item_gear("Alternative", i.text().unwrap_or("")))
+        .filter(|g| !g.name.is_empty())
+        .collect()).unwrap_or_default();
     Ok(Build {
+        alternatives,
         class: attr(&build_el, "className").to_string(),
         ascendancy: attr(&build_el, "ascendClassName").to_string(),
         level: attr(&build_el, "level").parse().unwrap_or(1),

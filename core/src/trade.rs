@@ -1235,9 +1235,13 @@ pub fn buy_query(text: &str, index: &StatIndex) -> Option<(Value, usize)> {
         let timeless = id.starts_with("explicit.pseudo_timeless_jewel_");
         let anoint = m.text.starts_with("Allocates ") && m.kind == "enchant";
         let roll = rolls.iter().find(|r| r.0 == template(&m.text).0).filter(|_| !timeless);
-        if unique && !m.text.contains("while affected by") && !timeless && !anoint && roll.is_none() { continue; }
+        // A corrupted unique's implicit is what the Vaal Orb gave it (a Tabula Rasa with "+2 to Level of Socketed
+        // Projectile Gems"): asked for, at least that number.
+        let corrupt_implicit = unique && item.corrupted && m.kind == "implicit";
+        if unique && !m.text.contains("while affected by") && !timeless && !anoint && roll.is_none() && !corrupt_implicit { continue; }
         if stats.iter().any(|v| v["id"] == id.as_str()) { continue; }
         let mut v = stat_json(&id);
+        if corrupt_implicit && roll.is_none() && value.is_finite() && value > 0.0 && v.get("value").is_none() { v["value"] = json!({ "min": value }); }
         // A unique's rolling mod (27 Nov, his KF build: Timeclasp's duration is the whole point of the ring): at
         // least the PoB guide's roll ("reduced" is searched as negative "increased", so at most). Ticked only when
         // the roll can land either side of zero, where a bad copy does the opposite (Timeclasp's -20 to 20%);
@@ -1259,6 +1263,7 @@ pub fn buy_query(text: &str, index: &StatIndex) -> Option<(Value, usize)> {
     let mut q = json!({ "status": { "option": "securable" }, "type": base, "stats": [{ "type": "and", "filters": stats }] });
     if unique {
         if let Some(n) = &item.name { q["name"] = json!(n.strip_prefix("Foulborn ").unwrap_or(n)); }
+        if item.corrupted { q["filters"] = json!({ "misc_filters": { "filters": { "corrupted": { "option": "true" } } } }); }
     } else if cat.is_some() {
         let rarity = match item.rarity.as_str() { "Rare" => "rare", "Magic" => "magic", "Normal" => "normal", _ => "nonunique" };
         q["filters"] = json!({ "type_filters": { "filters": { "rarity": { "option": rarity } } } });

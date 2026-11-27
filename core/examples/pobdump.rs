@@ -4,6 +4,14 @@ fn main() {
     let code = std::fs::read_to_string(std::env::args().nth(1).expect("path to a PoB code or XML")).unwrap();
     let xml = if code.trim_start().starts_with('<') { code } else { filter_core::pob::decode(&code).unwrap() };
     let b = filter_core::pob::parse(&xml).unwrap();
+    // Items no stage wears (shown as "Alternatives in this build"), with their Buy search when POB_BUY is set.
+    for g in &b.alternatives {
+        println!("alternative: {} / {}", g.name, g.base);
+        if let Ok(stats) = std::env::var("POB_BUY") {
+            let index = filter_core::trade::StatIndex::from_json(&serde_json::from_str(&std::fs::read_to_string(stats).unwrap()).unwrap());
+            if let Some((q, n)) = filter_core::trade::buy_query(&g.copy, &index) { println!("BUY\t{}\t{}\t{}", g.name, n, q); }
+        }
+    }
     for s in &b.stages {
         println!("{}: {} groups, {} gems, {} gear: {}", s.title, s.groups.len(), s.groups.iter().map(|g| g.gems.len()).sum::<usize>(), s.gear.len(),
             s.gear.iter().map(|g| g.slot.as_str()).collect::<Vec<_>>().join(", "));

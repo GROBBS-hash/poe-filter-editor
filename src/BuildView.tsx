@@ -12,7 +12,8 @@ export type PobGear = { slot: string; rarity: string; name: string; base: string
 /** A jewel in a tree socket (node) or in an item's abyssal socket (node null, slot "Belt Abyssal Socket 1"). */
 export type PobJewel = { node: number | null; item: PobGear; notables: string[] };
 export type PobStage = { title: string; tree: { version: string; nodes: number[]; url: string } | null; groups: PobGroup[]; gear: PobGear[]; jewels?: PobJewel[] };
-export type PobBuild = { class: string; ascendancy: string; level: number; stages: PobStage[]; active: number };
+/** alternatives: items in the PoB that no stage wears (the guide's options and upgrades). */
+export type PobBuild = { class: string; ascendancy: string; level: number; stages: PobStage[]; active: number; alternatives?: PobGear[] };
 export type PobState = { build: PobBuild; stage: number; link: string; follow?: boolean };
 
 const RARITY: Record<string, string> = { normal: "#c8c8c8", magic: "#8888ff", rare: "#ffff77", unique: "#af6025", relic: "#82ad6a" };
@@ -302,6 +303,8 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
           {flasks.filter(shown).map((it) => itemRow(it, it.slot, it.slot))}
           {otherGroups.length > 0 && <li className="bv-subhead">Other gems</li>}
           {otherGroups.length > 0 && <li className="bv-othergems">{otherGroups.map((g, i) => groupView(g, i, true))}</li>}
+          {(build.alternatives ?? []).filter(shown).length > 0 && <li className="bv-subhead" title="Items in the Path of Building that no stage wears: the guide's options and upgrades">Alternatives in this build</li>}
+          {(build.alternatives ?? []).filter(shown).map((it, i) => itemRow(it, "alt" + i, "Alternative"))}
         </ul>
       )}
 

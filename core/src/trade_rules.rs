@@ -660,6 +660,19 @@ mod buy_tests {
         assert_eq!(q["query"]["stats"][0]["filters"][0], json!({ "id": "enchant.stat_2954116742", "value": { "option": 3309 } }));
         assert_eq!(n, 1);
     }
+
+    #[test]
+    fn corrupted_uniques_ask_for_their_corruption() {
+        let idx = StatIndex::from_json(&json!({ "result": [
+            { "label": "Implicit", "entries": [
+                { "id": "implicit.stat_2176571093", "text": "+# to Level of Socketed Projectile Gems", "type": "implicit" } ] } ] }));
+        let tabula = "Item Class: Body Armours\nRarity: Unique\nTabula Rasa\nSimple Robe\n--------\nItem Level: 84\n--------\n\
+            +2 to Level of Socketed Projectile Gems (implicit)\n--------\nCorrupted\n";
+        let (q, n) = buy_query(tabula, &idx).unwrap();
+        assert_eq!(q["query"]["stats"][0]["filters"][0], json!({ "id": "implicit.stat_2176571093", "value": { "min": 2.0 } }));
+        assert_eq!(q["query"]["filters"]["misc_filters"]["filters"]["corrupted"]["option"], "true");
+        assert_eq!(n, 1);
+    }
 }
 
 #[cfg(test)]
