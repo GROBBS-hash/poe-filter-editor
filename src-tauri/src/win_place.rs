@@ -12,7 +12,7 @@ use std::collections::HashMap;
 /// Windows whose size is remembered too.
 const SIZED: [&str; 4] = ["build", "atlas", "sheet", "notes"];
 /// Windows whose place is remembered.
-const PLACED: [&str; 12] = ["build", "atlas", "trades", "earnings", "batch", "level", "tracker", "searches", "sheet", "notes", "splits", "pricesearch"];
+const PLACED: [&str; 13] = ["build", "atlas", "trades", "earnings", "batch", "level", "tracker", "searches", "sheet", "notes", "splits", "merc", "pricesearch"];
 
 #[derive(Serialize, serde::Deserialize, Clone, Copy, PartialEq)]
 struct Place { x: i32, y: i32, w: u32, h: u32 }

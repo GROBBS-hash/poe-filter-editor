@@ -223,6 +223,22 @@
         "shadow": false
       },
       {
+        "label": "merc",
+        "title": "Mercenary check",
+        "width": 380,
+        "height": 120,
+        "x": 20,
+        "y": 560,
+        "resizable": false,
+        "focus": false,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "shadow": false
+      },
+      {
         "label": "stashbox",
         "title": "Stash spot",
         "width": 60,

@@ -11,6 +11,7 @@ import BuildOverlay from "./BuildOverlay";
 import "./styles.css";
 import { ChoiceWindow, LevelWindow, NotesWindow, SearchesWindow, SheetWindow, TrackerWindow } from "./Play";
 import { SplitsWindow } from "./Splits";
+import { MercWindow } from "./Merc";
 import { choiceView, playMock, previewPriceSearch } from "./preview-play";
 import PriceSearch from "./PriceSearch";
 import { emit } from "@tauri-apps/api/event";
@@ -425,6 +426,6 @@ if (sheetWin) document.body.classList.add("overlay");
 };
 if (buildWin) document.body.classList.add("overlay");
 if (atlasWindow) document.body.classList.add("overlay");
-const PLAY_WINS: Record<string, () => React.ReactElement> = { level: LevelWindow, tracker: TrackerWindow, searches: SearchesWindow, sheet: SheetWindow, notes: NotesWindow, splits: SplitsWindow, choice: ChoiceWindow, pricesearch: PriceSearch };
-function PlayPreview() { const W = PLAY_WINS[playWin ?? ""] ?? SheetWindow; if (playWin === "choice") setTimeout(() => emit("choice-read", choiceView), 300); const [w, h] = ({ level: [380, 440], tracker: [280, 360], searches: [320, 380], sheet: [900, 600], notes: [360, 420], splits: [250, 350], choice: [380, 480], pricesearch: [860, 520] } as Record<string, number[]>)[playWin ?? ""] ?? [900, 600]; return <div style={{ width: w, height: h, position: "relative", transform: "translateZ(0)" }}><style>{`.bo,.ps{height:${h}px !important}`}</style><W /></div>; }
+const PLAY_WINS: Record<string, () => React.ReactElement> = { level: LevelWindow, tracker: TrackerWindow, searches: SearchesWindow, sheet: SheetWindow, notes: NotesWindow, splits: SplitsWindow, merc: MercWindow, choice: ChoiceWindow, pricesearch: PriceSearch };
+function PlayPreview() { const W = PLAY_WINS[playWin ?? ""] ?? SheetWindow; if (playWin === "choice") setTimeout(() => emit("choice-read", choiceView), 300); const [w, h] = ({ level: [380, 440], tracker: [280, 360], searches: [320, 380], sheet: [900, 600], notes: [360, 420], splits: [250, 350], merc: [380, 330], choice: [380, 480], pricesearch: [860, 520] } as Record<string, number[]>)[playWin ?? ""] ?? [900, 600]; return <div style={{ width: w, height: h, position: "relative", transform: "translateZ(0)" }}><style>{`.bo,.ps{height:${h}px !important}`}</style><W /></div>; }
 createRoot(document.getElementById("root")!).render(playWin ? <PlayPreview /> : atlasWindow ? <AtlasOverlay /> : buildWin ? <BuildOverlay /> : <App />);

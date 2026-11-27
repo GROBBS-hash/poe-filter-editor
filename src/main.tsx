@@ -11,12 +11,13 @@ import AtlasOverlay from "./AtlasOverlay";
 import { BatchWindow } from "./Batch";
 import PriceSearch from "./PriceSearch";
 import { SplitsWindow } from "./Splits";
+import { MercWindow } from "./Merc";
 import { AltarMarks, ChoiceWindow, LevelWindow, NotesWindow, SearchesWindow, SheetWindow, TrackerWindow } from "./Play";
 import "./styles.css";
 
 const label = getCurrentWindow().label;
 const StashBox = () => <div className="stashbox" />;
-const PLAY: Record<string, () => React.ReactElement> = { stashbox: StashBox, altar: AltarMarks, choice: ChoiceWindow, level: LevelWindow, tracker: TrackerWindow, searches: SearchesWindow, sheet: SheetWindow, notes: NotesWindow, splits: SplitsWindow };
+const PLAY: Record<string, () => React.ReactElement> = { stashbox: StashBox, altar: AltarMarks, choice: ChoiceWindow, level: LevelWindow, tracker: TrackerWindow, searches: SearchesWindow, sheet: SheetWindow, notes: NotesWindow, splits: SplitsWindow, merc: MercWindow };
 document.body.classList.add(label === "overlay" || label === "build" || label === "trade" || label === "trades" || label === "earnings" || label === "atlas" || label === "batch" || label === "pricesearch" || label in PLAY ? "overlay" : "main");
 if (label === "trade") document.body.classList.add("scroll");
 

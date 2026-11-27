@@ -96,6 +96,21 @@ export const splitsView = {
     { idx: 14, name: "AssIsAssInAss", class: "Shadow", started: 1773576222, acts: 10, time: bestRun[9], best: true, hidden: false }],
 };
 
+/** The Mercenary check (?play=merc, ?play=merc&strip for the strip before any Ctrl+D). Example numbers. */
+export const mercView = {
+  name: "Elvira Tarika", stage: "beaten", recruit_how: "trade", recruit: 35, recruit_listed: 7, divine: 150,
+  items: [
+    { name: "Headhunter", base: "Leather Belt", rarity: "Unique", chaos: 630, how: "ninja", listed: null },
+    { name: "Dusk Shell", base: "Assassin's Garb", rarity: "Rare", chaos: 40, how: "trade", listed: 12 },
+    { name: "Doom Loop", base: "Ruby Ring", rarity: "Rare", chaos: null, how: "pricing", listed: null },
+  ],
+  gems: [{ name: "Wrath", support: false, tier: null }, { name: "Arrow Nova", support: true, tier: 3 }, { name: "More Duration", support: true, tier: 2 }],
+  helps: ["Wrath: helps you"],
+  verdict: { kind: "kill", best: 0, kill: 630, recruit: 35, why: "Its best item is worth more than a Mercenary like it" },
+};
+export const mercStrip = { ...mercView, stage: "met", items: [], gems: [], recruit: null, recruit_listed: null, recruit_how: "", helps: [],
+  verdict: { kind: "check", best: null, kill: null, recruit: null, why: "Hover its items and press Ctrl+D" } };
+
 /** Answers the play windows' commands; null = not a play command. */
 export function playMock(cmd: string): unknown {
   switch (cmd) {
@@ -106,6 +121,7 @@ export function playMock(cmd: string): unknown {
     case "searches_get": return searchView;
     case "notes_get": return notesText;
     case "splits_view": return splitsView;
+    case "merc_view": return location.search.includes("strip") ? mercStrip : mercView;
     case "sheets_list": return [];
     default: return undefined;
   }
