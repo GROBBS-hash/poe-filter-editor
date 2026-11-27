@@ -1168,7 +1168,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 ## Still to check in game (keep this list current)
 - [ ] (0.2.91) My build: your current build shows in "Your builds". Add a second one (e.g. "Scion KF levelling (PoB code).txt"), press "Show this one" on each in turn: F6 in game and the levelling guide follow, and each build comes back on the stage you left it on. Rename and Remove work.
-- [ ] (next) Buy (My build / F6), Buy base and Unique finder trade links open with "Instant Buyout" already picked.
+- [ ] (0.2.92) Buy (My build / F6), Buy base and Unique finder trade links open with "Instant Buyout" already picked.
 - [ ] (0.2.91) My build > Buy on a unique: anointed amulets ask for the anoint (Karui Ward with Fleetfoot); Timeclasp asks for its duration roll; the unique's other rolls are on the trade page, unticked, at the guide's numbers. Try it with "Scion KF levelling (PoB code).txt".
 - [ ] (0.2.90) Switch atlas tree in game, then change "Strategy" on the map tracker to match: the map you're in and the next ones count for it (F7 shows that tree too). Game windows > Map runs: tick maps run on another tree, pick the right strategy; the Strategy column changes and Atlas > Your trees so far moves with it.
 - [ ] (0.2.89) ` brings the editor up over the game; press ` again in the editor (not in a text box) and you're back in the game.
