@@ -1168,7 +1168,6 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 ## Still to check in game (keep this list current)
 - [ ] (0.2.91) My build: your current build shows in "Your builds". Add a second one (e.g. "Scion KF levelling (PoB code).txt"), press "Show this one" on each in turn: F6 in game and the levelling guide follow, and each build comes back on the stage you left it on. Rename and Remove work.
-- [ ] (0.2.92) Buy (My build / F6), Buy base and Unique finder trade links open with "Instant Buyout" already picked.
 - [ ] (0.2.91) My build > Buy on a unique: anointed amulets ask for the anoint (Karui Ward with Fleetfoot); Timeclasp asks for its duration roll; the unique's other rolls are on the trade page, unticked, at the guide's numbers. Try it with "Scion KF levelling (PoB code).txt".
 - [ ] (0.2.90) Switch atlas tree in game, then change "Strategy" on the map tracker to match: the map you're in and the next ones count for it (F7 shows that tree too). Game windows > Map runs: tick maps run on another tree, pick the right strategy; the Strategy column changes and Atlas > Your trees so far moves with it.
 - [ ] (0.2.89) ` brings the editor up over the game; press ` again in the editor (not in a text box) and you're back in the game.
@@ -1538,6 +1537,7 @@ when the game window isn't found. Check in game: the window's spot, and that it 
 
 - [x] (Confirmed 21 Nov, matches PoEStash.) Build window (F6) / My build: gold "Buy" opens the trade site in your browser with the item's mods filled in, and
       says how many are for sale ("any 3 of 4 mods" when it had to loosen). Try a rare, a cluster jewel, Watcher's Eye.
+- [x] (Confirmed 27 Nov: "it works now, instant buyout opens".) 0.2.92: Buy (My build / F6), Buy base and Unique finder trade links open with "Instant Buyout" already picked.
 - [ ] Ctrl+D on a cluster jewel in game finds listings (it searched the wrong category before 21 Nov).
 - [x] (Confirmed 21 Nov: gems incl. 21/20 and supports.) Build window (F6) / My build: "Price" on a gear item, flask or jewel, or a click on a gem, opens the price window for it
       (Duskdawn as Maelström Staff, rares with their mods ready to search). Jewel mods no longer show "Has Alt Variant Two".
