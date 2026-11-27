@@ -37,8 +37,6 @@ struct PlayStore {
     keep_in_maps: bool,
     /// Chat commands ("!next" in game chat) switched off.
     chat_off: bool,
-    /// Race splits per character (when each act and level was reached).
-    races: journey::Races,
     /// Don't stop the map timer while the Escape menu or skill tree is open.
     pause_off: bool,
     /// How the game looks with no menu open (and with the Escape menu), from "Set up" on the Play tools page.
@@ -174,14 +172,14 @@ fn catch_up(app: &AppHandle, log: &str) {
 
 /// The PC's clock minus UTC, in seconds (the log is in local time).
 #[cfg(windows)]
-fn utc_offset() -> i64 {
+pub(crate) fn utc_offset() -> i64 {
     let t = unsafe { windows::Win32::System::SystemInformation::GetLocalTime() };
     let s = format!("{:04}/{:02}/{:02} {:02}:{:02}:{:02}", t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond);
     let diff = journey::log_time(&s).unwrap_or_else(unix) - unix();
     (diff as f64 / 900.0).round() as i64 * 900
 }
 #[cfg(not(windows))]
-fn utc_offset() -> i64 { 0 }
+pub(crate) fn utc_offset() -> i64 { 0 }
 
 /// Play windows put away for a map, for the list of windows to reopen; and put back as put away after a relaunch.
 pub fn reopen_hidden(app: &AppHandle) -> Vec<String> {
@@ -399,19 +397,10 @@ pub fn on_line(app: &AppHandle, line: &str) {
         PlayEvent::Area { id, level, time, .. } => {
             with_live(|l| { l.zone = Some((id.clone(), *level, *time)); l.zone_name.clear(); l.left = None; });
             follow_route(app, id);
-            // Race splits: the first time this character enters each act (maps count as act 11).
-            let poe2 = is_poe2(app);
-            let act = journey::route_for(poe2).areas.get(&journey::area_key(poe2, id)).map(|a| a.a)
-                .filter(|a| !poe2 || *a <= 6).or_else(|| journey::is_map_area(id).then_some(11));
-            if let (Some(act), Some(me)) = (act, with_live(|l| l.character.as_ref().map(|c| c.0.clone()))) {
-                with_store(app, |s| s.races.act(&me, act, *time));
-                save = true;
-            }
         }
         PlayEvent::Entered { name, .. } => { with_live(|l| l.zone_name = name.clone()); save = true; }
-        PlayEvent::Level { name, class, level, time } => {
+        PlayEvent::Level { name, class, level, .. } => {
             with_live(|l| l.character = Some((name.clone(), class.clone(), *level)));
-            with_store(app, |s| s.races.level(name, class, *level, *time));
             save = true;
         }
         _ => {}
@@ -1596,7 +1585,7 @@ pub fn toggle(app: &AppHandle, label: &str) {
 
 #[tauri::command]
 pub fn play_toggle(app: AppHandle, label: String) {
-    if ["level", "tracker", "searches", "sheet", "notes"].contains(&label.as_str()) { toggle(&app, &label); }
+    if ["level", "tracker", "searches", "sheet", "notes", "splits"].contains(&label.as_str()) { toggle(&app, &label); }
 }
 
 #[tauri::command]
@@ -1824,7 +1813,7 @@ fn map_visibility(app: &AppHandle, changes: &[MapChange]) {
         match c {
             MapChange::Started | MapChange::Resumed => {
                 let mut hidden = HIDDEN_FOR_MAP.lock().unwrap();
-                for label in ["level", "searches", "sheet", "notes"] {
+                for label in ["level", "searches", "sheet", "notes", "splits"] {
                     if let Some(w) = app.get_webview_window(label) {
                         if w.is_visible().unwrap_or(false) { let _ = w.hide(); if !hidden.iter().any(|h| h == label) { hidden.push(label.into()); } }
                     }
@@ -1873,7 +1862,7 @@ pub const CHAT_COMMANDS: &[(&str, &str)] = &[
     ("!reload", "load your filter again"),
     ("!done", "finish the map timer's current map"),
     ("!start / !stop / !lap / !reset", "the stopwatch"),
-    ("!level / !tracker / !sheet / !notes", "show or hide that window"),
+    ("!level / !tracker / !sheet / !notes / !splits", "show or hide that window"),
 ];
 
 fn run_chat_command(app: &AppHandle, cmd: &str) {
@@ -1905,7 +1894,7 @@ fn run_chat_command(app: &AppHandle, cmd: &str) {
             let a = if word == "stop" { "pause" } else { word };
             let _ = watch_action(app.clone(), a.into());
         }
-        "level" | "tracker" | "sheet" | "notes" | "searches" => toggle(app, word),
+        "level" | "tracker" | "sheet" | "notes" | "searches" | "splits" => toggle(app, word),
         _ => {}
     }
 }
@@ -1920,38 +1909,4 @@ pub fn chat_prefs(app: AppHandle, on: bool) -> bool {
 #[tauri::command]
 pub fn chat_get(app: AppHandle) -> (bool, Vec<(String, String)>) {
     (!with_store(&app, |s| s.chat_off), CHAT_COMMANDS.iter().map(|(a, b)| (a.to_string(), b.to_string())).collect())
-}
-
-// ---------- race splits ----------
-
-#[derive(Serialize, Clone)]
-pub struct RaceView {
-    pub name: String,
-    pub class: String,
-    /// Seconds since level 2.
-    pub elapsed: i64,
-    pub level: u32,
-    /// (act, your time, your best time on another character).
-    pub acts: Vec<(u32, i64, Option<i64>)>,
-    /// Your best time to the act you're in now (to beat), and to the next act.
-    pub best_next: Option<(u32, i64)>,
-    pub others: usize,
-}
-
-/// Your current character's race against your earlier ones.
-#[tauri::command]
-pub fn race_get(app: AppHandle) -> Option<RaceView> {
-    let me = with_live(|l| l.character.clone())?;
-    with_store(&app, |s| {
-        let r = s.races.chars.get(&me.0)?;
-        let (best_acts, _) = s.races.best_except(&me.0);
-        let best = |a: u32| best_acts.iter().find(|x| x.0 == a).map(|x| x.1);
-        let reached = r.acts.iter().map(|a| a.0).max().unwrap_or(1);
-        Some(RaceView {
-            name: me.0.clone(), class: r.class.clone(), elapsed: unix() - r.start, level: me.2,
-            acts: r.acts.iter().map(|&(a, t)| (a, t, best(a))).collect(),
-            best_next: best(reached + 1).map(|t| (reached + 1, t)),
-            others: s.races.chars.len().saturating_sub(1),
-        })
-    })
 }

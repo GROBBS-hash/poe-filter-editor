@@ -207,6 +207,22 @@
         "shadow": false
       },
       {
+        "label": "splits",
+        "title": "Split timer",
+        "width": 250,
+        "height": 350,
+        "x": 20,
+        "y": 200,
+        "resizable": false,
+        "focus": false,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "shadow": false
+      },
+      {
         "label": "stashbox",
         "title": "Stash spot",
         "width": 60,

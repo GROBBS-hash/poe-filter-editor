@@ -37,6 +37,7 @@ pub mod related;
 pub mod rules;
 pub mod saved;
 pub mod shop;
+pub mod splits;
 pub mod search;
 pub mod share;
 pub mod themes;

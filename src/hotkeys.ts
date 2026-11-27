@@ -46,6 +46,8 @@ export const HOTKEYS: Hotkey[] = [
     how: "Your saved search words. Click one and it's typed into the stash or vendor search box for you, so matching items light up." },
   { setting: "key_sheet", def: "F11", group: "windows", name: "Cheat sheets",
     how: "Quick-look pictures over the game: Syndicate rewards, Blight oil recipes and any pictures you add." },
+  { setting: "key_splits", def: "Alt+T", group: "windows", name: "Split timer",
+    how: "Races your campaign against your best run, act by act (green ahead, red behind). Comes up by itself on a new character." },
   { setting: "key_notes", def: "", group: "windows", name: "Notes", extra: true,
     how: "A notepad over the game for anything you want to remember. Saved as you type." },
 ];

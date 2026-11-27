@@ -1,0 +1,15 @@
+/* Split timer window (27 Nov, look C). */
+.sp .bo-body { padding: 6px 10px 8px; font-variant-numeric: tabular-nums; }
+.sp-row { display: grid; grid-template-columns: 1fr auto 62px; gap: 8px; align-items: baseline; font-size: 12.5px; padding: 1px 4px; margin: 0 -4px; border-radius: 4px; }
+.sp-row.now { background: var(--gold-bg); color: var(--text); }
+.sp-row.later { color: var(--text-3, #8f8678); }
+.sp-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-time { text-align: right; }
+.sp-diff { text-align: right; font-weight: 600; }
+.sp .ahead { color: var(--green); }
+.sp .behind { color: var(--red); }
+.sp .gold { color: #f0c040; }
+.sp-big { font-size: 26px; font-weight: 700; text-align: right; margin: 6px 0 2px; letter-spacing: .5px; }
+.sp-big.still { opacity: .7; }
+.sp-foot { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--text-2); }
+.sp-empty { font-size: 12.5px; color: var(--text-2); padding: 10px; }

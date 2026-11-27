@@ -6,6 +6,7 @@ mod bulk_app;
 mod atlas_app;
 mod farm_app;
 mod play_app;
+mod splits_app;
 mod worn_app;
 mod tonight_app;
 mod deaths_app;
@@ -124,7 +125,7 @@ fn register_hotkeys_now(app: &AppHandle, s: &Settings) -> Result<(), String> {
     // Last, so a clash skips the atlas key and keeps the older ones.
     if !s.key_atlas.trim().is_empty() { wanted.push((s.key_atlas.as_str(), HotAction::Atlas)); }
     // The play windows' keys (22 Nov): new, so like the atlas key a clash or a key another program owns skips just that one.
-    for (key, label) in [(&s.key_level, "level"), (&s.key_tracker, "tracker"), (&s.key_searches, "searches"), (&s.key_sheet, "sheet"), (&s.key_notes, "notes")] {
+    for (key, label) in [(&s.key_level, "level"), (&s.key_tracker, "tracker"), (&s.key_searches, "searches"), (&s.key_sheet, "sheet"), (&s.key_notes, "notes"), (&s.key_splits, "splits")] {
         if !key.trim().is_empty() { wanted.push((key.as_str(), HotAction::Play(label))); }
     }
     if !s.key_wiki.trim().is_empty() { wanted.push((s.key_wiki.as_str(), HotAction::Wiki)); }
@@ -3354,7 +3355,7 @@ pub fn run() {
         .plugin(tauri_plugin_window_state::Builder::default()
             .with_state_flags(tauri_plugin_window_state::StateFlags::SIZE | tauri_plugin_window_state::StateFlags::POSITION
                 | tauri_plugin_window_state::StateFlags::MAXIMIZED)
-            .with_denylist(&["overlay", "build", "trade", "trades", "earnings", "atlas", "batch", "level", "tracker", "searches", "sheet", "notes", "stashbox", "choice", "altar", "pricesearch"]).build())
+            .with_denylist(&["overlay", "build", "trade", "trades", "earnings", "atlas", "batch", "level", "tracker", "searches", "sheet", "notes", "splits", "stashbox", "choice", "altar", "pricesearch"]).build())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(move |app, sc, ev| {
@@ -3423,6 +3424,7 @@ pub fn run() {
             start_batch_watcher(app.handle().clone());
             start_hotkey_focus_watcher(app.handle().clone());
             start_whisper_watcher(app.handle().clone());
+            splits_app::start(app.handle().clone());
             play_app::start_watchers(app.handle().clone());
             phone_app::start_shop_watch(app.handle().clone());
             phone_app::start_page(app.handle());
@@ -3563,7 +3565,7 @@ pub fn run() {
             play_app::searches_save, play_app::search_type, play_app::stash_highlight, play_app::sheets_list, play_app::sheets_add,
             play_app::sheets_remove, play_app::notes_get, play_app::notes_save, play_app::play_toggle, play_app::play_hide,
             play_app::trade_price_check, play_app::show_stash_spot, play_app::hide_stash_spot, play_app::alerts_get, play_app::alerts_save, play_app::play_prefs, play_app::play_prefs_get, play_app::altar_auto_get, play_app::altar_auto_set, play_app::price_names,
-            play_app::chat_prefs, play_app::chat_get, play_app::race_get, phone_app::phone_get, phone_app::phone_save, phone_app::phone_test, phone_app::phone_check_shop, phone_app::phone_new_key, play_app::pause_setup, play_app::pause_prefs, play_app::tracker_over_panels, play_app::tracker_use_atlas, play_app::maps_set_atlas, play_app::loot_prefs_save, wealth_app::poe_login,
+            play_app::chat_prefs, play_app::chat_get, splits_app::splits_view, splits_app::splits_hide, phone_app::phone_get, phone_app::phone_save, phone_app::phone_test, phone_app::phone_check_shop, phone_app::phone_new_key, play_app::pause_setup, play_app::pause_prefs, play_app::tracker_over_panels, play_app::tracker_use_atlas, play_app::maps_set_atlas, play_app::loot_prefs_save, wealth_app::poe_login,
             open_rule,
             gear_picks,
             open_url,

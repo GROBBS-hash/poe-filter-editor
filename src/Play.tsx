@@ -9,6 +9,7 @@ import { ErrNote, PoeLogin, needsLogin } from "./LoginNeeded";
 import syndicate from "./data/syndicate.json";
 import anoints from "./data/anoints.json";
 import "./play.css";
+import { SplitsCard } from "./Splits";
 
 // ---------- shared types (mirror play_app.rs / journey.rs) ----------
 
@@ -131,10 +132,9 @@ function Step({ s, cls }: { s: StepView; cls: string }) {
 export function LevelWindow() {
   const [v, setV] = useState<LevelView | null>(null);
   const [copied, setCopied] = useState(false);
-  const [race, setRace] = useState<RaceView | null>(null);
   const keys = useKeys();
   useEsc("level");
-  const load = () => { invoke<LevelView>("level_view").then(setV).catch(() => {}); invoke<RaceView | null>("race_get").then(setRace).catch(() => {}); };
+  const load = () => { invoke<LevelView>("level_view").then(setV).catch(() => {}); };
   useEffect(() => {
     load();
     const un = listen("play-update", load);
@@ -163,7 +163,6 @@ export function LevelWindow() {
           </span>
         </div>
         <LevelChips v={v} />
-        {race && <RaceLine r={race} />}
         {v.steps.map((s, i) => <Step key={`${v.pos}-${i}`} s={s} cls={i < v.current ? "done" : i === v.current ? "now" : "next"} />)}
         {v.gem_search && <div className="lv-search">
           <div className="pw-row between"><span className="pw-small">Your build's gems at a vendor</span>
@@ -194,42 +193,6 @@ function LevelChips({ v }: { v: LevelView }) {
       {["Normal", "Cruel", "Merciless"].some(labReady) && normal.length > 0 &&
         <button className="pw-btn link" title="Today's lab layouts and where the treasure keys are (poelab.com)" onClick={() => invoke("open_url", { url: "https://www.poelab.com/" })}>Today's lab ↗</button>}
       {v.res_penalty < 0 && <span className="pw-tag bad" title="Every resistance is lowered after Kitava: check your gear still reaches 75%">res {v.res_penalty}% since {v.res_penalty === -30 ? "act 5" : "act 10"}</span>}
-    </div>
-  );
-}
-
-type RaceView = { name: string; class: string; elapsed: number; level: number; acts: [number, number, number | null][]; best_next: [number, number] | null; others: number };
-const actName = (a: number) => a >= 11 ? "maps" : `act ${a}`;
-const diff = (mine: number, best: number) => `${mine <= best ? "−" : "+"}${mmss(Math.abs(mine - best))}`;
-
-/** Race splits: your time since level 2, and how this act went against your best character. */
-function RaceLine({ r }: { r: RaceView }) {
-  const last = r.acts[r.acts.length - 1];
-  return (
-    <div className="pw-row" style={{ flexWrap: "wrap", gap: 5, marginTop: 5 }}>
-      <span className="pw-tag" title="Race clock: from reaching level 2">⏱ {mmss(r.elapsed)}</span>
-      {last && last[2] != null && <span className={`pw-tag ${last[1] <= last[2] ? "good" : "warn"}`} title={`Your best character reached ${actName(last[0])} at ${mmss(last[2])}`}>
-        {actName(last[0])} {diff(last[1], last[2])}</span>}
-      {r.best_next && <span className="pw-tag" title="Your best character's time to the next act">{actName(r.best_next[0])} by {mmss(r.best_next[1])} to beat</span>}
-    </div>
-  );
-}
-
-/** The Play tools page's race table: each act's time, against your best. */
-function RaceCard() {
-  const [r, setR] = useState<RaceView | null>(null);
-  useEffect(() => { invoke<RaceView | null>("race_get").then(setR).catch(() => {}); }, []);
-  if (!r || r.acts.length === 0) return null;
-  return (
-    <div className="card">
-      <h2>Race splits: {r.name}</h2>
-      <p className="muted small">From reaching level 2, against your fastest other character{r.others ? "" : " (none yet: this run becomes the one to beat)"}.
-        A live ladder rank isn't possible: GGG only opens the ladder to approved apps.</p>
-      <table className="pt-table"><thead><tr><th>Reached</th><th>Time</th><th>Your best</th><th></th></tr></thead>
-        <tbody>{r.acts.map(([a, t, b]) => (
-          <tr key={a}><td>{actName(a)}</td><td>{mmss(t)}</td><td className="muted">{b != null ? mmss(b) : ""}</td>
-            <td className={b == null ? "" : t <= b ? "w-full" : "w-low"}>{b != null ? diff(t, b) : ""}</td></tr>
-        ))}</tbody></table>
     </div>
   );
 }
@@ -852,6 +815,8 @@ export default function PlayTools() {
             Your build's gems and your map regex are added for you.</Tile>
           <Tile title="Cheat sheets" k={k("key_sheet", "F11")} label="sheet">The Syndicate rewards table (click the ones you want), plus any pictures you add below:
             Heist, lab layouts, Delve, anything.</Tile>
+          <Tile title="Split timer" k={k("key_splits", "Alt+T") || undefined} label="splits">Races your campaign against your best run, act by act, like LiveSplit:
+            green ahead, red behind, gold for your fastest ever act. Starts by itself when a new character reaches level 2.</Tile>
           <Tile title="Notes" k={k("key_notes", "") || undefined} label="notes">A notepad over the game, saved as you type.</Tile>
           <Tile title="Open on the wiki" k={k("key_wiki", "Alt+W")}>Hover an item and press the key: its wiki page opens in your browser (uniques by name, the rest by base).</Tile>
           <Tile title="Which one should I pick?" k={k("key_read", "Alt+R")}>Hover an Eldritch altar, an Expedition remnant or a reward screen and press the key:
@@ -889,7 +854,7 @@ export default function PlayTools() {
         </div>
       </div>}
 
-      <RaceCard />
+      <SplitsCard />
 
       <ChatCommands />
 

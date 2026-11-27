@@ -84,6 +84,18 @@ export const choiceView = {
 
 export const notesText = "Buy: 6-link for the Arc witch (under 1 div)\nNext: run Strand with Ambush scarabs\nCheck Kirac missions after act 10";
 
+/** The split timer (?play=splits): his Scion in act 2 against his best run (real times from his log, 27 Nov). */
+const bestRun = [14, 30, 46, 57, 71, 84, 98, 112, 123, 132].map((m) => m * 60 + 20);
+const bestSeg = [13, 14, 11, 11, 10, 11, 11, 13, 10, 9].map((m) => m * 60 + 40);
+export const splitsView = {
+  name: "PeeOhEe", class: "Scion", level: 24, played: 41 * 60 + 5, live: true, done: false,
+  rows: bestRun.map((b, i) => ({ label: i === 4 ? "Act 5 · Kitava" : i === 9 ? "Act 10 · Kitava" : "Act " + (i + 1), mine: i === 0 ? 23 * 60 + 10 : null, best: b,
+    seg: i === 0 ? 23 * 60 + 10 : null, best_seg: bestSeg[i], gold: false, level: i === 0 ? 13 : null })),
+  best_name: "AssIsAssInAss", best_total: bestRun[9], sum_best: bestSeg.reduce((a, b) => a + b, 0),
+  past: [{ idx: 28, name: "PeeOhEe", class: "Scion", started: 1795764826, acts: 1, time: 1390, best: false, hidden: false },
+    { idx: 14, name: "AssIsAssInAss", class: "Shadow", started: 1773576222, acts: 10, time: bestRun[9], best: true, hidden: false }],
+};
+
 /** Answers the play windows' commands; null = not a play command. */
 export function playMock(cmd: string): unknown {
   switch (cmd) {
@@ -93,6 +105,7 @@ export function playMock(cmd: string): unknown {
     case "play_prefs_get": return false;
     case "searches_get": return searchView;
     case "notes_get": return notesText;
+    case "splits_view": return splitsView;
     case "sheets_list": return [];
     default: return undefined;
   }

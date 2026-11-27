@@ -12,7 +12,7 @@ use std::collections::HashMap;
 /// Windows whose size is remembered too.
 const SIZED: [&str; 4] = ["build", "atlas", "sheet", "notes"];
 /// Windows whose place is remembered.
-const PLACED: [&str; 11] = ["build", "atlas", "trades", "earnings", "batch", "level", "tracker", "searches", "sheet", "notes", "pricesearch"];
+const PLACED: [&str; 12] = ["build", "atlas", "trades", "earnings", "batch", "level", "tracker", "searches", "sheet", "notes", "splits", "pricesearch"];
 
 #[derive(Serialize, serde::Deserialize, Clone, Copy, PartialEq)]
 struct Place { x: i32, y: i32, w: u32, h: u32 }
@@ -129,7 +129,7 @@ pub fn start_main(app: &AppHandle) {
 }
 
 /// Windows over the game that open again after a relaunch, where they were.
-const REOPEN: [&str; 8] = ["tracker", "level", "sheet", "notes", "searches", "build", "atlas", "earnings"];
+const REOPEN: [&str; 9] = ["tracker", "level", "sheet", "notes", "searches", "splits", "build", "atlas", "earnings"];
 /// The last run's list has been read: from now on it's kept up to date.
 static REOPENED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 

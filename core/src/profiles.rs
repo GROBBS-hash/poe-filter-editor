@@ -114,6 +114,8 @@ pub struct Settings {
     pub key_searches: String,
     pub key_sheet: String,
     pub key_notes: String,
+    /// The campaign split timer window (27 Nov).
+    pub key_splits: String,
     pub key_wiki: String,
     /// Read the league mechanic choice under the mouse (Eldritch altar, Expedition remnant, reward screen).
     pub key_read: String,
@@ -139,7 +141,7 @@ impl Default for Settings {
             trade_helper: true, thanks_message: "thanks, good luck!".into(), chat_keys: vec![], map_tool: Default::default(),
             poe_account: String::new(), poesessid: String::new(), leagues: BTreeMap::new(), wealth_tabs: vec![], wealth_min: 10.0, earn_minutes: 3,
             price_compare: true, price_rolls: true, price_instant_all: false, price_buyout_only: true, build_with_tree: false, key_tree: "P".into(), key_atlas: "F7".into(),
-            key_level: "F8".into(), key_tracker: "F9".into(), key_searches: "F10".into(), key_sheet: "F11".into(), key_notes: String::new(), key_wiki: "Alt+W".into(), key_read: "Alt+R".into(), key_find: "Alt+F".into(), key_editor: "`".into() }
+            key_level: "F8".into(), key_tracker: "F9".into(), key_searches: "F10".into(), key_sheet: "F11".into(), key_notes: String::new(), key_splits: "Alt+T".into(), key_wiki: "Alt+W".into(), key_read: "Alt+R".into(), key_find: "Alt+F".into(), key_editor: "`".into() }
     }
 }
 

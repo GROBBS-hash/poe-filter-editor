@@ -13,7 +13,7 @@ type Settings = {
   cycle_enabled: boolean; fallback_area_level: number; claude_api_key: string; map_avoid?: string[] | null;
   trade_helper?: boolean; thanks_message?: string; chat_keys?: { key: string; command: string }[];
   price_compare?: boolean; price_rolls?: boolean; price_instant_all?: boolean; price_buyout_only?: boolean; build_with_tree?: boolean; key_tree?: string;
-  key_level?: string; key_tracker?: string; key_searches?: string; key_sheet?: string; key_notes?: string; key_wiki?: string; key_read?: string; key_find?: string; key_editor?: string;
+  key_level?: string; key_tracker?: string; key_searches?: string; key_sheet?: string; key_notes?: string; key_splits?: string; key_wiki?: string; key_read?: string; key_find?: string; key_editor?: string;
 };
 const CHAT_IDEAS = ["/hideout", "/kingsmarch", "/menagerie", "/delve", "/exit", "/invite", "/kick", "/afk", "/remaining"];
 
@@ -123,6 +123,7 @@ export default function SettingsPage() {
           <KeyLabel id="key_searches" /><ClearableKey value={s.key_searches ?? "F10"} onChange={(k) => set({ key_searches: k })} />
           <KeyLabel id="key_sheet" /><ClearableKey value={s.key_sheet ?? "F11"} onChange={(k) => set({ key_sheet: k })} />
           <KeyLabel id="key_notes" /><ClearableKey value={s.key_notes ?? ""} onChange={(k) => set({ key_notes: k })} />
+          <KeyLabel id="key_splits" /><ClearableKey value={s.key_splits ?? ""} onChange={(k) => set({ key_splits: k })} />
           <label className="check"><input type="checkbox" checked={s.cycle_enabled} onChange={(e) => set({ cycle_enabled: e.target.checked })} />
             <span className="key-label"><b>{hotkey("key_cycle").name}</b><span>{hotkey("key_cycle").how} Off until you tick it.</span></span></label>
           <KeyBox value={s.key_cycle} disabled={!s.cycle_enabled} onChange={(k) => set({ key_cycle: k })} />
