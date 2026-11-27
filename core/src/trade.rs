@@ -1256,7 +1256,7 @@ pub fn buy_query(text: &str, index: &StatIndex) -> Option<(Value, usize)> {
     }
     // The base as the trade site knows it: magic items only have a full name ("Perpetual Sapphire Flask of Craft").
     let base = plain_base(&item);
-    let mut q = json!({ "status": { "option": "available" }, "type": base, "stats": [{ "type": "and", "filters": stats }] });
+    let mut q = json!({ "status": { "option": "securable" }, "type": base, "stats": [{ "type": "and", "filters": stats }] });
     if unique {
         if let Some(n) = &item.name { q["name"] = json!(n.strip_prefix("Foulborn ").unwrap_or(n)); }
     } else if cat.is_some() {
@@ -1314,7 +1314,7 @@ pub fn cluster_base_query(text: &str, index: &StatIndex) -> Option<(Value, u32, 
     let ilvl = levels.iter().map(|l| l.1).max().unwrap_or(1);
     let mut filters = json!({ "type_filters": { "filters": { "rarity": { "option": "nonunique" } } } });
     if ilvl > 1 { filters["misc_filters"] = json!({ "filters": { "ilvl": { "min": ilvl } } }); }
-    let q = json!({ "query": { "status": { "option": "available" }, "type": plain_base(&item),
+    let q = json!({ "query": { "status": { "option": "securable" }, "type": plain_base(&item),
         "stats": [{ "type": "and", "filters": stats }], "filters": filters }, "sort": { "price": "asc" } });
     Some((q, ilvl, levels))
 }

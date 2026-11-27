@@ -1154,6 +1154,8 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   that can land either side of zero are ticked (Timeclasp's -20 to 20% duration); the rest are on the page, unticked.
   Live: Timeclasp -18% 801 for sale, Fleetfoot Karui Ward 2. Status "available" matters: "online" found 0-30 (most
   3.30 sellers are instant buyout, not online).
+  Later 27 Nov (he asked, tired of switching it by hand): Buy, Buy base and the Unique finder's trade links search
+  "securable" = the site's "Instant Buyout" (Blackheart: 1908 vs 2491 with in-person). Price checks stay "available".
 
 - Resistances like Awakened 21 Nov (he asked; read in its pseudo/index.ts): elemental total always ticked, chaos total ticked
   (left out when its only source is a crafted chaos mod), fire / cold / lightning totals unticked; on rares every
