@@ -169,6 +169,19 @@ mod tests {
     }
 
     #[test]
+    fn plans_from_a_build_stage() {
+        // My build's Upgrades improve on the shown stage's gear: PoB's slot names must match.
+        let code = include_str!("../data/test_pob_kf_fixed.txt");
+        let b = crate::pob::parse(&crate::pob::decode(code.trim()).unwrap()).unwrap();
+        let st = b.stages.iter().find(|s| s.title.contains("50")).unwrap();
+        let slots: Vec<&str> = st.gear.iter().map(|g| g.slot.as_str()).collect();
+        let plans: Vec<Plan> = ["Helmet", "Body Armour", "Gloves", "Boots", "Belt", "Amulet", "Ring 1", "Ring 2"].iter()
+            .filter(|s| slots.contains(s)).map(|s| plan(s, &st.gear, [0, 0, 0])).collect();
+        assert!(plans.len() >= 6, "{slots:?}");
+        assert!(plans.iter().any(|p| p.now > 0.0));
+    }
+
+    #[test]
     fn no_search_for_weapons() {
         assert!(query(&plan("Weapon 1", &[], [0, 0, 0]), None).is_none());
     }

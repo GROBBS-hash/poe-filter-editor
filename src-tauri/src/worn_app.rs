@@ -108,21 +108,49 @@ pub struct Found { name: String, base: String, price: String, score: f64, better
 #[derive(Serialize)]
 pub struct Upgrades { total: u64, url: String, items: Vec<Found>, logged_in: bool }
 
-/// Str / Dex / Int your build is short of in the stage you're on (My build's check), zeros without a build.
-fn build_short(app: &AppHandle) -> [i64; 3] {
+/// Whose gear the upgrade search improves on: the shown build's stage (its gear, its Str / Dex / Int shortfall, its
+/// level) or what your character wears now (read from the site). Picked on the Upgrades tab; the build is the default
+/// there, since it sits under the build (asked for 28 Nov 2026: "showing upgrades for a build that isn't active").
+struct Source { gear: Vec<filter_core::pob::Gear>, short: [i64; 3], level: Option<u32> }
+
+fn source(app: &AppHandle, from: &str, stage: Option<usize>) -> Source {
     let st = app.state::<AppState>();
-    pob_load(&st).and_then(|p| p.checks.get(p.stage).map(|c| c.short)).unwrap_or([0; 3])
+    if from == "build" {
+        let Some(p) = pob_load(&st) else { return Source { gear: vec![], short: [0; 3], level: None } };
+        let i = stage.unwrap_or(p.stage).min(p.build.stages.len().saturating_sub(1));
+        let c = p.checks.get(i);
+        return Source {
+            gear: p.build.stages.get(i).map(|s| s.gear.clone()).unwrap_or_default(),
+            short: c.map(|c| c.short).unwrap_or([0; 3]),
+            level: c.map(|c| c.level).filter(|l| *l > 0),
+        };
+    }
+    // Your character: the shown build's shortfall doesn't apply to it.
+    Source { gear: current(app).gear(), short: [0; 3], level: play_app::level_view(app.clone()).char_level }
 }
 
-/// A plan for every slot you wear that the trade site can search by stats (not weapons).
+#[derive(Serialize)]
+pub struct UpgradePlans {
+    plans: Vec<filter_core::upgrade::Plan>,
+    /// The character whose gear is known ("" when none).
+    character: String,
+    /// The shown build's stage ("" without a build).
+    stage: String,
+}
+
+/// A plan for every slot the build's stage (or your character) wears that the trade site can search by stats (not weapons).
 #[tauri::command]
-pub fn upgrade_plans(app: AppHandle) -> Vec<filter_core::upgrade::Plan> {
+pub fn upgrade_plans(app: AppHandle, from: String, stage: Option<usize>) -> UpgradePlans {
+    let s = source(&app, &from, stage);
+    let plans = ["Helmet", "Body Armour", "Gloves", "Boots", "Belt", "Amulet", "Ring 1", "Ring 2"].iter()
+        .filter(|sl| s.gear.iter().any(|g| g.slot == **sl))
+        .map(|sl| filter_core::upgrade::plan(sl, &s.gear, s.short)).collect();
+    let st = app.state::<AppState>();
+    let poe2 = active_game(&st) == Game::Poe2;
     let w = current(&app);
-    let gear = w.gear();
-    let short = build_short(&app);
-    ["Helmet", "Body Armour", "Gloves", "Boots", "Belt", "Amulet", "Ring 1", "Ring 2"].iter()
-        .filter(|s| gear.iter().any(|g| g.slot == **s))
-        .map(|s| filter_core::upgrade::plan(s, &gear, short)).collect()
+    let character = if !w.pieces.is_empty() && w.poe2 == poe2 { w.character } else { String::new() };
+    let stage = pob_load(&st).and_then(|p| { let i = stage.unwrap_or(p.stage); p.build.stages.get(i).map(|s| s.title.clone()) }).unwrap_or_default();
+    UpgradePlans { plans, character, stage }
 }
 
 /// A trade listing's mods as lines ("+99 to maximum Life"), whether the site sent them as text or with details.
@@ -151,11 +179,12 @@ fn listing_lines(item: &serde_json::Value) -> Vec<String> {
 /// Runs the search (logged in: the site needs that for weighted sums) and lists the cheapest ten with their score.
 /// Without a login it opens the same search on the trade site, where your browser's login runs it.
 #[tauri::command(async)]
-pub fn upgrade_search(app: AppHandle, mut plan: filter_core::upgrade::Plan) -> Result<Upgrades, String> {
-    // Stats switched off change what yours scores: work it out again from what you wear.
-    if let Some(g) = current(&app).gear().iter().find(|g| g.slot == plan.slot) { plan.now = filter_core::upgrade::score(&g.lines, &plan.wants); }
+pub fn upgrade_search(app: AppHandle, mut plan: filter_core::upgrade::Plan, from: String, stage: Option<usize>) -> Result<Upgrades, String> {
+    let src = source(&app, &from, stage);
+    // Stats switched off change what yours scores: work it out again from what's worn.
+    if let Some(g) = src.gear.iter().find(|g| g.slot == plan.slot) { plan.now = filter_core::upgrade::score(&g.lines, &plan.wants); }
     let (poe2, league) = trade_league(&app);
-    let level = play_app::level_view(app.clone()).char_level;
+    let level = src.level;
     let q = filter_core::upgrade::query(&plan, level).ok_or("Nothing to search for: switch at least one stat on")?;
     let Some((_, sess, _)) = play_app::account(&app) else {
         let url = if poe2 { format!("https://www.pathofexile.com/trade2/search/poe2/{}?q={}", trade_api::enc(&league), trade_api::enc(&q.to_string())) }

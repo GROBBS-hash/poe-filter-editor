@@ -358,7 +358,7 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
         </ul>
       )}
 
-      {view === "upgrades" && !compact && <UpgradeFinder />}
+      {view === "upgrades" && !compact && <UpgradeFinder stage={stage} />}
 
       {view === "check" && (
         <div className="bv-check">

@@ -516,6 +516,8 @@ code { background: #000; padding: 1px 5px; border-radius: 4px; color: var(--gold
 .bv-check-stage.on { border-color: var(--gold); color: var(--gold); }
 /* Upgrade finder (My build > Upgrades) */
 .uf { display: grid; gap: 12px; padding: 10px 2px; }
+.uf-from { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.uf-from .chip { cursor: pointer; padding: 4px 12px; }
 .uf-slot { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: var(--panel); display: grid; gap: 8px; }
 .uf-head { display: flex; align-items: center; gap: 10px; }
 .uf-name { flex: 1; min-width: 0; }

@@ -14,23 +14,44 @@ const saveOff = (plans: Plan[]) => {
 type Found = { name: string; base: string; price: string; score: number; better_by: number; lines: string[]; icon: string };
 type Upgrades = { total: number; url: string; items: Found[]; logged_in: boolean };
 
-/** "Find something better" for each slot you wear: cheapest items that beat yours on what you need. */
-export default function UpgradeFinder() {
+type From = "build" | "worn";
+const FROM_KEY = "upgrades.from";
+
+/** "Find something better" for each slot: cheapest items that beat what's there on what you need. Improves on the
+ *  shown build's stage by default (it sits under the build), or on what your character wears. */
+export default function UpgradeFinder({ stage }: { stage: number }) {
+  const [from, setFromState] = useState<From>(() => (localStorage.getItem(FROM_KEY) as From) || "build");
   const [plans, setPlans] = useState<Plan[] | null>(null);
+  const [who, setWho] = useState({ character: "", stage: "" });
   const [open, setOpen] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [res, setRes] = useState<Record<string, Upgrades | string>>({});
+  const setFrom = (f: From) => { setFromState(f); try { localStorage.setItem(FROM_KEY, f); } catch { /* not kept */ } };
 
   useEffect(() => {
     const off = loadOff();
-    invoke<Plan[]>("upgrade_plans")
-      .then((ps) => setPlans(ps.map((p) => ({ ...p, wants: p.wants.map((w) => ({ ...w, on: !(off[p.slot] ?? []).includes(w.stat) })) }))))
+    setPlans(null); setRes({}); setOpen(null);
+    invoke<{ plans: Plan[]; character: string; stage: string }>("upgrade_plans", { from, stage })
+      .then((r) => {
+        setWho({ character: r.character, stage: r.stage });
+        setPlans(r.plans.map((p) => ({ ...p, wants: p.wants.map((w) => ({ ...w, on: !(off[p.slot] ?? []).includes(w.stat) })) })));
+      })
       .catch(() => setPlans([]));
-  }, []);
+  }, [from, stage]);
 
-  if (!plans) return <div className="empty">Reading what you wear…</div>;
+  const picker = (
+    <div className="uf-from">
+      <span className="muted small">Improve on:</span>
+      <button className={`chip ${from === "build" ? "on" : ""}`} onClick={() => setFrom("build")}>This build{who.stage ? ` (${who.stage})` : ""}</button>
+      <button className={`chip ${from === "worn" ? "on" : ""}`} onClick={() => setFrom("worn")}>What {who.character || "my character"} wears</button>
+    </div>
+  );
+
+  if (!plans) return <div className="uf">{picker}<div className="empty">Reading the gear…</div></div>;
   if (plans.length === 0) return (
-    <div className="empty">I don't know what you're wearing yet. Log in on the Wealth page (or press Ctrl+D on an item and use "I'm wearing this"), then come back.</div>
+    <div className="uf">{picker}<div className="empty">{from === "build"
+      ? "This stage of the build has no armour or jewellery to improve on."
+      : "I don't know what you're wearing yet. Log in on the Wealth page (or press Ctrl+D on an item and use \"I'm wearing this\"), then come back."}</div></div>
   );
 
   const toggle = (slot: string, stat: string) => {
@@ -44,13 +65,14 @@ export default function UpgradeFinder() {
   };
   const find = async (p: Plan) => {
     setBusy(p.slot); setOpen(p.slot);
-    try { setRes({ ...res, [p.slot]: await invoke<Upgrades>("upgrade_search", { plan: p }) }); }
+    try { setRes({ ...res, [p.slot]: await invoke<Upgrades>("upgrade_search", { plan: p, from, stage }) }); }
     catch (e) { setRes({ ...res, [p.slot]: String(e) }); }
     setBusy(null);
   };
 
   return (
     <div className="uf">
+      {picker}
       <p className="muted small">Each search adds up the stats below (weighted) and only lists items that beat what you wear now, cheapest first, instant buyout.
         Untick a stat to leave it out. Weapons aren't here: compare those with Ctrl+D.</p>
       {plans.map((p) => {
