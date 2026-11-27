@@ -14,7 +14,18 @@ export type PobJewel = { node: number | null; item: PobGear; notables: string[] 
 export type PobStage = { title: string; tree: { version: string; nodes: number[]; url: string } | null; groups: PobGroup[]; gear: PobGear[]; jewels?: PobJewel[] };
 /** alternatives: items in the PoB that no stage wears (the guide's options and upgrades). */
 export type PobBuild = { class: string; ascendancy: string; level: number; stages: PobStage[]; active: number; alternatives?: PobGear[] };
-export type PobState = { build: PobBuild; stage: number; link: string; follow?: boolean };
+export type CheckNote = { kind: "bad" | "warn" | "ok"; text: string };
+export type StageCheck = { title: string; level: number; level_guessed: boolean; str: number; dex: number; int: number; points: number; points_have: number;
+  mana: { total: number; reserved: number; free: number; skill: string; cost: number | null } | null;
+  speed: { skill: string; fires_after: number; attack_every: number; spare_pct: number } | null; notes: CheckNote[] };
+export type PobState = { build: PobBuild; stage: number; link: string; follow?: boolean; checks?: StageCheck[] };
+
+/** Red count for things that won't work, yellow for later or weak, a tick when clean. */
+function CheckBadge({ c }: { c: StageCheck }) {
+  const bad = c.notes.filter((n) => n.kind === "bad").length, warn = c.notes.filter((n) => n.kind === "warn").length;
+  if (!bad && !warn) return <span className="bv-cbadge ok" title="Nothing wrong">✓</span>;
+  return <>{bad > 0 && <span className="bv-cbadge bad" title={`${bad} won't work`}>{bad}</span>}{warn > 0 && <span className="bv-cbadge warn" title={`${warn} to watch`}>{warn}</span>}</>;
+}
 
 const RARITY: Record<string, string> = { normal: "#c8c8c8", magic: "#8888ff", rare: "#ffff77", unique: "#af6025", relic: "#82ad6a" };
 const SLOT_ORDER = ["Weapon 1", "Weapon 2", "Helmet", "Body Armour", "Gloves", "Boots", "Amulet", "Ring 1", "Ring 2", "Belt",
@@ -177,10 +188,10 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
   // A jewel picked in the list (shown on the tree) or on the tree (opened in the list).
   const [jewelNode, setJewelNode] = useState<number | null>(null);
   // Gems live under their item on the Gear tab now (21 Nov): an old "gems" choice opens Gear.
-  const [view, setView] = useState<"gear" | "jewels" | "tree">(() => {
+  const [view, setView] = useState<"gear" | "jewels" | "tree" | "check">(() => {
     try {
       const v = localStorage.getItem("build.view");
-      return v === "jewels" || v === "tree" ? v : "gear";
+      return v === "jewels" || v === "tree" || v === "check" ? v : "gear";
     } catch { return "gear"; }
   });
   const [openItem, setOpenItem] = useState<string | null>(null);
@@ -226,6 +237,8 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
   const before = new Set((build.stages[stage - 1]?.groups ?? []).flatMap((g) => g.gems.map((x) => x.name)));
   const newGems = stage > 0 ? [...new Set(s.groups.flatMap((g) => g.gems.filter((x) => x.enabled).map((x) => x.name)))].filter((n) => !before.has(n)) : [];
   const change = treeChange(build.stages, stage);
+  const checks = st.checks ?? [];
+  const chk = checks[stage];
   const sorted = [...s.gear].sort((a, b) => (SLOT_ORDER.indexOf(a.slot) + 99) % 99 - (SLOT_ORDER.indexOf(b.slot) + 99) % 99);
   const gear = sorted.filter((g) => !g.slot.startsWith("Flask"));
   const flasks = sorted.filter((g) => g.slot.startsWith("Flask"));
@@ -287,8 +300,9 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
         </span>
       </div>
       <div className="bv-tabs">
-        {(["gear", "jewels", "tree"] as const).map((v) => (
-          <button key={v} className={view === v ? "on" : ""} onClick={() => setView(v)}>{{ gear: "Gear and gems", jewels: `Jewels${jewels.length ? ` (${jewels.length})` : ""}`, tree: "Tree" }[v]}</button>
+        {(["gear", "jewels", "tree", "check"] as const).map((v) => (
+          <button key={v} className={view === v ? "on" : ""} onClick={() => setView(v)}>{{ gear: "Gear and gems", jewels: `Jewels${jewels.length ? ` (${jewels.length})` : ""}`, tree: "Tree",
+            check: <>Check{chk && <CheckBadge c={chk} />}</> }[v]}</button>
         ))}
       </div>
 
@@ -341,6 +355,42 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
             );
           })}
         </ul>
+      )}
+
+      {view === "check" && (
+        <div className="bv-check">
+          {!chk ? <div className="empty">Nothing to check in this stage.</div> : <>
+            <div className="bv-check-sum small">
+              Level <b>{chk.level}</b>{chk.level_guessed && <span className="muted"> (guessed from the tree)</span>}
+              {" · "}{chk.str} Str · {chk.dex} Dex · {chk.int} Int
+              {chk.points > 0 && <> · {chk.points} passive points</>}
+            </div>
+            {chk.speed && (
+              <div className={`bv-check-line ${chk.speed.spare_pct < 0 ? "bad" : "ok"}`}>
+                <b>{chk.speed.skill}</b> fires after <b>{chk.speed.fires_after.toFixed(2)} s</b>, you attack every <b>{chk.speed.attack_every.toFixed(2)} s</b>.{" "}
+                {chk.speed.spare_pct >= 0 ? `Room for about ${chk.speed.spare_pct}% more attack speed.` : "You attack too fast for it."}
+              </div>
+            )}
+            {chk.mana && (
+              <div className={`bv-check-line ${chk.mana.free < 0 ? "bad" : chk.mana.cost && chk.mana.free < chk.mana.cost * 2 ? "warn" : "ok"}`}>
+                Mana <b>{chk.mana.total}</b>, auras reserve <b>{chk.mana.reserved}</b>, <b>{chk.mana.free} free</b>
+                {chk.mana.cost ? <>. {chk.mana.skill} costs <b>{chk.mana.cost}</b> a use.</> : "."}
+              </div>
+            )}
+            <ul className="bv-check-notes">
+              {chk.notes.map((n, i) => <li key={i} className={n.kind}><span className="bv-check-icon">{n.kind === "bad" ? "✕" : n.kind === "warn" ? "!" : "✓"}</span>{n.text}</li>)}
+            </ul>
+            {checks.length > 1 && (
+              <div className="bv-check-all">
+                <span className="muted small">All stages:</span>
+                {checks.map((c, i) => (
+                  <button key={i} className={`bv-check-stage ${i === stage ? "on" : ""}`} onClick={() => setStage(i)}>{c.title} <CheckBadge c={c} /></button>
+                ))}
+              </div>
+            )}
+            <div className="muted small">Checked against Path of Building's game data: item and gem levels, Str / Dex / Int, sockets, passive points, mana after auras{chk.speed ? " and the duration breakpoint" : ""}. It doesn't work out damage.</div>
+          </>}
+        </div>
       )}
 
       {view === "tree" && (

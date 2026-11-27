@@ -1723,14 +1723,17 @@ fn pob_file(state: &AppState) -> PathBuf {
 }
 
 #[derive(serde::Serialize)]
-struct PobState { build: filter_core::pob::Build, stage: usize, link: String, follow: bool }
+struct PobState { build: filter_core::pob::Build, stage: usize, link: String, follow: bool,
+    /// What won't work in game, per stage (build checker).
+    checks: Vec<filter_core::buildcheck::StageCheck> }
 
 fn pob_load(state: &AppState) -> Option<PobState> {
     let code = std::fs::read_to_string(pob_file(state)).ok()?;
     let build = filter_core::pob::parse(&filter_core::pob::decode(&code).ok()?).ok()?;
     let s = state.store.lock().unwrap();
     let stage = s.settings.pob_stage.unwrap_or(build.active).min(build.stages.len().saturating_sub(1));
-    Some(PobState { build, stage, link: s.settings.pob_link.clone(), follow: s.settings.pob_follow })
+    let checks = filter_core::buildcheck::check(&build);
+    Some(PobState { build, stage, link: s.settings.pob_link.clone(), follow: s.settings.pob_follow, checks })
 }
 
 /// Your saved builds (My build page): one is shown (its code is also in pob.txt), the rest wait to be swapped in.

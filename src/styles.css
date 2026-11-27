@@ -496,6 +496,24 @@ code { background: #000; padding: 1px 5px; border-radius: 4px; color: var(--gold
 .bv-newgems { font-size: 12.5px; padding: 6px 9px; border-radius: 6px; background: #173219; color: #cfeecf; }
 .bv-newgems b { color: #5ee06a; font-weight: 600; }
 .gem.fresh { border-color: #5ee06a; box-shadow: 0 0 0 1px rgba(94,224,106,.4); }
+/* Build checker (My build > Check) */
+.bv-cbadge { display: inline-block; min-width: 16px; margin-left: 5px; padding: 0 5px; border-radius: 8px; font-size: 11px; font-weight: 700; line-height: 16px; text-align: center; }
+.bv-cbadge.bad { background: var(--red); color: #1a0d0c; }
+.bv-cbadge.warn { background: var(--gold); color: #1a1405; }
+.bv-cbadge.ok { color: var(--green); }
+.bv-check { display: grid; gap: 10px; padding: 10px 2px; }
+.bv-check-line { font-size: 13px; padding: 8px 11px; border-radius: 6px; border-left: 3px solid var(--green); background: rgba(98,207,128,.08); }
+.bv-check-line.warn { border-color: var(--gold); background: var(--gold-bg); }
+.bv-check-line.bad { border-color: var(--red); background: rgba(240,133,124,.1); }
+.bv-check-notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.bv-check-notes li { display: flex; gap: 9px; align-items: baseline; font-size: 13.5px; line-height: 1.45; }
+.bv-check-icon { flex: 0 0 18px; height: 18px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 11px; font-weight: 700; }
+.bv-check-notes li.bad .bv-check-icon { background: var(--red); color: #1a0d0c; }
+.bv-check-notes li.warn .bv-check-icon { background: var(--gold); color: #1a1405; }
+.bv-check-notes li.ok .bv-check-icon { background: var(--green); color: #0b1a10; }
+.bv-check-all { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.bv-check-stage { font-size: 12.5px; padding: 3px 9px; }
+.bv-check-stage.on { border-color: var(--gold); color: var(--gold); }
 
 /* ===== Polish pass: one system for controls, sections and type ===== */
 body.main { background: var(--bg); }

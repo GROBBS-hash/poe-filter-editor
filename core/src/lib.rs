@@ -4,6 +4,7 @@ pub mod atlas_model;
 pub mod atlas_opt;
 pub mod atlas_search;
 pub mod bases;
+pub mod buildcheck;
 pub mod bulk;
 pub mod compare;
 pub mod conds;
