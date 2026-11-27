@@ -1732,9 +1732,95 @@ fn pob_load(state: &AppState) -> Option<PobState> {
     Some(PobState { build, stage, link: s.settings.pob_link.clone(), follow: s.settings.pob_follow })
 }
 
-/// Imports a PoB link (pobb.in, pastebin, poe.ninja) or a pasted code, and remembers it.
+/// Your saved builds (My build page): one is shown (its code is also in pob.txt), the rest wait to be swapped in.
+#[derive(serde::Serialize, serde::Deserialize, Default)]
+struct PobBuilds { active: Option<String>, list: Vec<SavedPob> }
+
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+struct SavedPob {
+    id: String,
+    name: String,
+    link: String,
+    code: String,
+    #[serde(default)] stage: Option<usize>,
+    #[serde(default)] follow: bool,
+    /// Ascendancy (or class) and level, for the list.
+    #[serde(default)] class: String,
+    #[serde(default)] level: u32,
+}
+
+fn pob_builds_file(state: &AppState) -> PathBuf { state.store_path.with_file_name("pob_builds.json") }
+
+fn pob_new_id(b: &PobBuilds) -> String {
+    let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    let mut id = format!("b{secs}");
+    while b.list.iter().any(|e| e.id == id) { id.push('x'); }
+    id
+}
+
+fn pob_class(b: &filter_core::pob::Build) -> String { if b.ascendancy.is_empty() { b.class.clone() } else { b.ascendancy.clone() } }
+
+/// A name to start with: the build's main skill and ascendancy ("Kinetic Fusillade Hierophant").
+fn pob_name(b: &filter_core::pob::Build) -> String {
+    let class = pob_class(b);
+    let skill = b.stages.last().and_then(|st| st.groups.iter().filter(|g| g.enabled)
+        .max_by_key(|g| g.gems.iter().filter(|x| x.enabled).count())
+        .and_then(|g| g.gems.iter().find(|x| x.enabled && !x.support)).map(|x| x.name.clone()));
+    match skill {
+        Some(sk) if class.is_empty() => sk,
+        Some(sk) => format!("{sk} {class}"),
+        None if class.is_empty() => "My build".into(),
+        None => class,
+    }
+}
+
+/// The saved list. The first time, the build you already had becomes its first entry.
+fn pob_builds_load(state: &AppState) -> PobBuilds {
+    let mut b: PobBuilds = filter_core::keep::load(&pob_builds_file(state)).unwrap_or_default();
+    if b.list.is_empty() {
+        if let Ok(code) = std::fs::read_to_string(pob_file(state)) {
+            if let Some(build) = filter_core::pob::decode(&code).ok().and_then(|x| filter_core::pob::parse(&x).ok()) {
+                let id = pob_new_id(&b);
+                let s = state.store.lock().unwrap();
+                b.list.push(SavedPob { id: id.clone(), name: pob_name(&build), link: s.settings.pob_link.clone(), code: code.trim().into(),
+                    stage: s.settings.pob_stage, follow: s.settings.pob_follow, class: pob_class(&build), level: build.level });
+                drop(s);
+                b.active = Some(id);
+                let _ = filter_core::keep::save(&pob_builds_file(state), &b, true);
+            }
+        }
+    }
+    b
+}
+
+/// Before swapping away, the shown build keeps the stage you were on.
+fn pob_remember_stage(state: &AppState, b: &mut PobBuilds) {
+    let s = state.store.lock().unwrap();
+    let active = b.active.clone();
+    if let Some(e) = b.list.iter_mut().find(|e| Some(&e.id) == active.as_ref()) {
+        e.stage = s.settings.pob_stage;
+        e.follow = s.settings.pob_follow;
+    }
+}
+
+/// Makes a saved build the one shown (My build, F6, Home, the levelling guide...).
+fn pob_show(app: &AppHandle, state: &AppState, e: &SavedPob) -> Result<(), String> {
+    std::fs::write(pob_file(state), &e.code).map_err(err)?;
+    {
+        let mut s = state.store.lock().unwrap();
+        s.settings.pob_link = e.link.clone();
+        s.settings.pob_stage = e.stage;
+        s.settings.pob_follow = e.follow;
+        s.save(&state.store_path).map_err(err)?;
+    }
+    let _ = app.emit("pob-imported", ());
+    Ok(())
+}
+
+/// Imports a PoB link (pobb.in, pastebin, poe.ninja) or a pasted code and shows it. `replace`: the saved build it
+/// updates (the Update button); otherwise the same link updates its build, and anything else is added to the list.
 #[tauri::command]
-fn pob_import(app: AppHandle, state: State<AppState>, link: String) -> Result<PobState, String> {
+fn pob_import(app: AppHandle, state: State<AppState>, link: String, replace: Option<String>) -> Result<PobState, String> {
     let code = match filter_core::pob::raw_url(&link) {
         Some(url) => ureq::get(&url).set("User-Agent", "poe-filter-editor").timeout(Duration::from_secs(20)).call()
             .map_err(|e| format!("Couldn't download that build: {e}"))?
@@ -1742,15 +1828,88 @@ fn pob_import(app: AppHandle, state: State<AppState>, link: String) -> Result<Po
         None => link.trim().to_string(),
     };
     let build = filter_core::pob::parse(&filter_core::pob::decode(&code)?)?;
-    std::fs::write(pob_file(&state), code.trim()).map_err(err)?;
-    {
-        let mut s = state.store.lock().unwrap();
-        s.settings.pob_link = if filter_core::pob::raw_url(&link).is_some() { link.trim().to_string() } else { "(pasted code)".into() };
-        s.settings.pob_stage = Some(build.active);
-        s.save(&state.store_path).map_err(err)?;
-    }
-    let _ = app.emit("pob-imported", ());
+    let link = if filter_core::pob::raw_url(&link).is_some() { link.trim().to_string() } else { "(pasted code)".into() };
+    let mut b = pob_builds_load(&state);
+    pob_remember_stage(&state, &mut b);
+    let at = replace.as_ref().and_then(|id| b.list.iter().position(|e| &e.id == id))
+        .or_else(|| if link == "(pasted code)" { None } else { b.list.iter().position(|e| e.link == link) });
+    let entry = match at {
+        Some(i) => {
+            let e = &mut b.list[i];
+            e.link = link;
+            e.code = code.trim().into();
+            e.stage = Some(build.active);
+            e.class = pob_class(&build);
+            e.level = build.level;
+            e.clone()
+        }
+        None => {
+            let e = SavedPob { id: pob_new_id(&b), name: pob_name(&build), link, code: code.trim().into(), stage: Some(build.active),
+                follow: false, class: pob_class(&build), level: build.level };
+            b.list.push(e.clone());
+            e
+        }
+    };
+    b.active = Some(entry.id.clone());
+    filter_core::keep::save(&pob_builds_file(&state), &b, true).map_err(err)?;
+    pob_show(&app, &state, &entry)?;
     pob_load(&state).ok_or_else(|| "Couldn't read the build back".into())
+}
+
+#[derive(serde::Serialize)]
+struct PobListItem { id: String, name: String, link: String, class: String, level: u32, active: bool }
+
+/// The saved builds for the My build page.
+#[tauri::command]
+fn pob_list(state: State<AppState>) -> Vec<PobListItem> {
+    let b = pob_builds_load(&state);
+    b.list.iter().map(|e| PobListItem { id: e.id.clone(), name: e.name.clone(), link: e.link.clone(), class: e.class.clone(),
+        level: e.level, active: Some(&e.id) == b.active.as_ref() }).collect()
+}
+
+/// Swaps to another saved build; the one you leave keeps its stage.
+#[tauri::command]
+fn pob_switch(app: AppHandle, state: State<AppState>, id: String) -> Result<(), String> {
+    let mut b = pob_builds_load(&state);
+    let e = b.list.iter().find(|e| e.id == id).cloned().ok_or("That build isn't saved any more")?;
+    pob_remember_stage(&state, &mut b);
+    b.active = Some(id);
+    filter_core::keep::save(&pob_builds_file(&state), &b, true).map_err(err)?;
+    pob_show(&app, &state, &e)
+}
+
+#[tauri::command]
+fn pob_rename(state: State<AppState>, id: String, name: String) -> Result<(), String> {
+    let name = name.trim();
+    if name.is_empty() { return Err("Give it a name".into()); }
+    let mut b = pob_builds_load(&state);
+    if let Some(e) = b.list.iter_mut().find(|e| e.id == id) { e.name = name.chars().take(80).collect(); }
+    filter_core::keep::save(&pob_builds_file(&state), &b, true).map_err(err)
+}
+
+/// Takes a build off the list. Removing the shown one shows the newest left (or none).
+#[tauri::command]
+fn pob_remove(app: AppHandle, state: State<AppState>, id: String) -> Result<(), String> {
+    let mut b = pob_builds_load(&state);
+    let was_shown = b.active.as_deref() == Some(id.as_str());
+    b.list.retain(|e| e.id != id);
+    if !was_shown { return filter_core::keep::save(&pob_builds_file(&state), &b, true).map_err(err); }
+    b.active = b.list.last().map(|e| e.id.clone());
+    filter_core::keep::save(&pob_builds_file(&state), &b, true).map_err(err)?;
+    match b.list.last() {
+        Some(e) => pob_show(&app, &state, e),
+        None => {
+            let _ = std::fs::remove_file(pob_file(&state));
+            {
+                let mut s = state.store.lock().unwrap();
+                s.settings.pob_link.clear();
+                s.settings.pob_stage = None;
+                s.save(&state.store_path).map_err(err)?;
+            }
+            let _ = app.emit("pob-imported", ());
+            Ok(())
+        }
+    }
 }
 
 #[tauri::command]
@@ -3383,6 +3542,10 @@ pub fn run() {
             stack_choices,
             gear_setup,
             pob_import,
+            pob_list,
+            pob_switch,
+            pob_rename,
+            pob_remove,
             pob_get,
             pob_set_stage,
             pob_follow_now,

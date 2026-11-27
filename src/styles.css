@@ -2461,3 +2461,4 @@ button.qm-rule:hover, .qm-rule.can-open:hover { border-color: var(--gold); backg
 .acmp-notes { display: flex; flex-wrap: wrap; gap: 5px; }
 .acmp-note { background: none; border: 1px solid currentColor; border-radius: 99px; padding: 2px 10px; font-size: 12.5px; }
 .acmp-note:hover:not(:disabled) { background: color-mix(in srgb, currentColor 14%, transparent); }
+.mb-list li.mb-on { border-color: var(--gold); background: var(--gold-bg); }

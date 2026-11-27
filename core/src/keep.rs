@@ -69,7 +69,7 @@ fn note(path: &Path, what: &str) {
     let name = match path.file_stem().and_then(|s| s.to_str()).unwrap_or("") {
         "profiles" => "Your filters and settings file", "history" => "The file with your recent changes",
         "saved_searches" => "Your saved searches file", "wealth" => "Your stash worth file", "phone" => "Your phone page file",
-        "play" => "Your map history file", "atlas" => "Your atlas trees file", other => { TROUBLE.lock().unwrap().push(format!("{other} {what}.")); return; }
+        "play" => "Your map history file", "atlas" => "Your atlas trees file", "pob_builds" => "Your saved builds file", other => { TROUBLE.lock().unwrap().push(format!("{other} {what}.")); return; }
     };
     TROUBLE.lock().unwrap().push(format!("{name} {what}."));
 }

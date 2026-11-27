@@ -64,6 +64,11 @@ const mapTiers = () => ({
 });
 // ?build shows the F6 build window instead, with a sample build.
 const buildWin = location.search.includes("build");
+let pobList = [
+  { id: "b1", name: "Kinetic Fusillade Hierophant", link: "https://pobb.in/-qaBw-u7dKYl", class: "Hierophant", level: 94, active: true },
+  { id: "b2", name: "Righteous Fire Chieftain", link: "https://pobb.in/abc123", class: "Chieftain", level: 88, active: false },
+  { id: "b3", name: "Scion KF levelling", link: "(pasted code)", class: "Ascendant", level: 70, active: false },
+];
 const gem = (name: string, colour: string, support = false) => ({ name, level: 20, quality: 20, enabled: true, support, colour });
 const pob = async () => {
   const t = await fetch("/tree_poe1.json").then((r) => r.json());
@@ -247,6 +252,10 @@ mockIPC((cmd, args) => {
     return atlas;
   }
   if (cmd === "pob_get") return pob();
+  if (cmd === "pob_list") return pobList;
+  if (cmd === "pob_switch") { const id = (args as { id: string }).id; pobList = pobList.map((b) => ({ ...b, active: b.id === id })); return null; }
+  if (cmd === "pob_rename") { const a = args as { id: string; name: string }; pobList = pobList.map((b) => b.id === a.id ? { ...b, name: a.name } : b); return null; }
+  if (cmd === "pob_remove") { const id = (args as { id: string }).id; pobList = pobList.filter((b) => b.id !== id); return null; }
   if (cmd === "build_tree_opt") return [true, "P"];
   if (cmd === "list_sounds") return [];
   // Crafting page: public/_craft_pool.json / _craft_ways.json when present (cargo run --example craftof with CRAFT_JSON=public).
