@@ -197,7 +197,9 @@ fn game_copy(rarity: &str, name: &str, base: &str, lines: &[String]) -> String {
         let t = tidy(l);
         if t.is_empty() { continue; }
         if matches!(t.as_str(), "Corrupted" | "Mirrored" | "Split") || (t.ends_with(" Item") && !t.contains(char::is_numeric)) { tail.push(t); continue; }
-        let tag = if l.contains("{enchant}") || (left > 0 && base.ends_with("Cluster Jewel")) { " (enchant)" } else if left > 0 { " (implicit)" } else if l.contains("{crafted}") { " (crafted)" }
+        // An anoint ("{crafted}Allocates Fleetfoot", counted with the implicits in PoB) is an enchant in game.
+        let anoint = left > 0 && l.contains("{crafted}") && t.starts_with("Allocates ");
+        let tag = if l.contains("{enchant}") || anoint || (left > 0 && base.ends_with("Cluster Jewel")) { " (enchant)" } else if left > 0 { " (implicit)" } else if l.contains("{crafted}") { " (crafted)" }
             else if l.contains("{fractured}") { " (fractured)" } else { "" };
         if left > 0 { implicit_left = Some(left - 1); implicits.push(format!("{t}{tag}")); } else { mods.push(format!("{t}{tag}")); }
     }

@@ -1219,6 +1219,7 @@ pub fn offers(v: &Value) -> Vec<Offer> {
 pub fn buy_query(text: &str, index: &StatIndex) -> Option<(Value, usize)> {
     let item = parse_item(text)?;
     let unique = item.rarity == "Unique";
+    let rolls = if unique { item.name.as_deref().map(|n| unique_rolls(n.strip_prefix("Foulborn ").unwrap_or(n))).unwrap_or_default() } else { vec![] };
     let cat = category(&item.item_class);
     let local_first = cat.is_some_and(|c| c.starts_with("armour.") || c.starts_with("weapon."));
     let mut stats: Vec<Value> = Vec::new();
@@ -1230,11 +1231,23 @@ pub fn buy_query(text: &str, index: &StatIndex) -> Option<(Value, usize)> {
         if m.text.contains("Jewel Socket") && item.base_type.ends_with("Cluster Jewel") { continue; }
         let Some((id, value)) = local().or_else(|| index.find(&m)) else { continue };
         // A unique's fixed mods come with the name; only mods that differ between copies are worth asking for
-        // (Watcher's Eye auras, a timeless jewel's seed).
+        // (Watcher's Eye auras, a timeless jewel's seed, its anoint, and the mods that roll).
         let timeless = id.starts_with("explicit.pseudo_timeless_jewel_");
-        if unique && !m.text.contains("while affected by") && !timeless { continue; }
+        let anoint = m.text.starts_with("Allocates ") && m.kind == "enchant";
+        let roll = rolls.iter().find(|r| r.0 == template(&m.text).0).filter(|_| !timeless);
+        if unique && !m.text.contains("while affected by") && !timeless && !anoint && roll.is_none() { continue; }
         if stats.iter().any(|v| v["id"] == id.as_str()) { continue; }
         let mut v = stat_json(&id);
+        // A unique's rolling mod (27 Nov, his KF build: Timeclasp's duration is the whole point of the ring): at
+        // least the PoB guide's roll ("reduced" is searched as negative "increased", so at most). Ticked only when
+        // the roll can land either side of zero, where a bad copy does the opposite (Timeclasp's -20 to 20%);
+        // the rest are on the page, unticked, one click to ask for.
+        if let Some(&(_, lo, hi)) = roll {
+            if value.is_finite() && v.get("value").is_none() {
+                v["value"] = if value < 0.0 { json!({ "max": value }) } else { json!({ "min": value }) };
+                if !(lo < 0.0 && hi > 0.0) { v["disabled"] = json!(true); }
+            }
+        }
         // Crafted mods: you can craft them yourself, so they're on the page but not required.
         if m.kind == "crafted" { v["disabled"] = json!(true); }
         // "Adds 8 Passive Skills" / "2 Added Passive Skills are Jewel Sockets": that number is the jewel.
@@ -1252,6 +1265,22 @@ pub fn buy_query(text: &str, index: &StatIndex) -> Option<(Value, usize)> {
     }
     let n = q["stats"][0]["filters"].as_array().map(|a| a.iter().filter(|v| v.get("disabled").is_none()).count()).unwrap_or(0);
     Some((json!({ "query": q, "sort": { "price": "asc" } }), n))
+}
+
+/// A unique's mods that roll, from core/data/poe1_uniques.json: (the line's template as `template` writes it, low
+/// end, high end). Only lines with one range ("(-20-20)% reduced Skill Effect Duration"); "Adds (1-2) to (3-4)" is left out.
+fn unique_rolls(name: &str) -> Vec<(String, f64, f64)> {
+    let Some(u) = crate::gear::uniques().iter().find(|u| u.name.eq_ignore_ascii_case(name)) else { return vec![] };
+    u.mods.iter().filter_map(|m| {
+        if m.matches('(').count() != 1 { return None; }
+        let i = m.find('(')?;
+        let j = i + m[i..].find(')')?;
+        let inner = &m[i + 1..j];
+        // "-" splits the two ends; a leading "-" belongs to the number ("(-20-20)").
+        let k = inner.char_indices().skip(1).find(|(_, c)| *c == '-')?.0;
+        let (lo, hi) = (inner[..k].parse::<f64>().ok()?, inner[k + 1..].parse::<f64>().ok()?);
+        Some((template(&format!("{}1{}", &m[..i], &m[j + 1..])).0, lo, hi))
+    }).collect()
 }
 
 /// The item level a cluster jewel notable needs to roll (core/data/cluster_notables.json, from the game's mod data

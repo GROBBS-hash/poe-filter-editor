@@ -1147,6 +1147,12 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   Live 21 Nov: gloves 1, helmet 1, belt 5, cluster 15; others 0 (PoB guide's ideal mod sets; untick on the page).
   Dev check: `POB_STAGE="Endgame" POB_BUY=<data dir>/trade_stats_poe1.json cargo run -p filter-core --example pobdump -- <pob.txt>`
   (add POB_BUY_DEBUG=1 to see each item's copy).
+  27 Nov (he found uniques searched by name only, his KF Scion levelling build): a unique's Buy also asks for its
+  anoint (PoB's "{crafted}Allocates X" is now written "(enchant)" in the game copy, `pob.rs`) and every mod that rolls
+  (`unique_rolls` from `core/data/poe1_uniques.json`) at PoB's number ("reduced" = at most the negative). Only rolls
+  that can land either side of zero are ticked (Timeclasp's -20 to 20% duration); the rest are on the page, unticked.
+  Live: Timeclasp -18% 801 for sale, Fleetfoot Karui Ward 2. Status "available" matters: "online" found 0-30 (most
+  3.30 sellers are instant buyout, not online).
 
 - Resistances like Awakened 21 Nov (he asked; read in its pseudo/index.ts): elemental total always ticked, chaos total ticked
   (left out when its only source is a crafted chaos mod), fire / cold / lightning totals unticked; on rares every
@@ -1158,6 +1164,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
+- [ ] (next) My build > Buy on a unique: anointed amulets ask for the anoint (Karui Ward with Fleetfoot); Timeclasp asks for its duration roll; the unique's other rolls are on the trade page, unticked, at the guide's numbers. Try it with "Scion KF levelling (PoB code).txt".
 - [ ] (0.2.90) Switch atlas tree in game, then change "Strategy" on the map tracker to match: the map you're in and the next ones count for it (F7 shows that tree too). Game windows > Map runs: tick maps run on another tree, pick the right strategy; the Strategy column changes and Atlas > Your trees so far moves with it.
 - [ ] (0.2.89) ` brings the editor up over the game; press ` again in the editor (not in a text box) and you're back in the game.
 - [ ] (0.2.89) Alt-tab from the game to the editor itself: the tracker goes away too (0.2.88 left it up). Opening it from the editor's Play page still shows it.

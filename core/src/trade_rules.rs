@@ -636,6 +636,30 @@ mod buy_tests {
         let (q, n) = buy_query(unique, &idx()).unwrap();
         assert_eq!((q["query"]["name"].as_str(), n), (Some("Marylene's Fallacy"), 0));
     }
+
+    #[test]
+    fn uniques_ask_for_their_rolls_and_anoint() {
+        let idx = StatIndex::from_json(&json!({ "result": [
+            { "label": "Explicit", "entries": [
+                { "id": "explicit.dur", "text": "#% increased Skill Effect Duration", "type": "explicit" },
+                { "id": "explicit.aspd", "text": "#% increased Attack Speed", "type": "explicit" } ] },
+            { "label": "Enchant", "entries": [
+                { "id": "enchant.stat_2954116742|3309", "text": "Allocates Fleetfoot", "type": "enchant" } ] } ] }));
+        // Timeclasp's duration rolls -20 to 20: ticked, at most PoB's -18. Attack speed (10-15) on the page, unticked.
+        let ring = "Item Class: Rings\nRarity: Unique\nTimeclasp\nMoonstone Ring\n--------\nItem Level: 86\n--------\n\
+            12% increased Attack Speed\n18% reduced Skill Effect Duration\nUnaffected by Temporal Chains\n";
+        let (q, n) = buy_query(ring, &idx).unwrap();
+        let f = &q["query"]["stats"][0]["filters"];
+        assert_eq!(f[0], json!({ "id": "explicit.aspd", "value": { "min": 12.0 }, "disabled": true }));
+        assert_eq!(f[1], json!({ "id": "explicit.dur", "value": { "max": -18.0 } }));
+        assert_eq!(n, 1);
+        // An anointed Karui Ward: the anoint is asked for.
+        let amulet = "Item Class: Amulets\nRarity: Unique\nKarui Ward\nJade Amulet\n--------\nItem Level: 84\n--------\n\
+            Allocates Fleetfoot (enchant)\n--------\n+100 to Accuracy Rating\n";
+        let (q, n) = buy_query(amulet, &idx).unwrap();
+        assert_eq!(q["query"]["stats"][0]["filters"][0], json!({ "id": "enchant.stat_2954116742", "value": { "option": 3309 } }));
+        assert_eq!(n, 1);
+    }
 }
 
 #[cfg(test)]
