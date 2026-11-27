@@ -514,6 +514,24 @@ code { background: #000; padding: 1px 5px; border-radius: 4px; color: var(--gold
 .bv-check-all { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .bv-check-stage { font-size: 12.5px; padding: 3px 9px; }
 .bv-check-stage.on { border-color: var(--gold); color: var(--gold); }
+/* Upgrade finder (My build > Upgrades) */
+.uf { display: grid; gap: 12px; padding: 10px 2px; }
+.uf-slot { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: var(--panel); display: grid; gap: 8px; }
+.uf-head { display: flex; align-items: center; gap: 10px; }
+.uf-name { flex: 1; min-width: 0; }
+.uf-wants { display: flex; flex-wrap: wrap; gap: 6px; }
+.uf-want { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; padding: 2px 8px; border: 1px solid var(--line); border-radius: 12px; color: var(--muted); cursor: pointer; }
+.uf-want.on { color: var(--text); border-color: var(--line-2); }
+.uf-want input { margin: 0; }
+.uf-err { color: var(--red); font-size: 13px; }
+.uf-lose { color: var(--text-2); }
+.uf-results { display: grid; gap: 6px; }
+.uf-item { display: flex; gap: 10px; align-items: center; padding: 6px 8px; border-radius: 6px; background: var(--raised); }
+.uf-item img { width: 36px; height: 36px; object-fit: contain; }
+.uf-item-txt { flex: 1; min-width: 0; }
+.uf-item-side { text-align: right; white-space: nowrap; }
+.uf-price { color: var(--gold); font-weight: 600; }
+.uf-better { color: var(--green); }
 
 /* ===== Polish pass: one system for controls, sections and type ===== */
 body.main { background: var(--bg); }

@@ -98,3 +98,86 @@ pub fn worn_set(app: AppHandle, text: String, class: String, slot: String) -> Op
     }
     view(&app, &text, &class)
 }
+
+// ---- "Find something better": a weighted-sum trade search per slot you wear (filter_core::upgrade).
+
+/// A listing the upgrade search found, scored like your own gear.
+#[derive(Serialize)]
+pub struct Found { name: String, base: String, price: String, score: f64, better_by: f64, lines: Vec<String>, icon: String }
+
+#[derive(Serialize)]
+pub struct Upgrades { total: u64, url: String, items: Vec<Found>, logged_in: bool }
+
+/// Str / Dex / Int your build is short of in the stage you're on (My build's check), zeros without a build.
+fn build_short(app: &AppHandle) -> [i64; 3] {
+    let st = app.state::<AppState>();
+    pob_load(&st).and_then(|p| p.checks.get(p.stage).map(|c| c.short)).unwrap_or([0; 3])
+}
+
+/// A plan for every slot you wear that the trade site can search by stats (not weapons).
+#[tauri::command]
+pub fn upgrade_plans(app: AppHandle) -> Vec<filter_core::upgrade::Plan> {
+    let w = current(&app);
+    let gear = w.gear();
+    let short = build_short(&app);
+    ["Helmet", "Body Armour", "Gloves", "Boots", "Belt", "Amulet", "Ring 1", "Ring 2"].iter()
+        .filter(|s| gear.iter().any(|g| g.slot == **s))
+        .map(|s| filter_core::upgrade::plan(s, &gear, short)).collect()
+}
+
+/// A trade listing's mods as lines ("+99 to maximum Life"), whether the site sent them as text or with details.
+fn listing_lines(item: &serde_json::Value) -> Vec<String> {
+    let clean = |s: &str| {
+        // "[PlayerItemRarity|Item Rarity]" -> "Item Rarity"
+        let mut out = String::new();
+        let mut rest = s;
+        while let Some(i) = rest.find('[') {
+            let Some(j) = rest[i..].find(']').map(|j| i + j) else { break };
+            out.push_str(&rest[..i]);
+            let inner = &rest[i + 1..j];
+            out.push_str(inner.rsplit('|').next().unwrap_or(inner));
+            rest = &rest[j + 1..];
+        }
+        out.push_str(rest);
+        out
+    };
+    ["implicitMods", "explicitMods", "craftedMods", "fracturedMods", "enchantMods"].iter()
+        .flat_map(|k| item[*k].as_array().cloned().unwrap_or_default())
+        .filter_map(|m| m.as_str().map(String::from).or_else(|| m["description"].as_str().map(String::from)))
+        .flat_map(|t| t.lines().map(clean).collect::<Vec<_>>())
+        .collect()
+}
+
+/// Runs the search (logged in: the site needs that for weighted sums) and lists the cheapest ten with their score.
+/// Without a login it opens the same search on the trade site, where your browser's login runs it.
+#[tauri::command(async)]
+pub fn upgrade_search(app: AppHandle, mut plan: filter_core::upgrade::Plan) -> Result<Upgrades, String> {
+    // Stats switched off change what yours scores: work it out again from what you wear.
+    if let Some(g) = current(&app).gear().iter().find(|g| g.slot == plan.slot) { plan.now = filter_core::upgrade::score(&g.lines, &plan.wants); }
+    let (poe2, league) = trade_league(&app);
+    let level = play_app::level_view(app.clone()).char_level;
+    let q = filter_core::upgrade::query(&plan, level).ok_or("Nothing to search for: switch at least one stat on")?;
+    let Some((_, sess, _)) = play_app::account(&app) else {
+        let url = if poe2 { format!("https://www.pathofexile.com/trade2/search/poe2/{}?q={}", trade_api::enc(&league), trade_api::enc(&q.to_string())) }
+            else { format!("https://www.pathofexile.com/trade/search/{}?q={}", trade_api::enc(&league), trade_api::enc(&q.to_string())) };
+        open_url(url.clone())?;
+        return Ok(Upgrades { total: 0, url, items: vec![], logged_in: false });
+    };
+    let (id, ids, total) = trade_api::search_logged_in(poe2, &league, &q, &sess)?;
+    let url = trade_api::site_url(poe2, &league, &id);
+    let fetched = trade_api::fetch_logged_in(poe2, &ids, &id, &sess)?;
+    let items = fetched["result"].as_array().into_iter().flatten().filter_map(|r| {
+        let it = &r["item"];
+        let lines = listing_lines(it);
+        let score = filter_core::upgrade::score(&lines, &plan.wants);
+        let p = &r["listing"]["price"];
+        let price = match (p["amount"].as_f64(), p["currency"].as_str()) { (Some(a), Some(c)) => format!("{a} {c}"), _ => "no price".into() };
+        Some(Found {
+            name: it["name"].as_str().filter(|n| !n.is_empty()).unwrap_or(it["typeLine"].as_str()?).to_string(),
+            base: it["typeLine"].as_str().unwrap_or("").to_string(),
+            price, better_by: (score - plan.now).round(), score: score.round(), lines,
+            icon: it["icon"].as_str().unwrap_or("").to_string(),
+        })
+    }).collect();
+    Ok(Upgrades { total, url, items, logged_in: true })
+}

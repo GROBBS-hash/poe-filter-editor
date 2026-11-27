@@ -143,6 +143,12 @@ fn add_up(lines: &[String]) -> (Vec<f64>, Vec<String>) {
     (totals, other)
 }
 
+/// Each tracked stat's total over these mod lines, by name ("Life", "Fire res"…), for the upgrade finder's score.
+pub fn totals(lines: &[String]) -> std::collections::HashMap<&'static str, f64> {
+    let (t, _) = add_up(lines);
+    STATS.iter().zip(t).map(|((n, _), v)| (*n, v)).collect()
+}
+
 /// The checked item's mod lines against the gear in each slot it could go in.
 pub fn compare(this_lines: &[String], item_class: &str, gear: &[Gear]) -> Vec<Comparison> {
     compare_slots(this_lines, "", slots_for(item_class), gear)

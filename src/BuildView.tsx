@@ -2,6 +2,7 @@ import { friendly } from "./errors";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef, useState } from "react";
+import UpgradeFinder from "./UpgradeFinder";
 import { ItemIcon, useIcons } from "./icons";
 import TreeView from "./TreeView";
 import { CRAFT_ITEM_KEY, CRAFT_PLAN_MARK } from "./Craft";
@@ -188,10 +189,10 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
   // A jewel picked in the list (shown on the tree) or on the tree (opened in the list).
   const [jewelNode, setJewelNode] = useState<number | null>(null);
   // Gems live under their item on the Gear tab now (21 Nov): an old "gems" choice opens Gear.
-  const [view, setView] = useState<"gear" | "jewels" | "tree" | "check">(() => {
+  const [view, setView] = useState<"gear" | "jewels" | "tree" | "check" | "upgrades">(() => {
     try {
       const v = localStorage.getItem("build.view");
-      return v === "jewels" || v === "tree" || v === "check" ? v : "gear";
+      return v === "jewels" || v === "tree" || v === "check" || v === "upgrades" ? v : "gear";
     } catch { return "gear"; }
   });
   const [openItem, setOpenItem] = useState<string | null>(null);
@@ -300,9 +301,9 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
         </span>
       </div>
       <div className="bv-tabs">
-        {(["gear", "jewels", "tree", "check"] as const).map((v) => (
+        {(["gear", "jewels", "tree", "check", "upgrades"] as const).filter((v) => v !== "upgrades" || !compact).map((v) => (
           <button key={v} className={view === v ? "on" : ""} onClick={() => setView(v)}>{{ gear: "Gear and gems", jewels: `Jewels${jewels.length ? ` (${jewels.length})` : ""}`, tree: "Tree",
-            check: <>Check{chk && <CheckBadge c={chk} />}</> }[v]}</button>
+            check: <>Check{chk && <CheckBadge c={chk} />}</>, upgrades: "Upgrades" }[v]}</button>
         ))}
       </div>
 
@@ -356,6 +357,8 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
           })}
         </ul>
       )}
+
+      {view === "upgrades" && !compact && <UpgradeFinder />}
 
       {view === "check" && (
         <div className="bv-check">

@@ -75,6 +75,8 @@ pub struct StageCheck {
     pub str: i64, pub dex: i64, pub int: i64,
     pub points: u32,
     pub points_have: u32,
+    /// Str, Dex, Int you're short of for the most demanding item or gem (0 when enough).
+    pub short: [i64; 3],
     pub mana: Option<Mana>,
     pub speed: Option<Speed>,
     pub notes: Vec<Note>,
@@ -267,6 +269,8 @@ fn check_stage(b: &Build, st: &Stage, next_level: Option<u32>) -> StageCheck {
 
     // ---- gear
     let mut later: Vec<(u32, String)> = vec![];
+    // How much Str / Dex / Int you're short of at worst (the upgrade finder asks for it on gear).
+    let mut short_by = [0i64; 3];
     for g in &st.gear {
         let Some((_, base)) = base_of(g) else { continue };
         let lvl = (base[0] as u32).max(if g.rarity == "unique" { unique_level(&g.name) } else { 0 });
@@ -276,7 +280,9 @@ fn check_stage(b: &Build, st: &Stage, next_level: Option<u32>) -> StageCheck {
         // An item's own attributes don't count towards its own requirement.
         let mut own = Attr::default();
         for l in &g.lines { add_attr(&mut own, l); }
-        let short: Vec<String> = [("Str", base[1], ts - own.s as i64), ("Dex", base[2], td - own.d as i64), ("Int", base[3], ti - own.i as i64)]
+        let rows = [("Str", base[1], ts - own.s as i64), ("Dex", base[2], td - own.d as i64), ("Int", base[3], ti - own.i as i64)];
+        for (i, (_, need, have)) in rows.iter().enumerate() { short_by[i] = short_by[i].max(*need as i64 - *have); }
+        let short: Vec<String> = rows
             .iter().filter(|(_, need, have)| *need as i64 > *have).map(|(k, need, have)| format!("{need} {k} (you'd have {have})")).collect();
         if !short.is_empty() { note("bad", format!("{} needs {}.", g.name, short.join(" and "))); }
     }
@@ -293,6 +299,8 @@ fn check_stage(b: &Build, st: &Stage, next_level: Option<u32>) -> StageCheck {
         let Some(d) = gem_data(&g.name) else { continue };
         let req = at(&d.req, g.level);
         if req > level { note("warn", format!("{} level {} needs character level {req} (this stage starts at {level}).", g.name, g.level)); }
+        let needs = [gem_stat(req, d.sup, d.s), gem_stat(req, d.sup, d.d), gem_stat(req, d.sup, d.i)];
+        for (i, have) in [ts, td, ti].iter().enumerate() { short_by[i] = short_by[i].max(needs[i] - have); }
         let short: Vec<String> = [("Str", d.s, ts), ("Dex", d.d, td), ("Int", d.i, ti)].iter()
             .map(|(k, m, have)| (k, gem_stat(req, d.sup, *m), have)).filter(|(_, need, have)| need > *have)
             .map(|(k, need, have)| format!("{need} {k} (you'd have {have})")).collect();
@@ -380,7 +388,7 @@ fn check_stage(b: &Build, st: &Stage, next_level: Option<u32>) -> StageCheck {
     let mut seen = std::collections::HashSet::new();
     notes.retain(|n| seen.insert(n.text.clone()));
     if notes.is_empty() { notes.push(Note { kind: "ok".into(), text: "Everything in this stage can be worn and used at this level.".into() }); }
-    StageCheck { title: st.title.clone(), level, level_guessed, str: ts, dex: td, int: ti, points, points_have, mana: mana_out, speed, notes }
+    StageCheck { title: st.title.clone(), level, level_guessed, str: ts, dex: td, int: ti, short: short_by, points, points_have, mana: mana_out, speed, notes }
 }
 
 #[cfg(test)]

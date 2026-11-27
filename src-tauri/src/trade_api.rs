@@ -22,7 +22,7 @@ pub fn site_url(poe2: bool, league: &str, id: &str) -> String {
     else { format!("https://www.pathofexile.com/trade/search/{league}/{id}") }
 }
 
-fn enc(s: &str) -> String {
+pub fn enc(s: &str) -> String {
     s.bytes().map(|b| match b {
         b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => (b as char).to_string(),
         _ => format!("%{b:02X}"),
@@ -165,6 +165,24 @@ pub fn search(poe2: bool, league: &str, query: &Value) -> Result<(String, Vec<St
     let id = v["id"].as_str().ok_or("The trade site didn't return a search")?.to_string();
     let ids = v["result"].as_array().into_iter().flatten().filter_map(|x| x.as_str().map(String::from)).collect();
     Ok((id, ids, v["total"].as_u64().unwrap_or(0)))
+}
+
+/// The same, logged in with your POESESSID: the site only runs weighted-sum searches ("Query is too complex") for
+/// logged-in users. Same rate limits as any search.
+pub fn search_logged_in(poe2: bool, league: &str, query: &Value, sessid: &str) -> Result<(String, Vec<String>, u64), String> {
+    let url = format!("{}/search/{}", api_base(poe2), enc(league));
+    let req = ureq::post(&url).set("Cookie", &format!("POESESSID={}", sessid.trim()));
+    let v = call("search", req, Some(query))?;
+    let id = v["id"].as_str().ok_or("The trade site didn't return a search")?.to_string();
+    let ids = v["result"].as_array().into_iter().flatten().filter_map(|x| x.as_str().map(String::from)).collect();
+    Ok((id, ids, v["total"].as_u64().unwrap_or(0)))
+}
+
+/// Details for listings from a logged-in search.
+pub fn fetch_logged_in(poe2: bool, ids: &[String], search_id: &str, sessid: &str) -> Result<Value, String> {
+    if ids.is_empty() { return Ok(serde_json::json!({ "result": [] })); }
+    let url = format!("{}/fetch/{}?query={}", api_base(poe2), ids[..ids.len().min(10)].join(","), search_id);
+    call("fetch", ureq::get(&url).set("Cookie", &format!("POESESSID={}", sessid.trim())), None)
 }
 
 /// Details (price, seller…) for up to 10 listings.
