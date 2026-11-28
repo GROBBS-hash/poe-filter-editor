@@ -440,7 +440,8 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
         <div className="bv-tree">
           {s.tree ? (
             <>
-              <div className="bv-tree-sum small"><b>{change.total}</b> points
+              <div className="bv-tree-sum small"><b>{chk?.points || change.total}</b> points
+                {chk?.points && change.total > chk.points ? <span className="muted"> (+{change.total - chk.points} ascendancy)</span> : null}
                 {stage > 0 && <> · <b className="c-new">{change.added}</b> new{change.removed ? <>, <b className="c-gone">{change.removed}</b> to take back</> : ""} since “{build.stages[stage - 1].title}”</>}
                 <button className="link small" onClick={() => invoke("open_url", { url: s.tree!.url })}>Open on pathofexile.com</button>
               </div>
