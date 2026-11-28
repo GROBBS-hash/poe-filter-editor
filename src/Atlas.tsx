@@ -77,7 +77,7 @@ export default function Atlas({ go }: { go?: (tab: string) => void }) {
         </div>
         <div className="row">
           <input className="text grow" placeholder="Name (optional: uses the site's name)" value={name} onChange={(e) => setName(e.target.value)} />
-          <button className="primary" disabled={!link.trim() || busy} onClick={() => doImport().then((ok) => ok && pick("mine"))}>{busy ? "Reading…" : "Import"}</button>
+          <button disabled={!link.trim() || busy} onClick={() => doImport().then((ok) => ok && pick("mine"))}>{busy ? "Reading…" : "Import"}</button>
         </div>
         {msg && <div className="small at-msg">{msg}</div>}
       </div>

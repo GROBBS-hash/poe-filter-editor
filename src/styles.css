@@ -315,8 +315,8 @@ code { background: #000; padding: 1px 5px; border-radius: 4px; color: var(--gold
 .tip-btn { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; margin-left: 6px; padding: 0;
   border-radius: 50%; border: 1px solid var(--line-2); background: none; color: var(--gold); font-size: 11px; font-weight: 700; cursor: pointer; vertical-align: middle; }
 .tip-btn.on, .tip-btn:hover { background: var(--gold-bg); }
-.tip-body { font-size: 13px; font-weight: normal; line-height: 1.5; color: var(--text); background: var(--raised); border: 1px solid var(--line);
-  border-left: 3px solid var(--gold); border-radius: 6px; padding: 8px 12px; margin: 8px 0; text-transform: none; letter-spacing: 0; }
+.tip-body { font-size: 13px; font-weight: normal; line-height: 1.5; color: var(--text); background: var(--raised); border: 1px solid color-mix(in srgb, var(--gold) 35%, transparent);
+  border-radius: 6px; padding: 8px 12px; margin: 8px 0; text-transform: none; letter-spacing: 0; }
 .faq { list-style: none; padding: 0; margin: 0; }
 .faq li { border-bottom: 1px solid var(--line); }
 .faq-q { width: 100%; text-align: left; background: none; border: 0; padding: 10px 4px; color: var(--text); font-size: 14px; cursor: pointer; }
@@ -469,17 +469,17 @@ code { background: #000; padding: 1px 5px; border-radius: 4px; color: var(--gold
 .tv-asc-label.on { fill: var(--gold); } .tv-asc-label.new { fill: #5ee06a; }
 
 /* "Why" box in the quick menu */
-.qm-why { margin-top: 8px; padding: 7px 9px; border-radius: 7px; background: rgba(0,0,0,.28); border-left: 3px solid #8a7a55; }
+.qm-why { margin-top: 8px; padding: 7px 9px; border-radius: 7px; background: rgba(0,0,0,.28); border: 1px solid color-mix(in srgb, #8a7a55 60%, transparent); }
 .why-top { display: flex; align-items: baseline; gap: 7px; }
 .why-badge { flex: none; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; padding: 1px 6px; border-radius: 4px; background: var(--gold-bg); color: var(--gold); }
 .why-text { font-size: 13px; color: var(--text); }
 .why-where { font-size: 12px; color: var(--text-2); margin-top: 3px; }
 .why-more { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
 .why-actions { display: flex; gap: 10px; margin-top: 5px; align-items: center; }
-.qm-why.why-edit { border-left-color: #59d0ff; } .why-edit .why-badge { background: #12303c; color: #9fe3ff; }
-.qm-why.why-preset { border-left-color: #5ee06a; } .why-preset .why-badge { background: #173219; color: #b6f3bb; }
-.qm-why.why-price { border-left-color: #ffb347; } .why-price .why-badge { background: #3d2a10; color: #ffd59a; }
-.qm-why.why-none { border-left-color: #666; }
+.qm-why.why-edit { border-color: color-mix(in srgb, #59d0ff 45%, transparent); } .why-edit .why-badge { background: #12303c; color: #9fe3ff; }
+.qm-why.why-preset { border-color: color-mix(in srgb, #5ee06a 45%, transparent); } .why-preset .why-badge { background: #173219; color: #b6f3bb; }
+.qm-why.why-price { border-color: color-mix(in srgb, #ffb347 45%, transparent); } .why-price .why-badge { background: #3d2a10; color: #ffd59a; }
+.qm-why.why-none { border-color: color-mix(in srgb, #666 45%, transparent); }
 .tier.focus { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(220,178,90,.45); animation: chipglow 1.2s ease-in-out 2; }
 .se-match { width: 100%; margin: 4px 0 8px; font-size: 12.5px; padding: 6px; }
 .tv-nodes circle.hit { fill: transparent; stroke: none; cursor: pointer; }
@@ -502,9 +502,9 @@ code { background: #000; padding: 1px 5px; border-radius: 4px; color: var(--gold
 .bv-cbadge.warn { background: var(--gold); color: #1a1405; }
 .bv-cbadge.ok { color: var(--green); }
 .bv-check { display: grid; gap: 10px; padding: 10px 2px; }
-.bv-check-line { font-size: 13px; padding: 8px 11px; border-radius: 6px; border-left: 3px solid var(--green); background: rgba(98,207,128,.08); }
-.bv-check-line.warn { border-color: var(--gold); background: var(--gold-bg); }
-.bv-check-line.bad { border-color: var(--red); background: rgba(240,133,124,.1); }
+.bv-check-line { font-size: 13px; padding: 8px 11px; border-radius: 6px; border: 1px solid color-mix(in srgb, var(--green) 35%, transparent); background: rgba(98,207,128,.08); }
+.bv-check-line.warn { border-color: color-mix(in srgb, var(--gold) 45%, transparent); background: var(--gold-bg); }
+.bv-check-line.bad { border-color: color-mix(in srgb, var(--red) 45%, transparent); background: rgba(240,133,124,.1); }
 .bv-check-notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .bv-check-notes li { display: flex; gap: 9px; align-items: baseline; font-size: 13.5px; line-height: 1.45; }
 .bv-check-icon { flex: 0 0 18px; height: 18px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 11px; font-weight: 700; }
@@ -596,7 +596,7 @@ input[type=range] { accent-color: var(--gold); }
 /* Quick menu (over the game) */
 .qm { background: rgba(21, 23, 28, .97); border: 1px solid var(--line-2); border-radius: 12px; box-shadow: 0 12px 34px rgba(0,0,0,.55); }
 .qm-status { background: var(--input); border-color: var(--line); }
-.qm-why { background: var(--raised); border-left-color: var(--line-2); }
+.qm-why { background: var(--raised); border-color: var(--line-2); }
 .why-badge { text-transform: none; letter-spacing: 0; font-size: 11.5px; font-weight: 600; }
 
 /* Lists */
@@ -609,7 +609,7 @@ input[type=range] { accent-color: var(--gold); }
 .tip-btn { min-height: 0; width: 18px; height: 18px; padding: 0; border-radius: 50%; font-size: 11px; line-height: 1;
   background: none; border: 1px solid var(--line-2); color: var(--muted); vertical-align: 2px; }
 .tip-btn:hover:not(:disabled), .tip-btn.on { background: var(--gold-bg); border-color: var(--gold); color: var(--gold); }
-.tip-body { background: var(--raised); border: 1px solid var(--line); border-left: 3px solid var(--gold); color: var(--text-2); font-size: 13px; }
+.tip-body { background: var(--raised); border: 1px solid color-mix(in srgb, var(--gold) 35%, transparent); color: var(--text-2); font-size: 13px; }
 .tiers-nav input { width: 100%; }
 .se-label { display: block; font-size: 12.5px; color: var(--muted); margin: 12px 0 6px; }
 .se-label .muted { font-weight: normal; }
@@ -629,8 +629,8 @@ input[type=range] { accent-color: var(--gold); }
 .bo { background: #191c22; border-color: #4a5262; }
 
 /* The "why" box: the first thing you read under the item, with one clear button. */
-.qm-why { margin: 8px 0 6px; padding: 9px 11px 10px; border-radius: 8px; background: #20252f; border: 1px solid #343b48; border-left: 4px solid var(--gold); }
-.qm-why.why-hidden { border-left-color: #e0645a; }
+.qm-why { margin: 8px 0 6px; padding: 9px 11px 10px; border-radius: 8px; background: #20252f; border: 1px solid color-mix(in srgb, var(--gold) 40%, transparent); }
+.qm-why.why-hidden { border-color: color-mix(in srgb, #e0645a 50%, transparent); }
 .why-label { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--muted); margin-bottom: 3px; }
 .why-text { font-size: 15px; line-height: 1.3; color: #fff; font-weight: 600; }
 .why-where { font-size: 12.5px; color: var(--text-2); margin-top: 3px; }
@@ -894,7 +894,7 @@ body.overlay.scroll::-webkit-scrollbar-thumb { background: #3a404c; border-radiu
 :root {
   --bg: #0f1216; --side: #0b0d11; --panel: #151920; --raised: #1c212a; --input: #0e1115;
   --line: #222833; --line-2: #313a48; --text: #eef1f5; --text-2: #c4cbd6; --muted: #7e8796;
-  --ease: cubic-bezier(.2, .8, .2, 1); --spring: cubic-bezier(.34, 1.4, .64, 1);
+  --ease: cubic-bezier(.2, .8, .2, 1); --spring: cubic-bezier(.22, 1, .36, 1);
 }
 body.main { background: radial-gradient(1100px 520px at 85% -10%, rgba(220,178,90,.055), transparent 60%), var(--bg); background-attachment: fixed; }
 body.main ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -2378,7 +2378,7 @@ button.qm-rule:hover, .qm-rule.can-open:hover { border-color: var(--gold); backg
 .ap-caret { color: var(--muted); font-size: 11px; }
 .ap-work.open { background: color-mix(in srgb, var(--gold) 6%, transparent); border-radius: 6px; }
 .ap-work.open .ap-work-name { color: var(--gold); }
-.ap-does { grid-column: 1 / -1; margin-top: 6px; padding: 8px 10px; border-left: 2px solid var(--gold); background: var(--panel); border-radius: 0 6px 6px 0;
+.ap-does { grid-column: 1 / -1; margin-top: 6px; padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--gold) 35%, transparent); background: var(--panel); border-radius: 6px;
   font-size: 12.5px; color: var(--text); display: flex; flex-direction: column; gap: 3px; }
 /* "Your pathofexile.com login has run out" with its own Log in again button (any page, 23 Nov). */
 .login-needed { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 16px; color: var(--text); }
@@ -2445,7 +2445,7 @@ button.qm-rule:hover, .qm-rule.can-open:hover { border-color: var(--gold); backg
 .ap-clicked { border: 1px solid var(--gold); background: color-mix(in srgb, var(--gold) 8%, transparent); border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; display: grid; gap: 6px; }
 .ap-clicked .ap-acts { justify-self: start; }
 /* F2: an edit for just this item says so (24 Nov) */
-.qm-rule-scope { width: 100%; font-size: 12.5px; color: var(--text-2); padding: 5px 8px; border-radius: 6px; background: color-mix(in srgb, var(--gold) 10%, transparent); border-left: 3px solid var(--gold); }
+.qm-rule-scope { width: 100%; font-size: 12.5px; color: var(--text-2); padding: 5px 8px; border-radius: 6px; background: color-mix(in srgb, var(--gold) 10%, transparent); border: 1px solid color-mix(in srgb, var(--gold) 35%, transparent); }
 .qm-rule-scope b { color: var(--gold); }
 /* Tiers → Jewels: "Jewels with my mods" (24 Nov) */
 .jm-card { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 8px; }
@@ -2527,3 +2527,31 @@ button.qm-rule:hover, .qm-rule.can-open:hover { border-color: var(--gold); backg
 .home-kstrip kbd { min-width: 34px; text-align: center; color: var(--gold); border-color: color-mix(in srgb, var(--gold) 40%, var(--line)); background: var(--gold-bg); }
 .home-keys-links { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin-top: 4px; }
 .home-keys-links button.link { padding-left: 0; }
+
+/* No boxes inside boxes (28 Nov 2026 clean-up, whole-app check). A card that only holds a grid of cards is a plain
+   section instead; lists inside a card are flat rows, the picked or best one tinted rather than boxed. */
+.card.plain { background: none; border: none; box-shadow: none; padding: 4px 0 0; }
+.at-list .at-row { border: none; border-radius: 8px; background: none; }
+.at-list .at-row:hover { background: var(--raised); }
+.at-list .at-row.sel { background: var(--gold-bg); }
+.att-grid .att-group { background: none; border: none; border-radius: 0; border-top: 1px solid var(--line); padding: 10px 2px 4px; }
+.att-grid .att-group.changed header b { color: var(--gold); }
+.cr-way, .cr-way.best { border: none; border-radius: 8px; box-shadow: none; }
+.cr-way.best { background: var(--gold-bg); }
+.w-session { border: none; }
+.cn-warn { border: none; }
+
+/* Home "Getting started" (new users; gone once done or hidden). */
+.home-start { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin-bottom: 14px; }
+.home-start-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.home-start-head h3 { margin: 0; font-size: 15px; }
+.home-start-head button { margin-left: auto; }
+.home-start ol { list-style: none; margin: 0; padding: 0; }
+.home-start li { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); }
+.home-start li:first-child { border-top: none; }
+.home-start li.done .home-start-t { color: var(--muted); }
+.home-start-n { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 600;
+  background: var(--gold-bg); color: var(--gold); }
+.home-start li.done .home-start-n { background: rgba(98, 207, 128, .14); color: var(--green); }
+.home-start-t { flex: 1; min-width: 0; }
+.home-start kbd { color: var(--gold); }

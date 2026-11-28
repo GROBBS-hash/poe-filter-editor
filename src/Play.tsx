@@ -425,6 +425,8 @@ export function AnointLookup() {
   const [q, setQ] = useState("");
   const [have, setHave] = useState<string[]>([]);
   const [prices, setPrices] = useState<Record<string, number>>({});
+  /** Rows shown before "Show more" (28 Nov 2026: the full table was over 3 screens). A search or ticked oils shows up to 60. */
+  const [rows, setRows] = useState(15);
   useEffect(() => { invoke<Record<string, number>>("price_names", { names: [...ANOINTS.oils.map((o) => `${o} Oil`), "Divine Orb"] }).then(setPrices).catch(() => {}); }, []);
   const cost = (oils: string[]) => {
     const each = oils.map((o) => prices[`${o} Oil`]);
@@ -433,9 +435,11 @@ export function AnointLookup() {
   const words = q.trim().toLowerCase();
   // How many of a recipe's three oils you've ticked (each ticked colour counts for every copy the recipe needs).
   const got = (a: Anoint) => a.oils.filter((o) => have.includes(o)).length;
-  const list = ANOINTS.amulets.filter((a) => (words === "" || a.name.toLowerCase().includes(words) || a.stats.some((s) => s.toLowerCase().includes(words)))
+  const matches = ANOINTS.amulets.filter((a) => (words === "" || a.name.toLowerCase().includes(words) || a.stats.some((s) => s.toLowerCase().includes(words)))
     && (have.length === 0 || got(a) > 0))
-    .sort((a, b) => have.length ? got(b) - got(a) : 0).slice(0, 60);
+    .sort((a, b) => have.length ? got(b) - got(a) : 0);
+  const cap = words || have.length ? 60 : rows;
+  const list = matches.slice(0, cap);
   const toggle = (o: string) => setHave(have.includes(o) ? have.filter((x) => x !== o) : [...have, o]);
   return (
     <div>
@@ -461,6 +465,7 @@ export function AnointLookup() {
           </tr>
         ); })}</tbody></table>
       {list.length === 0 && <p className="pw-small">Nothing matches.</p>}
+      {!words && !have.length && matches.length > list.length && <button className="link pw-btn" onClick={() => setRows(rows + 30)}>Show more ({matches.length - list.length} left)</button>}
     </div>
   );
 }
@@ -805,7 +810,7 @@ export default function PlayTools() {
 
   return (
     <SideList label="Game windows parts" parts={parts} part={part} onPick={pick}>
-      {part === "windows" && <><div className="card">
+      {part === "windows" && <><div className="card plain">
         <h2>What each window does</h2>
         <p className="muted small">Small windows over the game. They read the game's log file and copied item text only (nothing that reads the
           game's memory). Change the keys under Settings → Hotkeys.</p>

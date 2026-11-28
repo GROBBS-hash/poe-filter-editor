@@ -64,6 +64,12 @@ export default function Home({ profile, keys, go, search }: {
         <kbd>Ctrl+F</kbd>
       </button>
 
+      <GettingStarted steps={[
+        { done: profile.rules.length > 0, text: <>Change how an item drops: hover it in game and press <kbd>{keys.key_quick_edit ?? "F2"}</kbd></>, page: "find", button: "Or pick one here" },
+        { done: build != null, text: <>Add your Path of Building build, to see its gems and gear in game</>, page: "build", button: "My build" },
+        { done: (atlas?.list.length ?? 0) > 0, text: <>Pick an atlas tree for the endgame, shown in game with <kbd>{keys.key_atlas ?? "F7"}</kbd></>, page: "atlas", button: "Atlas tree" },
+      ]} go={go} />
+
       <Tonight go={go} />
 
       <div className="home-grid">
@@ -121,5 +127,26 @@ export default function Home({ profile, keys, go, search }: {
         </div>
       </section>
     </div>
+  );
+}
+
+/** "Getting started" for someone new (28 Nov 2026, whole-app check: nothing said where to start after setup). Hides
+ *  itself once every step is done, or for good with Hide. */
+function GettingStarted({ steps, go }: { steps: { done: boolean; text: ReactNode; page: string; button: string }[]; go: (tab: string) => void }) {
+  const [hidden, setHidden] = useState(() => { try { return localStorage.getItem("home.start-hidden") === "1"; } catch { return false; } });
+  const done = steps.filter((x) => x.done).length;
+  if (hidden || done === steps.length) return null;
+  return (
+    <section className="home-start" aria-label="Getting started">
+      <div className="home-start-head"><h3 aria-level={2}>Getting started</h3><span className="muted small">{done} of {steps.length} done</span>
+        <button className="link small" onClick={() => { setHidden(true); try { localStorage.setItem("home.start-hidden", "1"); } catch { /* fine */ } }}>Hide</button></div>
+      <ol>{steps.map((x, i) => (
+        <li key={i} className={x.done ? "done" : ""}>
+          <span className="home-start-n" aria-hidden>{x.done ? "✓" : i + 1}</span>
+          <span className="home-start-t">{x.text}</span>
+          {!x.done && <button onClick={() => go(x.page)}>{x.button}</button>}
+        </li>
+      ))}</ol>
+    </section>
   );
 }

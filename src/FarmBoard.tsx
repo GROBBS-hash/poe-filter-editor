@@ -54,7 +54,7 @@ export default function FarmBoard({ list, div, steadyOnly, now, onFarm }: {
               </span>
               <span className="fb-badge">{s.big_sample && <span className="fb-sample" title="Most of its money comes from rare big drops: you need many runs before your own numbers mean much">🎲 Needs a big sample</span>}</span>
             </button>
-            <button className="primary fb-go" disabled={busy != null || now === s.title} title="Saves its tree and uses it, lists what to buy, and shows your profit after costs"
+            <button className={i === 0 ? "primary fb-go" : "fb-go"} disabled={busy != null || now === s.title} title="Saves its tree and uses it, lists what to buy, and shows your profit after costs"
               onClick={() => { setBusy(s.key); onFarm(s).finally(() => setBusy(null)); }}>{now === s.title ? "Farming now" : busy === s.key ? "Setting up…" : "Farm this"}</button>
             {isOpen && (
               <div className="fb-more">

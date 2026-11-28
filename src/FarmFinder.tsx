@@ -88,7 +88,7 @@ function Maps({ f }: { f: Farm }) {
   );
 }
 
-function Card({ f, best, div, onBuild, onFarm, now }: { f: Farm; best: boolean; div: number; onBuild: () => void; onFarm: () => Promise<void>; now: boolean }) {
+function Card({ f, best, lead, div, onBuild, onFarm, now }: { f: Farm; best: boolean; /** Its Farm this is the gold one (one per screen). */ lead: boolean; div: number; onBuild: () => void; onFarm: () => Promise<void>; now: boolean }) {
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
   return (
@@ -132,7 +132,7 @@ function Card({ f, best, div, onBuild, onFarm, now }: { f: Farm; best: boolean; 
         </div>
       )}
       <footer>
-        <button className="primary" disabled={busy || now} title="Saves its tree and uses it, lists the Threads and maps to get, and shows your profit after costs"
+        <button className={lead ? "primary" : ""} disabled={busy || now} title="Saves its tree and uses it, lists the Threads and maps to get, and shows your profit after costs"
           onClick={() => { setBusy(true); onFarm().finally(() => setBusy(false)); }}>{now ? "Farming now" : busy ? "Setting up…" : "Farm this"}</button>
         <button onClick={onBuild}>Build this tree</button>
         <button onClick={() => setOpen(!open)} aria-expanded={open}>{open ? "Less" : "Why?"}</button>
@@ -210,7 +210,7 @@ export default function FarmFinder({ onBuild, go }: { onBuild: () => void; go?: 
 
   return (<>
     {now && <FarmNow view={now} setView={setNow} go={go} />}
-    <div className="card ff">
+    <div className="card plain ff">
       <h2>What to farm today <Tip>Ranks mechanics, and mixes of them people really run together, by how much their drops sell for each player
         going for them. It can't see drops per map, so treat it as a good starting point: your own maps are the proof. Raw currency, beasts
         and temples are estimates.</Tip></h2>
@@ -236,7 +236,7 @@ export default function FarmFinder({ onBuild, go }: { onBuild: () => void; go?: 
       {r && want.length === 0 && (r.strategies ?? []).length > 0 && <div className="ap-step">By mechanic</div>}
       {r && want.length > 0 && <div className="ap-step">Your pick, and what goes with it</div>}
       {r && <div className="ff-cards">{r.farms.slice(0, 3).map((f, i) => (
-        <Card key={f.title} f={f} best={i === 0} div={r.divine} onBuild={() => build(f)} onFarm={() => farmThis(f)} now={now?.farm.title === f.title} />
+        <Card key={f.title} f={f} best={i === 0} lead={i === 0 && !(want.length === 0 && (r.strategies ?? []).length > 0)} div={r.divine} onBuild={() => build(f)} onFarm={() => farmThis(f)} now={now?.farm.title === f.title} />
       ))}</div>}
       {r && r.own.length > 0 && <>
         <div className="ap-step">Your trees so far <span className="ap-step-note">(loot in ordinary maps; each map counts its time inside plus your usual hideout turnaround, breaks left out)</span></div>

@@ -68,7 +68,7 @@ function readSel(): string[] {
 }
 
 /** Atlas page, top card: pick what you want to farm, see creators' trees that fit (best matches first),
- *  and "Use this tree" saves your own copy under My strategies (the creator's original stays on maxroll). */
+ *  and "Use this tree" saves your own copy under My trees (the creator's original stays on maxroll). */
 export default function AtlasPicks({ store, onImported, onShow }: {
   store: AtlasStore; onImported: (s: AtlasStore, msg: string) => void; onShow: (id: number) => void;
 }) {
@@ -168,7 +168,7 @@ export default function AtlasPicks({ store, onImported, onShow }: {
         {sel.length > 0 && <button className="link small" onClick={() => setSel([])}>Clear</button>}
       </div>
       {list.length === 0 && <div className="muted small ap-none">No creator tree has these yet. Try fewer, or paste a link below.</div>}
-      {list.map((p) => {
+      {list.map((p, i) => {
         const n = fit(p);
         const mine = saved(p.id);
         return (
@@ -181,8 +181,8 @@ export default function AtlasPicks({ store, onImported, onShow }: {
             {ms.length > 1 && <span className={`ap-fit ${n === ms.length ? "" : "part"}`}>{n === ms.length ? (ms.length === 2 ? "✓ Both" : "✓ All") : `${n} of ${ms.length}`}</span>}
             <button className="link small" onClick={() => invoke("open_url", { url: link(p.id) })}>maxroll</button>
             {mine
-              ? <button onClick={() => onShow(mine.id)} title="You already saved a copy">In My strategies</button>
-              : <button className="primary" disabled={busy !== null} onClick={() => use(p)}>{busy === p.id ? "Reading…" : "Use this tree"}</button>}
+              ? <button onClick={() => onShow(mine.id)} title="You already saved a copy">In My trees</button>
+              : <button className={i === 0 ? "primary" : ""} disabled={busy !== null} onClick={() => use(p)}>{busy === p.id ? "Reading…" : "Use this tree"}</button>}
           </div>
         );
       })}
@@ -216,7 +216,7 @@ function readList(key: string): number[] {
 function saveList(key: string, v: unknown) { try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* fine */ } }
 
 /** "Build my own": the optimiser (core atlas_opt.rs) for the picked mechanics. Always / Never on any node it
- *  shows; the tree updates straight away. Save adds it to My strategies like a creator tree. */
+ *  shows; the tree updates straight away. Save adds it to My trees like a creator tree. */
 function BuildOwn({ sel, goals, onClear, onSaved }: { sel: string[]; goals: string[]; onClear: () => void; onSaved: (s: AtlasStore, msg: string) => void }) {
   const [prio, setPrio] = useState<Priority>(() => { try { return (localStorage.getItem("atlas-opt-prio") as Priority) || "balanced"; } catch { return "balanced"; } });
   const [lock, setLock] = useState<number[]>(() => readList("atlas-opt-lock"));
@@ -234,7 +234,7 @@ function BuildOwn({ sel, goals, onClear, onSaved }: { sel: string[]; goals: stri
     for (const [id, n] of Object.entries(tree?.nodes ?? {})) m[Number(id)] = n[3];
     return m;
   }, [tree]);
-  // The row opened in "Doing the most" (shows what the node does), and the tree zooming to it.
+  // The row opened in "Most important points" (shows what the node does), and the tree zooming to it.
   const [openNode, setOpenNode] = useState<number | null>(null);
   const [find, setFind] = useState<{ id: number; n: number } | null>(null);
   // A point clicked on the tree: pinned at the top of the side panel with Always / Never (he asked 24 Nov).
@@ -270,7 +270,7 @@ function BuildOwn({ sel, goals, onClear, onSaved }: { sel: string[]; goals: stri
     setSaving(true);
     try {
       const s = await invoke<AtlasStore>("atlas_save_plan", { ask: ask(prio), name: "" });
-      onSaved(s, `Saved “${label}” (${plan?.points ?? ""} points) to My strategies. It's the one shown in game now.`);
+      onSaved(s, `Saved “${label}” (${plan?.points ?? ""} points) to My trees. It's the one shown in game now.`);
     } catch (e) { setErr(String(e)); }
     setSaving(false);
   };
@@ -354,7 +354,7 @@ function BuildOwn({ sel, goals, onClear, onSaved }: { sel: string[]; goals: stri
         </div>
         {plan && <span className="muted small">{plan.trees_used ? `Checked against about ${plan.trees_used} different tree ideas for these` : "Built from what the points do and what all trees take"}</span>}
         <span className="grow" />
-        <button className="primary" disabled={!plan || saving} onClick={save}>{saving ? "Saving…" : "Save as my strategy"}</button>
+        <button className="primary" disabled={!plan || saving} onClick={save}>{saving ? "Saving…" : "Save to My trees"}</button>
       </div>
       {(lock.length > 0 || block.length > 0) && (
         <div className="ap-pins">
@@ -392,12 +392,12 @@ function BuildOwn({ sel, goals, onClear, onSaved }: { sel: string[]; goals: stri
                 </span>
               </div>
             )}
-            <b>Doing the most</b>
-            <div className="muted small">+% = what the plan would lose without it (an estimate). Always = keep it in. Never = build around it.</div>
+            <b>Most important points</b>
+            <div className="muted small">The % is roughly how much worse the plan gets without that point. Click a point, then <b>Always</b> to keep it or <b>Never</b> to plan without it.</div>
             {plan.top.map((w) => row(w))}
             {plan.weak.length > 0 && <>
-              <b className="ap-weak-h">Doing little</b>
-              <div className="muted small">Only taken because a path runs through them.</div>
+              <b className="ap-weak-h">Points just for the path</b>
+              <div className="muted small">They do little on their own: the plan takes them to reach better points.</div>
               {plan.weak.map((w) => row(w, true))}
             </>}
           </div>
