@@ -133,7 +133,7 @@ export default function Find({ onChange, view = "find", pick, ask, openSearch }:
       </div>
 
       <div className="card">
-        <h2>Describe a change in your own words</h2>
+        <h2>Describe a change</h2>
         <div className="muted small" style={{ marginBottom: 6 }}>Type what you want and the editor makes the change for you (it asks before doing anything).</div>
         <div className="row">
           <input className="text grow" placeholder="e.g. show gold over 500 in a purple highlight · hide normal 2h swords · icon only for wisdom scrolls"

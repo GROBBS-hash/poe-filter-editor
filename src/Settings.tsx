@@ -85,12 +85,16 @@ export default function SettingsPage() {
   const [dirty, setDirty] = useState(false);
   const [msg, setMsg] = useState("");
   useEffect(() => { invoke<Settings>("get_settings").then(setS).catch((e) => setMsg(String(e))); }, []);
+  // Saves by itself a moment after a change, like every other page (28 Nov 2026: Settings was the only page with a Save button).
+  useEffect(() => {
+    if (!s || !dirty) return;
+    const t = window.setTimeout(() => {
+      invoke("save_settings", { settings: s }).then(() => { setDirty(false); setMsg("Saved."); }).catch((e) => setMsg(String(e)));
+    }, 700);
+    return () => window.clearTimeout(t);
+  }, [s, dirty]);
   if (!s) return msg ? <div className="card">{msg}</div> : <PageLoading />;
   const set = (patch: Partial<Settings>) => { setS({ ...s, ...patch }); setDirty(true); setMsg(""); };
-  const save = async () => {
-    try { await invoke("save_settings", { settings: s }); setDirty(false); setMsg("Saved. New keys work straight away."); }
-    catch (e) { setMsg(String(e)); }
-  };
 
   return (
     <div className="set-layout">
@@ -164,7 +168,7 @@ export default function SettingsPage() {
           <input className="text" value={s.thanks_message ?? "thanks, good luck!"} onChange={(e) => set({ thanks_message: e.target.value })} />
         </div>
         <h3>Chat hotkeys</h3>
-        <p className="muted small">One key, one command (for example F7 → /hideout). They only type while the game is in front.</p>
+        <p className="muted small">One key, one command (for example Alt+H → /hideout). They only type while the game is in front.</p>
         <div className="chat-keys">
           {(s.chat_keys ?? []).map((c, i) => {
             const edit = (p: Partial<{ key: string; command: string }>) =>
@@ -193,7 +197,7 @@ export default function SettingsPage() {
       </div></>}
 
       {sec === "ai" && <div className="card">
-        <h2>AI for the “Just say what you want” box (optional)</h2>
+        <h2>AI for the “Describe a change” box (optional)</h2>
         <p className="muted small">The box works without this for common phrases. With your own Claude API key it understands looser wording.
           Each request costs a fraction of a cent on your Anthropic account. The key is kept only on this PC.</p>
         <input className="text" type="password" placeholder="sk-ant-…" value={s.claude_api_key}
@@ -201,10 +205,9 @@ export default function SettingsPage() {
       </div>}
 
       {sec !== "looks" && sec !== "phone" && <div className="save-bar">
-        {msg && <span className="note">{msg}</span>}
-        <button className="primary" disabled={!dirty} onClick={save}>{dirty ? "Save settings" : "Saved"}</button>
+        <span className={dirty ? "muted small" : "note"} role="status">{dirty ? "Saving…" : msg === "Saved." && sec === "keys" ? "Saved. New keys work straight away." : msg || "Changes save as you make them."}</span>
       </div>}
-      {(sec === "looks" || sec === "phone") && <p className="muted small">{sec === "phone" ? "Phone settings save as you change them." : "Looks change straight away; nothing to save."}</p>}
+      {(sec === "looks" || sec === "phone") && <p className="muted small">{sec === "phone" ? "Changes save as you make them." : "Looks change straight away."}</p>}
       </ErrorBoundary>
       </div>
     </div>
