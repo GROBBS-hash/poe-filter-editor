@@ -170,7 +170,8 @@ pub fn from_build(groups: &[crate::pob::Group], index: &crate::trade::StatIndex,
     if need > 0 { stats.push(serde_json::json!({ "type": "count", "value": { "min": need }, "filters": sup_ids })); }
     Some(BuildWarrant {
         text: warrant_text("A Mercenary like this", &gems),
-        query: serde_json::json!({ "query": { "status": { "option": "available" }, "type": "Mercenary Warrant", "stats": stats }, "sort": { "price": "asc" } }),
+        // Instant buyout only, like Buy on gear (28 Nov: he wants no whispering for a warrant).
+        query: serde_json::json!({ "query": { "status": { "option": "securable" }, "type": "Mercenary Warrant", "stats": stats }, "sort": { "price": "asc" } }),
         skill: main.name.clone(),
         supports: sups.iter().map(|s| plain(&s.name)).collect(),
     })
@@ -283,6 +284,7 @@ mod tests {
             { "id": "mercenary.support_d2", "text": "More Duration (Tier 2)", "type": "mercenary" } ] } ] }));
         let w = from_build(&groups, &idx, 9).unwrap();
         assert_eq!((w.skill.as_str(), w.supports.clone()), ("Frost Blades", vec!["Hypothermia".to_string(), "Elemental Damage with Attacks".to_string()]));
+        assert_eq!(w.query["query"]["status"]["option"], "securable", "instant buyout only");
         let stats = &w.query["query"]["stats"];
         assert_eq!(stats[0]["filters"][0]["id"], "mercenary.skill_fb");
         assert_eq!(stats[1]["value"]["min"], 2);
