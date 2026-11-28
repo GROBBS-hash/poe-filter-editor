@@ -1236,9 +1236,14 @@ pub fn buy_query(text: &str, index: &StatIndex) -> Option<(Value, usize)> {
     let rolled: Vec<String> = all_mods.iter().filter(|m| m.kind == "explicit" || m.kind == "fractured").map(|m| m.text.clone()).collect();
     let totals = if unique { Default::default() } else { crate::compare::totals(&rolled) };
     let in_totals = |line: &str| !unique && { let t = crate::compare::totals(&[line.to_string()]); TOTALS.iter().any(|k| t.get(k).copied().unwrap_or(0.0) != 0.0) };
+    // Fire, cold and lightning as one "total elemental resistance" (he: "doesnt have to specify which").
+    let res = ["Fire res", "Cold res", "Lightning res"];
     for k in TOTALS {
         let v = totals.get(k).copied().unwrap_or(0.0);
-        if v >= 1.0 { if let Some(id) = crate::upgrade::pseudo(k) { stats.push(json!({ "id": id })); } }
+        if v < 1.0 { continue; }
+        if res.contains(&k) {
+            if !stats.iter().any(|x| x["id"] == "pseudo.pseudo_total_elemental_resistance") { stats.push(json!({ "id": "pseudo.pseudo_total_elemental_resistance" })); }
+        } else if let Some(id) = crate::upgrade::pseudo(k) { stats.push(json!({ "id": id })); }
     }
     for m in all_mods {
         if (m.kind == "explicit" || m.kind == "fractured") && in_totals(&m.text) { continue; }

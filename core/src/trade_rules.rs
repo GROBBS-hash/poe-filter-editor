@@ -608,7 +608,7 @@ mod buy_tests {
         let (q, n) = buy_query(gloves, &idx()).unwrap();
         let ids: Vec<&str> = q["query"]["stats"][0]["filters"].as_array().unwrap().iter().map(|v| v["id"].as_str().unwrap()).collect();
         // Life and resistances as totals (28 Nov 2026), no numbers anywhere: he types his own on the site.
-        assert_eq!(ids, ["pseudo.pseudo_total_life", "pseudo.pseudo_total_fire_resistance", "implicit.unnerve", "explicit.ar_local", "crafted.dex"]);
+        assert_eq!(ids, ["pseudo.pseudo_total_life", "pseudo.pseudo_total_elemental_resistance", "implicit.unnerve", "explicit.ar_local", "crafted.dex"]);
         assert_eq!(n, 4, "the crafted one is shown but not required");
         assert_eq!(q["query"]["stats"][0]["filters"][4]["disabled"], true);
         let f = q["query"]["stats"][0]["filters"].as_array().unwrap();
