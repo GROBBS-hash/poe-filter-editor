@@ -21,22 +21,40 @@ export function PobLine({ d, label = "PoB" }: { d: Record<string, number>; label
 type Row = { slot: string; now: string; change: Record<string, number> | null; error: string };
 type Check = { build: string; stage: string; rows: Row[]; note: string };
 
-/** Ctrl+D: what Path of Building says this item would do to the build shown on My build (28 Nov 2026). Nothing
- *  shows without a build, for items that don't go in a slot, or when PoB isn't installed and nothing was asked. */
+const ALWAYS = "pob.ctrl-d.always";
+/** Item classes that go in a gear slot (core compare.rs `slots_for`): only those get the button. */
+const GEAR = new Set(["Helmets", "Body Armours", "Gloves", "Boots", "Belts", "Amulets", "Rings", "Shields", "Quivers", "Wands", "Sceptres", "Staves", "Warstaves",
+  "Daggers", "Rune Daggers", "Claws", "Bows", "One Hand Swords", "Thrusting One Hand Swords", "Two Hand Swords", "One Hand Axes", "Two Hand Axes", "One Hand Maces", "Two Hand Maces"]);
+const always = () => { try { return localStorage.getItem(ALWAYS) === "1"; } catch { return false; } };
+
+/** Ctrl+D: what Path of Building says this item would do to the build shown on My build (28 Nov 2026). An option
+ *  (he: "This should be a OPTION not mandatory on the price checker"): a button, or every time with "Always" ticked.
+ *  Nothing shows without a build, for items that don't go in a slot, or when PoB isn't installed and nothing was asked. */
 export function PobCheck({ raw, itemClass }: { raw: string; itemClass: string }) {
   const [c, setC] = useState<Check | null>(null);
-  const [busy, setBusy] = useState(true);
-  useEffect(() => {
-    let on = true;
-    setC(null); setBusy(true);
-    invoke<Check>("pob_check", { text: raw, itemClass }).then((x) => on && setC(x)).catch(() => on && setC(null)).finally(() => on && setBusy(false));
-    return () => { on = false; };
-  }, [raw, itemClass]);
+  const [busy, setBusy] = useState(false);
+  const [auto, setAuto] = useState(always);
+  const [asked, setAsked] = useState(false);
+  const ask = () => {
+    setC(null); setBusy(true); setAsked(true);
+    invoke<Check>("pob_check", { text: raw, itemClass }).then(setC).catch(() => setC(null)).finally(() => setBusy(false));
+  };
+  const gear = GEAR.has(itemClass);
+  useEffect(() => { setC(null); setAsked(false); if (gear && always()) ask(); }, [raw, itemClass]); // eslint-disable-line react-hooks/exhaustive-deps
+  const setAlways = (on: boolean) => { setAuto(on); try { localStorage.setItem(ALWAYS, on ? "1" : "0"); } catch { /* not kept */ } if (on && !asked) ask(); };
+  if (!gear) return null;
+  if (!asked) return (
+    <div className="pob-ask row small">
+      <button className="link small" onClick={ask} title="Path of Building works out what this item does to the build shown on My build (life, ES, damage, resistances)">Ask Path of Building</button>
+      <label className="check" style={{ margin: 0 }}><input type="checkbox" checked={auto} onChange={(e) => setAlways(e.target.checked)} /><span className="muted">Always</span></label>
+    </div>
+  );
   if (busy) return <div className="pob-check muted small">Asking Path of Building what it does to your build…</div>;
-  if (!c || (!c.rows.length && !c.note)) return null;
+  if (!c || (!c.rows.length && !c.note)) return <div className="muted small pob-ask">Path of Building has nothing to say here (no build on My build, or not a gear piece).</div>;
   return (
     <div className="pob-check">
-      <div className="pob-check-head small"><b>Path of Building</b> <span className="muted">· {c.build}, “{c.stage}”</span></div>
+      <div className="pob-check-head small row" style={{ margin: 0 }}><b>Path of Building</b> <span className="muted">· {c.build}, “{c.stage}”</span>
+        <label className="check" style={{ margin: "0 0 0 auto" }}><input type="checkbox" checked={auto} onChange={(e) => setAlways(e.target.checked)} /><span className="muted">Always</span></label></div>
       {c.note && <div className="muted small">No numbers: {c.note}</div>}
       {c.rows.map((r) => (
         <div key={r.slot} className="pob-check-row">
