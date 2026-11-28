@@ -1909,7 +1909,7 @@ when the game window isn't found. Check in game: the window's spot, and that it 
       "Best strategies" ranks runs.
 
 ## Left to do (agreed order)
-- **Next for "Better than mine?":** weighted-sum upgrade search done 27 Nov (My build > Upgrades). Still: real Path of Building numbers (needs PoB installed to run it in a separate process; the web PoB at pob.cool works but can't be driven from the app; report 05 idea 3). Large, try-out first. Weapons in Upgrades done 28 Nov (attack weapons by DPS; spell weapons not yet).
+- **Next for "Better than mine?":** weighted-sum upgrade search done 27 Nov (My build > Upgrades). Still: real Path of Building numbers (28 Nov try-out, waiting for his OK: PoB Community is installed at D:POBPath of Building Community (2.68.1 beta). Plan: a tiny host that loads PoB's own lua51.dll (so its C modules work), runs PoB's HeadlessWrapper.lua + _SimpleGraphic.def.lua from its GitHub repo with the working folder set to the PoB install, loads the build XML (decoded from the PoB code) and reads build.calcsTab.mainOutput (Life, TotalDPS...). Built but not run: running it was held back for his approval. Original note: the web PoB at pob.cool works but can't be driven from the app; report 05 idea 3). Large, try-out first. Weapons in Upgrades done 28 Nov (attack weapons by DPS; spell weapons not yet).
 0. **24 Nov cloud work (see Done): merged and released in 0.2.65.** Phone alerts + stats
    page (8a/8b), chat commands (7d), atlas earnings per tree (5), race splits (instead of a live rank: GGG's ladder is
    OAuth-only), PoE 2 campaign route, Awakener's Orb crafting. Still not built: **PoE 2 crafting** (needs its own data
