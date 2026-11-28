@@ -136,8 +136,8 @@ export default function Batch({ on, onChange }: { on: boolean; onChange: () => v
                   </span>
                   {e.choice === "highlight" && <span className="batch-colours">{COLOURS.map((c) => (
                     <button key={c.name} className={e.colour === c.name ? "dot on" : "dot"} style={{ background: c.hex }} title={c.name}
-                      onClick={() => update(i, { colour: c.name })} />
-                  ))}</span>}
+                      aria-label={c.name} aria-pressed={e.colour === c.name} onClick={() => update(i, { colour: c.name })} />
+                  ))}{e.colour && <span className="se-chip-name">{e.colour}</span>}</span>}
                   <button className="link small" title="Take it off the list" onClick={() => remove(e)}>✕</button>
                 </span>
                 {e.choice === "look" && (

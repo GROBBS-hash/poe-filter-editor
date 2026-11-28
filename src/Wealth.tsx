@@ -617,8 +617,8 @@ function CardSets({ list, divine }: { list: CardSet[]; divine: number | null }) 
 /** "Tell me when Mageblood drops under 150 divines": checked against poe.ninja every hour; the alert pops up over the game. */
 function PriceAlerts({ divine }: { divine: number | null }) {
   const [list, setList] = useState<Alert[] | null>(null);
-  useEffect(() => { invoke<Alert[]>("alerts_get").then(setList).catch(() => setList([])); }, []);
-  if (!list) return null;
+  useEffect(() => { invoke<Alert[]>("alerts_get").then((x) => setList(x ?? [])).catch(() => setList([])); }, []);
+  if (!list) return <div className="card"><h2>Price alerts</h2><p className="muted small">Loading…</p></div>;
   const save = (l: Alert[]) => { setList(l); invoke<Alert[]>("alerts_save", { list: l }).then((x) => { if (x.length === l.length) setList(x); }).catch(() => {}); };
   const edit = (i: number, p: Partial<Alert>) => save(list.map((a, j) => j === i ? { ...a, ...p } : a));
   return (

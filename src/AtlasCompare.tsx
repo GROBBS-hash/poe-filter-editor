@@ -88,8 +88,8 @@ export default function AtlasCompare({ store, shown, pick }: { store: AtlasStore
       </div>
       {refKey(A.ref) === refKey(B.ref) ? <p className="muted small">Pick two different trees.</p> : <>
         <div className="acmp-sum">
-          <span><b className="ff-up">+{onlyB.length}</b> points only in B</span>
-          <span><b className="ff-dn">−{onlyA.length}</b> only in A</span>
+          {onlyB.length > 0 && <span><b className="ff-up">+{onlyB.length}</b> points only in B</span>}
+          {onlyA.length > 0 && <span><b className="ff-dn">−{onlyA.length}</b> only in A</span>}
           <span><b>{Math.max(0, same - 1)}</b> in both</span>
         </div>
         <div className="acmp-two">

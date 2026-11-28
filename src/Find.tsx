@@ -56,8 +56,9 @@ function Chips({ value, onPick }: { value: string; onPick: (c: string) => void }
   return (
     <span className="se-chips">
       {CHIPS.map((c) => (
-        <button key={c} title={c} className={value === c ? "se-chip on" : "se-chip"} style={{ background: GAME_COLOURS[c] }} onClick={() => onPick(c)} />
+        <button key={c} title={c} aria-label={c} aria-pressed={value === c} className={value === c ? "se-chip on" : "se-chip"} style={{ background: GAME_COLOURS[c] }} onClick={() => onPick(c)} />
       ))}
+      <span className="se-chip-name">{value}</span>
     </span>
   );
 }

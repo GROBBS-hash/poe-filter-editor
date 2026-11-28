@@ -80,7 +80,7 @@ export default function Profiles({ ov, active, onChange, onNew }: { ov: Overview
               </span>
               <span className="row">
                 <BaseChooser p={p} dir={p.game === "Poe1" ? ov.poe1_dir : ov.poe2_dir} onChange={onChange} onMsg={setMsg} />
-                <button className="link" onClick={() => del(p.id)}>Delete</button>
+                <button className="link profile-del" title="Delete this filter profile (asks first; the filter file stays in your game folder)" onClick={() => del(p.id)}>Delete</button>
               </span>
             </li>
           ))}
