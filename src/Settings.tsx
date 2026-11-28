@@ -1,4 +1,5 @@
 import { Tip } from "./Help";
+import ErrorBoundary from "./ErrorBoundary";
 import { PageLoading } from "./Loading";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -101,6 +102,7 @@ export default function SettingsPage() {
         ))}
       </nav>
       <div className="set-body">
+      <ErrorBoundary key={sec} where={`Settings, “${SECTIONS.find(([k]) => k === sec)?.[1] ?? sec}”`} onError={() => { try { localStorage.removeItem(SEC_KEY); } catch { /* fine */ } }}>
       {sec === "tracker" && <TrackerSettings />}
       {sec === "phone" && <PhoneSettings />}
       {sec === "looks" && <><MainLook /><div className="card"><PriceLook /></div></>}
@@ -202,6 +204,7 @@ export default function SettingsPage() {
         <button className="primary" disabled={!dirty} onClick={save}>{dirty ? "Save settings" : "Saved"}</button>
       </div>}
       {(sec === "looks" || sec === "phone") && <p className="muted small">{sec === "phone" ? "Phone settings save as you change them." : "Looks change straight away; nothing to save."}</p>}
+      </ErrorBoundary>
       </div>
     </div>
   );

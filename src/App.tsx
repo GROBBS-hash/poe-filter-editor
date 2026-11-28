@@ -397,7 +397,7 @@ export default function App() {
         <TroubleBar />
         <LoginBar />
         <RebuiltBar />
-        <ErrorBoundary key={tab + undoN}>
+        <ErrorBoundary key={tab + undoN} where={ALL.find((i) => i.id === tab)?.name}>
         <div key={tab} className="page-in">
         <div className="content-head">
           <h1><span className="head-icon" style={{ "--c": tabColour(tab) } as CSSProperties}><Icon d={ICONS[tab]} /></span>{current?.name}</h1>

@@ -19,7 +19,7 @@ export default function PhoneSettings() {
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    const load = () => invoke<PhoneView>("phone_get").then((x) => { setV(x); setP((old) => old ?? x.prefs); }).catch((e) => setMsg(friendly(e)));
+    const load = () => invoke<PhoneView>("phone_get").then((x) => { if (!x) return; setV(x); setP((old) => old ?? x.prefs); }).catch((e) => setMsg(friendly(e)));
     load();
     const un = listen("phone-sales", load);
     return () => { un.then((f) => f()); };

@@ -2555,3 +2555,8 @@ button.qm-rule:hover, .qm-rule.can-open:hover { border-color: var(--gold); backg
 .home-start li.done .home-start-n { background: rgba(98, 207, 128, .14); color: var(--green); }
 .home-start-t { flex: 1; min-width: 0; }
 .home-start kbd { color: var(--gold); }
+
+/* Error note (ErrorBoundary): plain words first, details folded away. */
+.err-card p { margin: 4px 0 12px; color: var(--text-2); }
+.err-more { margin-top: 10px; }
+.err-more .err-box { margin-top: 6px; }

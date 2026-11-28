@@ -1,4 +1,5 @@
 import { ReactNode, useState } from "react";
+import ErrorBoundary from "./ErrorBoundary";
 
 /** One part of a long page: shown on its own when picked in the side list. */
 export type Part = { key: string; name: string; icon: string; badge?: ReactNode; hide?: boolean };
@@ -24,9 +25,11 @@ export function useSidePart(page: string, parts: Part[], first?: string) {
   return [ok(part) ? part : parts.find((p) => !p.hide)?.key ?? "", pick] as const;
 }
 
-export default function SideList({ label, parts, part, onPick, children }: {
-  label: string; parts: Part[]; part: string; onPick: (k: string) => void; children: ReactNode;
+export default function SideList({ page, label, parts, part, onPick, children }: {
+  /** The same name as useSidePart's: a part that crashes is forgotten, so the page doesn't reopen into it. */
+  page: string; label: string; parts: Part[]; part: string; onPick: (k: string) => void; children: ReactNode;
 }) {
+  const name = parts.find((p) => p.key === part)?.name;
   return (
     <div className="set-layout side-layout">
       <nav className="set-nav" aria-label={label}>
@@ -38,7 +41,11 @@ export default function SideList({ label, parts, part, onPick, children }: {
           </button>
         ))}
       </nav>
-      <div className="set-body">{children}</div>
+      <div className="set-body">
+        <ErrorBoundary key={part} where={name ? `“${name}”` : undefined} onError={() => { try { localStorage.removeItem(`side.${page}`); } catch { /* fine */ } }}>
+          {children}
+        </ErrorBoundary>
+      </div>
     </div>
   );
 }

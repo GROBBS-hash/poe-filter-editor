@@ -849,7 +849,7 @@ export default function PlayTools() {
   const parts = PLAY_PARTS.map((x) => x.key === "maps" ? { ...x, badge: runs.length || undefined } : x);
 
   return (
-    <SideList label="Game windows parts" parts={parts} part={part} onPick={pick}>
+    <SideList page="play" label="Game windows parts" parts={parts} part={part} onPick={pick}>
       {part === "windows" && <><div className="card plain">
         <h2>What each window does</h2>
         <p className="muted small">Small windows over the game. They read the game's log file and copied item text only (nothing that reads the

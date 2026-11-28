@@ -386,7 +386,7 @@ export default function Wealth() {
         </div>
       )}
 
-      {connected && <SideList label="Stash worth parts" part={part} onPick={pick}
+      {connected && <SideList page="wealth" label="Stash worth parts" part={part} onPick={pick}
         parts={WEALTH_PARTS.map((x) => x.key === "sell" ? { ...x, badge: v.missed.length || undefined } : x)}>
       {part === "worth" && (
         <div className="card">

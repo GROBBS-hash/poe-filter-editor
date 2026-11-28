@@ -122,7 +122,7 @@ const ICON = {
 /** Today / Build a tree / My trees / Compare, one at a time (28 Nov 2026: the page was ~11 screens). */
 function AtlasParts({ parts, first, children }: { parts: Part[]; first: string; children: (part: string, pick: (k: string) => void) => ReactNode }) {
   const [part, pick] = useSidePart("atlas", parts, first);
-  return <SideList label="Atlas parts" parts={parts} part={part} onPick={pick}>{children(part, pick)}</SideList>;
+  return <SideList page="atlas" label="Atlas parts" parts={parts} part={part} onPick={pick}>{children(part, pick)}</SideList>;
 }
 
 type TreeResult = { id: number; maps: number; loot_per_map: number | null; loot_per_hour: number | null; sessions: number; session_hours: number; session_per_hour: number | null };
