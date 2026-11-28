@@ -101,3 +101,4 @@
 .fb-receipt tr.jack td:nth-child(2) { color: #b58cff; }
 .fb-receipt tr.tot td { border-bottom: none; border-top: 1px solid var(--line-2); font-weight: 600; }
 @media (max-width: 1100px) { .fb-main { grid-template-columns: 22px 40px 20px minmax(140px, 1fr) minmax(150px, 1.4fr); } .fb-cost, .fb-badge { display: none; } }
+.ff-foot { gap: 18px; margin: 6px 0 0; }

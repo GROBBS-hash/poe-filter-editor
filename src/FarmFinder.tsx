@@ -150,6 +150,41 @@ function Seg<T>({ opts, now, set }: { opts: [string, T][]; now: T; set: (v: T) =
   return <span className="ap-seg">{opts.map(([l, v]) => <button key={l} className={v === now ? "on" : ""} onClick={() => set(v)}>{l}</button>)}</span>;
 }
 
+/** "Copy for Claude" (the farm finder's AI part, planned 24 Nov): everything the finder knows, as plain text to paste
+ *  into a chat with Claude and ask what to run. Numbers only, no account details. */
+function forClaude(r: Finder, ask: Ask): string {
+  const d = r.divine;
+  const m = (c: number) => money(c, d);
+  const lines: string[] = [
+    "I play Path of Exile 1 (3.30). My editor's farm finder compared poe.ninja prices, players' atlas trees and creator strategies.",
+    `Data: prices ${day(r.prices_from)}, ${r.trees.toLocaleString()} players' trees from ${day(r.trees_from)}. 1 divine = ${Math.round(d)} chaos.`,
+    `My filters: ${ask.count === "steady" ? "regular drops only" : "all drops"}${ask.max_cost == null ? "" : ask.max_cost === 0 ? ", no Threads" : `, Threads up to ${ask.max_cost}c`}${ask.want.length ? `, I want to run: ${ask.want.join(", ")}` : ""}.`,
+    "",
+  ];
+  const strats = r.strategies ?? [];
+  if (strats.length && !ask.want.length) {
+    lines.push("## Creator strategies at today's prices (div per hour by their own pace, after costs)");
+    for (const x of strats.slice(0, 8)) {
+      lines.push(`- ${x.title}: about ${x.div_hour.toFixed(1)} div/hour (${x.runs_hour.toFixed(0)} runs/hour${x.runs_guess ? ", pace guessed" : ""}), costs ${m(x.cost)} per ${x.unit || "run"}${x.missing.length ? `; not priced: ${x.missing.join(", ")}` : ""}`);
+    }
+    lines.push("");
+  }
+  lines.push("## Best mechanics and mixes (score out of 100: drops sold per player going for it)");
+  for (const f of r.farms.slice(0, 8)) {
+    lines.push(`- ${f.title}: ${Math.round(f.score)}/100, ${f.verdict}${f.estimate ? " (partly estimated)" : ""}; Threads ${f.cost > 0 ? m(f.cost) : "none"}${f.maps[0] ? `; maps: ${f.maps.slice(0, 3).map((x) => short(x.map)).join(", ")}` : ""}`);
+    if (f.drops.length) lines.push(`  top drops: ${f.drops.slice(0, 4).map((x) => `${x.name} ${m(x.chaos)}`).join(", ")}`);
+    for (const w of f.why.slice(0, 2)) lines.push(`  why: ${w.text}`);
+    for (const w of f.warn.slice(0, 2)) lines.push(`  careful: ${w.text}`);
+    if (f.own) lines.push(`  my own maps with it: ${f.own.div_hour.toFixed(1)} div/hour, ${m(f.own.chaos_map)} a map over ${f.own.maps} maps${f.own.few ? " (few maps)" : ""}`);
+  }
+  if (r.own.length) {
+    lines.push("", "## My own atlas trees so far (from my map tracker)");
+    for (const x of r.own.slice(0, 8)) lines.push(`- ${x.name}${x.title ? ` (${x.title})` : ""}: ${x.own.div_hour.toFixed(1)} div/hour, ${m(x.own.chaos_map)} a map, ${x.own.maps} maps${x.own.few ? " (few maps)" : ""}`);
+  }
+  lines.push("", "Question: which should I farm today, and why? Say what you'd check first in my own maps, and any risks (prices dropping, crowded mechanics).");
+  return lines.join("\n");
+}
+
 /** Atlas page, top: what to farm today. Cross-checks prices and sales, players' trees, creators' trees and maps (core farm.rs). */
 export default function FarmFinder({ onBuild, go }: { onBuild: () => void; go?: (tab: string) => void }) {
   const [now, setNow] = useFarmNow();
@@ -157,6 +192,8 @@ export default function FarmFinder({ onBuild, go }: { onBuild: () => void; go?: 
   const [r, setR] = useState<Finder | null>(null);
   const [err, setErr] = useState("");
   const [table, setTable] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const copyForClaude = () => { if (!r) return; navigator.clipboard.writeText(forClaude(r, ask)).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 2500); }).catch(() => setErr("Couldn't copy")); };
   useEffect(() => {
     let on = true;
     const load = () => invoke<Finder>("farm_find", { ask: ask.want.length ? { ...ask, size: 0 } : ask }).then((x) => { if (on) { setR(x); setErr(""); } }).catch((e) => { if (on) setErr(friendly(e)); });
@@ -257,7 +294,10 @@ export default function FarmFinder({ onBuild, go }: { onBuild: () => void; go?: 
           </button>
         ))}</div>
       </>}
-      {r && <button className="link small" onClick={() => setTable(!table)}>{table ? "Hide" : "Show"} every mechanic on its own</button>}
+      {r && <div className="row ff-foot">
+        <button className="link small" onClick={() => setTable(!table)}>{table ? "Hide" : "Show"} every mechanic on its own</button>
+        <button className="link small" onClick={copyForClaude} title="Copies these results (and your own maps' numbers) as text to paste into a chat with Claude, with a question to ask">{copied ? "Copied: paste it into Claude" : "Copy for Claude"}</button>
+      </div>}
       {r && table && (
         <table className="ff-table">
           <caption className="muted small">Divines of drops sold for each 1% of players going for it. ~ is an estimate.</caption>
