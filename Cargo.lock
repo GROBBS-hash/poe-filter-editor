@@ -2801,6 +2801,7 @@ dependencies = [
  "dirs 6.0.0",
  "enigo",
  "filter-core",
+ "libloading",
  "serde",
  "serde_json",
  "tauri",

@@ -15,8 +15,25 @@ const loadOff = (): Record<string, string[]> => { try { return JSON.parse(localS
 const saveOff = (plans: Plan[]) => {
   try { localStorage.setItem(OFF_KEY, JSON.stringify(Object.fromEntries(plans.map((p) => [p.slot, p.wants.filter((w) => !w.on).map((w) => w.stat)])))); } catch { /* not kept */ }
 };
-type Found = { name: string; base: string; price: string; score: number; better_by: number; lines: string[]; icon: string };
-type Upgrades = { total: number; url: string; items: Found[]; logged_in: boolean };
+type Found = { name: string; base: string; price: string; score: number; better_by: number; lines: string[]; icon: string;
+  /** Path of Building's change to the build's stage (its numbers minus the stage's), when it could tell. */
+  pob?: Record<string, number> | null };
+type Upgrades = { total: number; url: string; items: Found[]; logged_in: boolean; pob_note?: string };
+
+/** PoB's numbers in plain words, most important first; resistances in %. */
+const POB_SHOW: [string, string, boolean][] = [["CombinedDPS", "DPS", false], ["Life", "Life", false], ["EnergyShield", "ES", false], ["TotalEHP", "Effective HP", false],
+  ["FireResist", "Fire res", true], ["ColdResist", "Cold res", true], ["LightningResist", "Lightning res", true], ["ChaosResist", "Chaos res", true], ["Mana", "Mana", false],
+  ["Armour", "Armour", false], ["Evasion", "Evasion", false], ["Str", "Str", false], ["Dex", "Dex", false], ["Int", "Int", false]];
+function PobLine({ d }: { d: Record<string, number> }) {
+  const parts = POB_SHOW.map(([k, label, pct]) => ({ k, label, pct, v: Math.round(d[k] ?? 0) })).filter((x) => x.v !== 0).slice(0, 6);
+  return (
+    <div className="uf-pob small" title="Path of Building's own numbers for this item on the build's stage, against what the stage wears now">
+      <span className="uf-pob-tag">PoB</span>
+      {parts.length === 0 ? <span className="muted">no change to life, damage or resistances</span>
+        : parts.map((x) => <span key={x.k} className={x.v > 0 ? "up" : "down"}>{x.label} {x.v > 0 ? "+" : "−"}{Math.abs(x.v).toLocaleString()}{x.pct ? "%" : ""}</span>)}
+    </div>
+  );
+}
 
 type From = "build" | "worn";
 const FROM_KEY = "upgrades.from";
@@ -119,12 +136,14 @@ export default function UpgradeFinder({ stage }: { stage: number }) {
                 : <div className="uf-results">
                     <div className="muted small">{r.total.toLocaleString()} beat yours{r.items.length ? ". Cheapest:" : "."}{" "}
                       <button className="link small" onClick={() => invoke("open_url", { url: r.url })}>Open on the trade site</button></div>
+                    {r.pob_note && <div className="muted small">No Path of Building numbers: {r.pob_note}</div>}
                     {r.items.map((it, i) => (
                       <div key={i} className="uf-item">
                         {it.icon && <img src={it.icon} alt="" />}
                         <div className="uf-item-txt">
                           <div><b>{it.name}</b> <span className="muted small">{it.base !== it.name ? it.base : ""}</span></div>
                           <div className="small">{it.lines.slice(0, 6).join(" · ")}</div>
+                          {it.pob && <PobLine d={it.pob} />}
                         </div>
                         <div className="uf-item-side">
                           <div className="uf-price">{it.price}</div>

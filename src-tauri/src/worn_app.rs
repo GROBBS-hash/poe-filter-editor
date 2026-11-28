@@ -103,10 +103,14 @@ pub fn worn_set(app: AppHandle, text: String, class: String, slot: String) -> Op
 
 /// A listing the upgrade search found, scored like your own gear.
 #[derive(Serialize)]
-pub struct Found { name: String, base: String, price: String, score: f64, better_by: f64, lines: Vec<String>, icon: String }
+pub struct Found { name: String, base: String, price: String, score: f64, better_by: f64, lines: Vec<String>, icon: String,
+    /// What Path of Building says it changes on the build's stage (its numbers minus the stage's), when it could tell.
+    pob: Option<std::collections::HashMap<String, f64>> }
 
 #[derive(Serialize)]
-pub struct Upgrades { total: u64, url: String, items: Vec<Found>, logged_in: bool }
+pub struct Upgrades { total: u64, url: String, items: Vec<Found>, logged_in: bool,
+    /// Why there are no Path of Building numbers ("" when there are, or when it wasn't asked).
+    pob_note: String }
 
 /// Whose gear the upgrade search improves on: the shown build's stage (its gear, its Str / Dex / Int shortfall, its
 /// level) or what your character wears now (read from the site). Picked on the Upgrades tab; the build is the default
@@ -195,12 +199,16 @@ pub fn upgrade_search(app: AppHandle, mut plan: filter_core::upgrade::Plan, from
         let url = if poe2 { format!("https://www.pathofexile.com/trade2/search/poe2/{}?q={}", trade_api::enc(&league), trade_api::enc(&q.to_string())) }
             else { format!("https://www.pathofexile.com/trade/search/{}?q={}", trade_api::enc(&league), trade_api::enc(&q.to_string())) };
         open_url(url.clone())?;
-        return Ok(Upgrades { total: 0, url, items: vec![], logged_in: false });
+        return Ok(Upgrades { total: 0, url, items: vec![], logged_in: false, pob_note: String::new() });
     };
     let (id, ids, total) = trade_api::search_logged_in(poe2, &league, &q, &sess)?;
     let url = trade_api::site_url(poe2, &league, &id);
     let fetched = trade_api::fetch_logged_in(poe2, &ids, &id, &sess)?;
-    let items = fetched["result"].as_array().into_iter().flatten().filter_map(|r| {
+    let listed: Vec<&serde_json::Value> = fetched["result"].as_array().into_iter().flatten().collect();
+    // Path of Building's own numbers for each listing on the build's stage (28 Nov 2026): only for a build (not
+    // what your character wears: PoB would need its whole character).
+    let (pob, pob_note) = if from == "build" { pob_numbers(&app, stage, &plan.slot, &listed) } else { (vec![], String::new()) };
+    let items = listed.iter().enumerate().filter_map(|(i, r)| {
         let it = &r["item"];
         let lines = listing_lines(it);
         // Weapons: the trade site's own DPS numbers for the listing ("extended").
@@ -215,7 +223,28 @@ pub fn upgrade_search(app: AppHandle, mut plan: filter_core::upgrade::Plan, from
             base: it["typeLine"].as_str().unwrap_or("").to_string(),
             price, better_by: (score - plan.now).round(), score: score.round(), lines,
             icon: it["icon"].as_str().unwrap_or("").to_string(),
+            pob: pob.get(i).cloned().flatten(),
         })
     }).collect();
-    Ok(Upgrades { total, url, items, logged_in: true })
+    Ok(Upgrades { total, url, items, logged_in: true, pob_note })
+}
+
+/// Each listing's change to the build's stage, by Path of Building (pob_worker.rs). Empty with a reason when PoB isn't
+/// installed or couldn't tell; a listing PoB can't read gets None.
+fn pob_numbers(app: &AppHandle, stage: Option<usize>, slot: &str, listed: &[&serde_json::Value]) -> (Vec<Option<std::collections::HashMap<String, f64>>>, String) {
+    let st = app.state::<AppState>();
+    let Some(code) = std::fs::read_to_string(pob_file(&st)).ok() else { return (vec![], String::new()) };
+    let Ok(xml) = filter_core::pob::decode(code.trim()) else { return (vec![], String::new()) };
+    let Some(p) = pob_load(&st) else { return (vec![], String::new()) };
+    let i = stage.unwrap_or(p.stage).min(p.build.stages.len().saturating_sub(1));
+    let title = p.build.stages.get(i).map(|s| s.title.clone()).unwrap_or_default();
+    let texts: Vec<Option<String>> = listed.iter().map(|r| crate::pob_worker::listing_text(&r["item"])).collect();
+    let asked: Vec<String> = texts.iter().map(|t| t.clone().unwrap_or_default()).collect();
+    match crate::pob_worker::compare(&st.data_dir, &xml, &title, slot, &asked) {
+        Ok((base, each)) => (each.into_iter().zip(&texts).map(|(r, t)| {
+            let n = r.ok().filter(|_| t.is_some())?;
+            Some(n.iter().map(|(k, v)| (k.clone(), v - base.get(k).copied().unwrap_or(0.0))).collect())
+        }).collect(), String::new()),
+        Err(e) => (vec![], e),
+    }
 }

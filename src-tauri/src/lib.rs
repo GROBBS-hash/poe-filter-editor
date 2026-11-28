@@ -20,6 +20,7 @@ mod win_place;
 mod updates;
 mod price_tick;
 mod price_search_app;
+mod pob_worker;
 
 use filter_core::{
     evaluate::{status_with_fallback, Status},
@@ -3422,6 +3423,8 @@ fn load_state() -> AppState {
 }
 
 pub fn run() {
+    // Started as the Path of Building worker (pob_worker.rs): no window, no editor.
+    if pob_worker::worker_main() { return; }
     tauri::Builder::default()
         .manage(load_state())
         .plugin(tauri_plugin_clipboard_manager::init())

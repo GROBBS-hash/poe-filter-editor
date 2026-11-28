@@ -261,7 +261,7 @@ mockIPC((cmd, args) => {
     { slot: "Weapon 1", current: "Doom Song", wants: [], now: 141.2, not_counted: [], dps: { pdps: 141.2, edps: 17.6, total: 158.8, aps: 1.76, kind: "pdps", category: "weapon.wand" } },
     { slot: "Helmet", current: "Doom Crown", now: 80, not_counted: [], wants: [{ stat: "Life", id: "pseudo.pseudo_total_life", weight: 1, why: "Life keeps you alive", on: true }] }] };
   if (cmd === "upgrade_search") return { total: 312, url: "https://www.pathofexile.com/trade", logged_in: true, items: [
-    { name: "Tornado Wand", base: "Imbued Wand", price: "1 alch", score: 169, better_by: 28, lines: ["Adds 12 to 22 Physical Damage", "25% increased Attack Speed"], icon: "" },
+    { name: "Tornado Wand", base: "Imbued Wand", price: "1 alch", score: 169, better_by: 28, lines: ["Adds 12 to 22 Physical Damage", "25% increased Attack Speed"], icon: "", pob: { CombinedDPS: 412, Life: 0, Mana: -12, Dex: 18 } },
     { name: "Coiled Wand", base: "Imbued Wand", price: "2 alch", score: 148, better_by: 7, lines: ["Adds 8 to 16 Physical Damage"], icon: "" }] };
   if (cmd === "pob_list") return pobList;
   if (cmd === "pob_switch") { const id = (args as { id: string }).id; pobList = pobList.map((b) => ({ ...b, active: b.id === id })); return null; }
