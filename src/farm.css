@@ -40,7 +40,7 @@
 .ff-map { display: grid; grid-template-columns: 30px 1fr; gap: 9px; align-items: start; }
 .ff-map .item-icon { object-fit: contain; }
 .ff-avoid { color: var(--red); }
-.ff-src { display: inline-block; font-size: 10.5px; color: var(--muted); border: 1px solid var(--line-2); border-radius: 4px; padding: 0 5px; white-space: nowrap; }
+.ff-src { display: inline-block; font-size: 11.5px; color: var(--muted); border: 1px solid var(--line-2); border-radius: 4px; padding: 0 5px; white-space: nowrap; }
 .ff-why { margin: 3px 0 0; padding-left: 16px; font-size: 12.5px; }
 .ff-why li { margin: 2px 0; }
 .ff-more { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--line); padding-top: 9px; }
@@ -64,7 +64,7 @@
 .ff-own .item-icon { object-fit: contain; }
 .ff-tiles { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); margin-bottom: 10px; }
 .ff-tiles .ap-tile { padding: 8px 4px 6px; }
-.ff-picked { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--gold); margin-bottom: 1px; }
+.ff-picked { font-size: 11.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--gold); margin-bottom: 1px; }
 .ff-warn { color: var(--gold); }
 .ff-row { cursor: pointer; }
 .ff-row:hover td { background: var(--raised); }

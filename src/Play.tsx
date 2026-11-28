@@ -53,7 +53,7 @@ export const lootPerHour = (s: SessionSummary, div: number | null) => {
 /** The loot kinds in the order they're shown (loot.rs KINDS), with their colours. */
 export const LOOT_KINDS: [string, string, string][] = [
   ["currency", "Currency", "#dcb25a"], ["cards", "Div cards", "#7fb8ff"], ["uniques", "Uniques", "#e0823d"], ["maps", "Maps", "#b9c0cc"],
-  ["scarabs", "Scarabs", "#6fd3a0"], ["fragments", "Fragments", "#b493ff"], ["gems", "Gems", "#4fc7c7"], ["gear", "Gear", "#8b92a1"], ["other", "Other", "#6b7280"],
+  ["scarabs", "Threads", "#6fd3a0"], ["fragments", "Fragments", "#b493ff"], ["gems", "Gems", "#4fc7c7"], ["gear", "Gear", "#8b92a1"], ["other", "Other", "#6b7280"],
 ];
 export const lootTotal = (l: LootLine[]) => l.reduce((a, b) => a + b.value, 0);
 /** "412c" or, from a divine up, "2.1 div". */

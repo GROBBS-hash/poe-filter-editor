@@ -5,6 +5,17 @@ import { MechArt, hasMechArt } from "./mechArt";
 import { GROUPS } from "./atlasGroups";
 
 const NUM = /\d+(?:\.\d+)?/g;
+/** Numbers that name something rather than add up: map tier ranges ("Tier 1-15") and "1 tier higher". They stay as
+ *  written, so "Tier 1-15 Maps … 5% chance to become 1 tier higher" ×3 reads 15%, not "Tier 3-45 … 3 tier higher". */
+const FIXED = /(?:Tier \d+(?:-\d+)?|\d+-\d+|\d+ tiers? )/gi;
+/** The line with its amounts as "#" and its fixed numbers kept, and the amounts in order. */
+function split(line: string): { key: string; nums: number[] } {
+  const nums: number[] = [];
+  let key = "", last = 0;
+  const amounts = (x: string) => x.replace(NUM, (n) => { nums.push(Number(n)); return "#"; });
+  for (const m of line.matchAll(FIXED)) { key += amounts(line.slice(last, m.index)) + m[0]; last = m.index! + m[0].length; }
+  return { key: key + amounts(line.slice(last)), nums };
+}
 type Total = { key: string; count: number; values: number[] };
 
 /** Every stat line of the taken points, same lines added up ("+12%" ×5 → "+60%"). A multiple-choice notable
@@ -20,8 +31,7 @@ function totals(tree: AtlasData, nodes: number[], choices: [number, number][]): 
     for (const raw of lines) {
       const line = raw.replace(/\s*\n\s*/g, " ").trim();
       if (!line || /^Select a type of content/.test(line)) continue;
-      const nums = [...line.matchAll(NUM)].map((m) => Number(m[0]));
-      const key = line.replace(NUM, "#");
+      const { key, nums } = split(line);
       const t = out.get(key) ?? { key, count: 0, values: nums.map(() => 0) };
       t.count++;
       nums.forEach((x, i) => { t.values[i] = (t.values[i] ?? 0) + x; });

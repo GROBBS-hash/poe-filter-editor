@@ -53,7 +53,7 @@ export default function Tonight({ go }: { go: (tab: string) => void }) {
   return (
     <section className="tn">
       <div className="tn-head">
-        <h3>Tonight</h3>
+        <h3 aria-level={2}>Tonight</h3>
         <Tip>Worked out from your last stash scan, your own maps and poe.ninja's prices. A card is left out when there isn't enough to go by.</Tip>
         <span className="tn-time">{[15, 30, 60].map((m) => <button key={m} className={m === minutes ? "on" : ""} aria-pressed={m === minutes} onClick={() => setMinutes(m)}>{m} min</button>)}</span>
       </div>

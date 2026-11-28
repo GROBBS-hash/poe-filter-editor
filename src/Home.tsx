@@ -22,7 +22,7 @@ function ago(secs: number) {
 function Tile({ title, children, action, onAction }: { title: string; children: ReactNode; action: string; onAction: () => void }) {
   return (
     <section className="home-tile">
-      <h3>{title}</h3>
+      <h3 aria-level={2}>{title}</h3>
       <div className="home-tile-body">{children}</div>
       <button className="link" onClick={onAction}>{action} →</button>
     </section>
@@ -112,7 +112,7 @@ export default function Home({ profile, keys, go, search }: {
       </div>
 
       <section className="home-keys">
-        <h3>In game</h3>
+        <h3 aria-level={2}>In game</h3>
         <KeyList keys={keys} />
         <button className="link small" onClick={() => go("settings")}>Change hotkeys</button>
       </section>

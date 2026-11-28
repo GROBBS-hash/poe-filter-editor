@@ -27,7 +27,7 @@ pub struct LootLine {
 
 /// The kinds, in the order they're shown, with their names.
 pub const KINDS: [(&str, &str); 9] = [
-    ("currency", "Currency"), ("cards", "Div cards"), ("uniques", "Uniques"), ("maps", "Maps"), ("scarabs", "Scarabs"),
+    ("currency", "Currency"), ("cards", "Div cards"), ("uniques", "Uniques"), ("maps", "Maps"), ("scarabs", "Threads"),
     ("fragments", "Fragments"), ("gems", "Gems"), ("gear", "Gear"), ("other", "Other"),
 ];
 
@@ -96,7 +96,8 @@ pub fn kind(i: &Value) -> &'static str {
         6 => "cards",
         3 | 9 => if is_map { "maps" } else { "uniques" },
         4 => "gems",
-        _ if t.contains("Scarab") => "scarabs",
+        // 3.30 replaced scarabs with Threads (same map device slot): they share this kind, shown as "Threads".
+        _ if t.contains("Scarab") || t.ends_with(" Thread") => "scarabs",
         _ if is_map => "maps",
         _ if ["Splinter", "Fragment", "Breachstone", "Emblem", "Invitation", "Reliquary Key", "Crest", "Sacrifice at", "Mortal ", "Divine Vessel", "Offering to the Goddess"]
             .iter().any(|w| t.contains(w)) => "fragments",
@@ -240,5 +241,11 @@ mod tests {
         assert_eq!(unique_tier(250.0, 200.0), 1);
         assert_eq!(unique_tier(12.0, 200.0), 2);
         assert_eq!(unique_tier(1.0, 200.0), 3);
+    }
+
+    #[test]
+    fn threads_count_as_the_old_scarab_kind() {
+        assert_eq!(kind(&cur("t", "Ritual Thread", 3)), "scarabs");
+        assert_eq!(kind(&cur("c", "Chaos Orb", 3)), "currency");
     }
 }

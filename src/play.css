@@ -140,7 +140,7 @@
 .loot-row.hero .loot-name { color: #ffb27a; font-weight: 650; }
 .loot-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .loot-v { margin-left: auto; font-variant-numeric: tabular-nums; padding-left: 8px; }
-.loot-tier { font-size: 10px; font-weight: 700; border-radius: 4px; padding: 0 4px; margin-right: 5px; vertical-align: 1px; }
+.loot-tier { font-size: 11px; font-weight: 700; border-radius: 4px; padding: 0 4px; margin-right: 5px; vertical-align: 1px; }
 .loot-tier.t1 { background: #e0823d; color: #1a1405; }
 .loot-tier.t2 { background: #6b4a2f; color: #ffd2ae; }
 .loot-tier.t3 { background: var(--input); color: var(--muted); border: 1px solid var(--line); }

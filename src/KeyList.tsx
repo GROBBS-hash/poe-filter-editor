@@ -9,7 +9,7 @@ export default function KeyList({ keys, all = false }: { keys: Record<string, st
     .filter((g) => g.list.length);
   return <>{groups.map((g) => (
     <div key={g.id} className="home-kgroup">
-      <h4>{g.name}{g.note && <em>· {g.note}</em>}</h4>
+      <h4 aria-level={3}>{g.name}{g.note && <em>· {g.note}</em>}</h4>
       <div className="home-keys-grid">
         {g.list.map((h) => <div key={h.setting}><kbd>{keyOf(keys, h.setting)}</kbd><div><b>{h.name}</b><span>{h.how}</span></div></div>)}
       </div>

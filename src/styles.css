@@ -1265,7 +1265,7 @@ body.main ::-webkit-scrollbar-thumb:hover { background: #4a5566; }
 /* Price window: small headings between kinds of rows ("Prefixes · up to 3 on an item"). */
 .tw-group { display: flex; align-items: baseline; gap: 8px; margin: 8px 2px 1px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .tw-group:first-child { margin-top: 0; }
-.tw-group-hint { text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 11.5px; color: #626a78; }
+.tw-group-hint { text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 11.5px; color: var(--muted); }
 /* Menu: each page has its own colour, shown as a tinted tile behind its icon (and on the page title). */
 .menu-ico { flex: none; display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 8px;
   color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); border: 1px solid color-mix(in srgb, var(--c) 22%, transparent);
@@ -1567,7 +1567,7 @@ main.content .card h2 { font-size: 19px; font-weight: 500; letter-spacing: .02em
 .cr-way.best { border-color: var(--gold); box-shadow: 0 0 0 1px rgba(232, 201, 106, .25) inset; }
 .cr-way-main { flex: 1; min-width: 0; }
 .cr-way-top { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
-.cr-way-group { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.cr-way-group { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
 .cr-way-nums { text-align: right; flex: none; min-width: 84px; }
 .cr-way-nums .cr-odds { font-size: 14px; min-width: 0; }
 .cr-icons { display: inline-flex; gap: 2px; flex: none; min-width: 26px; }
@@ -1937,7 +1937,7 @@ kbd { font: 600 11px/1.4 "Segoe UI", system-ui, sans-serif; color: var(--text-2)
 @media (prefers-reduced-motion: reduce) { .saved-note { animation: none; } }
 
 /* ── Price window: two layouts (grouped headings / flat with tags) and "low confidence" prices (21 Nov 2026) ── */
-.tw-group-hint { text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 12px; color: #737b8a; }
+.tw-group-hint { text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 12px; color: var(--muted); }
 .tw-res-sec .tw-group-hint { margin-left: 6px; font-family: "Segoe UI", system-ui, sans-serif; }
 .tw-room { font-weight: 500; color: var(--muted); font-size: 12px; }
 .tw-stat.open .tw-label { color: var(--text-2); }
@@ -1984,7 +1984,7 @@ kbd { font: 600 11px/1.4 "Segoe UI", system-ui, sans-serif; color: var(--text-2)
 .tw-stat:not(.on) .tw-tag { opacity: .78; }
 .menu-key { font-size: 11px; }
 .gem-lvl { font-size: 11px; }
-.tiers-ico-badge { font-size: 10.5px; }
+.tiers-ico-badge { font-size: 11px; }
 .tw-cmp th, .qm.tw th { font-size: 11px; }
 .qm-where { font-size: 12px; }
 .w-safe { margin: 4px 0 8px; padding-left: 18px; color: var(--text-2); line-height: 1.6; }
