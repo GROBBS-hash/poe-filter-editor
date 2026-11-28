@@ -135,11 +135,16 @@ pub fn warrant_text(name: &str, gems: &[MercGem]) -> String {
 #[derive(Debug, Clone, PartialEq)]
 pub struct BuildWarrant { pub text: String, pub query: serde_json::Value, pub skill: String, pub supports: Vec<String> }
 
-/// Skills and supports a warrant must not have, whatever it's for. Wild Strike: the computer plays it badly. On a Frost
-/// Blades Mercenary, Pierce stops its projectiles chaining (Ruetoo's Luminary notes, 3.30).
+/// Skills and supports that "brick" a Mercenary, so a warrant with them is left out (28 Nov, he asked; from Ruetoo's
+/// and OrionNotOnion's 3.30 Luminary notes). Wild Strike, Kinetic Bolt, Leap Slam, Flicker Strike: the computer plays
+/// them badly. Brutality: no elemental damage, and Mercenary builds are elemental. Dash: breaks how a Manyshot (bow)
+/// or Kineticist (wand) Mercenary moves; fine on a Combatant. Pierce on Frost Blades stops it chaining.
+/// (Kinetic Rain and Deadly Ailments aren't among the trade site's Mercenary stats, so they can't be left out.)
 fn avoid(main: &str) -> Vec<&'static str> {
-    let mut out = vec!["Wild Strike"];
+    let mut out = vec!["Wild Strike", "Kinetic Bolt", "Leap Slam", "Flicker Strike", "Brutality (Tier 2)", "Greater Brutality (Tier 3)"];
     if main == "Frost Blades" { out.extend(["Pierce (Tier 2)", "Greater Pierce (Tier 3)"]); }
+    let ranged = ["Ice Shot", "Vaal Ice Shot", "Tornado Shot", "Lightning Arrow", "Barrage", "Split Arrow", "Kinetic Blast", "Power Siphon", "Kinetic Fusillade"];
+    if ranged.contains(&main) { out.push("Dash"); }
     out
 }
 
@@ -161,6 +166,9 @@ pub fn from_build(groups: &[crate::pob::Group], index: &crate::trade::StatIndex,
         Some((skill, on.into_iter().filter(|x| x.support && !tiers(&plain(&x.name)).is_empty()).collect()))
     }).collect();
     let (main, sups) = skills.iter().max_by_key(|(_, s)| s.len())?;
+    // A support on the brick list is never asked for, even when the build lists it.
+    let bad = avoid(&main.name);
+    let sups: Vec<&crate::pob::Gem> = sups.iter().copied().filter(|s| !tiers(&plain(&s.name)).iter().any(|(l, _)| bad.contains(&l.as_str()))).collect();
     let mut gems = vec![];
     for (sk, ss) in &skills {
         gems.push(MercGem { name: sk.name.clone(), support: false, tier: None });
@@ -295,13 +303,17 @@ mod tests {
             { "id": "mercenary.support_e3", "text": "Greater Elemental Damage with Attacks (Tier 3)", "type": "mercenary" },
             { "id": "mercenary.support_d2", "text": "More Duration (Tier 2)", "type": "mercenary" },
             { "id": "mercenary.support_p2", "text": "Pierce (Tier 2)", "type": "mercenary" },
-            { "id": "mercenary.skill_ws", "text": "Wild Strike", "type": "mercenary" } ] } ] }));
+            { "id": "mercenary.skill_ws", "text": "Wild Strike", "type": "mercenary" },
+            { "id": "mercenary.support_b3", "text": "Greater Brutality (Tier 3)", "type": "mercenary" },
+            { "id": "mercenary.skill_dash", "text": "Dash", "type": "mercenary" } ] } ] }));
         // Greater: Tier 3 supports only; no Pierce (Frost Blades) or Wild Strike.
         let g3 = from_build(&groups, &idx, 9, true).unwrap();
         let st = &g3.query["query"]["stats"];
         let ids = |v: &serde_json::Value| -> Vec<String> { v["filters"].as_array().unwrap().iter().map(|f| f["id"].as_str().unwrap().to_string()).collect() };
         assert_eq!(ids(&st[1]), ["mercenary.support_h3", "mercenary.support_e3"]);
-        assert_eq!((st[2]["type"].as_str(), ids(&st[2])), (Some("not"), vec!["mercenary.skill_ws".to_string(), "mercenary.support_p2".to_string()]));
+        // Bricks left out; Dash is fine on a Frost Blades (Combatant) Mercenary.
+        assert_eq!((st[2]["type"].as_str(), ids(&st[2])), (Some("not"), vec!["mercenary.skill_ws".to_string(), "mercenary.support_b3".to_string(), "mercenary.support_p2".to_string()]));
+        assert!(avoid("Ice Shot").contains(&"Dash") && !avoid("Frost Blades").contains(&"Dash"));
         let w = from_build(&groups, &idx, 9, false).unwrap();
         assert_eq!((w.skill.as_str(), w.supports.clone()), ("Frost Blades", vec!["Hypothermia".to_string(), "Elemental Damage with Attacks".to_string()]));
         assert_eq!(w.query["query"]["status"]["option"], "securable", "instant buyout only");
