@@ -1,7 +1,7 @@
 import { Tip } from "./Help";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useEffect, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import AtlasTreeView, { AtlasStore, AtlasStrategy, ChoiceList, StepBar, StepList, StrategyNotes, useStep } from "./AtlasTreeView";
 import AtlasTotals from "./AtlasTotals";
 import AtlasCompare from "./AtlasCompare";
@@ -9,6 +9,7 @@ import TreeEditor from "./AtlasEditor";
 import { PageLoading } from "./Loading";
 import AtlasPicks from "./AtlasPicks";
 import FarmFinder from "./FarmFinder";
+import SideList, { Part, useSidePart } from "./SideList";
 
 const SITE: Record<string, string> = { maxroll: "maxroll", official: "pathofexile.com", optimiser: "built by the optimiser", planner: "Atlas Tree Planner", poeplanner: "poeplanner" };
 
@@ -45,41 +46,52 @@ export default function Atlas({ go }: { go?: (tab: string) => void }) {
       const s = await invoke<AtlasStore>("atlas_import", { link, name });
       setStore(s); setLink(""); setName(""); setSel(s.active);
       setMsg(`Saved “${s.list.find((x) => x.id === s.active)?.name}”. It's the one shown in game now (${key}).`);
+      setBusy(false); return true;
     } catch (e) { setMsg(String(e)); }
-    setBusy(false);
+    setBusy(false); return false;
   };
 
   if (!store) return msg ? <div className="card">{msg}</div> : <PageLoading />;
   const shown = store.list.find((x) => x.id === sel) ?? store.list.find((x) => x.id === store.active) ?? store.list[0];
+  const canCompare = store.list.reduce((n, s) => n + s.variants.length, 0) > 1;
+  const parts: Part[] = [
+    { key: "today", name: "Today", icon: ICON.today },
+    { key: "build", name: "Build a tree", icon: ICON.build },
+    { key: "mine", name: "My trees", icon: ICON.mine, badge: store.list.length || undefined },
+    { key: "compare", name: "Compare", icon: ICON.compare, hide: !canCompare },
+  ];
 
-  return (
-    <div className="atlas-page">
-      <FarmFinder go={go} onBuild={() => { setBuild((n) => n + 1); window.setTimeout(() => document.querySelector(".ap")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }} />
-      <AtlasPicks key={build} store={store} onShow={(id) => setSel(id)}
-        onImported={(s, m) => { setStore(s); setSel(s.active); setMsg(`${m} (${key})`); }} />
+  return <AtlasParts parts={parts} first={store.list.length ? "today" : "build"}>{(part, pick) => <>
+    {part === "today" && <FarmFinder go={go} onBuild={() => { setBuild((n) => n + 1); pick("build"); }} />}
+
+    {part === "build" && <>
+      <AtlasPicks key={build} store={store} onShow={(id) => { setSel(id); pick("mine"); }}
+        onImported={(s, m) => { setStore(s); setSel(s.active); setMsg(`${m} (${key})`); pick("mine"); }} />
       <div className="card">
-        <h2>Add a strategy from a link <Tip>A <b>maxroll farming strategy</b> link (maxroll.gg/poe/farming-strategy-planner/…) or a
+        <h2>Add a tree from a link <Tip>A <b>maxroll farming strategy</b> link (maxroll.gg/poe/farming-strategy-planner/…) or a
           <b> pathofexile.com atlas tree</b> link, an <b>Atlas Tree Planner</b> link (atlas-blush-beta.vercel.app/#…), a <b>poeplanner</b> atlas link (poeplanner.com/a/… — mobalytics guides link their trees there), or a <b>poe.ninja</b> atlas tree (open one on its Atlas Trees page and copy the link). maxroll strategies bring their notes, map device and threads too.</Tip></h2>
         <p className="muted small">Paste a maxroll strategy, or a pathofexile.com, poe.ninja, Atlas Tree Planner or poeplanner (mobalytics) atlas tree link.</p>
         <div className="row">
           <input className="text grow" placeholder="https://maxroll.gg/poe/farming-strategy-planner/…" value={link}
-            onChange={(e) => setLink(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && link.trim() && !busy) doImport(); }} />
+            onChange={(e) => setLink(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && link.trim() && !busy) doImport().then((ok) => ok && pick("mine")); }} />
         </div>
         <div className="row">
           <input className="text grow" placeholder="Name (optional: uses the site's name)" value={name} onChange={(e) => setName(e.target.value)} />
-          <button className="primary" disabled={!link.trim() || busy} onClick={doImport}>{busy ? "Reading…" : "Import"}</button>
+          <button className="primary" disabled={!link.trim() || busy} onClick={() => doImport().then((ok) => ok && pick("mine"))}>{busy ? "Reading…" : "Import"}</button>
         </div>
         {msg && <div className="small at-msg">{msg}</div>}
       </div>
+    </>}
 
-      {store.list.length === 0 ? (
-        <div className="empty">No strategies yet. Import one above, then press <b>{key}</b> in game to see it.</div>
-      ) : (
+    {part === "mine" && (store.list.length === 0 ? (
+      <div className="empty">No trees yet. Pick one in <button className="link" onClick={() => pick("build")}>Build a tree</button>, then press <b>{key}</b> in game to see it.</div>
+    ) : (
         <>
           <div className="card">
-            <h2>My strategies</h2>
+            <h2>My trees</h2>
             <p className="muted small">The one ticked “In game” shows when you press <b>{key}</b> (change the key in Settings).
               Maps you run and earnings sessions you start count for that tree, so you can see which one earns most.</p>
+            {msg && <div className="small at-msg">{msg}</div>}
             <div className="at-list">
               {store.list.map((s) => (
                 <StrategyRow key={s.id} s={s} active={store.active === s.id} selected={shown?.id === s.id} result={results.find((r) => r.id === s.id)} best={results[0]?.id === s.id && results.length > 1}
@@ -87,16 +99,30 @@ export default function Atlas({ go }: { go?: (tab: string) => void }) {
                   onUse={() => run("atlas_use", { id: s.id, variant: store.active === s.id ? store.variant : 0 })}
                   onRename={(n) => run("atlas_rename", { id: s.id, name: n })}
                   onDelete={() => { if (confirm(`Delete “${s.name}”?`)) run("atlas_delete", { id: s.id }); }}
-                  onCompare={store.list.length > 1 || s.variants.length > 1 ? () => setCmp((c) => ({ id: s.id, n: (c?.n ?? 0) + 1 })) : undefined} />
+                  onCompare={canCompare ? () => { setCmp((c) => ({ id: s.id, n: (c?.n ?? 0) + 1 })); pick("compare"); } : undefined} />
               ))}
             </div>
           </div>
           {shown && <Preview key={shown.id} s={shown} store={store} run={run} onSel={setSel} />}
-          {store.list.reduce((n, s) => n + s.variants.length, 0) > 1 && <AtlasCompare store={store} shown={shown?.id ?? null} pick={cmp} />}
         </>
-      )}
-    </div>
-  );
+    ))}
+
+    {part === "compare" && <AtlasCompare store={store} shown={shown?.id ?? null} pick={cmp} />}
+  </>}</AtlasParts>;
+}
+
+/** Stroke icons for the Atlas side list (24×24). */
+const ICON = {
+  today: "M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z",
+  build: "M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z",
+  mine: "M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 3v18M4 7.5l8 4.5 8-4.5",
+  compare: "M8 3v18M16 3v18M3 8h5M16 16h5M3 16h5M16 8h5",
+};
+
+/** Today / Build a tree / My trees / Compare, one at a time (28 Nov 2026: the page was ~11 screens). */
+function AtlasParts({ parts, first, children }: { parts: Part[]; first: string; children: (part: string, pick: (k: string) => void) => ReactNode }) {
+  const [part, pick] = useSidePart("atlas", parts, first);
+  return <SideList label="Atlas parts" parts={parts} part={part} onPick={pick}>{children(part, pick)}</SideList>;
 }
 
 type TreeResult = { id: number; maps: number; loot_per_map: number | null; loot_per_hour: number | null; sessions: number; session_hours: number; session_per_hour: number | null };

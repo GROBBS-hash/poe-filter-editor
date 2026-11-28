@@ -7,6 +7,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CurrencyIcon } from "./icons";
+import SideList, { Part, useSidePart } from "./SideList";
 
 export type Tab = { index: number; name: string; kind: string; colour: string; id?: string };
 export type Snapshot = { time: number; league: string; total: number; divine: number | null; tabs: [string, number][]; profile?: string };
@@ -317,6 +318,7 @@ export default function Wealth() {
   };
   const names = useMemo(() => [...new Set((v?.sessions ?? []).map((s) => s.name))], [v]);
 
+  const [part, pick] = useSidePart("wealth", WEALTH_PARTS);
   if (!v) return err ? <ErrNote msg={err} className="card" onRetry={() => { setErr(""); invoke<WealthView>("wealth_get").then(setV).catch((e) => setErr(friendly(e))); }} /> : <PageLoading />;
   const connected = v.has_sessid && v.account && v.tabs.length > 0;
   // History and totals for the profile in use ("" = whole stash) in this league.
@@ -384,7 +386,9 @@ export default function Wealth() {
         </div>
       )}
 
-      {connected && (
+      {connected && <SideList label="Stash worth parts" part={part} onPick={pick}
+        parts={WEALTH_PARTS.map((x) => x.key === "sell" ? { ...x, badge: v.missed.length || undefined } : x)}>
+      {part === "worth" && (
         <div className="card">
           <div className="row-between">
             <h2>{v.active ? `${v.active} is worth` : "Your stash is worth"}</h2>
@@ -434,11 +438,11 @@ export default function Wealth() {
         </div>
       )}
 
-      {connected && <FindInStash divine={v.divine} scanned={last?.time ?? 0} />}
+      {part === "find" && <FindInStash divine={v.divine} scanned={last?.time ?? 0} />}
 
-      {connected && last && last.tabs.length > 0 && <ByTab tabs={last.tabs} items={v.last_items ?? []} divine={v.divine} />}
+      {part === "find" && last && last.tabs.length > 0 && <ByTab tabs={last.tabs} items={v.last_items ?? []} divine={v.divine} />}
 
-      {connected && (
+      {part === "sell" && (
         <div className="card">
           <h2>Worth selling ({v.missed.length})</h2>
           <p className="muted small">Items from your last scan worth at least
@@ -462,11 +466,11 @@ export default function Wealth() {
         </div>
       )}
 
-      {connected && (v.reprice?.length ?? 0) > 0 && <RepriceCard list={v.reprice!} divine={v.divine} />}
-      {connected && (v.cards?.length ?? 0) > 0 && <CardSets list={v.cards!} divine={v.divine} />}
-      <PriceAlerts divine={v.divine} />
+      {part === "sell" && (v.reprice?.length ?? 0) > 0 && <RepriceCard list={v.reprice!} divine={v.divine} />}
+      {part === "sell" && (v.cards?.length ?? 0) > 0 && <CardSets list={v.cards!} divine={v.divine} />}
+      {part === "alerts" && <PriceAlerts divine={v.divine} />}
 
-      {connected && (
+      {part === "earn" && (
         <div className="card">
           <h2>Earnings per strategy</h2>
           <p className="muted small">Pick the tabs your loot goes into. Start a session named after what you're running.
@@ -533,9 +537,20 @@ export default function Wealth() {
           )}
         </div>
       )}
+      </SideList>}
+      {!connected && <PriceAlerts divine={v.divine} />}
     </>
   );
 }
+
+/** Stash worth in parts (28 Nov 2026, same side list as Atlas and Game windows); the four number tiles stay on top. */
+const WEALTH_PARTS: Part[] = [
+  { key: "worth", name: "Worth", icon: "M12 3v18M16.5 7.5c0-1.7-2-3-4.5-3s-4.5 1.3-4.5 3 2 2.6 4.5 3 4.5 1.3 4.5 3-2 3-4.5 3-4.5-1.3-4.5-3" },
+  { key: "find", name: "Find and tabs", icon: "M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM21 21l-5-5" },
+  { key: "sell", name: "To sell", icon: "M20 12l-8 8-9-9V3h8zM7.5 7.5h.01" },
+  { key: "earn", name: "Earnings", icon: "M4 19V5M4 19h16M8 15l4-4 3 3 5-6" },
+  { key: "alerts", name: "Price alerts", icon: "M6 16V11a6 6 0 1 1 12 0v5l2 2H4zM10 21h4" },
+];
 
 /** Lights these items up in the game's stash: types a search of their names into the stash search box (it's also
  *  copied). The game's box holds 250 characters, so a long list starts with the most valuable ones. */
