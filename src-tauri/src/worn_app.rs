@@ -248,3 +248,46 @@ fn pob_numbers(app: &AppHandle, stage: Option<usize>, slot: &str, listed: &[&ser
         Err(e) => (vec![], e),
     }
 }
+
+/// Ctrl+D: what Path of Building says this item would do to the shown build's stage, per slot it could go in
+/// (both rings). 28 Nov 2026, he picked "PoB numbers in more places" after Upgrades got them.
+#[derive(Serialize)]
+pub struct PobCheck {
+    /// "Luminary" and the stage's name.
+    build: String,
+    stage: String,
+    rows: Vec<PobRow>,
+    /// Why there's nothing ("" when there are rows).
+    note: String,
+}
+
+#[derive(Serialize)]
+pub struct PobRow { slot: String, now: String, change: Option<std::collections::HashMap<String, f64>>, error: String }
+
+#[tauri::command(async)]
+pub fn pob_check(app: AppHandle, text: String, item_class: String) -> PobCheck {
+    let st = app.state::<AppState>();
+    let empty = |note: &str| PobCheck { build: String::new(), stage: String::new(), rows: vec![], note: note.into() };
+    let slots = filter_core::compare::slots_for(&item_class);
+    if slots.is_empty() { return empty(""); }
+    let (Some(code), Some(p)) = (std::fs::read_to_string(pob_file(&st)).ok(), pob_load(&st)) else { return empty("") };
+    let Ok(xml) = filter_core::pob::decode(code.trim()) else { return empty("") };
+    let Some(stage) = p.build.stages.get(p.stage) else { return empty("") };
+    let build = if p.build.ascendancy.is_empty() { p.build.class.clone() } else { p.build.ascendancy.clone() };
+    let mut rows = vec![];
+    for slot in slots {
+        let now = stage.gear.iter().find(|g| g.slot == *slot).map(|g| g.name.clone()).unwrap_or_default();
+        match crate::pob_worker::compare(&st.data_dir, &xml, &stage.title, slot, std::slice::from_ref(&text)) {
+            Ok((base, each)) => {
+                let (change, error) = match each.into_iter().next() {
+                    Some(Ok(n)) => (Some(n.iter().map(|(k, v)| (k.clone(), v - base.get(k).copied().unwrap_or(0.0))).collect()), String::new()),
+                    Some(Err(e)) => (None, e),
+                    None => (None, "no answer".into()),
+                };
+                rows.push(PobRow { slot: slot.to_string(), now, change, error });
+            }
+            Err(e) => return PobCheck { build, stage: stage.title.clone(), rows: vec![], note: e },
+        }
+    }
+    PobCheck { build, stage: stage.title.clone(), rows, note: String::new() }
+}

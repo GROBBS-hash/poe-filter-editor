@@ -10,6 +10,7 @@ import BaseUniques from "./BaseUniques";
 import RelatedItems from "./RelatedItems";
 import { BaseWorth } from "./Bases";
 import { UniqueDust } from "./Dust";
+import { PobCheck } from "./PobLine";
 import { useDeathMods } from "./Deaths";
 import WornCompare, { Resists, type Comparison } from "./WornCompare";
 import { Item, RARITY_COLOUR, itemTitle } from "./types";
@@ -892,7 +893,8 @@ export default function TradeWindow() {
 
       {check.map && <MapCheck map={check.map} rarity={it.rarity} corrupted={/\nCorrupted/.test(setup?.raw ?? "")} />}
       {setup?.raw && !check.from_ground
-        ? <WornCompare raw={setup.raw} itemClass={it.item_class} build={check.compare ?? []}>{(list, title, head) => <CompareBlock list={list} title={title} head={head} />}</WornCompare>
+        ? <><WornCompare raw={setup.raw} itemClass={it.item_class} build={check.compare ?? []}>{(list, title, head) => <CompareBlock list={list} title={title} head={head} />}</WornCompare>
+          <PobCheck raw={setup.raw} itemClass={it.item_class} /></>
         : check.compare && check.compare.length > 0 && <CompareBlock list={check.compare} title="Against your build" />}
 
       {check.map && mapModCount > 0 && (

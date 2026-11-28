@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { PobLine } from "./PobLine";
 
 /** One slot you wear: what the search adds up (the trade site's weighted sum) and why. */
 type Want = { stat: string; id: string; weight: number; why: string; on: boolean };
@@ -20,20 +21,6 @@ type Found = { name: string; base: string; price: string; score: number; better_
   pob?: Record<string, number> | null };
 type Upgrades = { total: number; url: string; items: Found[]; logged_in: boolean; pob_note?: string };
 
-/** PoB's numbers in plain words, most important first; resistances in %. */
-const POB_SHOW: [string, string, boolean][] = [["CombinedDPS", "DPS", false], ["Life", "Life", false], ["EnergyShield", "ES", false], ["TotalEHP", "Effective HP", false],
-  ["FireResist", "Fire res", true], ["ColdResist", "Cold res", true], ["LightningResist", "Lightning res", true], ["ChaosResist", "Chaos res", true], ["Mana", "Mana", false],
-  ["Armour", "Armour", false], ["Evasion", "Evasion", false], ["Str", "Str", false], ["Dex", "Dex", false], ["Int", "Int", false]];
-function PobLine({ d }: { d: Record<string, number> }) {
-  const parts = POB_SHOW.map(([k, label, pct]) => ({ k, label, pct, v: Math.round(d[k] ?? 0) })).filter((x) => x.v !== 0).slice(0, 6);
-  return (
-    <div className="uf-pob small" title="Path of Building's own numbers for this item on the build's stage, against what the stage wears now">
-      <span className="uf-pob-tag">PoB</span>
-      {parts.length === 0 ? <span className="muted">no change to life, damage or resistances</span>
-        : parts.map((x) => <span key={x.k} className={x.v > 0 ? "up" : "down"}>{x.label} {x.v > 0 ? "+" : "−"}{Math.abs(x.v).toLocaleString()}{x.pct ? "%" : ""}</span>)}
-    </div>
-  );
-}
 
 type From = "build" | "worn";
 const FROM_KEY = "upgrades.from";

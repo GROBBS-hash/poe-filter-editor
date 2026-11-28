@@ -2648,3 +2648,7 @@ button.qm-rule:hover, .qm-rule.can-open:hover { border-color: var(--gold); backg
 .mb-list > li:has(.mb-code) { flex-wrap: wrap; }
 .mb-code { flex-basis: 100%; display: flex; flex-direction: column; gap: 6px; padding: 8px 0 4px; }
 .mb-code textarea { width: 100%; font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; word-break: break-all; resize: vertical; }
+
+/* Ctrl+D: Path of Building's verdict on the shown build (28 Nov 2026) */
+.pob-check { margin: 8px 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; gap: 6px; }
+.pob-check-row { display: flex; flex-direction: column; gap: 2px; }

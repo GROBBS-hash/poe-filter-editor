@@ -3648,7 +3648,7 @@ pub fn run() {
             farming_app::farm_now, farming_app::farm_start, farming_app::farm_costs, farming_app::farm_use_tree, farming_app::farm_filter, farming_app::farm_stop,
             deaths_app::deaths_get, deaths_app::deaths_avoid, deaths_app::deaths_for,
             tonight_app::tonight_get,
-            bases_app::base_worth, bases_app::bases_get, bases_app::bases_save, dust_app::dust_picks, dust_app::unique_dust, worn_app::worn_compare, worn_app::worn_refresh, worn_app::worn_set, worn_app::upgrade_plans, worn_app::upgrade_search,
+            bases_app::base_worth, bases_app::bases_get, bases_app::bases_save, dust_app::dust_picks, dust_app::unique_dust, worn_app::worn_compare, worn_app::worn_refresh, worn_app::worn_set, worn_app::upgrade_plans, worn_app::upgrade_search, worn_app::pob_check,
             play_app::maps_done, play_app::maps_history, play_app::maps_clear, play_app::watch_action, play_app::searches_get,
             play_app::searches_save, play_app::search_type, play_app::stash_highlight, play_app::sheets_list, play_app::sheets_add, play_app::lab_layout, play_app::show_lab,
             play_app::sheets_remove, play_app::notes_get, play_app::notes_save, play_app::play_toggle, play_app::play_windows_state, play_app::play_hide,

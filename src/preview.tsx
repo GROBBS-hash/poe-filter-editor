@@ -129,6 +129,9 @@ mockIPC(async (cmd, args) => {
   }
   if (cmd === "saved_list") return [];
   if (cmd === "base_worth") return { worth: { influence: "", ilvl: 70, value: 42, listings: 86, if_level: false }, divine: 179, loud: null };
+  if (cmd === "pob_check") return new Promise((r) => setTimeout(() => r({ build: "Luminary", stage: "Swap at Merciless Lab (level 68-90)", note: "", rows: [
+    { slot: "Ring 1", now: "Storm Loop", error: "", change: { Life: -214, EnergyShield: -68, ColdResist: -41, ChaosResist: -45, TotalEHP: -1930, Mana: 65 } },
+    { slot: "Ring 2", now: "Rapture Band", error: "", change: { Life: 12, FireResist: 14, TotalEHP: 220 } }] }), 600));
   if (cmd === "unique_dust") return (args as Json).item?.rarity === "Unique" ? { dust: 26250, at84: 52500, ilvl: 74 } : null;
   if (cmd === "worn_compare" || cmd === "worn_refresh" || cmd === "worn_set") {
     const cls = String((args as Json).class);

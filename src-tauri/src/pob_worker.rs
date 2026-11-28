@@ -252,6 +252,21 @@ mod tests {
         assert!(base.get("Life").copied().unwrap_or(0.0) > 1000.0);
     }
 
+    /// A copied item (Ctrl+C or Ctrl+Alt+C text in POB_ITEM) in POB_SLOT of his Luminary's swap stage.
+    #[test]
+    #[ignore]
+    fn pob_item_live() {
+        let text = std::fs::read_to_string(std::env::var("POB_ITEM").unwrap()).unwrap();
+        let slot = std::env::var("POB_SLOT").unwrap_or("Ring 1".into());
+        let code = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../Ruetoo Luminary aurabot (PoB code).txt")).unwrap();
+        let xml = filter_core::pob::decode(code.trim()).unwrap();
+        let (base, each) = compare(&std::env::temp_dir().join("pob-live-test"), &xml, "Swap at Merciless Lab (level 68-90)", &slot, &[text]).unwrap();
+        let r = each[0].as_ref().unwrap();
+        for k in ["Life", "EnergyShield", "Mana", "FireResist", "ColdResist", "LightningResist", "ChaosResist", "TotalEHP"] {
+            println!("{k}: {:+.0}", r.get(k).unwrap_or(&0.0) - base.get(k).unwrap_or(&0.0));
+        }
+    }
+
     /// Live trade listings through PoB: `POB_WORKER_EXE=<built editor> cargo test -p poe-filter-editor pob_trade_live -- --ignored --nocapture`.
     #[test]
     #[ignore]
