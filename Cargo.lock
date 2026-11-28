@@ -2795,7 +2795,7 @@ dependencies = [
 
 [[package]]
 name = "poe-filter-editor"
-version = "0.2.106"
+version = "0.2.107"
 dependencies = [
  "base64 0.23.1",
  "dirs 6.0.0",
