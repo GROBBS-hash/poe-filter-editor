@@ -1225,7 +1225,6 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 - [ ] (0.2.109) After the next update, leave the editor open 2 hours: Price tiers' "updated" never gets more than about 1¼ hours old (the data folder's ask_github.txt says "asked", not "couldn't ask").
 - [ ] (0.2.110) My build > Upgrades with a rare attack weapon (e.g. the KF build's wand stages): a Weapon row first with its DPS; Find better lists cheaper weapons with more DPS ("+28 DPS"); Physical / Elemental / Total switch what counts.
 - [ ] (0.2.110) My build > Upgrades (logged in, Path of Building installed): Find better on any slot; each result has a "PoB" line (Life, ES, Effective HP, DPS, resistances: green better, red worse). The first search takes a few seconds longer (Path of Building starting), later ones don't.
-- [ ] (0.2.112) My build > Buy on a rare: the trade page has "+# total maximum Life", total elemental resistance and movement speed as pseudo filters with empty boxes, instead of each mod.
 - [ ] (0.2.104) Dust uniques: Prices page, tick "Uniques that give lots of dust", press Save, then F4 in game. A unique on a high-dust base at a high item level shows orange on dark blue with a purple beam (tier 1 also plays a sound); the list on the card shows which bases. Disenchant one at Faustus and check the dust is at least what the card says (at item level 84 without quality).
 - [ ] (0.2.104) Sidebar: "My maps" under Endgame (your map runs, deaths, session); Price check has Currency exchange and Blight oils in its side list; "Change an item" is gone from the menu but opens when you pick an item in Ctrl+F search or press Modify this rule in F2.
 - [ ] (0.2.104) Settings: no Save button any more, changes save a moment later ("Saving…" then "Saved"). Tiers: the list on the left folds by group, each tier shows one row with "+N more". If a page part ever breaks, it shows a short plain note with Copy details instead of code.
@@ -1349,7 +1348,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 - [ ] (0.2.55) When the pathofexile.com login runs out: the red message has a "Log in again" button on that page; after logging in, it carries on (Sell in bulk reads the stash again).
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
 (move them to "Confirmed in game") as he reports back, and add new features here as they land.
-Confirmed in game so far: 28 Nov (0.2.105-0.2.106): copy / paste looks, look editor keeps your place; 23 Nov (0.2.53): F5 works outside the game, F2 works in game; basic Ctrl+D price check (trade search returned listings); 20 Nov: weapon + armour
+Confirmed in game so far: 28 Nov (0.2.112): Buy asks for pseudo totals with empty boxes ("That looks much better!"); 28 Nov (0.2.105-0.2.106): copy / paste looks, look editor keeps your place; 23 Nov (0.2.53): F5 works outside the game, F2 works in game; basic Ctrl+D price check (trade search returned listings); 20 Nov: weapon + armour
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
 **Sell in bulk (23 Nov, released in 0.2.52):**
