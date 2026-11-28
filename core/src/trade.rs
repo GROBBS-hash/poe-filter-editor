@@ -1227,7 +1227,21 @@ pub fn buy_query(text: &str, index: &StatIndex) -> Option<(Value, usize)> {
     let cat = category(&item.item_class);
     let local_first = cat.is_some_and(|c| c.starts_with("armour.") || c.starts_with("weapon."));
     let mut stats: Vec<Value> = Vec::new();
-    for m in mods(text) {
+    // A rare or magic item (28 Nov 2026, he asked: resistances "and max life etc are PSeudo tags, so we can filter by how
+    // much"): life, fire / cold / lightning resistance and Str / Dex / Int become the trade site's totals with a minimum
+    // a tenth under this item's (its own rolled mods; crafted and implicit ones left out: you craft those, and a
+    // swapped base has other implicits). The mods that make them up aren't asked for one by one. Chaos stays as it is.
+    const TOTALS: [&str; 7] = ["Life", "Fire res", "Cold res", "Lightning res", "Strength", "Dexterity", "Intelligence"];
+    let all_mods = mods(text);
+    let rolled: Vec<String> = all_mods.iter().filter(|m| m.kind == "explicit" || m.kind == "fractured").map(|m| m.text.clone()).collect();
+    let totals = if unique { Default::default() } else { crate::compare::totals(&rolled) };
+    let in_totals = |line: &str| !unique && { let t = crate::compare::totals(&[line.to_string()]); TOTALS.iter().any(|k| t.get(k).copied().unwrap_or(0.0) != 0.0) };
+    for k in TOTALS {
+        let v = totals.get(k).copied().unwrap_or(0.0);
+        if v >= 1.0 { if let Some(id) = crate::upgrade::pseudo(k) { stats.push(json!({ "id": id, "value": { "min": (v * 0.9).floor() } })); } }
+    }
+    for m in all_mods {
+        if (m.kind == "explicit" || m.kind == "fractured") && in_totals(&m.text) { continue; }
         let local = || index.find(&ModLine { text: format!("{} (Local)", m.text), ..m.clone() }).filter(|_| local_first && local_fits(cat, &m.text));
         // A cluster jewel's "2 Added Passive Skills are Jewel Sockets": comes with its passive count, and asking for it
         // (as enchant or explicit, any number) finds nothing on the trade site (tested 21 Nov, his large lightning

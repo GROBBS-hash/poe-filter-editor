@@ -117,7 +117,7 @@ pub fn dps_of(g: &Gear) -> Option<Dps> {
 }
 
 /// The stat's trade pseudo id.
-fn pseudo(stat: &str) -> Option<&'static str> {
+pub fn pseudo(stat: &str) -> Option<&'static str> {
     Some(match stat {
         "Life" => "pseudo.pseudo_total_life", "Energy Shield" => "pseudo.pseudo_total_energy_shield", "Mana" => "pseudo.pseudo_total_mana",
         "Fire res" => "pseudo.pseudo_total_fire_resistance", "Cold res" => "pseudo.pseudo_total_cold_resistance",
