@@ -103,7 +103,7 @@ function BuyButton({ it }: { it: PobGear }) {
   );
 }
 
-type MercBuy = { total: number; need: number; skill: string; supports: string[] };
+type MercBuy = { total: number; need: number; greater: boolean; skill: string; supports: string[] };
 /** A Mercenary stage's first row: Mercenary Warrants with the same main attack and supports (28 Nov). */
 function MercRow({ groups }: { groups: PobGroup[] }) {
   const [state, setState] = useState<"idle" | "busy" | MercBuy | string>("idle");
@@ -112,7 +112,7 @@ function MercRow({ groups }: { groups: PobGroup[] }) {
     invoke<MercBuy>("buy_build_merc", { groups }).then(setState).catch((err) => setState(String(err)));
   };
   const note = typeof state === "object"
-    ? `${state.total} for sale${state.need < state.supports.length ? ` · with ${state.need} of its ${state.supports.length} supports` : ""}`
+    ? `${state.total} for sale · ${state.need < state.supports.length ? `${state.need} of its ${state.supports.length} supports` : "all its supports"}${state.greater ? " as Greater" : ", any tier"}`
     : state !== "idle" && state !== "busy" ? state : "";
   const main = groups.find((g) => g.enabled && g.gems.some((x) => !x.support))?.gems.find((x) => !x.support);
   return (
@@ -126,7 +126,7 @@ function MercRow({ groups }: { groups: PobGroup[] }) {
         </span>
         {note && <span className={`bv-buynote small ${typeof state === "string" ? "bad" : ""}`} title={note}>{note}</span>}
         <button className="bv-price bv-buy" disabled={state === "busy"}
-          title={"Search the trade site for Mercenary Warrants with this main attack and its supports (any tier),\ncheapest first, and open it in your browser"}
+          title={"Search the trade site for instant-buyout Mercenary Warrants with this main attack and its supports as Greater\n(Tier 3), no Wild Strike (and no Pierce on Frost Blades), cheapest first. The site can't tell which skill a support\nis on, so check the warrant's skill list before you buy."}
           onClick={buy}>{state === "busy" ? "Searching…" : "Buy"}</button>
         <PriceButton onClick={() => invoke("price_build_merc", { groups }).catch(() => null)} />
       </div>

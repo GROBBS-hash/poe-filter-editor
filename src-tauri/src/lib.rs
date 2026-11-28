@@ -820,26 +820,27 @@ fn buy_build_item(app: AppHandle, text: String) -> Result<BuyResult, String> {
 }
 
 #[derive(Serialize)]
-struct MercBuyResult { total: u64, need: usize, skill: String, supports: Vec<String> }
+struct MercBuyResult { total: u64, need: usize, greater: bool, skill: String, supports: Vec<String> }
 
-/// "Buy" on a Mercenary stage of your build: Mercenary Warrants with its main attack and all its supports (any tier),
-/// cheapest first; with none for sale, one support fewer at a time.
+/// "Buy" on a Mercenary stage of your build: instant-buyout Mercenary Warrants with its main attack and all its supports
+/// as Greater (Tier 3), cheapest first. With none for sale: one Greater support fewer (down to two), then any tier.
 #[tauri::command(async)]
 fn buy_build_merc(app: AppHandle, groups: Vec<filter_core::pob::Group>) -> Result<MercBuyResult, String> {
     let (poe2, league) = trade_league(&app);
     let dir = app.state::<AppState>().data_dir.clone();
     let index = trade_api::stats(&dir, poe2).unwrap_or_default();
-    let all = filter_core::merc::from_build(&groups, &index, usize::MAX).ok_or("No Mercenary skill in this stage")?;
-    let mut need = all.supports.len();
-    loop {
-        let w = filter_core::merc::from_build(&groups, &index, need).ok_or("No Mercenary skill in this stage")?;
+    let n = filter_core::merc::from_build(&groups, &index, usize::MAX, false).ok_or("No Mercenary skill in this stage")?.supports.len();
+    let tries: Vec<(bool, usize)> = (2..=n).rev().map(|k| (true, k)).chain((1..=n.max(1)).rev().map(|k| (false, k))).collect();
+    let mut last = None;
+    for (greater, need) in tries {
+        let w = filter_core::merc::from_build(&groups, &index, need, greater).ok_or("No Mercenary skill in this stage")?;
         let (id, _, total) = trade_api::search(poe2, &league, &w.query)?;
-        if total > 0 || need <= 1 {
-            open_url(trade_api::site_url(poe2, &league, &id))?;
-            return Ok(MercBuyResult { total, need, skill: w.skill, supports: w.supports });
-        }
-        need -= 1;
+        last = Some((id, MercBuyResult { total, need: need.min(n), greater, skill: w.skill, supports: w.supports }));
+        if total > 0 { break; }
     }
+    let (id, r) = last.ok_or("No Mercenary skill in this stage")?;
+    open_url(trade_api::site_url(poe2, &league, &id))?;
+    Ok(r)
 }
 
 /// "Price" on a Mercenary stage: the price window's warrant search, where the supports can be ticked.
@@ -848,7 +849,7 @@ fn price_build_merc(app: AppHandle, groups: Vec<filter_core::pob::Group>) {
     thread::spawn(move || {
         let (poe2, _) = trade_league(&app);
         let index = trade_api::stats(&app.state::<AppState>().data_dir, poe2).unwrap_or_default();
-        let Some(w) = filter_core::merc::from_build(&groups, &index, usize::MAX) else { return };
+        let Some(w) = filter_core::merc::from_build(&groups, &index, usize::MAX, true) else { return };
         let payload = text_payload(&app, &w.text);
         show_price(&app, payload, &w.text, false);
     });
@@ -3604,7 +3605,7 @@ pub fn run() {
             tonight_app::tonight_get,
             bases_app::base_worth, bases_app::bases_get, bases_app::bases_save, worn_app::worn_compare, worn_app::worn_refresh, worn_app::worn_set, worn_app::upgrade_plans, worn_app::upgrade_search,
             play_app::maps_done, play_app::maps_history, play_app::maps_clear, play_app::watch_action, play_app::searches_get,
-            play_app::searches_save, play_app::search_type, play_app::stash_highlight, play_app::sheets_list, play_app::sheets_add,
+            play_app::searches_save, play_app::search_type, play_app::stash_highlight, play_app::sheets_list, play_app::sheets_add, play_app::lab_layout, play_app::show_lab,
             play_app::sheets_remove, play_app::notes_get, play_app::notes_save, play_app::play_toggle, play_app::play_hide,
             play_app::trade_price_check, play_app::show_stash_spot, play_app::hide_stash_spot, play_app::alerts_get, play_app::alerts_save, play_app::play_prefs, play_app::play_prefs_get, play_app::altar_auto_get, play_app::altar_auto_set, play_app::price_names,
             play_app::chat_prefs, play_app::chat_get, splits_app::splits_view, splits_app::splits_hide, merc_app::merc_view, merc_app::merc_remove, merc_app::merc_details, merc_app::merc_recruit_details, merc_app::merc_hide, phone_app::phone_get, phone_app::phone_save, phone_app::phone_test, phone_app::phone_check_shop, phone_app::phone_new_key, play_app::pause_setup, play_app::pause_prefs, play_app::tracker_over_panels, play_app::tracker_use_atlas, play_app::maps_set_atlas, play_app::loot_prefs_save, wealth_app::poe_login,

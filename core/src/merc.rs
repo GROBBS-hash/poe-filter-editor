@@ -131,14 +131,23 @@ pub fn warrant_text(name: &str, gems: &[MercGem]) -> String {
 
 /// "A Mercenary like this" for a build's Mercenary stage (28 Nov: My build had no way to search for the Mercenary itself).
 /// `text` is a warrant copy for the price window; `query` asks the trade site for a warrant with the main attack and
-/// at least `need` of its supports, in any tier.
+/// at least `need` of its supports: Tier 3 only when `greater`, else any tier.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BuildWarrant { pub text: String, pub query: serde_json::Value, pub skill: String, pub supports: Vec<String> }
 
+/// Skills and supports a warrant must not have, whatever it's for. Wild Strike: the computer plays it badly. On a Frost
+/// Blades Mercenary, Pierce stops its projectiles chaining (Ruetoo's Luminary notes, 3.30).
+fn avoid(main: &str) -> Vec<&'static str> {
+    let mut out = vec!["Wild Strike"];
+    if main == "Frost Blades" { out.extend(["Pierce (Tier 2)", "Greater Pierce (Tier 3)"]); }
+    out
+}
+
 /// From a Mercenary stage's gem groups (Path of Building names: "Hypothermia", or "Hypothermia Support"). The main
 /// attack is the group with the most supports whose skill is a Mercenary skill on the trade site; other Mercenary
-/// skills go in the warrant text too. A support counts in any tier: "Hypothermia (Tier 2)" or "Greater Hypothermia (Tier 3)".
-pub fn from_build(groups: &[crate::pob::Group], index: &crate::trade::StatIndex, need: usize) -> Option<BuildWarrant> {
+/// skills go in the warrant text too. A support counts as "Greater Hypothermia (Tier 3)" when `greater` (28 Nov: the
+/// any-tier search's cheapest matches were weak), else in any tier ("Hypothermia (Tier 2)" too).
+pub fn from_build(groups: &[crate::pob::Group], index: &crate::trade::StatIndex, need: usize, greater: bool) -> Option<BuildWarrant> {
     let merc = |n: &str| index.ids("mercenary", n);
     let plain = |n: &str| n.trim_end_matches(" Support").to_string();
     // Every tier of a support, best first: (label, ids).
@@ -164,10 +173,13 @@ pub fn from_build(groups: &[crate::pob::Group], index: &crate::trade::StatIndex,
     let skill_ids = merc(&main.name);
     let mut stats = vec![if skill_ids.len() == 1 { serde_json::json!({ "type": "and", "filters": [{ "id": skill_ids[0] }] }) }
         else { serde_json::json!({ "type": "count", "value": { "min": 1 }, "filters": skill_ids.iter().map(|i| serde_json::json!({ "id": i })).collect::<Vec<_>>() }) }];
-    let sup_ids: Vec<serde_json::Value> = sups.iter().flat_map(|s| tiers(&plain(&s.name)).into_iter().flat_map(|(_, ids)| ids))
+    let sup_ids: Vec<serde_json::Value> = sups.iter().flat_map(|s| tiers(&plain(&s.name)).into_iter()
+            .filter(|(l, _)| !greater || l.ends_with("(Tier 3)")).flat_map(|(_, ids)| ids))
         .map(|i| serde_json::json!({ "id": i })).collect();
     let need = need.min(sups.len());
-    if need > 0 { stats.push(serde_json::json!({ "type": "count", "value": { "min": need }, "filters": sup_ids })); }
+    if need > 0 && !sup_ids.is_empty() { stats.push(serde_json::json!({ "type": "count", "value": { "min": need }, "filters": sup_ids })); }
+    let not: Vec<serde_json::Value> = avoid(&main.name).iter().flat_map(|l| merc(l)).map(|i| serde_json::json!({ "id": i })).collect();
+    if !not.is_empty() { stats.push(serde_json::json!({ "type": "not", "filters": not })); }
     Some(BuildWarrant {
         text: warrant_text("A Mercenary like this", &gems),
         // Instant buyout only, like Buy on gear (28 Nov: he wants no whispering for a warrant).
@@ -281,8 +293,16 @@ mod tests {
             { "id": "mercenary.support_h2", "text": "Hypothermia (Tier 2)", "type": "mercenary" },
             { "id": "mercenary.support_h3", "text": "Greater Hypothermia (Tier 3)", "type": "mercenary" },
             { "id": "mercenary.support_e3", "text": "Greater Elemental Damage with Attacks (Tier 3)", "type": "mercenary" },
-            { "id": "mercenary.support_d2", "text": "More Duration (Tier 2)", "type": "mercenary" } ] } ] }));
-        let w = from_build(&groups, &idx, 9).unwrap();
+            { "id": "mercenary.support_d2", "text": "More Duration (Tier 2)", "type": "mercenary" },
+            { "id": "mercenary.support_p2", "text": "Pierce (Tier 2)", "type": "mercenary" },
+            { "id": "mercenary.skill_ws", "text": "Wild Strike", "type": "mercenary" } ] } ] }));
+        // Greater: Tier 3 supports only; no Pierce (Frost Blades) or Wild Strike.
+        let g3 = from_build(&groups, &idx, 9, true).unwrap();
+        let st = &g3.query["query"]["stats"];
+        let ids = |v: &serde_json::Value| -> Vec<String> { v["filters"].as_array().unwrap().iter().map(|f| f["id"].as_str().unwrap().to_string()).collect() };
+        assert_eq!(ids(&st[1]), ["mercenary.support_h3", "mercenary.support_e3"]);
+        assert_eq!((st[2]["type"].as_str(), ids(&st[2])), (Some("not"), vec!["mercenary.skill_ws".to_string(), "mercenary.support_p2".to_string()]));
+        let w = from_build(&groups, &idx, 9, false).unwrap();
         assert_eq!((w.skill.as_str(), w.supports.clone()), ("Frost Blades", vec!["Hypothermia".to_string(), "Elemental Damage with Attacks".to_string()]));
         assert_eq!(w.query["query"]["status"]["option"], "securable", "instant buyout only");
         let stats = &w.query["query"]["stats"];
@@ -291,7 +311,7 @@ mod tests {
         let ids: Vec<&str> = stats[1]["filters"].as_array().unwrap().iter().map(|f| f["id"].as_str().unwrap()).collect();
         assert_eq!(ids, ["mercenary.support_h3", "mercenary.support_h2", "mercenary.support_e3"]);
         assert!(w.text.contains("Frost Blades\nGreater Hypothermia (Tier: 3)\n") && w.text.contains("Static Strike\nMore Duration (Tier: 2)\n"), "{}", w.text);
-        assert_eq!(from_build(&groups[..1], &idx, 2), None, "no Mercenary skill");
+        assert_eq!(from_build(&groups[..1], &idx, 2, false), None, "no Mercenary skill");
     }
 
     #[test]

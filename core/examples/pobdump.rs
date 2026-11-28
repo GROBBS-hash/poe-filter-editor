@@ -22,7 +22,7 @@ fn main() {
             let index = filter_core::trade::StatIndex::from_json(&serde_json::from_str(&std::fs::read_to_string(stats).unwrap()).unwrap());
             // A Mercenary stage: the "A Mercenary like this" warrant search.
             if s.title.to_lowercase().contains("mercenar") {
-                if let Some(w) = filter_core::merc::from_build(&s.groups, &index, usize::MAX) { println!("MERC\t{}\t{:?}\t{}", w.skill, w.supports, w.query); }
+                if let Some(w) = filter_core::merc::from_build(&s.groups, &index, usize::MAX, true) { println!("MERC\t{}\t{:?}\t{}", w.skill, w.supports, w.query); }
             }
             for g in s.gear.iter().chain(s.jewels.iter().map(|j| &j.item)) {
                 if std::env::var("POB_BASE").is_ok() {
