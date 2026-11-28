@@ -798,6 +798,8 @@ struct BuyResult {
     any_level: bool,
     /// The level this base (or unique) needs, when it's above the stage's: the guide's pick can't be worn then.
     base_level: Option<u32>,
+    /// The base searched for instead (same kind, wearable at the stage's level), when the guide's needs more.
+    swapped: Option<String>,
 }
 
 /// "Buy" on an item in your build: a trade search for that base with every mod it has (no numbers, like
@@ -807,16 +809,22 @@ fn buy_build_item(app: AppHandle, text: String, stage: Option<String>) -> Result
     let (poe2, league) = trade_league(&app);
     let dir = app.state::<AppState>().data_dir.clone();
     let index = trade_api::stats(&dir, poe2).unwrap_or_default();
-    let (mut q, of) = filter_core::trade::buy_query(&text, &index).ok_or("Couldn't read that item")?;
-    if let Ok(t) = trade_api::item_types(&dir, poe2) { t.fix_query(&mut q); }
+    let (mut q, mut of) = filter_core::trade::buy_query(&text, &index).ok_or("Couldn't read that item")?;
     // A stage named for a level ("Swap at Merciless Lab (level 68-90)"): only what you can wear then.
     let level = stage.as_deref().and_then(filter_core::buildcheck::title_level);
-    // The base itself needs a higher level (his level 68 stage's Torturer's Mask needs 81): no copy fits, so don't
-    // narrow the search; say so instead.
+    // The base itself needs a higher level (his level 68 stage's Torturer's Mask needs 84). A rare or magic item:
+    // the same mods on the best base of the same kind that fits (Deicide Mask). A unique can't change base, so
+    // the search isn't narrowed and the note says why.
     let item = filter_core::item::parse_item(&text);
     let need = item.as_ref().map(|i| filter_core::buildcheck::wear_level(&i.base_type, &i.rarity, i.name.as_deref().unwrap_or(""))).unwrap_or(0);
     let base_level = level.filter(|l| need > *l).map(|_| need);
-    let level = level.filter(|_| base_level.is_none());
+    let swapped = match (&item, level, base_level) {
+        (Some(i), Some(l), Some(_)) if !i.rarity.eq_ignore_ascii_case("unique") => filter_core::buildcheck::wearable_base(&i.base_type, l),
+        _ => None,
+    };
+    if let Some(b) = &swapped { of = filter_core::trade::swap_base(&mut q, b); }
+    if let Ok(t) = trade_api::item_types(&dir, poe2) { t.fix_query(&mut q); }
+    let level = level.filter(|_| base_level.is_none() || swapped.is_some());
     let any = q.clone();
     if let Some(l) = level { filter_core::trade::max_level(&mut q, l); }
     let (mut id, _, mut total) = trade_api::search(poe2, &league, &q)?;
@@ -841,7 +849,7 @@ fn buy_build_item(app: AppHandle, text: String, stage: Option<String>) -> Result
         }
     }
     open_url(trade_api::site_url(poe2, &league, &id))?;
-    Ok(BuyResult { total, of, need, level, any_level, base_level })
+    Ok(BuyResult { total, of, need, level, any_level, base_level, swapped })
 }
 
 #[derive(Serialize)]

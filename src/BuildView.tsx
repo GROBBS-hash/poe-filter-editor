@@ -54,7 +54,7 @@ function CraftButton({ it }: { it: PobGear }) {
   );
 }
 
-type BuyResult = { total: number; of: number; need: number; level?: number | null; any_level?: boolean; base_level?: number | null };
+type BuyResult = { total: number; of: number; need: number; level?: number | null; any_level?: boolean; base_level?: number | null; swapped?: string | null };
 
 /** "Buy": opens the trade site in your browser, searching for an item with the mods PoB lists. */
 type BaseResult = { total: number; ilvl: number; notables: [string, number][] };
@@ -90,7 +90,7 @@ function BuyButton({ it, stage }: { it: PobGear; stage?: string }) {
     invoke<BuyResult | null>("buy_build_item", { text: it.copy, stage: stage ?? null }).then((r) => setState(r ?? "No answer from the trade site")).catch((err) => setState(String(err)));
   };
   const note = typeof state === "object" && state
-    ? `${state.total} for sale${state.need < state.of ? ` · any ${state.need} of ${state.of} mods` : ""}${state.base_level ? ` · this base needs level ${state.base_level}` : state.any_level ? ` · none you can wear at level ${state.level}, showing all` : state.level ? ` · wearable at level ${state.level}` : ""}`
+    ? `${state.total} for sale${state.need < state.of ? ` · any ${state.need} of ${state.of} mods` : ""}${state.swapped ? ` · as ${state.swapped} (${it.base} needs level ${state.base_level})` : ""}${state.base_level && !state.swapped ? ` · this base needs level ${state.base_level}` : state.any_level ? ` · none you can wear at level ${state.level}, showing all` : state.level ? ` · wearable at level ${state.level}` : ""}`
     : state !== "idle" && state !== "busy" ? state : "";
   return (
     <>

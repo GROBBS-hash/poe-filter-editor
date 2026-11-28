@@ -158,6 +158,29 @@ pub fn wear_level(base: &str, rarity: &str, name: &str) -> u32 {
     (b.map(|b| b[0] as u32).unwrap_or(0)).max(if rarity.eq_ignore_ascii_case("unique") { unique_level(name) } else { 0 })
 }
 
+/// The best base you can wear at `level` instead of one that needs more (28 Nov 2026, he asked: "If the base is too
+/// high level, we should use the lower level bases with similar modifiers"): the same item class and the same kind
+/// of base (armour: the same defence type, Evasion/ES for a Torturer's Mask; others: the same Str/Dex/Int
+/// requirements, and two-handed or not), the highest level that fits, most attributes asked (= most defence or
+/// damage) on a tie. None when the base already fits or nothing does.
+pub fn wearable_base(base: &str, level: u32) -> Option<String> {
+    let bases = &data().0.bases;
+    let me = bases.get(base)?;
+    if me[0] as u32 <= level { return None; }
+    let classes = crate::item::base_classes();
+    let class = classes.get(base)?;
+    let defs = crate::item::defences();
+    let kind = |b: &str, v: &[f64; 6]| match defs.get(b) {
+        Some(d) => d.clone(),
+        None => format!("{}{}{}{}", (v[1] > 0.0) as u8, (v[2] > 0.0) as u8, (v[3] > 0.0) as u8, (v[5] > 0.0) as u8),
+    };
+    let want = kind(base, me);
+    bases.iter()
+        .filter(|(b, v)| b.as_str() != base && v[0] as u32 <= level && classes.get(b.as_str()) == Some(class) && kind(b, v) == want)
+        .max_by(|(an, a), (bn, b)| (a[0] as u32, (a[1] + a[2] + a[3]) as u32).cmp(&(b[0] as u32, (b[1] + b[2] + b[3]) as u32)).then_with(|| bn.cmp(an)))
+        .map(|(b, _)| b.clone())
+}
+
 fn unique_level(name: &str) -> u32 {
     let n = name.strip_prefix("Foulborn ").unwrap_or(name);
     crate::gear::uniques().iter().find(|u| u.name == n).map(|u| u.level).unwrap_or(0)
@@ -288,7 +311,11 @@ fn check_stage(b: &Build, st: &Stage, next_level: Option<u32>) -> StageCheck {
         let Some((_, base)) = base_of(g) else { continue };
         let lvl = (base[0] as u32).max(if g.rarity == "unique" { unique_level(&g.name) } else { 0 });
         let short_name = g.name.split(" of ").next().unwrap_or(&g.name).trim_start_matches("Constant ").to_string();
-        if lvl > level && !later.iter().any(|(_, n)| *n == short_name) { later.push((lvl, short_name)); }
+        if lvl > level && !later.iter().any(|(_, n)| n.starts_with(&short_name)) {
+            // A rare's base that fits now (Buy searches it too): "Torturer's Mask at 84 (wear Deicide Mask until then)".
+            let instead = (g.rarity != "unique").then(|| wearable_base(&g.base, level)).flatten();
+            later.push((lvl, match instead { Some(b) => format!("{short_name} at {lvl} (wear {b} until then)"), None => format!("{short_name} at {lvl}") }));
+        }
         if g.lines.iter().any(|l| l == "Has no Attribute Requirements") { continue; }
         // An item's own attributes don't count towards its own requirement.
         let mut own = Attr::default();
@@ -302,7 +329,7 @@ fn check_stage(b: &Build, st: &Stage, next_level: Option<u32>) -> StageCheck {
 
     if !later.is_empty() {
         later.sort();
-        note("warn", format!("Not wearable at level {level} yet: {}.", later.iter().map(|(l, n)| format!("{n} at {l}")).collect::<Vec<_>>().join(", ")));
+        note("warn", format!("Not wearable at level {level} yet: {}.", later.iter().map(|(_, n)| n.clone()).collect::<Vec<_>>().join(", ")));
     }
 
     // ---- gems
@@ -417,6 +444,12 @@ mod tests {
         assert!(wear_level("Vaal Gauntlets", "Rare", "") > 0);
         assert_eq!(wear_level("Not A Base", "Rare", ""), 0);
         assert_eq!(title_level("Swap at Merciless Lab (level 68-90)"), Some(68));
+        // Too high for the stage: the best Evasion/ES helmet at 68 instead.
+        assert_eq!(wearable_base("Torturer's Mask", 68).as_deref(), Some("Deicide Mask"));
+        let mitts = wearable_base("Phantom Mitts", 68).unwrap();
+        assert_eq!(crate::item::defences().get(mitts.as_str()).map(|s| s.as_str()), Some("ev_es"), "{mitts}");
+        assert!(wear_level(&mitts, "Rare", "") <= 68);
+        assert_eq!(wearable_base("Deicide Mask", 68), None, "already fits");
     }
 
     #[test]

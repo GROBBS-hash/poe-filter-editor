@@ -1300,6 +1300,16 @@ pub fn max_level(q: &mut Value, level: u32) {
     query["filters"]["req_filters"] = json!({ "filters": { "lvl": { "max": level } } });
 }
 
+/// The same search on another base (one you can wear sooner): its implicit mods are the old base's, so they're
+/// left out; the explicit mods stay. Returns how many mods it now asks for.
+pub fn swap_base(q: &mut Value, base: &str) -> usize {
+    q["query"]["type"] = json!(base);
+    if let Some(f) = q["query"]["stats"][0]["filters"].as_array_mut() {
+        f.retain(|v| !v["id"].as_str().unwrap_or("").starts_with("implicit."));
+    }
+    q["query"]["stats"][0]["filters"].as_array().map(|a| a.iter().filter(|v| v.get("disabled").is_none()).count()).unwrap_or(0)
+}
+
 /// The item level a cluster jewel notable needs to roll (core/data/cluster_notables.json, from the game's mod data
 /// via tools/build_cluster_levels.mjs; checked against poedb).
 pub fn notable_ilvl(name: &str) -> Option<u32> {
