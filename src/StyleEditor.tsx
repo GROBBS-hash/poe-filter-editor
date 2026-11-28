@@ -115,11 +115,24 @@ function Chips({ value, onPick, allowOff }: { value: string | null; onPick: (v: 
   );
 }
 
+/** A copied look, kept between pages and restarts, so one look can be pasted onto any tier, rule or theme
+ *  (28 Nov 2026, he asked: "copy the look of tier 1, or any look i want and add to another filter/look"). */
+const COPIED = "look.copied";
+function copiedLook(): CustomStyle | null {
+  try { const v = localStorage.getItem(COPIED); return v ? JSON.parse(v) as CustomStyle : null; } catch { return null; }
+}
+
 export default function StyleEditor({ start, label, onSave, onCancel }: {
   start: CustomStyle; label: string; onSave: (s: CustomStyle) => void; onCancel: () => void;
 }) {
   const [s, setS] = useState<CustomStyle>(start);
   const [files, setFiles] = useState<string[]>([]);
+  const [copied, setCopied] = useState<CustomStyle | null>(copiedLook);
+  const [note, setNote] = useState("");
+  const copy = () => {
+    try { localStorage.setItem(COPIED, JSON.stringify(s)); setCopied(s); setNote("Copied. Open any other look and press Paste."); } catch { /* not kept */ }
+  };
+  const paste = () => { if (copied) { setS(JSON.parse(JSON.stringify(copied))); setNote("Pasted. Press Save look to keep it."); } };
   const audio = useRef<HTMLAudioElement | null>(null);
   const set = (patch: Partial<CustomStyle>) => setS((x) => ({ ...x, ...patch }));
 
@@ -245,6 +258,13 @@ export default function StyleEditor({ start, label, onSave, onCancel }: {
         </div>
       )}
       {s.sound.kind === "Builtin" && <div className="se-hint">Game sounds play in game; they can't be previewed here.</div>}
+
+      <div className="se-copy">
+        <button onClick={copy} title="Remember this look so you can paste it onto another tier, rule or theme">Copy this look</button>
+        <button onClick={paste} disabled={!copied} title={copied ? "Use the look you copied" : "Copy a look first"}>Paste copied look</button>
+        {copied && <span className="se-copied" aria-label="The copied look"><Preview s={copied} text="Copied" /></span>}
+        {note && <span className="muted small" role="status">{note}</span>}
+      </div>
 
       <div className="se-actions">
         <button onClick={onCancel}>Cancel</button>

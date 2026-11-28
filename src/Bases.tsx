@@ -83,10 +83,11 @@ export default function BasesCard({ profileId, onSaved }: { profileId: string; o
       <p className="muted small">Plain, magic or rare bases crafters pay for, by what sellers ask (poe.ninja, only bases with 10 or more for sale).
         Your own edits still win.</p>
       <div className="bs-row">
-        <span>Stand out from</span>
-        <input type="number" min={10} step={10} value={min} onChange={(e) => type(Math.max(10, +e.target.value || 10))} />
-        <CurrencyIcon id="chaos" />
-        {p.divine != null && <button className="link small" onClick={() => type(Math.round(p.divine!))}>1 divine</button>}
+        <span>Stand out when worth</span>
+        <input type="number" min={10} step={10} value={min} aria-label="Chaos orbs" onChange={(e) => type(Math.max(10, +e.target.value || 10))} />
+        <span className="bs-unit"><CurrencyIcon id="chaos" /> chaos or more</span>
+        {p.divine != null && <span className="muted small">{min >= p.divine ? `about ${+(min / p.divine).toFixed(1)} divine` : `1 divine is ${Math.round(p.divine)} chaos`}</span>}
+        {p.divine != null && Math.round(p.divine) !== min && <button className="link small" onClick={() => type(Math.round(p.divine!))}>Use 1 divine</button>}
         <label className="check"><input type="checkbox" checked={p.influenced} onChange={(e) => (on ? save(true, min, e.target.checked) : load(min, e.target.checked))} /><span>Influenced ones too</span></label>
       </div>
       <div className="muted small">{p.total === 0 ? "No base lists at that much now." : `${p.total} ${on ? "stand out" : "would stand out"} right now`}</div>

@@ -79,6 +79,8 @@ pub struct DustPick {
     pub high: u64,
     /// How many uniques drop on it.
     pub uniques: usize,
+    /// Their names, least dust first (the page shows the uniques, not just the base).
+    pub names: Vec<String>,
     /// The tier it reaches at 84 (0 = the top one), and from which item level.
     pub tier: usize,
     pub ilvl: u32,
@@ -101,9 +103,12 @@ pub fn picks(tiers: &[Tier], segs: &[Segment]) -> Vec<DustPick> {
         let v = base_value(base)?;
         if dust(v, 84, 0, 0) < lowest.min as u64 { return None; }
         let tier = tiers.iter().position(|t| dust(v, 84, 0, 0) >= t.min as u64)?;
-        let ground: Vec<f64> = uniques_on(base).iter().filter(|(n, _)| drops_on_ground(n)).map(|x| x.1).collect();
-        let high = ground.iter().copied().fold(v, f64::max);
-        Some(DustPick { base: base.clone(), low: dust(v, 84, 0, 0), high: dust(high, 84, 0, 0), uniques: ground.len(), tier,
+        let ground: Vec<&(String, f64)> = uniques_on(base).iter().filter(|(n, _)| drops_on_ground(n)).collect();
+        let high = ground.iter().map(|x| x.1).fold(v, f64::max);
+        let mut names: Vec<&(String, f64)> = ground.clone();
+        names.sort_by(|a, b| a.1.total_cmp(&b.1));
+        Some(DustPick { base: base.clone(), low: dust(v, 84, 0, 0), high: dust(high, 84, 0, 0), uniques: ground.len(),
+            names: names.iter().map(|x| x.0.clone()).collect(), tier,
             ilvl: level_for(v, tiers[tier].min as u64).unwrap_or(84), neversink: loud.contains(base) })
     }).collect();
     out.sort_by(|a, b| b.low.cmp(&a.low).then_with(|| a.base.cmp(&b.base)));

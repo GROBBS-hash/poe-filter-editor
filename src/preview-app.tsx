@@ -186,7 +186,8 @@ mockIPC((cmd, args) => {
     return { ...wealth };
   }
   if (cmd === "buy_base_item") return { total: 3480, ilvl: 75, notables: [["Doryani's Lesson", 68], ["Inspired Oppression", 75], ["Overshock", 50]] };
-  if (cmd === "get_price_settings") return { settings: { enabled: false, groups: [{ group: "DivinationCards", enabled: true, tiers: [], hide_below: null }, { group: "Uniques", enabled: true, tiers: [], hide_below: null }] }, info: { unit: "chaos", league: "Keepers", updated: new Date().toISOString(), count: 18432 } };
+  if (cmd === "get_price_settings") return { settings: { enabled: false, groups: [{ group: "DivinationCards", enabled: true, tiers: [], hide_below: null }, { group: "Uniques", enabled: true, tiers: [], hide_below: null }],
+    dust: { enabled: true, tiers: [50000, 20000, 10000].map((min, i) => ({ min, style: { font_size: 45 - i * 3, text: [175, 96, 37, 255], border: [175, 96, 37, 255], background: [10, 30, 45, 255], beam: null, minimap: null, sound: { kind: "Default" }, label_hidden: false } })) } }, game: "Poe1", info: { unit: "chaos", league: "Keepers", updated: new Date().toISOString(), count: 18432 } };
   if (cmd === "price_count_below") return [Math.round(Math.min(480, (args as { limit: number }).limit * 60)), 512];
   if (cmd === "price_thin_cards") { const min = (args as { minSold: number }).minSold; return ([["Nook's Crown", 15, 0.2], ["The Gambler", 8.65, 13], ["The Pack Leader", 4, 0.2], ["The Lich", 2.95, 3.7], ["The Master Artisan", 1.18, 5.7], ["Immortal Resolve", 3.3, 1], ["The Beast", 3.5, 0.7]] as [string, number, number][]).filter((c) => c[2] < min); }
   if (cmd === "set_price_settings") return [];
@@ -385,6 +386,11 @@ mockIPC((cmd, args) => {
   if (cmd === "bases_get" || cmd === "bases_save") return { min: basesOn, influenced: false, total: 41, divine: 179, known: true,
     list: [["Focused Amulet", 83, 6534, 41], ["Simplex Amulet", 83, 1508, 38], ["Helical Ring", 84, 2692, 114], ["Gloam Ring", 83, 1616, 67], ["Dusk Ring", 83, 718, 76], ["Cord Belt", 86, 359, 54], ["Crystal Belt", 86, 100, 73]]
       .map(([base, ilvl, value, listings]) => ({ base, ilvl, value, listings, influence: "" })) };
+  if (cmd === "dust_picks") return { total: 4, updated: "2026-11-28", list: [
+    { base: "Fossilised Spirit Shield", names: ["Prism Guardian", "Rise of the Phoenix"], low: 525000, high: 900000, uniques: 2, tier: 0, ilvl: 66, neversink: false },
+    { base: "Grand Mana Flask", names: ["Doedre's Elixir"], low: 266000, high: 266000, uniques: 1, tier: 0, ilvl: 68, neversink: false },
+    { base: "Vaal Gauntlets", names: ["Atziri's Acuity", "Doryani's Fist"], low: 112000, high: 300000, uniques: 2, tier: 0, ilvl: 73, neversink: false },
+    { base: "Jewelled Foil", names: ["Cospri's Malice"], low: 109000, high: 109000, uniques: 1, tier: 0, ilvl: 74, neversink: false }] };
   if (cmd === "base_worth") return { worth: { influence: "", ilvl: 86, value: 7665, listings: 86, if_level: false }, divine: 179, loud: null };
   // The farm finder (dev: FARM_OUT=.claude/farm.json, see core farm.rs).
   if (cmd === "farm_find") { const want = (args as { ask: { want: string[] } }).ask.want ?? [];

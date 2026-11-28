@@ -7,7 +7,7 @@ import "./bases.css";
 
 export type DustTier = { min: number; style: CustomStyle };
 export type DustSettings = { enabled: boolean; tiers: DustTier[] };
-type Pick = { base: string; low: number; high: number; uniques: number; tier: number; ilvl: number; neversink: boolean };
+type Pick = { base: string; low: number; high: number; uniques: number; names?: string[]; tier: number; ilvl: number; neversink: boolean };
 type Picks = { total: number; list: Pick[]; updated: string };
 
 /** "52k" / "1.2m" dust. */
@@ -40,7 +40,7 @@ export default function DustCard({ profileId, dust, onChange, onLook }: {
       </label>
       <p className="muted small">Faustus in Kingsmarch turns uniques into Thaumaturgic Dust. How much depends on the unique and its item
         level: 84 or higher gives 20 times what 65 gives. Quality, influence and corrupted implicits add more on top (not counted here).
-        A filter can only see the base, so a base counts at its lowest-dust unique. Works with price tiers off; a price tier still wins.</p>
+        The list shows each unique and the base it drops on. A filter can only see the base, so a base counts at its lowest-dust unique. Works with price tiers off; a price tier still wins.</p>
       <ul className="tiers">
         {order.map(({ t, ti }, rank) => (
           <li key={ti}>
@@ -60,15 +60,15 @@ export default function DustCard({ profileId, dust, onChange, onLook }: {
         d.tiers.push({ min: Math.max(1000, Math.round(low / 2000) * 1000), style: JSON.parse(JSON.stringify(order.at(-1)!.t.style)) });
       })}>Add a tier</button>
       {p && <div className="muted small" style={{ marginTop: 8 }}>
-        {p.total === 0 ? "No base gives that much." : `${p.total} bases ${dust.enabled ? "stand out" : "would stand out"} at item level 84`}
+        {p.total === 0 ? "No base gives that much." : `${p.total} unique bases ${dust.enabled ? "stand out" : "would stand out"} at item level 84`}
         {theirs.length > 0 && ` (and ${theirs.length} NeverSink already shows loudly, left to him)`}. Dust list from {p.updated}.
       </div>}
       <div className="bs-list">
         {shown.map((x) => (
-          <div key={x.base} className="bs-item" title={`${x.uniques} unique${x.uniques === 1 ? "" : "s"} on this base: ${dustText(x.low)}${x.high > x.low ? ` to ${dustText(x.high)}` : ""} dust at item level 84`}>
-            <ItemIcon name={x.base} base={x.base} size={34} />
-            <div><div className="bs-name">{x.base}</div>
-              <div className="muted small">Tier {x.tier + 1}{x.ilvl > 64 ? ` from item level ${x.ilvl}` : ", any item level"}</div></div>
+          <div key={x.base} className="bs-item" title={`Uniques on ${x.base}: ${(x.names ?? []).join(", ")}. ${dustText(x.low)}${x.high > x.low ? ` to ${dustText(x.high)}` : ""} dust at item level 84. The filter can only see the base, so they all get this look.`}>
+            <ItemIcon name={x.names?.[0] ?? x.base} base={x.base} size={34} />
+            <div><div className="bs-name bs-unique">{x.names?.[0] ?? x.base}{(x.names?.length ?? 0) > 1 && <span className="muted small"> +{x.names!.length - 1} more</span>}</div>
+              <div className="muted small">Unique {x.base} · tier {x.tier + 1}{x.ilvl > 64 ? ` from item level ${x.ilvl}` : ""}</div></div>
             <span className="bs-money">{dustText(x.low)}{x.high > x.low ? "+" : ""}</span>
           </div>
         ))}
