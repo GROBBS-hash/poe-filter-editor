@@ -3,7 +3,11 @@ import { invoke } from "@tauri-apps/api/core";
 
 /** One slot you wear: what the search adds up (the trade site's weighted sum) and why. */
 type Want = { stat: string; id: string; weight: number; why: string; on: boolean };
-type Plan = { slot: string; current: string; wants: Want[]; now: number; not_counted?: string[] };
+/** A rare or magic attack weapon: searched by damage per second (core upgrade.rs `Dps`). */
+type Dps = { pdps: number; edps: number; total: number; aps: number; kind: "pdps" | "edps" | "dps"; category: string };
+type Plan = { slot: string; current: string; wants: Want[]; now: number; not_counted?: string[]; dps?: Dps | null };
+const DPS_KINDS: [Dps["kind"], string, keyof Dps][] = [["pdps", "Physical", "pdps"], ["edps", "Elemental", "edps"], ["dps", "Total", "total"]];
+const dpsOf = (d: Dps, k: Dps["kind"]) => (k === "pdps" ? d.pdps : k === "edps" ? d.edps : d.total);
 
 /** Stats you unticked stay unticked (per slot), so a capped resistance is switched off once. */
 const OFF_KEY = "upgrades.off";
@@ -59,6 +63,7 @@ export default function UpgradeFinder({ stage }: { stage: number }) {
     setPlans(next);
     saveOff(next);
   };
+  const setKind = (slot: string, kind: Dps["kind"]) => setPlans(plans.map((p) => p.slot !== slot || !p.dps ? p : { ...p, dps: { ...p.dps, kind }, now: dpsOf(p.dps, kind) }));
   const nowScore = (p: Plan) => {
     // The score of what you wear with only the switched-on stats; the backend scores it the same way.
     return p.wants.every((w) => w.on) ? p.now : null;
@@ -74,7 +79,8 @@ export default function UpgradeFinder({ stage }: { stage: number }) {
     <div className="uf">
       {picker}
       <p className="muted small">Each search adds up the stats below (weighted) and only lists items that beat what you wear now, cheapest first, instant buyout.
-        Untick a stat to leave it out. Weapons aren't here: compare those with Ctrl+D.</p>
+        Untick a stat to leave it out. Rare and magic attack weapons are searched by damage per second instead (counted at 20% quality, like the trade site);
+        unique and spell weapons aren't here: compare those with Ctrl+D.</p>
       {plans.map((p) => {
         const r = res[p.slot];
         const score = nowScore(p);
@@ -82,9 +88,18 @@ export default function UpgradeFinder({ stage }: { stage: number }) {
           <div key={p.slot} className="uf-slot">
             <div className="uf-head">
               <span className="uf-name"><b>{p.slot}</b> <span className="muted">{p.current || "empty"}</span></span>
-              {score != null && <span className="muted small">scores {Math.round(score)}</span>}
+              {p.dps ? <span className="muted small">{Math.round(dpsOf(p.dps, p.dps.kind))} {DPS_KINDS.find((k) => k[0] === p.dps!.kind)![1].toLowerCase()} DPS · {p.dps.aps} attacks a second</span>
+                : score != null && <span className="muted small">scores {Math.round(score)}</span>}
               <button className="primary small" disabled={busy != null} onClick={() => find(p)}>{busy === p.slot ? "Searching…" : "Find better"}</button>
             </div>
+            {p.dps && <div className="uf-wants" role="radiogroup" aria-label="Damage to beat">
+              {DPS_KINDS.filter(([k]) => k === "dps" || dpsOf(p.dps!, k) > 0).map(([k, label]) => (
+                <label key={k} className={`uf-want ${p.dps!.kind === k ? "on" : ""}`} title={k === "dps" ? "Physical, elemental and chaos together" : `Only ${label.toLowerCase()} damage counts`}>
+                  <input type="radio" name={`dps-${p.slot}`} checked={p.dps!.kind === k} onChange={() => setKind(p.slot, k)} />
+                  {label} <span className="muted">{Math.round(dpsOf(p.dps!, k))}</span>
+                </label>
+              ))}
+            </div>}
             <div className="uf-wants">
               {p.wants.map((w) => (
                 <label key={w.stat} className={`uf-want ${w.on ? "on" : ""}`} title={w.why}>
@@ -113,7 +128,7 @@ export default function UpgradeFinder({ stage }: { stage: number }) {
                         </div>
                         <div className="uf-item-side">
                           <div className="uf-price">{it.price}</div>
-                          <div className="uf-better small">+{it.better_by}</div>
+                          <div className="uf-better small">+{it.better_by}{p.dps ? " DPS" : ""}</div>
                         </div>
                       </div>
                     ))}

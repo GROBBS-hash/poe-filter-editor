@@ -142,9 +142,12 @@ pub struct UpgradePlans {
 #[tauri::command]
 pub fn upgrade_plans(app: AppHandle, from: String, stage: Option<usize>) -> UpgradePlans {
     let s = source(&app, &from, stage);
-    let plans = ["Helmet", "Body Armour", "Gloves", "Boots", "Belt", "Amulet", "Ring 1", "Ring 2"].iter()
+    // Weapons first: a rare or magic attack weapon is searched by damage per second (28 Nov 2026); others aren't listed.
+    let weapons = ["Weapon 1", "Weapon 2"].iter().filter(|sl| s.gear.iter().any(|g| g.slot == **sl))
+        .map(|sl| filter_core::upgrade::plan(sl, &s.gear, s.short)).filter(|p| p.dps.is_some());
+    let plans = weapons.chain(["Helmet", "Body Armour", "Gloves", "Boots", "Belt", "Amulet", "Ring 1", "Ring 2"].iter()
         .filter(|sl| s.gear.iter().any(|g| g.slot == **sl))
-        .map(|sl| filter_core::upgrade::plan(sl, &s.gear, s.short)).collect();
+        .map(|sl| filter_core::upgrade::plan(sl, &s.gear, s.short))).collect();
     let st = app.state::<AppState>();
     let poe2 = active_game(&st) == Game::Poe2;
     let w = current(&app);
@@ -182,7 +185,9 @@ fn listing_lines(item: &serde_json::Value) -> Vec<String> {
 pub fn upgrade_search(app: AppHandle, mut plan: filter_core::upgrade::Plan, from: String, stage: Option<usize>) -> Result<Upgrades, String> {
     let src = source(&app, &from, stage);
     // Stats switched off change what yours scores: work it out again from what's worn.
-    if let Some(g) = src.gear.iter().find(|g| g.slot == plan.slot) { plan.now = filter_core::upgrade::score(&g.lines, &plan.wants); }
+    // A weapon: the DPS kind picked on the page.
+    if let Some(d) = &plan.dps { plan.now = d.value(&d.kind); }
+    else if let Some(g) = src.gear.iter().find(|g| g.slot == plan.slot) { plan.now = filter_core::upgrade::score(&g.lines, &plan.wants); }
     let (poe2, league) = trade_league(&app);
     let level = src.level;
     let q = filter_core::upgrade::query(&plan, level).ok_or("Nothing to search for: switch at least one stat on")?;
@@ -198,7 +203,11 @@ pub fn upgrade_search(app: AppHandle, mut plan: filter_core::upgrade::Plan, from
     let items = fetched["result"].as_array().into_iter().flatten().filter_map(|r| {
         let it = &r["item"];
         let lines = listing_lines(it);
-        let score = filter_core::upgrade::score(&lines, &plan.wants);
+        // Weapons: the trade site's own DPS numbers for the listing ("extended").
+        let score = match &plan.dps {
+            Some(d) => it["extended"][d.kind.as_str()].as_f64().unwrap_or(0.0),
+            None => filter_core::upgrade::score(&lines, &plan.wants),
+        };
         let p = &r["listing"]["price"];
         let price = match (p["amount"].as_f64(), p["currency"].as_str()) { (Some(a), Some(c)) => format!("{a} {c}"), _ => "no price".into() };
         Some(Found {

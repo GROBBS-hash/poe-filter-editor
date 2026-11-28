@@ -55,6 +55,8 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 ## Done (recent sessions)
 
+- **Weapons in Upgrades (28 Nov, not released; he picked it from the Left to do list).** A rare / magic / normal attack weapon in Weapon 1 / 2 gets a plan with `Plan.dps` (`upgrade::dps_of`): base damage and attack time from `core/data/poe1_weapons.json` (361 bases, `node tools/build_weapons.mjs`, from RePoE base_items), plus local flat damage, % physical, attack speed, quality counted at least 20% like the trade site (its listings say `dps_aug`, checked live). The search is the same weapon category with `weapon_filters` pdps / edps / dps above yours, wearable at the stage level, cheapest first; listings are scored by the site's own `extended` DPS. The page shows "141 physical DPS" with Physical / Elemental / Total to pick what to beat. Uniques (picked for what they do; levelling uniques scale with level) and spell weapons aren't listed. Live check: wands 142+ pdps at level 68 or lower: 10,000+ for sale from 1 alch.
+
 - **Dust tiers start at 100k / 50k / 25k (28 Nov, not released; he asked after changing his own).** The first defaults (50k / 20k / 10k at item level 84) lit up 6 in 10 of the 1,349 uniques (typical unique about 16k); now about the top 1 in 9, 1 in 6 and 1 in 3. Only filters that never saved dust settings get the new numbers.
 
 - **Hourly prices fixed after an auto-update (28 Nov, released in 0.2.109).** His prices were 4.5 h old: `ask_github.txt` said "couldn't ask: … gh auth login" though `gh` is signed in (keyring). `gh` run without APPDATA says exactly that, and the editor restarted by the updater seems to run without it. `price_tick::ask` now sets APPDATA for `gh` (the data folder's parent, from `dirs::data_dir`) when it's missing. I started the price job by hand the same day so his prices caught up.
@@ -1217,6 +1219,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 - [ ] (0.2.109) Atlas → Build a tree: most points show Solid / Maths / Players as before; now and then one also has a gold "Close call" (rest the mouse on it).
 - [ ] (0.2.109) Ctrl+D or F2 on any unique: a line "Disenchants for about N Thaumaturgic Dust" (higher on item level 84+ copies). Disenchant one at Faustus to compare.
 - [ ] (0.2.109) After the next update, leave the editor open 2 hours: Price tiers' "updated" never gets more than about 1¼ hours old (the data folder's ask_github.txt says "asked", not "couldn't ask").
+- [ ] (not released) My build > Upgrades with a rare attack weapon (e.g. the KF build's wand stages): a Weapon row first with its DPS; Find better lists cheaper weapons with more DPS ("+28 DPS"); Physical / Elemental / Total switch what counts.
 - [ ] (0.2.104) Dust uniques: Prices page, tick "Uniques that give lots of dust", press Save, then F4 in game. A unique on a high-dust base at a high item level shows orange on dark blue with a purple beam (tier 1 also plays a sound); the list on the card shows which bases. Disenchant one at Faustus and check the dust is at least what the card says (at item level 84 without quality).
 - [ ] (0.2.104) Sidebar: "My maps" under Endgame (your map runs, deaths, session); Price check has Currency exchange and Blight oils in its side list; "Change an item" is gone from the menu but opens when you pick an item in Ctrl+F search or press Modify this rule in F2.
 - [ ] (0.2.104) Settings: no Save button any more, changes save a moment later ("Saving…" then "Saved"). Tiers: the list on the left folds by group, each tier shows one row with "+N more". If a page part ever breaks, it shows a short plain note with Copy details instead of code.
@@ -1906,7 +1909,7 @@ when the game window isn't found. Check in game: the window's spot, and that it 
       "Best strategies" ranks runs.
 
 ## Left to do (agreed order)
-- **Next for "Better than mine?":** weighted-sum upgrade search done 27 Nov (My build > Upgrades). Still: real Path of Building numbers (needs PoB installed to run it in a separate process; the web PoB at pob.cool works but can't be driven from the app; report 05 idea 3). Large, try-out first. Also weapons in Upgrades (needs DPS, not sums).
+- **Next for "Better than mine?":** weighted-sum upgrade search done 27 Nov (My build > Upgrades). Still: real Path of Building numbers (needs PoB installed to run it in a separate process; the web PoB at pob.cool works but can't be driven from the app; report 05 idea 3). Large, try-out first. Weapons in Upgrades done 28 Nov (attack weapons by DPS; spell weapons not yet).
 0. **24 Nov cloud work (see Done): merged and released in 0.2.65.** Phone alerts + stats
    page (8a/8b), chat commands (7d), atlas earnings per tree (5), race splits (instead of a live rank: GGG's ladder is
    OAuth-only), PoE 2 campaign route, Awakener's Orb crafting. Still not built: **PoE 2 crafting** (needs its own data
