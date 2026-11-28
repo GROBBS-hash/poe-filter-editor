@@ -2653,3 +2653,5 @@ button.qm-rule:hover, .qm-rule.can-open:hover { border-color: var(--gold); backg
 .pob-check { margin: 8px 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; gap: 6px; }
 .pob-check-row { display: flex; flex-direction: column; gap: 2px; }
 .pob-ask { gap: 12px; align-items: center; margin: 6px 0; }
+/* The guide's own words about its minions (28 Nov). */
+.bv-quote { margin: 0; padding: 6px 10px; border-left: 3px solid var(--gold); border-radius: 0; background: var(--gold-bg); font-size: 12.5px; display: flex; flex-direction: column; gap: 2px; }

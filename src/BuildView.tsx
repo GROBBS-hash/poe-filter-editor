@@ -14,7 +14,9 @@ export type PobGear = { slot: string; rarity: string; name: string; base: string
 export type PobJewel = { node: number | null; item: PobGear; notables: string[] };
 /** Spectres and the Animate Guardian's gear (28 Nov). `main`: picked on a Raise Spectre gem; the rest are the build's spectre list. */
 export type PobMinions = { spectres: { id: string; name: string; main: boolean }[]; spectre_gem: PobGem | null; spectre_limit: number | null;
-  guardian_gem: PobGem | null; guardian_set: string; guardian: PobGear[] };
+  guardian_gem: PobGem | null; guardian_set: string; guardian: PobGear[];
+  /** The guide's notes, word for word, where they name the spectres / the guardian's gear. */
+  spectre_note?: string; guardian_note?: string };
 export type PobStage = { title: string; tree: { version: string; nodes: number[]; url: string } | null; groups: PobGroup[]; gear: PobGear[]; jewels?: PobJewel[]; minions?: PobMinions };
 /** alternatives: items in the PoB that no stage wears (the guide's options and upgrades). */
 export type PobBuild = { class: string; ascendancy: string; level: number; stages: PobStage[]; active: number; alternatives?: PobGear[] };
@@ -513,8 +515,11 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
             {who === "guardian" && m && <>
               <div className="bv-ownerhead">
                 {m.guardian_gem && <GemPill g={m.guardian_gem} main={true} />}
-                <span className="muted small">{m.guardian.length ? <>The Animate Guardian wears the guide's “{m.guardian_set}” set. Drop these on the ground, then use the gem on them.</> : "The guide doesn't give the Animate Guardian any gear."}</span>
+                <span className="muted small">{!m.guardian.length ? "The guide doesn't give the Animate Guardian any gear." : m.guardian_set === "the guide's notes"
+                  ? "The guide names this gear in its notes. Drop the items on the ground, then use the gem on them."
+                  : <>The Animate Guardian wears the guide's “{m.guardian_set}” set. Drop these on the ground, then use the gem on them.</>}</span>
               </div>
+              {m.guardian_note && <blockquote className="bv-quote" title="Word for word from the guide's notes in Path of Building"><span className="muted small">The guide says:</span>{m.guardian_note.split("\n").map((l, i) => <div key={i}>{l}</div>)}</blockquote>}
               <GearDoll key={"ag" + stage} gear={m.guardian} groups={[]} stage={s.title} have={have} onHave={(it) => toggleHave(haveKey(it))}
                 newGems={[]} empty="No gear for it in this guide." />
             </>}
@@ -525,13 +530,14 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
                   <span>raises <b>{m.spectre_limit ?? "?"}</b> spectre{m.spectre_limit === 1 ? "" : "s"}</span>
                   <span className="muted small" title="From the gem's level, gem levels on your gear, and +spectres from your tree and gear. Support gems aren't counted.">(about: from the gem level, gear and tree)</span>
                 </div>
+                {m.spectre_note && <blockquote className="bv-quote" title="Word for word from the guide's notes in Path of Building"><span className="muted small">The guide says:</span>{m.spectre_note.split("\n").map((l, i) => <div key={i}>{l}</div>)}</blockquote>}
                 {m.spectres.length === 0 && <div className="empty">The guide doesn't say which spectres to raise.</div>}
                 {m.spectres.some((x) => x.main) && <div className="bv-subhead">Raise these</div>}
                 {m.spectres.filter((x) => x.main).map((x) => (
                   <div key={x.id} className="bv-spectre main"><GemPic g={m.spectre_gem!} /><b>{x.name}</b>
-                    <span className="muted small">the guide's pick on this stage's Raise Spectre gem</span></div>
+                    <span className="muted small">{x.id ? "the guide's pick on this stage's Raise Spectre gem" : "the guide's pick in its notes"}</span></div>
                 ))}
-                {m.spectres.some((x) => !x.main) && <div className="bv-subhead" title="Path of Building's spectre list for this build: every spectre the guide set up, for all its stages">Also in the guide's spectre list</div>}
+                {m.spectres.some((x) => !x.main) && <div className="bv-subhead" title="Path of Building's spectre list for this build: every spectre the guide set up, for all its stages">{m.spectre_note ? "Also mentioned" : "Also in the guide's spectre list"}</div>}
                 {m.spectres.filter((x) => !x.main).map((x) => <div key={x.id} className="bv-spectre"><span>{x.name}</span></div>)}
               </div>
             )}

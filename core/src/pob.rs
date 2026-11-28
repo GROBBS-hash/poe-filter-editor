@@ -99,6 +99,119 @@ pub struct Minions {
     /// The item set the Animate Guardian wears ("Animate Guardian", "AG gear"...).
     pub guardian_set: String,
     pub guardian: Vec<Gear>,
+    /// What the guide's own notes say, word for word, when it names spectres or Animate Guardian gear there instead
+    /// of in PoB's spectre list / an item set (Ruetoo's Luminary guide: "Spectres - Perfect Spirit of Fortune and …").
+    #[serde(default)]
+    pub spectre_note: String,
+    #[serde(default)]
+    pub guardian_note: String,
+}
+
+/// PoB's colour codes ("^xE05030", "^7") out of a notes line.
+fn plain_note(l: &str) -> String {
+    let mut out = String::new();
+    let mut it = l.chars().peekable();
+    while let Some(c) = it.next() {
+        if c == '^' {
+            if it.peek() == Some(&'x') { it.next(); for _ in 0..6 { it.next(); } continue; }
+            if it.peek().is_some_and(|d| d.is_ascii_digit()) { it.next(); continue; }
+        }
+        out.push(c);
+    }
+    out.trim().to_string()
+}
+
+/// Names from `names` written in `text` (whole words, longest first so "Perfect Forest Warrior" isn't also "Forest Warrior").
+fn names_in(text: &str, names: &[&str]) -> Vec<String> {
+    let mut low = text.to_lowercase().replace("chieftan", "chieftain");
+    let mut found: Vec<(usize, String)> = vec![];
+    for n in names {
+        let k = n.to_lowercase();
+        while let Some(p) = low.find(&k) {
+            let before = low[..p].chars().last().is_none_or(|c| !c.is_alphanumeric());
+            let after = low[p + k.len()..].chars().next().is_none_or(|c| !c.is_alphanumeric());
+            // Blank it out either way, so a shorter name can't match inside it.
+            low.replace_range(p..p + k.len(), &" ".repeat(k.len()));
+            if before && after && !found.iter().any(|(_, x)| x == n) { found.push((p, n.to_string())); }
+        }
+    }
+    found.sort();
+    found.into_iter().map(|(_, n)| n).collect()
+}
+
+/// What a guide's notes say about its minions (28 Nov: he found Ruetoo's guide names its spectres and the Animate
+/// Guardian's gear only in the notes). Spectres: the lines that mention spectres (and a "(…)" line after one), every
+/// spectre name in them; the ones in brackets are "for now" picks. Guardian: a line about the Animate Guardian's gear
+/// ("Early Game gear for Animate Guardian") and the next lines, every unique named there.
+fn notes_minions(notes: &str) -> (Vec<(String, bool)>, String, Vec<Gear>, String) {
+    let lines: Vec<String> = notes.lines().map(plain_note).collect();
+    let mut sp_names: Vec<&str> = spectre_names().values().map(|s| s.as_str()).collect();
+    sp_names.sort_by_key(|s| std::cmp::Reverse(s.len()));
+    sp_names.dedup();
+    let mut spectres: Vec<(String, bool)> = vec![];
+    let mut sp_note: Vec<String> = vec![];
+    for (i, l) in lines.iter().enumerate() {
+        if !l.to_lowercase().contains("spectre") { continue; }
+        let mut take = vec![(l.clone(), true)];
+        if let Some(n) = lines.get(i + 1).filter(|n| n.starts_with('(')) { take.push((n.clone(), false)); }
+        let mut any = false;
+        for (text, main) in &take {
+            for n in names_in(text, &sp_names) {
+                any = true;
+                if !spectres.iter().any(|(x, _)| *x == n) { spectres.push((n, *main)); }
+            }
+        }
+        if any { for (text, _) in take { if !sp_note.contains(&text) { sp_note.push(text); } } }
+    }
+    let mut un: Vec<&crate::gear::Unique> = crate::gear::uniques().iter().filter(|u| u.name.len() >= 5).collect();
+    un.sort_by_key(|u| std::cmp::Reverse(u.name.len()));
+    let un_names: Vec<&str> = un.iter().map(|u| u.name.as_str()).collect();
+    let mut gear: Vec<Gear> = vec![];
+    let mut g_note: Vec<String> = vec![];
+    for (i, l) in lines.iter().enumerate() {
+        let low = l.to_lowercase();
+        if !(low.contains("animate guardian") || low.split(|c: char| !c.is_alphanumeric()).any(|w| w == "ag")) || !low.contains("gear") { continue; }
+        // The heading line and the next two lines with something on them.
+        let take: Vec<&String> = std::iter::once(l).chain(lines[i + 1..].iter().filter(|x| !x.is_empty()).take(2)).collect();
+        let mut any = false;
+        for text in &take {
+            let found = names_in(text, &un_names);
+            if found.is_empty() { continue; }
+            any = true;
+            if !g_note.contains(text) { g_note.push((*text).clone()); }
+            for n in found {
+                let Some(u) = un.iter().find(|u| u.name == n) else { continue };
+                if gear.iter().any(|g| g.name == u.name) { continue; }
+                let slot = match u.class.as_str() {
+                    "Helmets" => "Helmet", "Body Armours" => "Body Armour", "Gloves" => "Gloves", "Boots" => "Boots", "Belts" => "Belt",
+                    "Amulets" => "Amulet", "Rings" => if gear.iter().any(|g| g.slot == "Ring 1") { "Ring 2" } else { "Ring 1" },
+                    "Shields" | "Quivers" => "Weapon 2",
+                    c if c.contains("Flask") => "Flask 1",
+                    c if c.contains("Jewel") => continue,
+                    _ => if gear.iter().any(|g| g.slot == "Weapon 1") { "Weapon 2" } else { "Weapon 1" },
+                };
+                let class = match u.class.as_str() {
+                    "Gloves" | "Boots" => u.class.clone(), "Staves" => "Staff".into(), "Warstaves" => "Warstaff".into(),
+                    c => c.trim_end_matches('s').to_string(),
+                };
+                gear.push(Gear { slot: slot.into(), rarity: "unique".into(), name: u.name.clone(), base: u.base.clone(), lines: u.mods.clone(),
+                    copy: format!("Item Class: {class}\nRarity: Unique\n{}\n{}\n--------\n", u.name, u.base) });
+            }
+            // Names our unique list doesn't have (Dying Breath, an old staff): a "Name Like This" piece of the same
+            // list still counts, shown with its picture but no Buy (we don't know its base).
+            for piece in text.split([',', '(', ')', ';']).flat_map(|p| p.split(" or ")).map(str::trim) {
+                let words: Vec<&str> = piece.split_whitespace().collect();
+                let named = (2..=4).contains(&words.len()) && words.iter().all(|w| w.chars().next().is_some_and(|c| c.is_uppercase()) || ["of", "the"].contains(w))
+                    && !piece.chars().any(|c| c.is_ascii_digit()) && !["Rare", "Magic", "Early", "Animate", "Spectres"].contains(&words[0]);
+                if named && !gear.iter().any(|g| g.name.eq_ignore_ascii_case(piece)) {
+                    let n = gear.iter().filter(|g| g.slot.starts_with("Guide item")).count() + 1;
+                    gear.push(Gear { slot: format!("Guide item {n}"), rarity: "unique".into(), name: piece.to_string(), base: String::new(), lines: vec![], copy: String::new() });
+                }
+            }
+        }
+        let _ = any;
+    }
+    (spectres, sp_note.join("\n"), gear, g_note.join("\n"))
 }
 
 fn spectre_names() -> &'static HashMap<String, String> {
@@ -379,6 +492,8 @@ pub fn parse(xml: &str) -> Result<Build, String> {
         for s in sets { skill_sets.push((attr(&s, "title").to_string(), read(s))); minion_sets.push(minions_of(s)); }
     }
     // The build's spectre list (PoB's Spectre library: every spectre the guide set up, for all stages).
+    // The guide's notes: some name their spectres and the Animate Guardian's gear only there.
+    let (note_spectres, spectre_note, note_guardian, guardian_note) = child(root, "Notes").and_then(|n| n.text()).map(notes_minions).unwrap_or_default();
     let spectre_library: Vec<String> = build_el.children().filter(|c| c.has_tag_name("Spectre")).map(|c| attr(&c, "id").to_string())
         .filter(|s| !s.is_empty()).collect();
 
@@ -453,7 +568,24 @@ pub fn parse(xml: &str) -> Result<Build, String> {
             if let Some(j) = g_set { sets_used[j] = true; }
             let guardian = g_set.map(|j| item_sets[j].1.iter().filter(|g| !g.slot.contains("Abyssal Socket")).cloned().collect()).unwrap_or_default();
             let guardian_set = g_set.map(|j| plain_title(&item_titles[j])).unwrap_or_default();
-            Some(Minions { spectres: list, spectre_gem, spectre_limit: None, guardian_gem, guardian_set, guardian })
+            let mut guardian: Vec<Gear> = guardian;
+            let mut guardian_set = guardian_set;
+            let mut g_note = String::new();
+            if guardian_gem.is_some() && !note_guardian.is_empty() {
+                g_note = guardian_note.clone();
+                // No item set for it: the uniques the notes name stand in.
+                if guardian.is_empty() { guardian = note_guardian.clone(); guardian_set = "the guide's notes".into(); }
+            }
+            let mut s_note = String::new();
+            if spectre_gem.is_some() && !note_spectres.is_empty() {
+                s_note = spectre_note.clone();
+                let had_main = list.iter().any(|x| x.main);
+                for (n, main) in &note_spectres {
+                    if let Some(x) = list.iter_mut().find(|x| &x.name == n) { x.main |= *main && !had_main; continue; }
+                    list.push(Spectre { id: String::new(), name: n.clone(), main: *main && !had_main });
+                }
+            }
+            Some(Minions { spectres: list, spectre_gem, spectre_limit: None, guardian_gem, guardian_set, guardian, spectre_note: s_note, guardian_note: g_note })
         });
         let (abyss, gear) = split_abyss(set.map(|j| item_sets[j].1.clone()).unwrap_or_default());
         let mut jewels: Vec<Jewel> = tree_jewels.get(i).filter(|_| i < trees.len()).cloned().unwrap_or_default();
@@ -747,6 +879,21 @@ Royal Burgonet</Item>
         assert_eq!(m.spectre_limit, Some(5));
         assert_eq!(m.guardian_set, "AG");
         assert_eq!(m.guardian.iter().map(|g| g.name.as_str()).collect::<Vec<_>>(), ["The Formless Flame"]);
+    }
+
+    #[test]
+    fn minions_from_the_guide_notes() {
+        // Ruetoo's Luminary guide names them only in its notes (with PoB colour codes and a typo).
+        let notes = "^7Early Game gear for Animate Guardian\n\n^xE05030Dying Breath, Leer Cast, Belly of the Beast, Southbound, Rare boots with MS\n\n\
+            Spectres - Perfect Spirit of Fortune and Perfect Forest Warrior \n(Carnage Chieftan and Warcaller until you can afford the perfect spectres)";
+        let (sp, sp_note, gear, g_note) = notes_minions(notes);
+        assert_eq!(sp, [("Perfect Spirit of Fortune".to_string(), true), ("Perfect Forest Warrior".to_string(), true),
+            ("Carnage Chieftain".to_string(), false), ("Warcaller".to_string(), false)]);
+        assert!(sp_note.starts_with("Spectres - Perfect Spirit"));
+        let g: Vec<(&str, &str)> = gear.iter().map(|g| (g.slot.as_str(), g.name.as_str())).collect();
+        assert!(g.contains(&("Helmet", "Leer Cast")) && g.contains(&("Body Armour", "Belly of the Beast")) && g.contains(&("Gloves", "Southbound")), "{g:?}");
+        assert!(g.iter().any(|(_, n)| *n == "Dying Breath"), "{g:?}");
+        assert!(g_note.starts_with("Dying Breath, Leer Cast"));
     }
 
     #[test]
