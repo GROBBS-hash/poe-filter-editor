@@ -192,7 +192,8 @@ function LevelChips({ v }: { v: LevelView }) {
       {nextLab && <span className="pw-tag" title={lab(nextLab).map((t) => `${t.done ? "✓" : "·"} ${t.zone}`).join("\n")}>
         {nextLab} trials {lab(nextLab).filter((t) => t.done).length}/{lab(nextLab).length}</span>}
       {["Normal", "Cruel", "Merciless"].some(labReady) && normal.length > 0 &&
-        <button className="pw-btn link" title="Today's lab layouts and where the treasure keys are (poelab.com)" onClick={() => invoke("open_url", { url: "https://www.poelab.com/" })}>Today's lab ↗</button>}
+        <button className="pw-btn link" title="Today's lab layout and where the treasure keys are (from poelab.com), in the cheat sheets"
+          onClick={() => invoke("show_lab", { lab: ["Merciless", "Cruel", "Normal"].find(labReady) ?? "Normal" })}>Today's lab</button>}
       {v.res_penalty < 0 && <span className="pw-tag bad" title="Every resistance is lowered after Kitava: check your gear still reaches 75%">res {v.res_penalty}% since {v.res_penalty === -30 ? "act 5" : "act 10"}</span>}
     </div>
   );
@@ -395,22 +396,61 @@ export function SheetWindow() {
     const load = () => invoke<Sheet[]>("sheets_list").then(setSheets).catch(() => {});
     load();
     const un = listen("play-shown", load);
-    return () => { un.then((f) => f()); };
+    // The levelling window's "Today's lab" button: open on that lab.
+    const un2 = listen<string>("sheet-lab", (e) => { pick("lab"); pickLab(e.payload); });
+    return () => { un.then((f) => f()); un2.then((f) => f()); };
   }, []);
+  const [lab, setLab] = useState(() => { try { return localStorage.getItem("sheet.lab") || "normal"; } catch { return "normal"; } });
+  const pickLab = (l: string) => { setLab(l); try { localStorage.setItem("sheet.lab", l); } catch { /* fine */ } };
   const pick = (t: string) => { setTab(t); try { localStorage.setItem("sheet.tab", t); } catch { /* fine */ } };
-  const shown = sheets.find((s) => s.name === tab);
+  const shown = tab === "lab" ? undefined : sheets.find((s) => s.name === tab);
   return (
     <div className="bo pw">
       <WinBar title="Cheat sheets" hint={`Esc / ${keys.key_sheet || "F11"} hides`} onClose={() => invoke("play_hide", { label: "sheet" })} />
       <div className="bo-body">
         <div className="cs-tabs">
-          <button className={tab === "syndicate" || (!shown && tab !== "anoints") ? "on" : ""} onClick={() => pick("syndicate")}>Syndicate</button>
+          <button className={tab === "syndicate" || (!shown && tab !== "anoints" && tab !== "lab") ? "on" : ""} onClick={() => pick("syndicate")}>Syndicate</button>
           <button className={tab === "anoints" ? "on" : ""} onClick={() => pick("anoints")}>Blight oils</button>
+          <button className={tab === "lab" ? "on" : ""} onClick={() => pick("lab")}>Today's lab</button>
           {sheets.map((s) => <button key={s.name} className={tab === s.name ? "on" : ""} onClick={() => pick(s.name)}>{s.name}</button>)}
         </div>
-        {shown ? <img className="cs-img" src={shown.data} alt={shown.name} /> : tab === "anoints" ? <AnointLookup /> : <SyndicateTable />}
+        {shown ? <img className="cs-img" src={shown.data} alt={shown.name} /> : tab === "anoints" ? <AnointLookup /> : tab === "lab" ? <LabLayoutView lab={lab} pick={pickLab} /> : <SyndicateTable />}
       </div>
       <ResizeGrips />
+    </div>
+  );
+}
+
+// ---------- today's lab ----------
+
+type LabLayout = { lab: string; date: string; data: string; page: string };
+const LABS = ["normal", "cruel", "merciless", "uber"];
+
+/** Today's lab layout picture from poelab.com (treasure keys, darkshrines, the quickest way through). */
+function LabLayoutView({ lab, pick }: { lab: string; pick: (l: string) => void }) {
+  const [got, setGot] = useState<Record<string, LabLayout>>({});
+  const [error, setError] = useState<string | null>(null);
+  const shown = got[lab];
+  const today = new Date().toISOString().slice(0, 10);
+  useEffect(() => {
+    // A new layout comes out at midnight UTC: fetch again once the one we have is from an earlier day.
+    if (shown && shown.date >= today) return;
+    setError(null);
+    invoke<LabLayout>("lab_layout", { lab }).then((l) => setGot((g) => ({ ...g, [lab]: l }))).catch((e) => setError(String(e)));
+  }, [lab, today]);
+  return (
+    <div>
+      <div className="pw-row" style={{ gap: 5, marginBottom: 6, flexWrap: "wrap" }}>
+        <div className="cs-tabs cs-sub" style={{ margin: 0 }}>
+          {LABS.map((l) => <button key={l} className={l === lab ? "on" : ""} onClick={() => pick(l)}>{l[0].toUpperCase() + l.slice(1)}</button>)}
+        </div>
+        <span className="pw-small" style={{ marginLeft: "auto" }}>
+          {shown ? `${shown.date}${shown.date < today ? " (yesterday's: today's isn't up yet)" : ""} · ` : ""}
+          <button className="link pw-btn" title="The full notes on poelab.com" onClick={() => invoke("open_url", { url: shown?.page ?? "https://www.poelab.com/" })}>poelab.com ↗</button>
+        </span>
+      </div>
+      {shown ? <img className="cs-img" src={shown.data} alt={`Today's ${lab} lab layout`} />
+        : error ? <ErrNote msg={error} className="pw-small" /> : <div className="pw-small">Getting today's layout…</div>}
     </div>
   );
 }

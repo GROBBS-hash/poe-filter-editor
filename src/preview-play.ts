@@ -123,6 +123,8 @@ export function playMock(cmd: string): unknown {
     case "splits_view": return splitsView;
     case "merc_view": return location.search.includes("strip") ? mercStrip : mercView;
     case "sheets_list": return [];
+    case "lab_layout": return { lab: "normal", date: new Date().toISOString().slice(0, 10), page: "https://www.poelab.com/",
+      data: "data:image/svg+xml," + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='840' height='300'><rect width='840' height='300' fill='#2a2418'/><text x='420' y='155' fill='#c8a96a' font-size='28' text-anchor='middle'>Lab layout (preview)</text></svg>") };
     default: return undefined;
   }
 }

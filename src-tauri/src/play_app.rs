@@ -1505,6 +1505,80 @@ fn map_regex_text(app: &AppHandle) -> Result<String, String> {
     Ok(filter_core::mapregex::regex(&mods, &bad, &s.map_tool.wants))
 }
 
+// ---------- today's lab layout (poelab.com) ----------
+
+#[derive(Serialize, Clone)]
+pub struct LabLayout { pub lab: String, pub date: String, pub data: String, pub page: String }
+
+/// poelab's page for each lab (its "Daily Notes" links on the home page; unchanged for years).
+fn lab_page(lab: &str) -> Option<&'static str> {
+    Some(match lab {
+        "normal" => "https://www.poelab.com/gtgax",
+        "cruel" => "https://www.poelab.com/r8aws",
+        "merciless" => "https://www.poelab.com/riikv",
+        "uber" => "https://www.poelab.com/wfbra",
+        _ => return None,
+    })
+}
+
+/// The layout picture's address on a poelab lab page: `src=".../labfiles/2026-11-28_005015088_normal.jpg"`.
+fn lab_image_url(html: &str, lab: &str) -> Option<String> {
+    let end = format!("_{lab}.jpg\"");
+    let at = html.find(&end)?;
+    let start = html[..at].rfind('"')? + 1;
+    let url = &html[start..at + end.len() - 1];
+    url.contains("/labfiles/").then(|| url.to_string())
+}
+
+/// Today's layout for a lab (normal, cruel, merciless, uber) as a picture the window can show. It changes at midnight
+/// UTC; each day's picture is kept in the data folder's "labs" so reopening it doesn't download it again.
+#[tauri::command]
+pub async fn lab_layout(app: AppHandle, lab: String) -> Result<LabLayout, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        use base64::Engine;
+        use std::io::Read;
+        let lab = lab.to_lowercase();
+        let page = lab_page(&lab).ok_or("unknown lab")?;
+        let html = ureq::get(page).set("User-Agent", "poe-filter-editor").timeout(Duration::from_secs(20)).call()
+            .map_err(|e| format!("Couldn't reach poelab.com ({e})"))?.into_string().map_err(err)?;
+        let url = lab_image_url(&html, &lab).ok_or("poelab hasn't put up today's layout yet")?;
+        let file = url.rsplit('/').next().unwrap_or("lab.jpg").to_string();
+        let dir = app.state::<AppState>().data_dir.join("labs");
+        let path = dir.join(&file);
+        let bytes = match std::fs::read(&path) {
+            Ok(b) if !b.is_empty() => b,
+            _ => {
+                let mut b = Vec::new();
+                ureq::get(&url).set("User-Agent", "poe-filter-editor").timeout(Duration::from_secs(30)).call()
+                    .map_err(|e| format!("Couldn't download the layout ({e})"))?
+                    .into_reader().take(10_000_000).read_to_end(&mut b).map_err(err)?;
+                let _ = std::fs::create_dir_all(&dir);
+                // Keep only today's picture for this lab.
+                for e in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
+                    let n = e.file_name().to_string_lossy().to_string();
+                    if n.ends_with(&format!("_{lab}.jpg")) && n != file { let _ = std::fs::remove_file(e.path()); }
+                }
+                let _ = std::fs::write(&path, &b);
+                b
+            }
+        };
+        Ok(LabLayout {
+            date: file.get(..10).unwrap_or("").to_string(),
+            data: format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes)),
+            page: page.to_string(),
+            lab,
+        })
+    }).await.map_err(err)?
+}
+
+/// Opens the cheat sheets on the lab tab (the levelling window's "Today's lab" button).
+#[tauri::command]
+pub fn show_lab(app: AppHandle, lab: String) {
+    let Some(w) = app.get_webview_window("sheet") else { return };
+    let _ = w.emit("sheet-lab", lab.to_lowercase());
+    if !w.is_visible().unwrap_or(false) { toggle(&app, "sheet"); }
+}
+
 // ---------- cheat sheets and notes ----------
 
 fn sheets_dir(app: &AppHandle) -> PathBuf { app.state::<AppState>().data_dir.join("cheatsheets") }
@@ -1627,6 +1701,16 @@ pub fn wiki_page(rarity: &str, name: Option<&str>, base: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn lab_pictures() {
+        // As poelab's pages had them on 28 Nov 2026 (merciless and uber also carry a "-poi" picture).
+        let merc = r#"<img src="https://www.poelab.com/wp-content/labfiles/2026-11-28_002158628.merciless-poi.jpg"><img src="https://www.poelab.com/wp-content/labfiles/2026-11-28_002158628_merciless.jpg" alt="">"#;
+        assert_eq!(super::lab_image_url(merc, "merciless").as_deref(), Some("https://www.poelab.com/wp-content/labfiles/2026-11-28_002158628_merciless.jpg"));
+        let uber = r#"<img src="https://www.poelab.com/wp-content/labfiles/2026-11-28_000046493_uber-poi.jpg"><img src="https://www.poelab.com/wp-content/labfiles/2026-11-28_000046493_uber.jpg">"#;
+        assert_eq!(super::lab_image_url(uber, "uber").as_deref(), Some("https://www.poelab.com/wp-content/labfiles/2026-11-28_000046493_uber.jpg"));
+        assert_eq!(super::lab_image_url("<p>nothing yet</p>", "normal"), None);
+    }
+
     #[test]
     fn wiki_pages() {
         assert_eq!(super::wiki_page("Unique", Some("Tabula Rasa"), "Simple Robe"), "Tabula Rasa");

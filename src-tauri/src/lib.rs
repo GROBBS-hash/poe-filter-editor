@@ -3605,7 +3605,7 @@ pub fn run() {
             tonight_app::tonight_get,
             bases_app::base_worth, bases_app::bases_get, bases_app::bases_save, worn_app::worn_compare, worn_app::worn_refresh, worn_app::worn_set, worn_app::upgrade_plans, worn_app::upgrade_search,
             play_app::maps_done, play_app::maps_history, play_app::maps_clear, play_app::watch_action, play_app::searches_get,
-            play_app::searches_save, play_app::search_type, play_app::stash_highlight, play_app::sheets_list, play_app::sheets_add,
+            play_app::searches_save, play_app::search_type, play_app::stash_highlight, play_app::sheets_list, play_app::sheets_add, play_app::lab_layout, play_app::show_lab,
             play_app::sheets_remove, play_app::notes_get, play_app::notes_save, play_app::play_toggle, play_app::play_hide,
             play_app::trade_price_check, play_app::show_stash_spot, play_app::hide_stash_spot, play_app::alerts_get, play_app::alerts_save, play_app::play_prefs, play_app::play_prefs_get, play_app::altar_auto_get, play_app::altar_auto_set, play_app::price_names,
             play_app::chat_prefs, play_app::chat_get, splits_app::splits_view, splits_app::splits_hide, merc_app::merc_view, merc_app::merc_remove, merc_app::merc_details, merc_app::merc_recruit_details, merc_app::merc_hide, phone_app::phone_get, phone_app::phone_save, phone_app::phone_test, phone_app::phone_check_shop, phone_app::phone_new_key, play_app::pause_setup, play_app::pause_prefs, play_app::tracker_over_panels, play_app::tracker_use_atlas, play_app::maps_set_atlas, play_app::loot_prefs_save, wealth_app::poe_login,

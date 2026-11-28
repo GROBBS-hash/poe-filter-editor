@@ -49,7 +49,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   the game's chat it can't be typed while the key is set.
 - **Mercenary check (28 Nov, window `merc`, no key):** comes up by itself (no focus) when a Mercenary talks to you; while it's up, Ctrl+D on its items and gems fills it instead of the price window.
 - **Play windows (22 Nov):** **F8** levelling route, **F9** map tracker + XP/h + stopwatch, **F10** saved searches,
-  **F11** cheat sheets (Syndicate, blight oils + his pictures), notes (no key by default), **Alt+W** wiki page of the hovered
+  **F11** cheat sheets (Syndicate, blight oils, today's lab layout + his pictures), notes (no key by default), **Alt+W** wiki page of the hovered
   item, **Alt+R** read the altar / remnant / reward screen under the mouse.
   Like the atlas key, a clash or a key another program owns skips just that key with a warning. Clear a key with ✕.
 
@@ -556,6 +556,9 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
     life/res, quality gems) plus "made for you" (build gems, Maps page regex). Click = focus game, Ctrl+F, Ctrl+A,
     Ctrl+V (pasted, not typed, so stray letters never hit skill keys; clipboard restored). Wealth → Worth selling has
     "Highlight in stash" (`stash_highlight`, item names, 250-char cap, most valuable first).
+  - **Today's lab (cheat sheets tab):** `lab_layout` reads the poelab.com page for Normal/Cruel/Merciless/Uber
+    (slugs in `lab_page`), takes the `labfiles/..._<lab>.jpg` picture and keeps it in the data folder's `labs` (one per lab).
+    Levelling's "Today's lab" button calls `show_lab` (opens the sheet window on the right lab).
   - **Cheat sheets (F11):** Syndicate table from Lailloken/Exile-UI Betrayal.json (MIT, data dated 12 Nov 2026),
     rebuilt with `node tools/build_syndicate.mjs <Betrayal.json>` → `src/data/syndicate.json`; click cells to mark
     picks (localStorage), find box dims the rest. Plus his own pictures: added on the page, copied to the data
@@ -584,7 +587,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
   - **Session summary** (`SessionSummary` in tracker view: new session after 30 quiet minutes; maps, made, XP gained,
     levels, deaths, best map) in the tracker window and on Play tools.
   - **Levelling:** trials count per lab ("Normal trials 4/6", from the route's trial steps vs your position), "Trial of
-    Ascendancy in this zone", Today's lab link (poelab.com) once a lab's trials are done, res -30/-60 reminder, a note
+    Ascendancy in this zone", "Today's lab" once a lab's trials are done (opens the cheat sheets on that lab), res -30/-60 reminder, a note
     on PoE 2 that the route is PoE 1's.
   - **Wealth:** "Check your prices" (listed items under 70% / over 150% of poe.ninja; `Valued.note` now kept),
     "Divination cards" (sets from `Valued.max_stack`, all tabs), **price alerts** (play.json `alerts`, checked after each
@@ -1177,6 +1180,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 
 ## Still to check in game (keep this list current)
+- [ ] (next release) Today's lab: press F11, click "Today's lab". Normal, Cruel, Merciless and Uber each show today's poelab map with the date. While levelling, once a lab's trials are done, "Today's lab" in the levelling window opens it straight on that lab.
 - [ ] (next release) My build: re-import "Ruetoo Luminary aurabot (PoB code).txt", open a "Mercenary:" stage. The first row says "A Mercenary like this" (Frost Blades). Buy opens the trade site with instant-buyout warrants with Greater supports and no Pierce, and says how many are for sale; Price opens the price window with its skills listed.
 - [x] (Confirmed 28 Nov: "seems to work".) (0.2.99) My build: load "Ruetoo Luminary aurabot (PoB code).txt". After the 9 stages for you come 4 "Mercenary:" stages with its gear and skills; the Check tab on those says it's Mercenary gear. Then load OrionNotOnion's guide (pobb.in/Gh8uoWkHJixY): its "Mercenary Ideal Gear" and "AG gear" sets now show as stages at the end. Follow my game in maps should never jump to a Mercenary stage.
 - [ ] (0.2.101) Clean-up: Atlas Today has one gold Farm this (the top one), saved trees and crafting ways are flat rows, tips have a thin gold border instead of a bar down the side, blight oils show 15 rows with Show more. A new player sees "Getting started" on Home (you won't: you've done all three).
