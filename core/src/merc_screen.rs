@@ -26,6 +26,9 @@ fn colourful(p: [u8; 3]) -> bool {
     mx - mn > 60 && mx > 90
 }
 
+/// Anything lit on the panel's dark rows (a grey-silver gem isn't colourful).
+fn lit(p: [u8; 3]) -> bool { colourful(p) || *p.iter().max().unwrap() > 110 }
+
 /// The numeral's pale strokes.
 fn pale(p: [u8; 3]) -> bool { *p.iter().min().unwrap() > 120 && *p.iter().max().unwrap() > 200 }
 
@@ -97,14 +100,23 @@ pub fn distance(a: &[u8], b: &[u8]) -> f32 {
 /// The tier from the numeral on the gem's bottom right: its upright strokes, counted (I, II or III).
 pub fn tier(pic: &Pic, r: [usize; 3]) -> Option<u32> {
     let [x0, y0, s] = r;
-    let (ya, yb) = (y0 + s * 6 / 10, (y0 + s * 108 / 100).min(pic.h));
-    let (xa, xb) = (x0 + s * 4 / 10, (x0 + s * 110 / 100).min(pic.w));
-    let long = (s as f32 * 0.22).ceil() as usize;
-    let stroke: Vec<bool> = (xa..xb).map(|x| {
-        let (mut best, mut run) = (0, 0);
-        for y in ya..yb { if pale(pic.at(x, y)) { run += 1; best = best.max(run); } else { run = 0; } }
-        best >= long
+    // The numeral sits on the icon's bottom right and can reach past the gem to the slot's edge.
+    let (ya, yb) = (y0 + s * 50 / 100, (y0 + s * 110 / 100).min(pic.h));
+    let (xa, xb) = (x0 + s * 45 / 100, (x0 + s * 130 / 100).min(pic.w));
+    if ya >= yb || xa >= xb { return None; }
+    let long = (s as f32 * 0.2).ceil() as usize;
+    // Each column's longest pale run and the row it ends on.
+    let runs: Vec<(usize, usize)> = (xa..xb).map(|x| {
+        let (mut best, mut end, mut run) = (0, 0, 0);
+        // A stroke can lean a pixel (the game draws the numeral small): its neighbours count too.
+        for y in ya..yb {
+            if (x.saturating_sub(1)..=x + 1).any(|x| pale(pic.at(x, y))) { run += 1; if run >= best { best = run; end = y; } } else { run = 0; }
+        }
+        (best, end)
     }).collect();
+    // The numeral's strokes all stand on one line; a pale edge of the gem stops higher up.
+    let base = runs.iter().filter(|r| r.0 >= long).map(|r| r.1).max()?;
+    let stroke: Vec<bool> = runs.iter().map(|&(n, end)| n >= long && end + (s / 20).max(1) >= base).collect();
     // Thin groups of stroke columns: a numeral's stroke is a few pixels wide, a pale patch of the gem is wider.
     let mut count = 0;
     let mut i = 0;
@@ -112,7 +124,7 @@ pub fn tier(pic: &Pic, r: [usize; 3]) -> Option<u32> {
         if !stroke[i] { i += 1; continue; }
         let start = i;
         while i < stroke.len() && stroke[i] { i += 1; }
-        if (i - start) as f32 <= s as f32 * 0.15 { count += 1; }
+        if (i - start) as f32 <= s as f32 * 0.2 { count += 1; }
     }
     (1..=3).contains(&count).then_some(count as u32)
 }
@@ -148,12 +160,22 @@ pub fn panel_open(lines: &[(String, [f32; 4])]) -> bool {
 /// The skill rows on screen. `lines` is the screen reader's text with where each line is ([x, y, w, h], in the
 /// picture's pixels); `skills` the Mercenary skills the trade site knows.
 pub fn read_rows(pic: &Pic, lines: &[(String, [f32; 4])], skills: &[String]) -> Vec<SeenSkill> {
-    let mut found: Vec<(String, [f32; 4])> = lines.iter()
-        .filter_map(|(t, r)| match_name(t, skills).map(|n| (n.clone(), *r))).collect();
+    let mut found: Vec<(String, [f32; 4])> = vec![];
+    for (i, (t, r)) in lines.iter().enumerate() {
+        if let Some(n) = match_name(t, skills) { found.push((n.clone(), *r)); continue; }
+        // A long name wraps onto two lines ("LEAP SLAM OF" / "GROUNDBREAKING"): the line right under it, same left edge.
+        let below = lines.iter().enumerate().find(|(j, (_, q))| *j != i && (q[0] - r[0]).abs() < r[3] && q[1] > r[1] && q[1] - r[1] < r[3] * 2.2);
+        if let Some((_, (t2, q))) = below {
+            if let Some(n) = match_name(&format!("{t} {t2}"), skills) {
+                let (x1, y1) = ((r[0] + r[2]).max(q[0] + q[2]), q[1] + q[3]);
+                found.push((n.clone(), [r[0], r[1], x1 - r[0], y1 - r[1]]));
+            }
+        }
+    }
     found.sort_by(|a, b| a.1[1].partial_cmp(&b.1[1]).unwrap());
     found.dedup_by(|a, b| a.0 == b.0);
     if found.is_empty() { return vec![]; }
-    let text_h = { let mut h: Vec<f32> = found.iter().map(|f| f.1[3]).collect(); h.sort_by(|a, b| a.partial_cmp(b).unwrap()); h[h.len() / 2] };
+    let text_h = { let mut h: Vec<f32> = found.iter().map(|f| f.1[3]).filter(|h| *h > 0.0).collect(); if h.is_empty() { return vec![]; } h.sort_by(|a, b| a.partial_cmp(b).unwrap()); h[h.len() / 2] };
     // Row height: the smallest gap between rows (a hover box can hide the rows between), else from the text size.
     let mut gaps: Vec<f32> = found.windows(2).map(|w| (w[1].1[1] + w[1].1[3] / 2.0) - (w[0].1[1] + w[0].1[3] / 2.0))
         .filter(|g| *g > text_h * 2.0).collect();
@@ -172,7 +194,7 @@ fn icons_in_row(pic: &Pic, from: f32, to: f32, yc: f32, row: f32) -> Vec<SeenIco
     let (ya, yb) = ((yc - band).max(0.0) as usize, ((yc + band) as usize).min(pic.h));
     if xa >= xb || ya >= yb { return vec![]; }
     let need = ((yb - ya) as f32 * 0.3).ceil() as usize;
-    let on: Vec<bool> = (xa..xb).map(|x| (ya..yb).filter(|&y| colourful(pic.at(x, y))).count() >= need).collect();
+    let on: Vec<bool> = (xa..xb).map(|x| (ya..yb).filter(|&y| lit(pic.at(x, y))).count() >= need).collect();
     // Runs of gem-coloured columns, joining small breaks.
     let mut runs: Vec<(usize, usize)> = vec![];
     let mut x = 0;
@@ -187,8 +209,12 @@ fn icons_in_row(pic: &Pic, from: f32, to: f32, yc: f32, row: f32) -> Vec<SeenIco
         // How tall the gem is (its glow can make the run wider than the gem).
         let need = ((x1 - x0) / 12).max(2);
         let top = ((yc - row * 0.45).max(0.0) as usize, ((yc + row * 0.45) as usize).min(pic.h));
-        let rows: Vec<usize> = (top.0..top.1).filter(|&y| (x0..x1).filter(|&x| colourful(pic.at(x, y))).count() >= need).collect();
-        let (y0, y1) = (*rows.first()?, *rows.last()? + 1);
+        let extent = |f: &dyn Fn([u8; 3]) -> bool| -> Option<(usize, usize)> {
+            let rows: Vec<usize> = (top.0..top.1).filter(|&y| (x0..x1).filter(|&x| f(pic.at(x, y))).count() >= need).collect();
+            Some((*rows.first()?, *rows.last()? + 1))
+        };
+        // By its colour (as the art is cut); a grey gem by anything lit.
+        let (y0, y1) = extent(&colourful).filter(|(a, b)| (b - a) as f32 >= row * 0.35).or_else(|| extent(&lit))?;
         let s = y1 - y0;
         if (s as f32) < row * 0.35 { return None; }
         let rect = [((x0 + x1) / 2).saturating_sub(s / 2), y0, s];
@@ -219,7 +245,11 @@ pub fn tier_name(fam: &str, tier: Option<u32>, names: &[String]) -> Option<(Stri
 /// A hover box over a support names it (its title, e.g. "Increased Area of Effect"): the family, if one is on screen.
 pub fn tooltip_support(lines: &[(String, [f32; 4])], names: &[String]) -> Option<String> {
     let bases: Vec<String> = names.iter().filter_map(|n| n.rsplit_once(" (Tier ").map(|(b, _)| b.to_string())).collect();
-    lines.iter().find_map(|(t, _)| match_name(t, &bases)).map(|b| family(b))
+    // Its title can say a little more than the trade site's name ("Cooldown Recovery Rate" for "Cooldown Recovery").
+    lines.iter().find_map(|(t, _)| match_name(t, &bases).or_else(|| {
+        let n = norm(t);
+        bases.iter().filter(|b| b.len() >= 8 && (n.starts_with(&format!("{} ", norm(b))) || n == norm(b))).max_by_key(|b| b.len())
+    })).map(|b| family(b))
 }
 
 /// A known support picture: its family and print (hex).
@@ -289,6 +319,17 @@ mod tests {
     }
 
     #[test]
+    fn a_name_on_two_lines() {
+        let (w, h) = (900, 200);
+        let px = draw(w, h, &[(400, 100, 22, [60, 90, 230], 2)]);
+        let pic = Pic { px: &px, w, h, bgra: false };
+        let lines = vec![("LEAP SLAM OF".to_string(), [60.0, 78.0, 140.0, 18.0]), ("GROUNDBREAKING".to_string(), [60.0, 106.0, 187.0, 18.0])];
+        let skills = vec!["Leap Slam".to_string(), "Leap Slam of Groundbreaking".to_string()];
+        let rows = read_rows(&pic, &lines, &skills);
+        assert_eq!(rows.iter().map(|r| r.name.as_str()).collect::<Vec<_>>(), vec!["Leap Slam of Groundbreaking"]);
+    }
+
+    #[test]
     fn families_and_trade_names() {
         assert_eq!(family("Greater Area of Effect (Tier 3)"), "Area of Effect");
         assert_eq!(family("Lesser Increased Area of Effect"), "Area of Effect");
@@ -302,6 +343,9 @@ mod tests {
         assert_eq!(tier_name("Pierce", Some(1), &names), None);
         let tip = vec![("INCREASED AREA OF EFFECT".to_string(), [0.0; 4]), ("Supported skills have 40% increased Area of".to_string(), [0.0; 4])];
         assert_eq!(tooltip_support(&tip, &names), Some("Area of Effect".into()));
+        // His 28 Nov hover box said a little more than the trade site's name.
+        let names2 = vec!["Cooldown Recovery (Tier 2)".to_string(), "Greater Cooldown Recovery (Tier 3)".to_string()];
+        assert_eq!(tooltip_support(&[("COOLDOWN RECOVERY RATE".to_string(), [0.0; 4])], &names2), Some("Cooldown Recovery".into()));
         assert!(panel_open(&[("TAKE ITEM".into(), [0.0; 4]), ("REMATCH".into(), [0.0; 4]), ("HIRE".into(), [0.0; 4])]));
         assert!(!panel_open(&[("Hired help".into(), [0.0; 4])]));
     }

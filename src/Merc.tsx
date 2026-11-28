@@ -61,7 +61,7 @@ export function MercWindow() {
   return (
     <div className="bo pw mc">
       <WinBar title={<><span className="mc-sword" aria-hidden>⚔</span> {v.name}</>} hint={STAGE[v.stage] ?? ""} onClose={hide} compact>
-        {!filled && <span className={`mc-tag ${vd?.kind ?? "check"}`}>{tag}</span>}
+        {!filled && vd && vd.kind !== "check" && <span className={`mc-tag ${vd.kind}`}>{tag}</span>}
       </WinBar>
       <div className="bo-body">
         {!filled ? (
