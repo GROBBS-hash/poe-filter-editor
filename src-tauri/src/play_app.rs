@@ -433,6 +433,9 @@ fn emit_all(app: &AppHandle) {
 
 // ---------- levelling ----------
 
+/// The level of the character you're playing (from the game's log), when known.
+pub(crate) fn char_level() -> Option<u32> { with_live(|l| l.character.as_ref().map(|c| c.2)).filter(|l| *l > 0) }
+
 fn char_key() -> String { with_live(|l| l.character.as_ref().map(|c| c.0.clone())).unwrap_or_else(|| "_".into()) }
 
 /// Is the active filter for PoE 2 (the levelling route follows the game)?

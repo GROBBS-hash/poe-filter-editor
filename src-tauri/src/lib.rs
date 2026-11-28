@@ -812,6 +812,8 @@ fn buy_build_item(app: AppHandle, text: String, stage: Option<String>) -> Result
     let (mut q, mut of) = filter_core::trade::buy_query(&text, &index).ok_or("Couldn't read that item")?;
     // A stage named for a level ("Swap at Merciless Lab (level 68-90)"): only what you can wear then.
     let level = stage.as_deref().and_then(filter_core::buildcheck::title_level);
+    // Already past the stage's start (level 75 in a 68-90 stage): what you can wear now counts.
+    let level = level.map(|l| play_app::char_level().filter(|c| *c > l).unwrap_or(l));
     // The base itself needs a higher level (his level 68 stage's Torturer's Mask needs 84). A rare or magic item:
     // the same mods on the best base of the same kind that fits (Deicide Mask). A unique can't change base, so
     // the search isn't narrowed and the note says why.
