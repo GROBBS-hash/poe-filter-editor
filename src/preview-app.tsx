@@ -251,7 +251,7 @@ mockIPC((cmd, args) => {
       top: notable.slice(0, 10).map(work), weak: notable.slice(10, 12).map((x: number, i: number) => ({ ...work(x, i), why: "on the way to better nodes" })), trees_used: 7,
       notes: ["Eater of Worlds side only: a map has one Eldritch influence"] };
     if (cmd === "atlas_optimise") return fetch(`/_plan_${ask.priority}.json`).then((r) => (r.ok && r.headers.get("content-type")?.includes("json") ? r.json() : plan)).catch(() => plan);
-    atlas = { ...atlas, active: 99, list: [...atlas.list, { ...atlas.list[0], id: 99, name: `${ask.mechanics.join(" + ")} (optimiser)`, site: "optimiser", link: "" }] };
+    atlas = { ...atlas, active: 99, list: [...atlas.list, { ...atlas.list[0], id: 99, name: `${ask.mechanics.join(" + ")} (optimiser)`, site: "optimiser", link: "", ask }] };
     return atlas;
   }
   if (cmd === "pob_get") return pob();

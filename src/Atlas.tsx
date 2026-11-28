@@ -2,7 +2,7 @@ import { Tip } from "./Help";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { ReactNode, useEffect, useState } from "react";
-import AtlasTreeView, { AtlasStore, AtlasStrategy, ChoiceList, StepBar, StepList, StrategyNotes, useStep } from "./AtlasTreeView";
+import AtlasTreeView, { AtlasAsk, AtlasStore, AtlasStrategy, ChoiceList, StepBar, StepList, StrategyNotes, useStep } from "./AtlasTreeView";
 import AtlasTotals from "./AtlasTotals";
 import AtlasCompare from "./AtlasCompare";
 import TreeEditor from "./AtlasEditor";
@@ -61,6 +61,17 @@ export default function Atlas({ go }: { go?: (tab: string) => void }) {
     { key: "compare", name: "Compare", icon: ICON.compare, hide: !canCompare },
   ];
 
+  /** Open a tree from Build a tree there again, set up as it was built (goals, Threads, maps, Always / Never). */
+  const rebuild = (a: AtlasAsk) => {
+    try {
+      const set = (k: string, v: unknown) => localStorage.setItem(k, typeof v === "string" ? v : JSON.stringify(v));
+      set("atlas-picks-sel", a.mechanics); set("atlas-opt-goals", a.goals); set("atlas-opt-prio", a.priority);
+      set("atlas-opt-lock", a.lock); set("atlas-opt-block", a.block); set("atlas-picks-tab", "own");
+      set("atlas-opt-setup", { map: a.map || "rolled", build: a.build || "normal", altar: a.altar || "auto", has: a.map_has, threads: a.threads });
+    } catch { /* fine */ }
+    setBuild((n) => n + 1);
+  };
+
   return <AtlasParts parts={parts} first={store.list.length ? "today" : "build"}>{(part, pick) => <>
     {part === "today" && <FarmFinder go={go} onBuild={() => { setBuild((n) => n + 1); pick("build"); }} />}
 
@@ -103,7 +114,7 @@ export default function Atlas({ go }: { go?: (tab: string) => void }) {
               ))}
             </div>
           </div>
-          {shown && <Preview key={shown.id} s={shown} store={store} run={run} onSel={setSel} />}
+          {shown && <Preview key={shown.id} s={shown} store={store} run={run} onSel={setSel} onRebuild={(a) => { rebuild(a); pick("build"); }} />}
         </>
     ))}
 
@@ -172,7 +183,7 @@ function StrategyRow({ s, active, selected, onSelect, onUse, onRename, onDelete,
   );
 }
 
-function Preview({ s, store, run, onSel }: { s: AtlasStrategy; store: AtlasStore; run: (cmd: string, args: Record<string, unknown>) => Promise<void>; onSel: (id: number | null) => void }) {
+function Preview({ s, store, run, onSel, onRebuild }: { s: AtlasStrategy; store: AtlasStore; run: (cmd: string, args: Record<string, unknown>) => Promise<void>; onSel: (id: number | null) => void; onRebuild: (a: AtlasAsk) => void }) {
   const [editing, setEditing] = useState(false);
   const [vi, setVi] = useState(store.active === s.id ? Math.min(store.variant, s.variants.length - 1) : 0);
   const [own, setOwn] = useState(s.own_notes);
@@ -195,6 +206,7 @@ function Preview({ s, store, run, onSel }: { s: AtlasStrategy; store: AtlasStore
             {s.link && s.site === "maxroll" && <button className="link small" onClick={() => invoke("open_url", { url: s.link })}>Open on maxroll</button>}
             {s.link && s.site === "poeplanner" && <button className="link small" onClick={() => invoke("open_url", { url: s.link })}>Open on poeplanner</button>}
             {s.link && s.site === "planner" && <button className="link small" onClick={() => invoke("open_url", { url: s.link })}>Open on Atlas Tree Planner</button>}
+            {s.ask && <button className="link small" onClick={() => onRebuild(s.ask!)} title="Opens Build a tree set up as this tree was built (goals, Threads, maps, Always / Never) to change it; Save adds the new one">Change what it's built for</button>}
             <button className="link small" onClick={openOfficial} title="Opens this tree on pathofexile.com">Open on pathofexile.com</button>
             {v && !editing && <button className="primary at-edit-btn" onClick={() => setEditing(true)}>Edit this tree</button>}
           </div>

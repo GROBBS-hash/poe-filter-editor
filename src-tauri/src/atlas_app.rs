@@ -189,6 +189,7 @@ pub fn atlas_goals() -> Vec<(String, String)> { filter_core::atlas_opt::goals() 
 #[tauri::command]
 pub fn atlas_save_plan(app: AppHandle, ask: filter_core::atlas_opt::Ask, name: String) -> Result<AtlasStore, String> {
     use filter_core::atlas::{NoteLine, Notes, Variant};
+    let kept = ask.clone();
     let ask = priced(&app, ask);
     let plan = filter_core::atlas_opt::optimise(&ask);
     let goals = filter_core::atlas_opt::goals();
@@ -201,7 +202,11 @@ pub fn atlas_save_plan(app: AppHandle, ask: filter_core::atlas_opt::Ask, name: S
     lines.extend(plan.top.iter().take(8).map(|w| NoteLine { kind: "li".into(), depth: 0, text: format!("{}: {}", w.name, w.why) }));
     let variant = Variant { name: "Optimised tree".into(), nodes: plan.nodes, choices: plan.choices, steps: plan.steps,
         notes: vec![Notes { title: "How it was built".into(), lines }] };
-    let strat = Strategy { name: format!("{} (optimiser)", mechs.join(" + ")), site: "optimiser".into(), imported: now(), variants: vec![variant], ..Default::default() };
+    // The Threads go in the map device notes too, so the in-game panel says what to put in.
+    let device = (!plan.threads.is_empty()).then(|| filter_core::atlas::Device {
+        threads: plan.threads.iter().map(|(t, n)| format!("{} ×{n}", filter_core::atlas_model::cap(t))).collect(), ..Default::default() });
+    let strat = Strategy { name: format!("{} (optimiser)", mechs.join(" + ")), site: "optimiser".into(), imported: now(), variants: vec![variant],
+        device, ask: Some(kept), ..Default::default() };
     with_store(&app, true, |s| { s.add(strat, &name); s.clone() })
 }
 

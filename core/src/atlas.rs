@@ -198,6 +198,9 @@ pub struct Strategy {
     pub own_notes: String,
     /// When you last changed its tree in the editor (0 = never).
     pub edited: u64,
+    /// A tree from Build a tree: what it was built for (goals, mechanics, Threads, maps, Always / Never), so it can
+    /// be opened there again and changed (HANDOFF "save his Threads / goal with a strategy").
+    pub ask: Option<crate::atlas_opt::Ask>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

@@ -9,7 +9,11 @@ export type AtlasStep = { name: string; node: number; nodes: number[]; total: nu
 export type AtlasVariant = { name: string; nodes: number[]; choices: [number, number][]; notes: AtlasNotes[]; steps?: AtlasStep[] };
 export type AtlasDevice = { maps: string[]; threads: string[]; rolls: string[]; text: string };
 export type AtlasStrategy = { id: number; name: string; site: string; link: string; author: string; imported: number;
-  device: AtlasDevice | null; notes: AtlasNotes[]; variants: AtlasVariant[]; own_notes: string };
+  device: AtlasDevice | null; notes: AtlasNotes[]; variants: AtlasVariant[]; own_notes: string;
+  /** Built with Build a tree: what for (atlas_opt.rs Ask), to open it there again. */
+  ask?: AtlasAsk | null };
+export type AtlasAsk = { mechanics: string[]; goals: string[]; priority: string; lock: number[]; block: number[]; threads: [string, number][];
+  altar: string; map_has: string[]; map: string; build: string };
 export type AtlasStore = { list: AtlasStrategy[]; active: number | null; variant: number };
 
 /** The strategy shown in game (or the first one). */
