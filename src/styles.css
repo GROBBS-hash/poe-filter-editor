@@ -1064,6 +1064,7 @@ button:focus-visible, select:focus-visible, .text:focus-visible, input:focus-vis
 .atv-pick { color: #9db8ff; }
 .atlas-tv.compact .atv-majors { max-height: 72px; overflow-y: auto; }
 .at-msg { margin-top: 4px; color: var(--text-2); }
+.at-import { margin-top: 12px; }
 .at-list { display: flex; flex-direction: column; gap: 6px; }
 .at-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--raised); cursor: pointer;
   transition: border-color .15s var(--ease), background .15s var(--ease); }

@@ -72,6 +72,16 @@ export default function Atlas({ go }: { go?: (tab: string) => void }) {
     setBuild((n) => n + 1);
   };
 
+  /** My trees: one line to import a tree from a link (same import as Build a tree; rename it after if you like). */
+  const importLine = (
+    <div className="row at-import">
+      <input className="text grow" value={link} onChange={(e) => setLink(e.target.value)}
+        placeholder="Import a tree: paste a maxroll, pathofexile.com, poeplanner, poe.ninja or Atlas Tree Planner link"
+        onKeyDown={(e) => { if (e.key === "Enter" && link.trim() && !busy) doImport(); }} />
+      <button className="primary" disabled={!link.trim() || busy} onClick={doImport}>{busy ? "Reading…" : "Import"}</button>
+    </div>
+  );
+
   return <AtlasParts parts={parts} first={store.list.length ? "today" : "build"}>{(part, pick) => <>
     {part === "today" && <FarmFinder go={go} onBuild={() => { setBuild((n) => n + 1); pick("build"); }} />}
 
@@ -95,14 +105,17 @@ export default function Atlas({ go }: { go?: (tab: string) => void }) {
     </>}
 
     {part === "mine" && (store.list.length === 0 ? (
-      <div className="empty">No trees yet. Pick one in <button className="link" onClick={() => pick("build")}>Build a tree</button>, then press <b>{key}</b> in game to see it.</div>
+      <div className="card">
+        <div className="empty">No trees yet. Pick one in <button className="link" onClick={() => pick("build")}>Build a tree</button> or paste a link below, then press <b>{key}</b> in game to see it.</div>
+        {importLine}
+        {msg && <div className="small at-msg">{msg}</div>}
+      </div>
     ) : (
         <>
           <div className="card">
             <h2>My trees</h2>
             <p className="muted small">The one ticked “In game” shows when you press <b>{key}</b> (change the key in Settings).
               Maps you run and earnings sessions you start count for that tree, so you can see which one earns most.</p>
-            {msg && <div className="small at-msg">{msg}</div>}
             <div className="at-list">
               {store.list.map((s) => (
                 <StrategyRow key={s.id} s={s} active={store.active === s.id} selected={shown?.id === s.id} result={results.find((r) => r.id === s.id)} best={results[0]?.id === s.id && results.length > 1}
@@ -113,6 +126,8 @@ export default function Atlas({ go }: { go?: (tab: string) => void }) {
                   onCompare={canCompare ? () => { setCmp((c) => ({ id: s.id, n: (c?.n ?? 0) + 1 })); pick("compare"); } : undefined} />
               ))}
             </div>
+            {importLine}
+            {msg && <div className="small at-msg">{msg}</div>}
           </div>
           {shown && <Preview key={shown.id} s={shown} store={store} run={run} onSel={setSel} onRebuild={(a) => { rebuild(a); pick("build"); }} />}
         </>
