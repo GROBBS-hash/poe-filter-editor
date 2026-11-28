@@ -167,12 +167,15 @@ pub struct StatIndex {
     /// Every id for a text, where the site lists the same words more than once (Mercenary supports: two
     /// "Gilded Extra Targets (Tier 3)").
     all: HashMap<(String, String), Vec<String>>,
+    /// The "Mercenary" stats' words as the site writes them (its skills, and supports like "Pierce (Tier 2)").
+    pub merc: Vec<String>,
 }
 
 impl StatIndex {
     pub fn from_json(v: &Value) -> StatIndex {
         let mut by_text = HashMap::new();
         let mut all: HashMap<(String, String), Vec<String>> = HashMap::new();
+        let mut merc = Vec::new();
         for group in v["result"].as_array().into_iter().flatten() {
             for e in group["entries"].as_array().into_iter().flatten() {
                 let (Some(id), Some(text), Some(kind)) = (e["id"].as_str(), e["text"].as_str(), e["type"].as_str()) else { continue };
@@ -180,11 +183,12 @@ impl StatIndex {
                 // (Temple rooms are open / closed: searched as open, see temple_rows.)
                 if e.get("option").is_some() && !id.starts_with("pseudo.pseudo_temple_") { continue; }
                 let key = (kind.to_string(), text.replace('\n', " ").to_lowercase());
+                if kind == "mercenary" && !all.contains_key(&key) { merc.push(text.to_string()); }
                 all.entry(key.clone()).or_default().push(id.to_string());
                 by_text.entry(key).or_insert_with(|| id.to_string());
             }
         }
-        StatIndex { by_text, all }
+        StatIndex { by_text, all, merc }
     }
     pub fn len(&self) -> usize { self.by_text.len() }
     /// Every trade id listed with exactly these words under this kind.

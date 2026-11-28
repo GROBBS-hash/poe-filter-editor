@@ -148,6 +148,13 @@ fn avoid(main: &str) -> Vec<&'static str> {
     out
 }
 
+/// Which of a Mercenary's skills and supports brick it (trade names: "Leap Slam", "Greater Brutality (Tier 3)"), for
+/// the checker's red flags. `main` is its main skill (the one with the most supports).
+pub fn bricks(main: &str, names: &[String]) -> Vec<String> {
+    let bad = avoid(main);
+    names.iter().filter(|n| bad.contains(&n.as_str())).cloned().collect()
+}
+
 /// From a Mercenary stage's gem groups (Path of Building names: "Hypothermia", or "Hypothermia Support"). The main
 /// attack is the group with the most supports whose skill is a Mercenary skill on the trade site; other Mercenary
 /// skills go in the warrant text too. A support counts as "Greater Hypothermia (Tier 3)" when `greater` (28 Nov: the
@@ -235,6 +242,13 @@ pub fn verdict(prices: &[Option<f64>], recruit: Option<f64>, helps: &[String]) -
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bricks_are_flagged() {
+        let names: Vec<String> = ["Sunder of Trarthus", "Greater Brutality (Tier 3)", "Leap Slam", "Pierce (Tier 2)"].iter().map(|s| s.to_string()).collect();
+        assert_eq!(bricks("Sunder of Trarthus", &names), vec!["Greater Brutality (Tier 3)".to_string(), "Leap Slam".to_string()]);
+        assert!(bricks("Frost Blades", &names).contains(&"Pierce (Tier 2)".to_string()));
+    }
 
     #[test]
     fn reads_his_log() {

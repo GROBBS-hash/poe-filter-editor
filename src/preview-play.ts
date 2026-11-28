@@ -105,10 +105,22 @@ export const mercView = {
     { name: "Doom Loop", base: "Ruby Ring", rarity: "Rare", chaos: null, how: "pricing", listed: null },
   ],
   gems: [{ name: "Wrath", support: false, tier: null }, { name: "Arrow Nova", support: true, tier: 3 }, { name: "More Duration", support: true, tier: 2 }],
-  helps: ["Wrath: helps you"],
+  helps: ["Determination: helps you"],
   verdict: { kind: "kill", best: 0, kill: 630, recruit: 35, why: "Its best item is worth more than a Mercenary like it" },
+  skills: [
+    { name: "Sunder of Trarthus", brick: false, supports: [
+      { name: null, family: null, tier: 2, brick: false },
+      { name: "Greater Brutality", family: "Brutality", tier: 3, brick: true },
+      { name: "Greater Faster Attacks", family: "Faster Attacks", tier: 3, brick: false }] },
+    { name: "Ground Slam", brick: false, supports: [
+      { name: "Greater Rage on Hit", family: null, tier: 3, brick: false },
+      { name: "Brutality", family: "Brutality", tier: 2, brick: true }] },
+    { name: "Burrow", brick: false, supports: [{ name: "Pulverise", family: "Pulverise", tier: 2, brick: false }] },
+    { name: "Determination", brick: false, supports: [] },
+    { name: "Leap Slam", brick: true, supports: [] },
+  ],
 };
-export const mercStrip = { ...mercView, stage: "met", items: [], gems: [], recruit: null, recruit_listed: null, recruit_how: "", helps: [],
+export const mercStrip = { ...mercView, stage: "met", items: [], gems: [], skills: [], recruit: null, recruit_listed: null, recruit_how: "", helps: [],
   verdict: { kind: "check", best: null, kill: null, recruit: null, why: "Hover its items and press Ctrl+D" } };
 
 /** Answers the play windows' commands; null = not a play command. */

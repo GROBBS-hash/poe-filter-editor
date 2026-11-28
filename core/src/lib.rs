@@ -29,6 +29,7 @@ pub mod journey;
 pub mod loot;
 pub mod maps;
 pub mod merc;
+pub mod merc_screen;
 pub mod mapregex;
 pub mod neversink;
 pub mod pob;

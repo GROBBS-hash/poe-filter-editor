@@ -87,6 +87,27 @@ pub fn read_lines_near_mouse(w: i32, h: i32) -> Result<Vec<String>, String> {
     imp::read_lines(w, h).map_err(|e| e.to_string())
 }
 
+/// A picture of part of the screen and the text read in it (the Mercenary skill reader).
+pub struct Grab {
+    /// BGRA pixels.
+    pub px: Vec<u8>,
+    pub w: i32,
+    pub h: i32,
+    /// Where it is on screen.
+    pub x: i32,
+    pub y: i32,
+    /// Every line read, with its box [x, y, w, h] in the picture.
+    pub lines: Vec<(String, [f32; 4])>,
+    /// The mouse, in the picture.
+    pub mouse: (i32, i32),
+}
+
+/// Grabs this box of the screen and reads its text.
+#[cfg(windows)]
+pub fn grab_and_read(x: i32, y: i32, w: i32, h: i32) -> Result<Grab, String> { imp::grab_and_read(x, y, w, h).map_err(|e| e.to_string()) }
+#[cfg(not(windows))]
+pub fn grab_and_read(_x: i32, _y: i32, _w: i32, _h: i32) -> Result<Grab, String> { Err("Reading the screen only works on Windows".into()) }
+
 /// Every line of text in this box of the screen, top to bottom (the map tracker's "GAME PAUSED" check).
 #[cfg(windows)]
 pub fn read_lines_in(x: i32, y: i32, w: i32, h: i32) -> Result<Vec<String>, String> { imp::read_lines_at(x + w / 2, y + h / 2, w, h).map_err(|e| e.to_string()) }
@@ -531,6 +552,55 @@ mod imp {
         Ok(out)
     }
 
+    /// The box [x, y, w, h] of the screen, its text read (made smaller first when over the reader's size limit).
+    pub fn grab_and_read(x: i32, y: i32, w: i32, h: i32) -> windows::core::Result<super::Grab> {
+        let max = OcrEngine::MaxImageDimension().unwrap_or(2600) as i32;
+        let engine = OcrEngine::TryCreateFromUserProfileLanguages()?;
+        let (pic, mx, my) = capture(x + w / 2, y + h / 2, w, h)?;
+        let (ox, oy) = (x + w / 2 - mx, y + h / 2 - my);
+        let mut p = POINT::default();
+        unsafe { GetCursorPos(&mut p)? };
+        let lines = read_pic(&engine, &pic, max)?;
+        Ok(super::Grab { w: pic.w, h: pic.h, x: ox, y: oy, mouse: (p.x - ox, p.y - oy), px: pic.px, lines })
+    }
+
+    /// The text in a BGRA picture (a test reads a saved screenshot with it).
+    #[cfg(test)]
+    pub fn read_bgra(px: Vec<u8>, w: i32, h: i32) -> windows::core::Result<Vec<(String, [f32; 4])>> {
+        let max = OcrEngine::MaxImageDimension().unwrap_or(2600) as i32;
+        read_pic(&OcrEngine::TryCreateFromUserProfileLanguages()?, &Pic { px, w, h }, max)
+    }
+
+    fn read_pic(engine: &OcrEngine, pic: &Pic, max: i32) -> windows::core::Result<Vec<(String, [f32; 4])>> {
+        let k = if pic.w > max || pic.h > max { 2 } else { 1 };
+        let (sw, sh) = (pic.w / k, pic.h / k);
+        let mut small = vec![0u8; (sw * sh * 4) as usize];
+        for yy in 0..sh {
+            for xx in 0..sw {
+                let s = (((yy * k) * pic.w + xx * k) * 4) as usize;
+                let d = ((yy * sw + xx) * 4) as usize;
+                small[d..d + 3].copy_from_slice(&pic.px[s..s + 3]);
+                small[d + 3] = 255;
+            }
+        }
+        let buffer = CryptographicBuffer::CreateFromByteArray(&small)?;
+        let bitmap = SoftwareBitmap::CreateCopyWithAlphaFromBuffer(&buffer, BitmapPixelFormat::Bgra8, sw, sh, BitmapAlphaMode::Ignore)?;
+        let result = engine.RecognizeAsync(&bitmap)?.get()?;
+        let kf = k as f32;
+        let mut lines = Vec::new();
+        for line in result.Lines()? {
+            let t = line.Text()?.to_string();
+            if t.trim().is_empty() { continue; }
+            let (mut x0, mut y0, mut x1, mut y1) = (f32::MAX, f32::MAX, f32::MIN, f32::MIN);
+            for word in line.Words()? {
+                let r = word.BoundingRect()?;
+                x0 = x0.min(r.X); y0 = y0.min(r.Y); x1 = x1.max(r.X + r.Width); y1 = y1.max(r.Y + r.Height);
+            }
+            if x0 <= x1 { lines.push((t, [x0 * kf, y0 * kf, (x1 - x0) * kf, (y1 - y0) * kf])); }
+        }
+        Ok(lines)
+    }
+
     pub fn read(accept: &dyn Fn(&str) -> bool) -> windows::core::Result<(ScreenRead, TooltipLines)> {
         let mut p = POINT::default();
         unsafe { GetCursorPos(&mut p)? };
@@ -715,6 +785,32 @@ mod tests {
             let _ = writeln!(f, "{:?} front {front} rect {rect:?} still {still} menu {:?} took {:?} hud {:?} lines {lines:?}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs(),
                 lines.as_ref().map(|l| filter_core::journey::is_pause_menu(l)), t0.elapsed(), hud.map(|h| h.iter().flatten().map(|c| *c as u64).sum::<u64>()));
         }
+    }
+
+    /// A beaten Mercenary's window, read like the Mercenary check does: `MERC_RAW=<file of RGBA> MERC_W=2000 MERC_H=1238
+    /// cargo test -p poe-filter-editor merc_window -- --ignored --nocapture` (the raw file from a screenshot).
+    #[test]
+    #[ignore]
+    #[cfg(windows)]
+    fn merc_window() {
+        let (Ok(path), Ok(w), Ok(h)) = (std::env::var("MERC_RAW"), std::env::var("MERC_W"), std::env::var("MERC_H")) else { return };
+        let (w, h): (usize, usize) = (w.parse().unwrap(), h.parse().unwrap());
+        let rgba = std::fs::read(path).unwrap();
+        let bgra: Vec<u8> = rgba.chunks(4).flat_map(|p| [p[2], p[1], p[0], 255]).collect();
+        let lines = super::imp::read_bgra(bgra.clone(), w as i32, h as i32).unwrap();
+        for l in &lines { println!("{:?}", l); }
+        let stats: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(std::env::var("MERC_STATS").unwrap()).unwrap()).unwrap();
+        let index = filter_core::trade::StatIndex::from_json(&stats);
+        let (skills, supports): (Vec<String>, Vec<String>) = index.merc.iter().cloned().partition(|n| !n.contains(" (Tier "));
+        let pic = filter_core::merc_screen::Pic { px: &bgra, w, h, bgra: true };
+        let rows = filter_core::merc_screen::read_rows(&pic, &lines, &skills);
+        let book = filter_core::merc_screen::seed();
+        for r in &rows {
+            let s: Vec<String> = r.icons.iter().map(|i| format!("{:?} {:?}", filter_core::merc_screen::identify(&i.print, &book).map(|x| x.0), i.tier)).collect();
+            println!("{} -> {:?}", r.name, s);
+        }
+        println!("panel open: {}, hover box names: {:?}", filter_core::merc_screen::panel_open(&lines), filter_core::merc_screen::tooltip_support(&lines, &supports));
+        assert!(rows.iter().any(|r| r.name == "Sunder of Trarthus" && r.icons.len() == 3));
     }
 
     #[test]

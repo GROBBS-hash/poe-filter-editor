@@ -12,11 +12,15 @@ import "./merc.css";
 
 type Item = { name: string; base: string; rarity: string; chaos: number | null; how: string; listed: number | null };
 type Gem = { name: string; support: boolean; tier: number | null };
+type Support = { name: string | null; family: string | null; tier: number | null; brick: boolean };
+type Skill = { name: string; supports: Support[]; brick: boolean };
 type Verdict = { kind: "kill" | "recruit" | "check"; best: number | null; kill: number | null; recruit: number | null; why: string };
 export type MercView = {
   name: string; stage: string; items: Item[]; gems: Gem[]; recruit: number | null; recruit_listed: number | null; recruit_how: string;
-  helps: string[]; verdict: Verdict | null; divine: number | null;
+  helps: string[]; verdict: Verdict | null; divine: number | null; skills: Skill[];
 };
+
+const ROMAN = ["", "I", "II", "III"];
 
 const STAGE: Record<string, string> = { met: "wants a duel", beaten: "beaten: your choice", joined: "recruited", took: "you took an item" };
 
@@ -48,7 +52,8 @@ export function MercWindow() {
   );
   const d = v.divine;
   const vd = v.verdict;
-  const filled = v.items.length > 0 || v.gems.length > 0;
+  const filled = v.items.length > 0 || v.gems.length > 0 || v.skills.length > 0;
+  const unknown = v.skills.reduce((n, s) => n + s.supports.filter((p) => !p.name).length, 0);
   const skills = v.gems.filter((g) => !g.support);
   const supports = v.gems.filter((g) => g.support);
   const best = vd?.best != null ? v.items[vd.best] : null;
@@ -60,7 +65,7 @@ export function MercWindow() {
       </WinBar>
       <div className="bo-body">
         {!filled ? (
-          <div className="mc-hint">Hover each of its items and skill gems and press <b>Ctrl+D</b>: they're priced here.</div>
+          <div className="mc-hint">Hover each of its items and press <b>Ctrl+D</b>: they're priced here. Its skills are read off the screen when its window opens after the duel.</div>
         ) : (
           <>
             <div className="mc-verdict">
@@ -85,7 +90,28 @@ export function MercWindow() {
                 <button className="link small" title="Not one of its items" onClick={() => invoke("merc_remove", { index: i, gem: false })}>✕</button>
               </div>
             ))}
-            {v.gems.length > 0 && (
+            {v.skills.length > 0 && (
+              <div className="mc-gems">
+                <div className="mc-sub">Its skills{v.recruit_listed != null ? ` · ${v.recruit_listed} like it for sale` : ""}
+                  {" "}<button className="link small" onClick={() => invoke("merc_recruit_details")}>Details</button></div>
+                {v.skills.map((s) => (
+                  <div key={s.name} className="mc-skill">
+                    <div className={`mc-sk ${s.brick ? "bad" : ""}`}>
+                      <ItemIcon base={s.name} size={18} />{s.name}{s.brick && <span className="mc-brick"> · bricks a Mercenary</span>}
+                    </div>
+                    {s.supports.map((p, i) => (
+                      <span key={i} className={`mc-gem sup ${p.tier === 3 ? "t3" : ""} ${p.brick ? "bad" : ""} ${p.name ? "" : "unk"}`}
+                        title={p.brick ? "Bricks a Mercenary" : p.name ? undefined : "Not known yet: hover it in game and press Ctrl+D"}>
+                        {p.family && <ItemIcon name={`Increased ${p.family} Support`} base={`${p.family} Support`} size={16} />}
+                        {p.name ?? "?"} {p.tier ? ROMAN[p.tier] : ""}
+                      </span>
+                    ))}
+                  </div>
+                ))}
+                {unknown > 0 && <div className="mc-hint small mc-unk">{unknown === 1 ? "1 support isn't" : `${unknown} supports aren't`} known yet: hover it in game and press Ctrl+D (once each).</div>}
+              </div>
+            )}
+            {v.skills.length === 0 && v.gems.length > 0 && (
               <div className="mc-gems">
                 <div className="mc-sub">Its skills{v.recruit_listed != null ? ` · ${v.recruit_listed} like it for sale` : ""}
                   {" "}<button className="link small" onClick={() => invoke("merc_recruit_details")}>Details</button></div>
@@ -101,7 +127,7 @@ export function MercWindow() {
                 })}
               </div>
             )}
-            {v.gems.length === 0 && <div className="mc-hint small">Ctrl+D its skill gems too, to price recruiting it.</div>}
+            {v.gems.length === 0 && v.skills.length === 0 && <div className="mc-hint small">Its skills are read when its window opens after the duel (or hover its skill list and press Ctrl+D).</div>}
           </>
         )}
       </div>
