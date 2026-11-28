@@ -2560,3 +2560,12 @@ button.qm-rule:hover, .qm-rule.can-open:hover { border-color: var(--gold); backg
 .err-card p { margin: 4px 0 12px; color: var(--text-2); }
 .err-more { margin-top: 10px; }
 .err-more .err-box { margin-top: 6px; }
+
+/* Tiers: folding groups in the section list (28 Nov 2026). */
+.tiers-gtoggle { display: flex; align-items: center; gap: 6px; width: 100%; white-space: nowrap; background: none; border: none; padding: 7px 6px 3px; margin: 2px 0 0; cursor: pointer; text-align: left;
+  font: inherit; font-size: 11.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); border-radius: 6px; }
+.tiers-gtoggle:disabled { cursor: default; opacity: 1; }
+.tiers-gtoggle:hover:not(:disabled) { color: var(--text); background: none; }
+.tiers-gtoggle span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tiers-gcount { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tiers-gchev { width: 12px; color: var(--muted); }

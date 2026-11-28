@@ -1,5 +1,6 @@
 import { Tip } from "./Help";
 import ErrorBoundary from "./ErrorBoundary";
+import { pageTop } from "./SideList";
 import { PageLoading } from "./Loading";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -79,7 +80,7 @@ const SEC_KEY = "settings.section";
 
 export default function SettingsPage() {
   const [sec, setSec] = useState(() => { try { const v = localStorage.getItem(SEC_KEY); return SECTIONS.some(([k]) => k === v) ? v! : "keys"; } catch { return "keys"; } });
-  const pickSec = (k: string) => { setSec(k); try { localStorage.setItem(SEC_KEY, k); } catch { /* not kept */ } };
+  const pickSec = (k: string) => { setSec(k); try { localStorage.setItem(SEC_KEY, k); } catch { /* not kept */ } pageTop(); };
   const [s, setS] = useState<Settings | null>(null);
   const [dirty, setDirty] = useState(false);
   const [msg, setMsg] = useState("");

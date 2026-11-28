@@ -1,4 +1,5 @@
 import WorthLine, { SectionWorth, worthText } from "./WorthLine";
+import { pageTop } from "./SideList";
 import { invoke } from "@tauri-apps/api/core";
 import { Tip } from "./Help";
 import { useEffect, useMemo, useState } from "react";
@@ -157,7 +158,8 @@ const editHides = (s: Section, t: TierRow, b: string) => {
   return h && (h.from == null || h.from > Math.max(1, t.min_stack ?? 1)) ? h : null;
 };
 
-const SHOW_ITEMS = 24;
+/** Items shown per tier before "+N more" (28 Nov 2026: 24 made walls of chips; about one row now). */
+const SHOW_ITEMS = 12;
 
 /** The item a chip stands for, so clicking it opens everything about it (25 Nov, his idea). null = the chip is only part
  *  of a name ("Small" flasks, "Omen of"), so there's no single item to open. */
@@ -253,6 +255,7 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
   }).catch((e) => setMsg(String(e)));
   useEffect(() => { load(); }, [profile.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const [openGroups, setOpenGroups] = useState<string[]>([]);
   const groups = useMemo(() => {
     const g = new Map<string, Section[]>();
     if (extra) g.set(extra.group, [extra]);
@@ -337,20 +340,28 @@ export default function Tiers({ profile, onChange, focus }: { profile: ProfileIn
         )}
         <div className="tiers-group">
           <div className="tiers-gname">Maps</div>
-          <button className={"tiers-sec " + (sel === MAPS_KEY ? "on" : "")} onClick={() => { setSel(MAPS_KEY); setEditing(null); }}><SectionIcon title="Map tiers" />Map tiers</button>
-          <button className={"tiers-sec " + (sel === THREADS_KEY ? "on" : "")} onClick={() => { setSel(THREADS_KEY); setEditing(null); }}>
+          <button className={"tiers-sec " + (sel === MAPS_KEY ? "on" : "")} onClick={() => { setSel(MAPS_KEY); setEditing(null); pageTop(); }}><SectionIcon title="Map tiers" />Map tiers</button>
+          <button className={"tiers-sec " + (sel === THREADS_KEY ? "on" : "")} onClick={() => { setSel(THREADS_KEY); setEditing(null); pageTop(); }}>
             <span className="tiers-ico"><ItemIcon base="Breach Thread" size={22} /></span>Threads</button>
         </div>
-        {groups.map(([g, list]) => (
-          <div key={g} className="tiers-group">
-            <div className="tiers-gname">{g}</div>
-            {list.map((s) => {
+        {groups.map(([g, list]) => {
+          // Groups fold (28 Nov 2026: ~110 sections in one list): the one you are in stays open, click a name to open others.
+          const here = list.some((s) => s.type_path.join(">") === sel);
+          const open = here || openGroups.includes(g);
+          return (
+          <div key={g} className={`tiers-group ${open ? "open" : ""}`}>
+            <button className="tiers-gtoggle" aria-expanded={open} disabled={here}
+              onClick={() => setOpenGroups((o) => o.includes(g) ? o.filter((x) => x !== g) : [...o, g])}>
+              <span>{g}</span><span className="tiers-gcount">{list.length}</span><span className="tiers-gchev" aria-hidden>{open ? "▾" : "▸"}</span>
+            </button>
+            {open && list.map((s) => {
               const k = s.type_path.join(">");
-              return <button key={k + (s === extra ? "*" : "")} className={`tiers-sec ${sel === k ? "on" : ""}`} onClick={() => { setSel(k); setEditing(null); }}>
+              return <button key={k + (s === extra ? "*" : "")} className={`tiers-sec ${sel === k ? "on" : ""}`} onClick={() => { setSel(k); setEditing(null); pageTop(); }}>
                 <SectionIcon title={s.title} first={s.tiers.find((t) => t.bases.length)?.bases[0]} />{s.title}</button>;
             })}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="tiers-main">

@@ -1,6 +1,14 @@
 import { ReactNode, useState } from "react";
 import ErrorBoundary from "./ErrorBoundary";
 
+/** Back to the top of the page: each part (or Tiers section) starts at its top, not where the last one was scrolled
+ *  to. The window scrolls the document (the content column grows), so scroll that; .content too in case a look makes
+ *  it scroll on its own. */
+export function pageTop() {
+  document.scrollingElement?.scrollTo({ top: 0 });
+  document.querySelector(".content")?.scrollTo({ top: 0 });
+}
+
 /** One part of a long page: shown on its own when picked in the side list. */
 export type Part = { key: string; name: string; icon: string; badge?: ReactNode; hide?: boolean };
 
@@ -19,8 +27,7 @@ export function useSidePart(page: string, parts: Part[], first?: string) {
   const pick = (k: string) => {
     setPart(k);
     try { localStorage.setItem(key, k); } catch { /* not kept */ }
-    // Each part starts at its top, not where the last one was scrolled to.
-    document.querySelector(".content")?.scrollTo({ top: 0 });
+    pageTop();
   };
   return [ok(part) ? part : parts.find((p) => !p.hide)?.key ?? "", pick] as const;
 }
