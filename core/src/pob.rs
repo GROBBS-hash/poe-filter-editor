@@ -354,18 +354,33 @@ pub fn parse(xml: &str) -> Result<Build, String> {
     let skill_titles: Vec<String> = skill_sets.iter().map(|s| s.0.clone()).collect();
     let item_titles: Vec<String> = item_sets.iter().map(|s| s.0.clone()).collect();
     let mut stages = vec![];
+    let mut sets_used = vec![false; item_sets.len()];
+    // Abyss jewels sit in items' "… Abyssal Socket N" slots: list them with the other jewels.
+    let split_abyss = |gear: Vec<Gear>| -> (Vec<Jewel>, Vec<Gear>) {
+        let (abyss, gear): (Vec<Gear>, Vec<Gear>) = gear.into_iter().partition(|g| g.slot.contains("Abyssal Socket"));
+        (abyss.into_iter().map(|g| Jewel { node: None, notables: vec![], item: g }).collect(), gear)
+    };
     for i in 0..n {
         let (title, tree) = trees.get(i).map(|(t, tr)| (t.clone(), Some(tr.clone())))
             .unwrap_or_else(|| (skill_titles.get(i).cloned().unwrap_or_default(), None));
         let groups = pick_by(&title, i, &skill_titles).map(|j| skill_sets[j].1.clone()).unwrap_or_default();
-        let gear: Vec<Gear> = pick_by(&title, i, &item_titles).map(|j| item_sets[j].1.clone()).unwrap_or_default();
-        // Abyss jewels sit in items' "… Abyssal Socket N" slots: list them with the other jewels.
-        let (abyss, gear): (Vec<Gear>, Vec<Gear>) = gear.into_iter().partition(|g| g.slot.contains("Abyssal Socket"));
+        let set = pick_by(&title, i, &item_titles);
+        if let Some(j) = set { sets_used[j] = true; }
+        let (abyss, gear) = split_abyss(set.map(|j| item_sets[j].1.clone()).unwrap_or_default());
         let mut jewels: Vec<Jewel> = tree_jewels.get(i).filter(|_| i < trees.len()).cloned().unwrap_or_default();
-        jewels.extend(abyss.into_iter().map(|g| Jewel { node: None, notables: vec![], item: g }));
+        jewels.extend(abyss);
         let shown = plain_title(&title);
         let title = if shown.is_empty() { format!("Setup {}", i + 1) } else { shown };
         stages.push(Stage { title, tree, groups, gear, jewels });
+    }
+    // Gear sets no stage wears, like a Luminary's "Mercenary gear" sets (28 Nov: they showed nowhere):
+    // each becomes a stage of its own, after the others, with just its gear.
+    for (j, (title, gear)) in item_sets.iter().enumerate() {
+        if sets_used[j] || gear.is_empty() { continue; }
+        let (jewels, gear) = split_abyss(gear.clone());
+        let shown = plain_title(title);
+        let title = if shown.is_empty() { format!("Gear set {}", j + 1) } else { shown };
+        stages.push(Stage { title, tree: None, groups: vec![], gear, jewels });
     }
     // Items no gear set slot and no tree socket points at (27 Nov: he wanted a guide's alternatives shown too).
     let mut used: std::collections::HashSet<String> = std::collections::HashSet::new();
@@ -414,6 +429,8 @@ pub fn act_of(area_level: u32) -> u32 {
 /// The act a stage's title is for: "Act 2 RF Swap" -> 2, "Start of Maps" -> 11, "Animate Guardian" -> None.
 pub fn stage_act(title: &str) -> Option<u32> {
     let t = title.to_lowercase();
+    // A Mercenary's gear is never where you are, even "Mercenary: endgame". ("Merc Lab" is the Merciless Lab, so not "merc".)
+    if t.contains("mercenar") { return None; }
     // "Act 3", "Acts 1-3", "act3", "A3" (its first act); whole words, so "Compact" isn't an act.
     let words: Vec<&str> = t.split(|c: char| !c.is_alphanumeric()).filter(|w| !w.is_empty()).collect();
     let num = |w: Option<&&str>| w.and_then(|w| w.parse::<u32>().ok());
@@ -457,7 +474,8 @@ mod tests {
     fn stage_names_and_loadout_tags() {
         for (t, a) in [("Act 3", Some(3)), ("Acts 1-3", Some(1)), ("act10", Some(10)), ("A4 twink", Some(4)), ("Compact tree", None), ("Character", None),
             ("Level 12", Some(act_of(12))), ("Lvl 30", Some(act_of(30))), ("Levelling 1-30", Some(1)), ("Leveling", Some(1)), ("Campaign", Some(1)),
-            ("Early Mapping", Some(11)), ("Level 90 Endgame", Some(11)), ("Endgame {2}", Some(11)), ("Uber", None)] {
+            ("Early Mapping", Some(11)), ("Level 90 Endgame", Some(11)), ("Endgame {2}", Some(11)), ("Uber", None),
+            ("Mercenary: endgame", None), ("Mercenary Ideal Gear (Combatant)", None), ("Merc Lab (Map Start)", Some(11))] {
             assert_eq!(stage_act(t), a, "{t}");
         }
         assert_eq!(loadout_tags("Gear {1,L2}"), ["1", "l2"]);
@@ -591,6 +609,41 @@ Adds 10 to 20 Lightning Damage to Spells
         assert_eq!(b.stages[1].groups[0].slot, "Helmet");
         // Codes may arrive with line breaks or padding.
         assert!(decode(&format!(" {}\n", encode(XML))).is_ok());
+    }
+
+    #[test]
+    fn unworn_gear_sets_become_stages() {
+        // A Luminary guide: the player's stage, plus a Mercenary gear set no tree or gem set is named after.
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<PathOfBuilding>
+	<Build ascendClassName="Luminary" className="Scion" level="90" targetVersion="3_0"/>
+	<Tree activeSpec="1"><Spec title="Endgame" treeVersion="3_29" classId="0" ascendClassId="3" nodes="1,2"/></Tree>
+	<Skills activeSkillSet="1"><SkillSet id="1" title="Endgame"/></Skills>
+	<Items activeItemSet="1">
+		<Item id="1">Rarity: UNIQUE
+Augyre
+Void Sceptre</Item>
+		<Item id="2">Rarity: UNIQUE
+Marylene's Fallacy
+Lapis Amulet</Item>
+		<Item id="3">Rarity: RARE
+Merc Jewel
+Murderous Eye Jewel
++12% to Global Critical Strike Multiplier</Item>
+		<ItemSet id="1" title="Endgame"><Slot name="Weapon 1" itemId="1"/></ItemSet>
+		<ItemSet id="2" title="Mercenary endgame gear"><Slot name="Amulet" itemId="2"/><Slot name="Helmet Abyssal Socket 1" itemId="3"/></ItemSet>
+		<ItemSet id="3" title="Empty"/>
+	</Items>
+</PathOfBuilding>"#;
+        let b = parse(xml).unwrap();
+        assert_eq!(b.stages.iter().map(|s| s.title.as_str()).collect::<Vec<_>>(), ["Endgame", "Mercenary endgame gear"]);
+        let m = &b.stages[1];
+        assert!(m.tree.is_none() && m.groups.is_empty());
+        assert_eq!(m.gear.iter().map(|g| g.name.as_str()).collect::<Vec<_>>(), ["Marylene's Fallacy"]);
+        assert_eq!(m.jewels.iter().map(|j| j.item.name.as_str()).collect::<Vec<_>>(), ["Merc Jewel"]);
+        assert!(b.alternatives.is_empty());
+        // Following your game never lands on it.
+        assert_eq!(stage_for(&b.stages, 80), Some(0));
     }
 
     #[test]
