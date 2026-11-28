@@ -113,8 +113,12 @@ export default function Home({ profile, keys, go, search }: {
 
       <section className="home-keys">
         <h3 aria-level={2}>In game</h3>
-        <KeyList keys={keys} />
-        <button className="link small" onClick={() => go("settings")}>Change hotkeys</button>
+        <KeyList keys={keys} strip />
+        <div className="home-keys-links">
+          <button className="link small" onClick={() => go("help")}>What each one does →</button>
+          <button className="link small" onClick={() => go("settings")}>Change hotkeys →</button>
+          <span className="muted small">Rest the mouse on a key to see what it does.</span>
+        </div>
       </section>
     </div>
   );

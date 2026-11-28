@@ -8,6 +8,8 @@ export type Hotkey = {
   def: string;
   /** A short name, e.g. "Change an item's look". */
   name: string;
+  /** One or two words for Home's key strip (28 Nov 2026), e.g. "Price check". */
+  short: string;
   /** How it works, in one or two short sentences. */
   how: string;
   group: "filter" | "lookup" | "windows";
@@ -16,39 +18,39 @@ export type Hotkey = {
 };
 
 export const HOTKEYS: Hotkey[] = [
-  { setting: "key_quick_edit", def: "F2", group: "filter", name: "Change how an item drops",
+  { setting: "key_quick_edit", def: "F2", group: "filter", name: "Change how an item drops", short: "Change an item",
     how: "Hover an item (on the ground, in your bags or stash) and press it. Choose how your loot filter shows that kind of item from now on: hide it, make it stand out, or change its colour or drop sound." },
-  { setting: "key_batch", def: "F3", group: "filter", name: "Change many items at once",
+  { setting: "key_batch", def: "F3", group: "filter", name: "Change many items at once", short: "Many at once",
     how: "Press it, then Ctrl+C each item you want to change. Press it again and the editor opens with all of them, so you change them together." },
-  { setting: "key_reload", def: "F4", group: "filter", name: "Apply filter changes",
+  { setting: "key_reload", def: "F4", group: "filter", name: "Apply filter changes", short: "Apply changes",
     how: "Makes the game load your filter again, so changes you made in the editor show straight away. It types /itemfilter in chat for you." },
-  { setting: "key_cycle", def: "F5", group: "filter", name: "Switch filter", extra: true,
+  { setting: "key_cycle", def: "F5", group: "filter", name: "Switch filter", short: "Switch filter", extra: true,
     how: "Swaps to your next filter (e.g. League Start, then Strict) and loads it in the game. Handy when you want to hide more as you get stronger." },
-  { setting: "key_price", def: "Ctrl+D", group: "lookup", name: "Price check",
+  { setting: "key_price", def: "Ctrl+D", group: "lookup", name: "Price check", short: "Price check",
     how: "Hover an item and press it to see what it sells for on the trade site. On a map it also warns you about mods your build can't run." },
-  { setting: "key_find", def: "Alt+F", group: "lookup", name: "Search a price",
+  { setting: "key_find", def: "Alt+F", group: "lookup", name: "Search a price", short: "Search a price",
     how: "Press it anywhere in the game and type an item name: its poe.ninja price shows as you type, with every version and a link to the trade site. Not Ctrl+F, which is the game's own stash search." },
-  { setting: "key_wiki", def: "Alt+W", group: "lookup", name: "Open on the wiki",
+  { setting: "key_wiki", def: "Alt+W", group: "lookup", name: "Open on the wiki", short: "Wiki",
     how: "Hover an item and press it: its page on the Path of Exile wiki opens in your browser." },
-  { setting: "key_read", def: "Alt+R", group: "lookup", name: "Which one should I pick?",
+  { setting: "key_read", def: "Alt+R", group: "lookup", name: "Which one should I pick?", short: "Which to pick",
     how: "When the game makes you choose (an Eldritch altar, an Expedition remnant, a reward screen), hover it and press: it tells you the best pick for your build and what's dangerous." },
-  { setting: "key_editor", def: "`", group: "windows", name: "Open the editor",
+  { setting: "key_editor", def: "`", group: "windows", name: "Open the editor", short: "Editor",
     how: "Brings this editor to the front over the game, so you can change things without alt-tabbing. Press it again (or alt-tab) to go back to the game." },
-  { setting: "key_build", def: "F6", group: "windows", name: "Your build",
+  { setting: "key_build", def: "F6", group: "windows", name: "Your build", short: "Build",
     how: "Shows your Path of Building build over the game: which gems, gear and passive points to aim for." },
-  { setting: "key_atlas", def: "F7", group: "windows", name: "Atlas plan",
+  { setting: "key_atlas", def: "F7", group: "windows", name: "Atlas plan", short: "Atlas",
     how: "Shows your atlas passive tree plan over the game, one step at a time, so you know which point to take next." },
-  { setting: "key_level", def: "F8", group: "windows", name: "Levelling route",
+  { setting: "key_level", def: "F8", group: "windows", name: "Levelling route", short: "Levelling",
     how: "For a new character: where to go next and which quest rewards to take. Moves on by itself as you enter each zone." },
-  { setting: "key_tracker", def: "F9", group: "windows", name: "Map tracker",
+  { setting: "key_tracker", def: "F9", group: "windows", name: "Map tracker", short: "Map tracker",
     how: "Times each map and counts your loot and deaths, so you see how much you make per hour. Stops while you alt-tab or a menu is open." },
-  { setting: "key_searches", def: "F10", group: "windows", name: "Stash searches",
+  { setting: "key_searches", def: "F10", group: "windows", name: "Stash searches", short: "Searches",
     how: "Your saved search words. Click one and it's typed into the stash or vendor search box for you, so matching items light up." },
-  { setting: "key_sheet", def: "F11", group: "windows", name: "Cheat sheets",
+  { setting: "key_sheet", def: "F11", group: "windows", name: "Cheat sheets", short: "Cheat sheets",
     how: "Quick-look pictures over the game: Syndicate rewards, Blight oil recipes and any pictures you add." },
-  { setting: "key_splits", def: "Alt+T", group: "windows", name: "Split timer",
+  { setting: "key_splits", def: "Alt+T", group: "windows", name: "Split timer", short: "Split timer",
     how: "Races your campaign against your best run, act by act (green ahead, red behind). Comes up by itself on a new character." },
-  { setting: "key_notes", def: "", group: "windows", name: "Notes", extra: true,
+  { setting: "key_notes", def: "", group: "windows", name: "Notes", short: "Notes", extra: true,
     how: "A notepad over the game for anything you want to remember. Saved as you type." },
 ];
 

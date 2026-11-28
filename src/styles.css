@@ -2518,3 +2518,12 @@ button.qm-rule:hover, .qm-rule.can-open:hover { border-color: var(--gold); backg
 .menu-bottom { flex-direction: row; flex-wrap: wrap; padding-top: 6px; }
 .menu-bottom > .menu-item { flex: 1 1 0; min-width: 0; width: auto; }
 .menu-bottom .side-foot { flex-basis: 100%; padding: 4px 10px 0; }
+
+/* Home "In game" as a key strip (28 Nov 2026, "A · keys in a strip"): key + one or two words, how it works on hover. */
+.home-kgroup.strip { margin: 0 0 10px; }
+.home-kgroup.strip h4 { margin-bottom: 6px; }
+.home-kstrip { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.home-kstrip > span { display: inline-flex; align-items: center; gap: 7px; color: var(--text-2); font-size: 13px; cursor: default; }
+.home-kstrip kbd { min-width: 34px; text-align: center; color: var(--gold); border-color: color-mix(in srgb, var(--gold) 40%, var(--line)); background: var(--gold-bg); }
+.home-keys-links { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin-top: 4px; }
+.home-keys-links button.link { padding-left: 0; }
