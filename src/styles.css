@@ -1541,7 +1541,7 @@ main.content .card h2 { font-size: 19px; font-weight: 500; letter-spacing: .02em
 .cr-list { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 10px 14px; box-sizing: border-box; }
 .cr-list-top { display: flex; gap: 8px; align-items: center; position: sticky; top: -10px; background: var(--panel); padding: 2px 0 6px; z-index: 1; }
 .cr-search { flex: 1; }
-.cr-legend { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin: 2px 2px 4px; }
+.cr-legend { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 8px; align-items: center; margin: 2px 2px 4px; }
 .cr-h { margin: 12px 4px 4px; font-size: 13px; color: var(--text); }
 .cr-sub { margin: 10px 6px 2px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .cr-mod { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 6px; border: 1px solid transparent; cursor: pointer; font-size: 13px; }
@@ -1551,7 +1551,7 @@ main.content .card h2 { font-size: 19px; font-weight: 500; letter-spacing: .02em
 .cr-text { flex: 1; min-width: 0; color: #8f99ff; line-height: 1.3; }
 .cr-text.inf { color: var(--ic); }
 .cr-yours { font-size: 10.5px; padding: 0 5px; border-radius: 5px; background: rgba(98,207,128,.15); color: #8fe0a6; flex: none; }
-.cr-mini { font-size: 10px; width: 16px; height: 16px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; background: var(--raised); border: 1px solid var(--line); color: var(--muted); flex: none; }
+.cr-mini { font-size: 11px; width: 17px; height: 17px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; background: var(--raised); border: 1px solid var(--line); color: var(--muted); flex: none; }
 .cr-odds { font-size: 12px; color: var(--gold); min-width: 62px; text-align: right; flex: none; white-space: nowrap; }
 .cr-mod .cr-odds { font-variant-numeric: tabular-nums; }
 .cr-add { width: 22px; height: 22px; padding: 0; border-radius: 6px; font-size: 14px; line-height: 1; flex: none; }
@@ -1771,7 +1771,7 @@ input[type=checkbox]:disabled { opacity: .45; cursor: default; }
    once per heading instead of in a cramped legend, and the detail's Add to plan button stays on one line. */
 @media (min-width: 1201px) { .cr-cols { grid-template-columns: minmax(250px, 300px) minmax(0, 1.25fr) minmax(0, 1fr); } }
 .cr-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.cr-h-col { font-size: 10.5px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-right: 30px; white-space: nowrap; }
+.cr-h-col { font-size: 11.5px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-right: 30px; white-space: nowrap; }
 .cr-legend button.link { white-space: nowrap; }
 .cr-detail-head > button { flex: none; white-space: nowrap; }
 .cr-way-nums .cr-price, .cr-way-nums .cr-odds { font-variant-numeric: tabular-nums; }
@@ -2569,3 +2569,5 @@ button.qm-rule:hover, .qm-rule.can-open:hover { border-color: var(--gold); backg
 .tiers-gtoggle span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .tiers-gcount { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .tiers-gchev { width: 12px; color: var(--muted); }
+.cr-key { display: flex; align-items: center; gap: 5px; flex-basis: 100%; order: 3; white-space: nowrap; margin-top: 2px; }
+.cr-key .cr-mini:last-of-type { margin-left: 6px; }

@@ -244,6 +244,7 @@ export default function Craft() {
           </div>
           <div className="cr-legend small">
             {pool && <span className="muted">{pool.cluster ? pool.cluster.size : pool.class === "AbyssJewel" ? "Abyss jewel" : pool.class} · item level {pool.ilvl}{pool.jewel ? " · up to " + pool.side + " prefixes + " + pool.side + " suffixes" : ""}</span>}
+            <span className="muted cr-key" title="Badges after a mod"><span className="cr-mini" aria-hidden>E</span> an essence can give it <span className="cr-mini" aria-hidden>B</span> the bench can add it</span>
             <button className="link small" onClick={() => setExtras(!extras)}>{extras ? "Hide" : "Show"} bench / essence only</button>
           </div>
           {(["prefix", "suffix"] as const).map((a) => {
@@ -257,8 +258,8 @@ export default function Craft() {
                 {f.needs && <InfIcon name={f.needs} />}
                 <span className={`cr-text ${f.needs ? "inf" : ""}`}>{lines(f.text)}</span>
                 {f.have != null && <span className="cr-yours" title="On your item">{f.have ? `T${f.have}` : "yours"}</span>}
-                {f.essences.length > 0 && <span className="cr-mini" title="An essence can give it">E</span>}
-                {f.bench.length > 0 && <span className="cr-mini" title="The crafting bench can add it">B</span>}
+                {f.essences.length > 0 && <span className="cr-mini" title="An essence can give it" aria-label="An essence can give it">E</span>}
+                {f.bench.length > 0 && <span className="cr-mini" title="The crafting bench can add it" aria-label="The crafting bench can add it">B</span>}
                 <span className="cr-odds">{f.tiers.length ? (lockedOut(f) ? `needs ${f.needs}` : odds(f.chaos)) : f.bench.length ? "bench" : "essence"}</span>
                 <button className={`cr-add ${inPlan(f.key) ? "on" : ""}`} title={inPlan(f.key) ? "In your plan" : "Add to the plan (odds for several mods at once)"}
                   onClick={(e) => { e.stopPropagation(); inPlan(f.key) ? setPlan(plan.filter((t) => t.key !== f.key)) : addPlan(f); }}>{inPlan(f.key) ? "✓" : "+"}</button>
