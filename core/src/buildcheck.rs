@@ -25,6 +25,9 @@ struct GemData {
     #[serde(default)] proj: u32,
     #[serde(default)] dur: f64,
     #[serde(default, rename = "projDelay")] proj_delay: f64,
+    /// Raise Spectre: spectres allowed per gem level (to level 40), and per quality.
+    #[serde(default)] spectres: Vec<f64>,
+    #[serde(default, rename = "spectresQ")] spectres_q: f64,
 }
 
 #[derive(Deserialize, Default)]
@@ -252,6 +255,49 @@ fn stage_lines(st: &Stage, alloc: &[u32], active: &[String]) -> Pool {
     }
     for j in &st.jewels { if j.node.is_none_or(|n| alloc.contains(&n)) { gear.extend(j.item.lines.iter().filter_map(keep)); } }
     Pool { tree, gear }
+}
+
+/// "+2 to Level of all Minion Skill Gems" -> 2 (None when the line doesn't start with a number).
+fn lead_num(l: &str) -> Option<i64> {
+    let t = l.trim_start_matches('+');
+    let n: String = t.chars().take_while(|c| c.is_ascii_digit()).collect();
+    n.parse().ok()
+}
+
+/// How many spectres a Raise Spectre gem raises in this stage (28 Nov, he asked "how many"): the gem's level table from
+/// Path of Building (Raise Spectre: 1, 2 from level 13, 3 from 25), with gem levels from gear ("+1 to Level of all
+/// Minion Skill Gems", "… Raise Spectre Gems", "… Spell Skill Gems", socketed gem levels on the item it sits in),
+/// quality (Transience), and "+N to maximum number of Spectres" from the tree, gear and jewels. Not the support gems
+/// or anything PoB's config adds, so it can be one or two short of PoB's own number.
+pub fn spectre_limit(st: &Stage, gem: &crate::pob::Gem) -> u32 {
+    let Some(d) = gem_data(&gem.name).filter(|d| !d.spectres.is_empty()) else { return 0 };
+    let alloc: Vec<u32> = st.tree.as_ref().map(|t| t.nodes.clone()).unwrap_or_default();
+    let pool = stage_lines(st, &alloc, &[]);
+    let lines: Vec<String> = pool.tree.iter().chain(pool.gear.iter()).map(|l| l.to_lowercase()).collect();
+    let mut level = gem.level as i64;
+    for l in &lines {
+        let Some(n) = lead_num(l) else { continue };
+        if ["to level of all minion skill gems", "to level of all raise spectre gems", "to level of all spell skill gems",
+            "to level of all skill gems", "to level of all intelligence skill gems"].iter().any(|k| l.ends_with(k)) { level += n; }
+    }
+    // Socketed gem levels count only on the item the gem is in.
+    let slot = st.groups.iter().find(|g| g.gems.iter().any(|x| x == gem)).map(|g| g.slot.clone()).unwrap_or_default();
+    for g in st.gear.iter().filter(|g| !slot.is_empty() && g.slot == slot) {
+        for l in g.lines.iter().map(|l| l.to_lowercase()) {
+            let Some(n) = lead_num(&l) else { continue };
+            if ["to level of socketed gems", "to level of socketed minion gems", "to level of socketed spell gems",
+                "to level of socketed intelligence gems"].iter().any(|k| l.ends_with(k)) { level += n; }
+        }
+    }
+    let lv = level.clamp(1, d.spectres.len() as i64) as usize;
+    let mut n = d.spectres[lv - 1] + (gem.quality as f64 * d.spectres_q).floor();
+    for l in &lines {
+        if l.starts_with("maximum number of raised spectres is ") { return lead_num(l.trim_start_matches("maximum number of raised spectres is ")).unwrap_or(1) as u32; }
+        if l.ends_with("to maximum number of spectres") || l.ends_with("to maximum number of raised spectres") {
+            if let Some(x) = lead_num(l) { n += x as f64; }
+        }
+    }
+    n.max(0.0) as u32
 }
 
 pub fn check(b: &Build) -> Vec<StageCheck> {

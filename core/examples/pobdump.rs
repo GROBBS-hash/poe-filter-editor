@@ -16,6 +16,11 @@ fn main() {
         println!("{}: {} groups, {} gems, {} gear: {}", s.title, s.groups.len(), s.groups.iter().map(|g| g.gems.len()).sum::<usize>(), s.gear.len(),
             s.gear.iter().map(|g| g.slot.as_str()).collect::<Vec<_>>().join(", "));
         for j in &s.jewels { println!("   jewel {:?} {} / {} {:?}", j.node, j.item.name, j.item.base, j.notables); }
+        if let Some(m) = &s.minions {
+            if let Some(g) = &m.spectre_gem { println!("   spectres: {} from {} {}/{}", m.spectre_limit.unwrap_or(0), g.name, g.level, g.quality); }
+            for x in &m.spectres { println!("   spectre {}{}", x.name, if x.main { " (main)" } else { "" }); }
+            if m.guardian_gem.is_some() { println!("   guardian wears \"{}\": {}", m.guardian_set, m.guardian.iter().map(|g| format!("{} {}", g.slot, g.name)).collect::<Vec<_>>().join(", ")); }
+        }
         // POB_COPY=1: the price-window copy of every item, and whether it reads back.
         // POB_BUY=<trade_stats_poe1.json> [POB_STAGE=<part of a stage name>]: the "Buy" search for each item, one JSON per line.
         if let (Ok(stats), true) = (std::env::var("POB_BUY"), s.title.contains(&std::env::var("POB_STAGE").unwrap_or_default())) {

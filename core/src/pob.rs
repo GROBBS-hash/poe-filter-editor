@@ -71,6 +71,44 @@ pub struct Stage {
     /// Tree and abyssal jewels.
     #[serde(default)]
     pub jewels: Vec<Jewel>,
+    /// Spectres and the Animate Guardian's gear, when this stage's gems raise them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub minions: Option<Minions>,
+}
+
+/// A spectre in the build: PoB's monster id and its name.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Spectre {
+    pub id: String,
+    pub name: String,
+    /// Picked on one of this stage's Raise Spectre gems (the one PoB works the numbers out with). The others are
+    /// only in the build's spectre list (PoB's "Spectre library", shared by every stage).
+    pub main: bool,
+}
+
+/// Minions a stage raises (28 Nov, he asked: "which spectres, how many and what gear the animate guardian uses").
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct Minions {
+    pub spectres: Vec<Spectre>,
+    /// The Raise Spectre gem (the highest level one when there are several).
+    pub spectre_gem: Option<Gem>,
+    /// How many spectres it raises: the gem's level table (plus gem levels from gear), quality, and "+N to maximum
+    /// number of Spectres" from the tree, gear and jewels. Filled in by `buildcheck::spectre_limit`.
+    pub spectre_limit: Option<u32>,
+    pub guardian_gem: Option<Gem>,
+    /// The item set the Animate Guardian wears ("Animate Guardian", "AG gear"...).
+    pub guardian_set: String,
+    pub guardian: Vec<Gear>,
+}
+
+fn spectre_names() -> &'static HashMap<String, String> {
+    static D: OnceLock<HashMap<String, String>> = OnceLock::new();
+    D.get_or_init(|| serde_json::from_str(include_str!("../data/poe1_spectres.json")).unwrap_or_default())
+}
+
+/// A spectre's name from PoB's id (the id's last part when PoB's list doesn't have it).
+pub fn spectre_name(id: &str) -> String {
+    spectre_names().get(id).cloned().unwrap_or_else(|| id.rsplit('/').next().unwrap_or(id).trim_end_matches('_').to_string())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -301,7 +339,26 @@ pub fn parse(xml: &str) -> Result<Build, String> {
 
     // Gem setups. Older builds have <Skill> straight under <Skills> (one set).
     let mut skill_sets: Vec<(String, Vec<Group>)> = vec![];
+    // Per gem set: the spectres its Raise Spectre gems pick and the item set its Animate Guardian wears (PoB keeps
+    // them on the gem: skillMinion="Metadata/Monsters/…", skillMinionItemSet="2"; the "…Calcs" copies are the Calcs tab's).
+    let mut minion_sets: Vec<(Vec<String>, Option<String>)> = vec![];
     if let Some(sk) = child(root, "Skills") {
+        let minions_of = |n: roxmltree::Node| -> (Vec<String>, Option<String>) {
+            let mut spectres: Vec<String> = vec![];
+            let mut set = None;
+            for s in n.children().filter(|c| c.has_tag_name("Skill") && attr(c, "enabled") != "false") {
+                for g in s.children().filter(|g| g.has_tag_name("Gem") && attr(g, "enabled") != "false") {
+                    let pick = |k: &str| g.attribute(k).or_else(|| g.attribute(&*format!("{k}Calcs"))).filter(|v| !v.is_empty() && *v != "nil").map(String::from);
+                    if attr(&g, "skillId").starts_with("RaiseSpectre") || attr(&g, "nameSpec").starts_with("Raise Spectre") {
+                        if let Some(id) = pick("skillMinion") { if !spectres.contains(&id) { spectres.push(id); } }
+                    }
+                    if attr(&g, "skillId").starts_with("AnimateGuardian") || attr(&g, "nameSpec").starts_with("Animate Guardian") {
+                        set = set.or(pick("skillMinionItemSet").or_else(|| Some(String::new())));
+                    }
+                }
+            }
+            (spectres, set)
+        };
         let read = |n: roxmltree::Node| -> Vec<Group> {
             n.children().filter(|c| c.has_tag_name("Skill")).map(|s| Group {
                 label: attr(&s, "label").to_string(),
@@ -318,12 +375,16 @@ pub fn parse(xml: &str) -> Result<Build, String> {
             }).filter(|g: &Group| !g.gems.is_empty()).collect()
         };
         let sets: Vec<roxmltree::Node> = sk.children().filter(|c| c.has_tag_name("SkillSet")).collect();
-        if sets.is_empty() { skill_sets.push((String::new(), read(sk))); }
-        for s in sets { skill_sets.push((attr(&s, "title").to_string(), read(s))); }
+        if sets.is_empty() { skill_sets.push((String::new(), read(sk))); minion_sets.push(minions_of(sk)); }
+        for s in sets { skill_sets.push((attr(&s, "title").to_string(), read(s))); minion_sets.push(minions_of(s)); }
     }
+    // The build's spectre list (PoB's Spectre library: every spectre the guide set up, for all stages).
+    let spectre_library: Vec<String> = build_el.children().filter(|c| c.has_tag_name("Spectre")).map(|c| attr(&c, "id").to_string())
+        .filter(|s| !s.is_empty()).collect();
 
     // Gear.
     let mut item_sets: Vec<(String, Vec<Gear>)> = vec![];
+    let mut item_set_ids: Vec<String> = vec![];
     if let Some(items) = child(root, "Items") {
         let read = |n: roxmltree::Node| -> Vec<Gear> {
             n.children().filter(|c| c.has_tag_name("Slot"))
@@ -332,8 +393,8 @@ pub fn parse(xml: &str) -> Result<Build, String> {
                 .collect()
         };
         let sets: Vec<roxmltree::Node> = items.children().filter(|c| c.has_tag_name("ItemSet")).collect();
-        if sets.is_empty() { item_sets.push((String::new(), read(items))); }
-        for s in sets { item_sets.push((attr(&s, "title").to_string(), read(s))); }
+        if sets.is_empty() { item_sets.push((String::new(), read(items))); item_set_ids.push(String::new()); }
+        for s in sets { item_sets.push((attr(&s, "title").to_string(), read(s))); item_set_ids.push(attr(&s, "id").to_string()); }
     }
 
     // Stages: one per tree (or per gem set if there are more), matched by title, else by position.
@@ -360,18 +421,46 @@ pub fn parse(xml: &str) -> Result<Build, String> {
         let (abyss, gear): (Vec<Gear>, Vec<Gear>) = gear.into_iter().partition(|g| g.slot.contains("Abyssal Socket"));
         (abyss.into_iter().map(|g| Jewel { node: None, notables: vec![], item: g }).collect(), gear)
     };
+    let title_at = |i: usize| trees.get(i).map(|(t, _)| t.clone()).unwrap_or_else(|| skill_titles.get(i).cloned().unwrap_or_default());
+    // Item sets the player wears in some stage: never the Animate Guardian's, even when its gem points there (his
+    // Ruetoo guide's gem points at "Level 1").
+    let player_sets: Vec<usize> = (0..n).filter_map(|i| pick_by(&title_at(i), i, &item_titles)).collect();
     for i in 0..n {
         let (title, tree) = trees.get(i).map(|(t, tr)| (t.clone(), Some(tr.clone())))
             .unwrap_or_else(|| (skill_titles.get(i).cloned().unwrap_or_default(), None));
-        let groups = pick_by(&title, i, &skill_titles).map(|j| skill_sets[j].1.clone()).unwrap_or_default();
+        let skills = pick_by(&title, i, &skill_titles);
+        let groups = skills.map(|j| skill_sets[j].1.clone()).unwrap_or_default();
         let set = pick_by(&title, i, &item_titles);
         if let Some(j) = set { sets_used[j] = true; }
+        let minions = skills.and_then(|j| minion_sets.get(j)).and_then(|(spectres, ag)| {
+            let gem_of = |pre: &str| groups.iter().filter(|g| g.enabled).flat_map(|g| g.gems.iter())
+                .filter(|x| x.enabled && x.name.starts_with(pre)).max_by_key(|x| x.level).cloned();
+            let spectre_gem = gem_of("Raise Spectre");
+            let guardian_gem = gem_of("Animate Guardian");
+            if spectre_gem.is_none() && guardian_gem.is_none() { return None; }
+            let mut list: Vec<Spectre> = spectres.iter().map(|id| Spectre { id: id.clone(), name: spectre_name(id), main: true }).collect();
+            if spectre_gem.is_some() {
+                for id in &spectre_library { if !spectres.contains(id) { list.push(Spectre { id: id.clone(), name: spectre_name(id), main: false }); } }
+            }
+            // The Animate Guardian's item set: the one its gem points at, else one named for it. A set named for it wins
+            // over the gem's when they differ (pobb.in/d3eVCew-AbSN's levelling gems point at "Level 5", the player's).
+            let named = item_titles.iter().position(|t| is_guardian_set(t));
+            let g_set = guardian_gem.as_ref().and_then(|_| {
+                let pointed = ag.as_ref().filter(|id| !id.is_empty()).and_then(|id| item_set_ids.iter().position(|x| x == id))
+                    .filter(|p| is_guardian_set(&item_titles[*p]) || !player_sets.contains(p));
+                match (pointed, named) { (Some(p), Some(n)) if !is_guardian_set(&item_titles[p]) => Some(n), (p, n) => p.or(n) }
+            }).filter(|j| Some(*j) != set);
+            if let Some(j) = g_set { sets_used[j] = true; }
+            let guardian = g_set.map(|j| item_sets[j].1.iter().filter(|g| !g.slot.contains("Abyssal Socket")).cloned().collect()).unwrap_or_default();
+            let guardian_set = g_set.map(|j| plain_title(&item_titles[j])).unwrap_or_default();
+            Some(Minions { spectres: list, spectre_gem, spectre_limit: None, guardian_gem, guardian_set, guardian })
+        });
         let (abyss, gear) = split_abyss(set.map(|j| item_sets[j].1.clone()).unwrap_or_default());
         let mut jewels: Vec<Jewel> = tree_jewels.get(i).filter(|_| i < trees.len()).cloned().unwrap_or_default();
         jewels.extend(abyss);
         let shown = plain_title(&title);
         let title = if shown.is_empty() { format!("Setup {}", i + 1) } else { shown };
-        stages.push(Stage { title, tree, groups, gear, jewels });
+        stages.push(Stage { title, tree, groups, gear, jewels, minions });
     }
     // Gear sets no stage wears, like a Luminary's "Mercenary gear" sets (28 Nov: they showed nowhere):
     // each becomes a stage of its own, after the others, with just its gear.
@@ -380,7 +469,7 @@ pub fn parse(xml: &str) -> Result<Build, String> {
         let (jewels, gear) = split_abyss(gear.clone());
         let shown = plain_title(title);
         let title = if shown.is_empty() { format!("Gear set {}", j + 1) } else { shown };
-        stages.push(Stage { title, tree: None, groups: vec![], gear, jewels });
+        stages.push(Stage { title, tree: None, groups: vec![], gear, jewels, minions: None });
     }
     // Items no gear set slot and no tree socket points at (27 Nov: he wanted a guide's alternatives shown too).
     let mut used: std::collections::HashSet<String> = std::collections::HashSet::new();
@@ -392,6 +481,10 @@ pub fn parse(xml: &str) -> Result<Build, String> {
         .map(|i| item_gear("Alternative", i.text().unwrap_or("")))
         .filter(|g| !g.name.is_empty())
         .collect()).unwrap_or_default();
+    for s in stages.iter_mut() {
+        let limit = s.minions.as_ref().and_then(|m| m.spectre_gem.as_ref()).map(|g| crate::buildcheck::spectre_limit(s, g));
+        if let Some(m) = s.minions.as_mut() { m.spectre_limit = limit; }
+    }
     Ok(Build {
         alternatives,
         class: attr(&build_el, "className").to_string(),
@@ -400,6 +493,12 @@ pub fn parse(xml: &str) -> Result<Build, String> {
         active: tree_active.saturating_sub(1).min(stages.len().saturating_sub(1)),
         stages,
     })
+}
+
+/// An item set made for the Animate Guardian: "Animate Guardian", "AG gear", "Guardian items".
+fn is_guardian_set(title: &str) -> bool {
+    let t = plain_title(title).to_lowercase();
+    t.contains("guardian") || t.split(|c: char| !c.is_alphanumeric()).any(|w| w == "ag")
 }
 
 /// The loadout tags in a set's title: "Endgame {2}", "Gear {1,2}", "Tree {L3}".
@@ -612,6 +711,45 @@ Adds 10 to 20 Lightning Damage to Spells
     }
 
     #[test]
+    fn minions_spectres_and_guardian_gear() {
+        // Like pobb.in/1pm8DU7V1vN6: Raise Spectre picks its monster, Animate Guardian points at its own item set.
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<PathOfBuilding>
+	<Build ascendClassName="Guardian" className="Templar" level="95" targetVersion="3_0">
+		<Spectre id="Metadata/Monsters/LeagueAzmeri/SpecialCorpses/OakHigh"/>
+		<Spectre id="Metadata/Monsters/BloodChieftain/MonkeyChiefBloodEnrage"/>
+	</Build>
+	<Tree activeSpec="1"><Spec title="Main" treeVersion="3_29" classId="5" ascendClassId="1" nodes="19897"/></Tree>
+	<Skills activeSkillSet="1"><SkillSet id="1" title="Main">
+		<Skill enabled="true" slot="Boots">
+			<Gem nameSpec="Raise Spectre" skillId="RaiseSpectre" gemId="Metadata/Items/Gems/SkillGemRaiseSpectre" level="25" quality="0" enabled="true" skillMinion="Metadata/Monsters/BloodChieftain/MonkeyChiefBloodEnrage"/>
+			<Gem nameSpec="Animate Guardian" skillId="AnimateGuardian" gemId="Metadata/Items/Gems/SkillGemAnimateArmour" level="20" quality="0" enabled="true" skillMinionItemSet="2"/>
+		</Skill>
+	</SkillSet></Skills>
+	<Items activeItemSet="1">
+		<Item id="1">Rarity: UNIQUE
+Bones of Ullr
+Silk Slippers
++1 to maximum number of Spectres</Item>
+		<Item id="2">Rarity: UNIQUE
+The Formless Flame
+Royal Burgonet</Item>
+		<ItemSet id="1" title="Main"><Slot name="Boots" itemId="1"/></ItemSet>
+		<ItemSet id="2" title="AG"><Slot name="Helmet" itemId="2"/></ItemSet>
+	</Items>
+</PathOfBuilding>"#;
+        let b = parse(xml).unwrap();
+        // The guardian's set is shown with the stage, not as a stage of its own.
+        assert_eq!(b.stages.len(), 1);
+        let m = b.stages[0].minions.as_ref().unwrap();
+        assert_eq!(m.spectres.iter().map(|s| (s.name.as_str(), s.main)).collect::<Vec<_>>(), [("Carnage Chieftain", true), ("Perfect Warlord", false)]);
+        // Level 25 gem: 3, Bones of Ullr +1, the tree's "+1 to Maximum number of Spectres" +1.
+        assert_eq!(m.spectre_limit, Some(5));
+        assert_eq!(m.guardian_set, "AG");
+        assert_eq!(m.guardian.iter().map(|g| g.name.as_str()).collect::<Vec<_>>(), ["The Formless Flame"]);
+    }
+
+    #[test]
     fn unworn_gear_sets_become_stages() {
         // A Luminary guide: the player's stage, plus a Mercenary gear set no tree or gem set is named after.
         let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -650,7 +788,7 @@ Murderous Eye Jewel
     fn follows_your_act() {
         let titles = ["Act 1", "Act 2 RF Swap", "Act 3", "Act 4 First Lab", "Act 7 Right Before Staff Swap", "Act 7 Staff Swap",
             "Start of Maps", "End of Early Maps", "Mageblood No Whispers", "Animate Guardian"];
-        let st: Vec<Stage> = titles.iter().map(|t| Stage { title: t.to_string(), tree: None, groups: vec![], gear: vec![], jewels: vec![] }).collect();
+        let st: Vec<Stage> = titles.iter().map(|t| Stage { title: t.to_string(), tree: None, groups: vec![], gear: vec![], jewels: vec![], minions: None }).collect();
         let at = |lvl| stage_for(&st, lvl).map(|i| titles[i]);
         assert_eq!(at(5), Some("Act 1"));
         assert_eq!(at(18), Some("Act 2 RF Swap"));

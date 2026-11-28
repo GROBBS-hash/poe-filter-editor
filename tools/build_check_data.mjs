@@ -37,6 +37,9 @@ for (const f of skillFiles) {
     const statAt = (stat) => statNames.indexOf(stat);
     for (const m of levels.matchAll(/\[(\d+)\] = \{([^\n]*)\},/g)) {
       const lv = +m[1], row = m[2];
+      // Spectre limits to level 40 (gear lifts the gem past 21: Raise Spectre raises 3 from level 25).
+      const sp = statAt("base_number_of_spectres_allowed");
+      if (sp >= 0 && lv <= 40) { const v = parseFloat(row.split(",")[sp]); if (!isNaN(v)) (g.spectres ??= [])[lv - 1] = v; }
       if (lv > 21) continue;
       g.req[lv - 1] = +(row.match(/levelRequirement = (\d+)/)?.[1] ?? 1);
       const nums = row.split(/,\s*[a-zA-Z]/)[0].split(",").map((x) => parseFloat(x)).filter((x) => !isNaN(x));
@@ -53,6 +56,7 @@ for (const f of skillFiles) {
       }
     }
     const extraProj = b.match(/\{ "number_of_additional_projectiles", (\d+) \}/)?.[1]; if (extraProj) g.proj = +extraProj;
+    const spQ = b.match(/qualityStats = \{[^}]*?\{ "base_number_of_spectres_allowed", ([\d.]+) \}/)?.[1]; if (spQ) g.spectresQ = +spQ;
     const baseDur = b.match(/\{ "base_skill_effect_duration", (\d+) \}/)?.[1]; if (baseDur) g.dur = +baseDur / 1000;
     const delay = b.match(/\{ "kinetic_fusillade_base_delay_between_projectiles_ms", (\d+) \}/)?.[1]; if (delay) g.projDelay = +delay / 1000;
     if (/SkillType\.Aura\] = true/.test(b) || /HasReservation\] = true/.test(b)) g.reserves = true;
@@ -83,7 +87,7 @@ const C = tree.constants;
 const ang = (n, i) => n === 16 ? [0, 30, 45, 60, 90, 120, 135, 150, 180, 210, 225, 240, 270, 300, 315, 330][i]
   : n === 40 ? [0, 10, 20, 30, 40, 45, 50, 60, 70, 80, 90, 100, 110, 120, 130, 135, 140, 150, 160, 170, 180, 190, 200, 210, 220, 225, 230, 240, 250, 260, 270, 280, 290, 300, 310, 315, 320, 330, 340, 350][i]
   : 360 * i / n;
-const WANT = /Strength|Dexterity|Intelligence|Attributes|Skill Effect Duration|Attack Speed|maximum Mana|Reservation Efficiency|Mana Cost|Leeched as Mana/;
+const WANT = /Strength|Dexterity|Intelligence|Attributes|Skill Effect Duration|Attack Speed|maximum Mana|Reservation Efficiency|Mana Cost|Leeched as Mana|Spectre|Minion Skill Gems|Minion Gems/;
 const nodes = {};
 for (const [id, n] of Object.entries(tree.nodes)) {
   if (id === "root" || n.group == null) continue;
@@ -105,3 +109,11 @@ const out = { gems, bases, nodes };
 const file = new URL("../core/data/poe1_buildcheck.json", import.meta.url);
 fs.writeFileSync(file, JSON.stringify(out));
 console.log(Object.keys(gems).length, "gems,", Object.keys(bases).length, "bases,", Object.keys(nodes).length, "nodes,", fs.statSync(file).size, "bytes");
+
+// ---- spectre names (28 Nov 2026, he asked which spectres a build uses): PoB's Spectres.lua, id -> monster name.
+// A Raise Spectre gem in a PoB build names its monster by id ("Metadata/Monsters/BloodChieftain/MonkeyChiefBloodEnrage").
+const spectres = {};
+for (const m of (await get(RAW + "Spectres.lua")).matchAll(/minions\["([^"]+)"\] = \{\s*name = "([^"]+)"/g)) spectres[m[1]] = m[2];
+const sfile = new URL("../core/data/poe1_spectres.json", import.meta.url);
+fs.writeFileSync(sfile, JSON.stringify(spectres));
+console.log(Object.keys(spectres).length, "spectres,", fs.statSync(sfile).size, "bytes");
