@@ -64,7 +64,7 @@ export default function Profiles({ ov, active, onChange, onNew }: { ov: Overview
       <div className="card">
         <div className="row between">
           <h2>Your filters <Tip><b>Going stricter?</b> Change <b>Built on</b> to e.g. Uber Strict: your edits, tier changes, levelling setup,
-            price tiers and theme all carry over. <b>Want both?</b> Save as new first, then change the copy, and switch between them in
+            price tiers and theme all carry over. <b>Want both?</b> Make a copy first, then change it, and switch between them in
             game with F4. <b>FilterBlade file?</b> Choose it under “Your own file”; your edits go on top of it.</Tip></h2>
           <button onClick={onNew}>New filter (e.g. for PoE 2)…</button>
         </div>
@@ -89,14 +89,23 @@ export default function Profiles({ ov, active, onChange, onNew }: { ov: Overview
       </div>
       <SharePacks active={active} names={ov.profiles.map((p) => p.name)} onChange={onChange} />
       <div className="card">
-        <h2>Save “{active.name}” as a new filter</h2>
-        <p className="muted">Great for going stricter as the league goes on, without touching your league-start filter.</p>
-        <input className="text" placeholder="e.g. Strict 1" value={name} onChange={(e) => setName(e.target.value)} />
+        <h2>Make a copy of “{active.name}”</h2>
+        <p className="muted">
+          A second filter that starts with everything “{active.name}” has: your edits, colours, prices and strictness.
+          Change the copy (e.g. for levelling a new character, or going stricter later) and “{active.name}” stays as it is.
+        </p>
+        <input className="text" placeholder="Name of the copy, e.g. Levelling or Strict 1" value={name} onChange={(e) => setName(e.target.value)} />
         <label className="check">
           <input type="checkbox" checked={inherit} onChange={(e) => setInherit(e.target.checked)} />
-          Keep following “{active.name}” (fixes you make there carry over)
+          {inherit
+            ? <>Linked: later changes to “{active.name}” also show up in the copy. Your changes to the copy stay only in the copy.</>
+            : <>Separate: the copy is on its own. Later changes to “{active.name}” don't reach it.</>}
         </label>
-        <button className="primary" disabled={!name.trim()} onClick={fork}>Save as new</button>
+        <button className="primary" disabled={!name.trim()} onClick={fork}>Make the copy</button>
+        <p className="muted small">
+          The copy becomes the filter you're editing (switch back with the filter picker at the top). In game, pick it once
+          under Options → Game → Item filter, then F4 reloads it as usual.
+        </p>
       </div>
 
     </>

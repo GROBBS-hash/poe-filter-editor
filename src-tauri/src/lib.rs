@@ -879,6 +879,15 @@ fn buy_build_merc(app: AppHandle, groups: Vec<filter_core::pob::Group>) -> Resul
     Ok(r)
 }
 
+/// "Buy" on a Wickerman body part the guide asks for: that part and version, instant buyout, cheapest first.
+#[tauri::command(async)]
+fn buy_wicker_part(app: AppHandle, query: serde_json::Value) -> Result<u64, String> {
+    let (poe2, league) = trade_league(&app);
+    let (id, _, total) = trade_api::search(poe2, &league, &query)?;
+    open_url(trade_api::site_url(poe2, &league, &id))?;
+    Ok(total)
+}
+
 /// "Price" on a Mercenary stage: the price window's warrant search, where the supports can be ticked.
 #[tauri::command]
 fn price_build_merc(app: AppHandle, groups: Vec<filter_core::pob::Group>) {
@@ -3580,7 +3589,7 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            price_build_item, buy_build_item, buy_base_item, buy_build_merc, price_build_merc, trade_untick_one, trade_hidden, overview,
+            price_build_item, buy_build_item, buy_base_item, buy_build_merc, buy_wicker_part, price_build_merc, trade_untick_one, trade_hidden, overview,
             craft_bases, craft_start, craft_pool, craft_ways, craft_plan, craft_routes, craft_now, craft_buy, craft_search, craft_buy_plan, jewel_mods,
             create_profile,
             list_filters,

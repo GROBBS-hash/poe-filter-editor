@@ -235,6 +235,137 @@ pub struct Build {
     /// Items in the build that no stage wears and no tree socket holds: the guide's alternatives and upgrades.
     #[serde(default)]
     pub alternatives: Vec<Gear>,
+    /// The Wickerman body parts the guide's notes ask for (3.30; Ruetoo's "Wickerman progression").
+    #[serde(default)]
+    pub wickerman: Vec<WickerPart>,
+}
+
+/// One Wickerman body part a guide asks for, matched to the game's part (data from poedb, `tools/viscera_data.mjs`).
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+pub struct WickerPart {
+    /// The guide's heading for it: "Head", "Arm", "Torso", "Leg".
+    pub slot: String,
+    /// "Endgame" when the guide puts it under such a line, else empty.
+    #[serde(default)]
+    pub when: String,
+    /// The part as it drops ("Lesser Bandit Rogue's Head"), empty when no part fits the guide's words.
+    pub name: String,
+    pub base: String,
+    /// "Low" / "Med" / "High" (or empty for parts with one version).
+    pub tier: String,
+    pub mods: Vec<String>,
+    /// "Act 2, Kraityn, The Broken Bridge".
+    pub drops: Vec<String>,
+    pub icon: String,
+    /// The trade site's search for it (instant buyout), league added by the app.
+    pub query: Option<serde_json::Value>,
+    /// The guide's own lines for it.
+    pub note: String,
+}
+
+#[derive(Deserialize)]
+struct Viscera { name: String, slot: String, drops: Vec<String>, tiers: Vec<VisceraTier>, icon: String }
+#[derive(Deserialize)]
+struct VisceraTier { tier: String, mods: Vec<String>, query: Option<serde_json::Value> }
+
+fn viscera() -> &'static Vec<Viscera> {
+    static D: OnceLock<Vec<Viscera>> = OnceLock::new();
+    D.get_or_init(|| serde_json::from_str(include_str!("../data/poe1_viscera.json")).unwrap_or_default())
+}
+
+/// The words of a mod or a guide line that say what it does: lower case, no numbers, no short words.
+fn mod_words(s: &str) -> Vec<String> {
+    s.to_lowercase().split(|c: char| !c.is_alphabetic()).filter(|w| w.len() >= 4).map(String::from).collect()
+}
+
+/// A part's drop line -> (boss, zone): "Act 2, Kraityn, The Broken Bridge" -> ("kraityn", "the broken bridge").
+fn drop_place(d: &str) -> (String, String) {
+    let d = if d.starts_with("Act ") { d.split_once(", ").map(|(_, r)| r).unwrap_or(d) } else { d };
+    let (boss, zone) = d.rsplit_once(", ").unwrap_or((d, ""));
+    (boss.split(", ").next().unwrap_or(boss).trim().to_lowercase(), zone.trim().to_lowercase())
+}
+
+/// The guide's "Wickerman" list (28 Nov, he found Ruetoo's Luminary guide lists them only in the notes): body-part
+/// headings ("HEAD", "ARM", "Torso", "LEG"), under each one or more parts written as where it drops and what it does
+/// ("Act 2, The Broken Bridge Kraityn - 4-6% attack and cast speed", "Map: Racecourse Bringer of Blood (10-20)% chance
+/// to gain an Endurance Charge when you Block"), with "Med" / "High" lines for the version and a short line after a
+/// gap ("Endgame") for when. Each is matched to the game's part by its boss, its zone and its mod.
+fn notes_wickerman(notes: &str) -> Vec<WickerPart> {
+    let lines: Vec<String> = notes.lines().map(plain_note).collect();
+    let Some(start) = lines.iter().position(|l| l.to_lowercase().contains("wickerman")) else { return vec![] };
+    let heading = |l: &str| -> Option<&'static str> {
+        match l.trim().trim_end_matches(':').to_lowercase().as_str() {
+            "head" | "heads" => Some("Head"),
+            "arm" | "arms" | "upper limb" | "upper limbs" => Some("Upper Limb"),
+            "torso" | "body" | "chest" => Some("Torso"),
+            "leg" | "legs" | "lower limb" | "lower limbs" => Some("Lower Limb"),
+            _ => None,
+        }
+    };
+    let tier_word = |l: &str| -> Option<&'static str> {
+        match l.trim().to_lowercase().as_str() { "low" | "lesser" => Some("Low"), "med" | "medium" => Some("Med"), "high" | "greater" => Some("High"), _ => None }
+    };
+    // "Med (5-6)% of Physical …": a version word in front of the mod.
+    let lead_tier = |l: &str| l.split_whitespace().next().and_then(|w| tier_word(w));
+    let starts_entry = |l: &str| { let x = l.to_lowercase(); x.starts_with("act ") || x.starts_with("map:") || x.starts_with("pinnacle") || x.starts_with("boss") };
+    // (slot heading, its game slot, when, lines, tier word)
+    let mut entries: Vec<(String, &'static str, String, Vec<String>, Option<&'static str>)> = vec![];
+    let mut slot: Option<(String, &'static str)> = None;
+    let mut when = String::new();
+    let mut open = false;
+    let mut blanks = 0;
+    for l in lines.iter().skip(start + 1) {
+        if l.is_empty() { blanks += 1; if blanks >= 2 && slot.is_some() { break; } open = false; continue; }
+        let after_gap = blanks > 0;
+        blanks = 0;
+        if let Some(h) = heading(l) { slot = Some((l.trim().to_string(), h)); when.clear(); open = false; continue; }
+        let Some((sname, sgame)) = slot.clone() else { continue };
+        if let Some(t) = tier_word(l) { if let Some(e) = entries.last_mut().filter(|_| open) { e.4 = Some(t); } continue; }
+        let short = l.split_whitespace().count() <= 2 && !l.chars().any(|c| c.is_ascii_digit());
+        if short && after_gap && !starts_entry(l) { when = l.trim().to_string(); continue; }
+        if starts_entry(l) || !open {
+            entries.push((sname, sgame, when.clone(), vec![l.clone()], lead_tier(l)));
+            open = true;
+        } else if let Some(e) = entries.last_mut() {
+            if e.4.is_none() { e.4 = lead_tier(l); }
+            e.3.push(l.clone());
+        }
+    }
+    entries.into_iter().map(|(sname, sgame, when, text, tier)| {
+        let all = text.join(" ");
+        let low = all.to_lowercase();
+        let words = mod_words(&all);
+        // The best part: the boss (or zone) named, how much of a version's mod the guide's words have, the slot.
+        let mut best: Option<(f64, &Viscera, &VisceraTier)> = None;
+        for v in viscera() {
+            if v.slot != sgame { continue; }
+            let place: f64 = v.drops.iter().map(|d| {
+                let (boss, zone) = drop_place(d);
+                (if boss.len() >= 4 && low.contains(&boss) { 1.0 } else { 0.0 }) + (if zone.len() >= 4 && low.contains(&zone) { 0.5 } else { 0.0 })
+            }).fold(0.0, f64::max);
+            for t in &v.tiers {
+                let mw: Vec<String> = t.mods.iter().flat_map(|m| mod_words(m)).collect();
+                let hit = if mw.is_empty() { 0.0 } else { mw.iter().filter(|w| words.contains(w)).count() as f64 / mw.len() as f64 };
+                let tier_bonus = if tier.is_some_and(|x| x == t.tier) { 0.3 } else { 0.0 };
+                // Versions of one part often share the words; their numbers ("15-20" vs "8-12") tell them apart.
+                let nums = t.mods.iter().flat_map(|m| m.split(|c: char| !(c.is_ascii_digit() || c == '-' || c == '.')))
+                    .filter(|n| n.len() >= 3 && n.contains('-') && n.chars().next().is_some_and(|c| c.is_ascii_digit())).any(|n| low.contains(n));
+                let score = place + hit * 1.5 + tier_bonus + if nums { 0.4 } else { 0.0 };
+                if best.is_none_or(|(s, _, _)| score > s) { best = Some((score, v, t)); }
+            }
+        }
+        let mut p = WickerPart { slot: sname, when, note: text.join("\n"), ..Default::default() };
+        if let Some((_, v, t)) = best.filter(|(s, _, _)| *s >= 1.0) {
+            p.name = match t.tier.as_str() { "Low" => format!("Lesser {}", v.name), "High" => format!("Greater {}", v.name), _ => v.name.clone() };
+            p.base = v.name.clone();
+            p.tier = t.tier.clone();
+            p.mods = t.mods.clone();
+            p.drops = v.drops.clone();
+            p.icon = v.icon.clone();
+            p.query = t.query.clone().map(|q| serde_json::json!({ "query": q, "sort": { "price": "asc" } }));
+        }
+        p
+    }).collect()
 }
 
 fn colours() -> &'static HashMap<String, String> {
@@ -617,8 +748,10 @@ pub fn parse(xml: &str) -> Result<Build, String> {
         let limit = s.minions.as_ref().and_then(|m| m.spectre_gem.as_ref()).map(|g| crate::buildcheck::spectre_limit(s, g));
         if let Some(m) = s.minions.as_mut() { m.spectre_limit = limit; }
     }
+    let wickerman = child(root, "Notes").and_then(|n| n.text()).map(notes_wickerman).unwrap_or_default();
     Ok(Build {
         alternatives,
+        wickerman,
         class: attr(&build_el, "className").to_string(),
         ascendancy: attr(&build_el, "ascendClassName").to_string(),
         level: attr(&build_el, "level").parse().unwrap_or(1),
@@ -894,6 +1027,33 @@ Royal Burgonet</Item>
         assert!(g.contains(&("Helmet", "Leer Cast")) && g.contains(&("Body Armour", "Belly of the Beast")) && g.contains(&("Gloves", "Southbound")), "{g:?}");
         assert!(g.iter().any(|(_, n)| *n == "Dying Breath"), "{g:?}");
         assert!(g_note.starts_with("Dying Breath, Leer Cast"));
+    }
+
+    #[test]
+    fn wickerman_parts_from_the_guide_notes() {
+        // Ruetoo's Luminary guide, word for word (28 Nov).
+        let notes = "^xC8A45A########## RUETOO'S NOTES ##########^7\nWickerman progression\nHEAD\nAct 2, The Broken Bridge Kraityn - 4-6% attack and cast speed\n\n\
+Endgame\nMap: Armoury Warmonger (15-20)% increased maximum Energy Shield\nMap: Racecourse Bringer of Blood (10-20)% chance to gain an Endurance Charge when you Block\n\n\
+ARM\nAct 8, The Harbour Bridge Lunaris, Eternal Moon\nMed (5-6)% of Physical Damage from Hits taken as Cold Damage\n\n\
+Torso\nAct 2, Zone not confirmed Boneshaper (4-6)% additional Physical Damage Reduction\nPinnacle: The Black Star The Searing Exarch\nGrim Fate\n\
+(4-6)% of Physical Damage taken as Fire Damage\n(4-6)% of Cold Damage taken as Fire Damage\n(4-6)% of Lightning Damage taken as Fire Damage\n\n\
+LEG\nDont know where its from\nHigh\nIgnore all Movement Penalties from Armour\n\nMap: Mineral Pools Shock and Horror\n\
++(2-3)% to maximum Lightning Resistance  When you go melding\n\n\n\nTarget Mercenary is Bladebitter\n";
+        let w = notes_wickerman(notes);
+        let got: Vec<(&str, &str, &str, &str)> = w.iter().map(|p| (p.slot.as_str(), p.when.as_str(), p.name.as_str(), p.tier.as_str())).collect();
+        for (x, p) in got.iter().zip(&w) { eprintln!("{x:?} {:?} {:?}", p.mods, p.note); }
+        assert_eq!(w.len(), 8, "{got:#?}");
+        assert_eq!(got[0], ("HEAD", "", "Lesser Bandit Rogue's Head", "Low"));
+        assert_eq!(got[1], ("HEAD", "Endgame", "General's Head", "Med"));
+        assert_eq!((got[2].1, got[2].2), ("Endgame", "Pit Fighter's Helm"));
+        assert!(w[2].mods[0].contains("Endurance Charge"), "{:?}", w[2].mods);
+        assert_eq!(got[3], ("ARM", "", "Crescent Blade", "Med"));
+        assert_eq!(got[5].2, "Searing Exarch's Descry");
+        assert!(w[5].note.contains("Grim Fate"));
+        assert_eq!(got[4].2, "Greater Bonestalker's Ribcage", "Boneshaper isn't a boss poedb knows: matched by its mod");
+        assert_eq!(got[6].2, "Greater Captain's Leg");
+        assert_eq!(got[7].2, "Greater Galvanic Tentacle");
+        assert!(w[0].query.as_ref().unwrap()["query"]["term"] == "Lesser Bandit Rogue's Head");
     }
 
     #[test]

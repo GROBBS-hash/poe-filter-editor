@@ -353,7 +353,7 @@ Travel to this Map by using it in a personal Map Device. Maps can only be used o
         let gem = |n: &str, s: bool| Gem { name: n.into(), level: 20, quality: 0, enabled: true, support: s, colour: "b".into() };
         let group = |g: Vec<Gem>| Group { label: String::new(), slot: String::new(), enabled: true, gems: g };
         let stage = |t: &str, g: Vec<Gem>| Stage { title: t.into(), tree: None, gear: vec![], jewels: vec![], minions: None, groups: if g.is_empty() { vec![] } else { vec![group(g)] } };
-        let names = |stages: Vec<Stage>| suggest(&Build { class: "Scion".into(), ascendancy: String::new(), level: 90, active: 0, stages, alternatives: vec![] }).into_iter().map(|s| s.name).collect::<Vec<_>>();
+        let names = |stages: Vec<Stage>| suggest(&Build { class: "Scion".into(), ascendancy: String::new(), level: 90, active: 0, stages, alternatives: vec![], wickerman: vec![] }).into_iter().map(|s| s.name).collect::<Vec<_>>();
         // Blade Vortex isn't Vortex, and Arcane Surge isn't Arc.
         let n = names(vec![stage("Endgame", vec![gem("Blade Vortex", false), gem("Arcane Surge", true), gem("Unleash", true)])]);
         assert!(n.contains(&"Physical reflect".to_string()) && !n.contains(&"Elemental reflect".to_string()), "{n:?}");
@@ -367,7 +367,7 @@ Travel to this Map by using it in a personal Map Device. Maps can only be used o
     #[test]
     fn suggests_from_build() {
         let gem = |n: &str, s: bool| Gem { name: n.into(), level: 20, quality: 0, enabled: true, support: s, colour: "b".into() };
-        let b = Build { class: "Witch".into(), ascendancy: "Elementalist".into(), level: 90, active: 0, alternatives: vec![], stages: vec![Stage {
+        let b = Build { class: "Witch".into(), ascendancy: "Elementalist".into(), level: 90, active: 0, alternatives: vec![], wickerman: vec![], stages: vec![Stage {
             title: "Endgame".into(), tree: None, gear: vec![], jewels: vec![], minions: None,
             groups: vec![
                 Group { label: String::new(), slot: String::new(), enabled: true,

@@ -20,7 +20,7 @@ export const FAQ: Faq[] = [
     q: "Go stricter (e.g. Semi-Strict → Uber Strict) but keep all my settings",
     a: <>Open <b>Filters</b> and pick the strictness you want in the box next to your filter. Your edits, tier changes,
       levelling setup, price tiers and theme are all kept: they're stored separately and put back on top of the new NeverSink file.
-      Press <b>F4</b> in game. Want to keep the old one too? Use <b>Save as new</b> first, then change the copy.</>,
+      Press <b>F4</b> in game. Want to keep the old one too? Use <b>Make the copy</b> (Filters tab) first, then change the copy.</>,
     tab: ["profiles", "Open Filters"],
   },
   {

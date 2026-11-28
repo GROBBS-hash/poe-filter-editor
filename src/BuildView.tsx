@@ -19,7 +19,9 @@ export type PobMinions = { spectres: { id: string; name: string; main: boolean }
   spectre_note?: string; guardian_note?: string };
 export type PobStage = { title: string; tree: { version: string; nodes: number[]; url: string } | null; groups: PobGroup[]; gear: PobGear[]; jewels?: PobJewel[]; minions?: PobMinions };
 /** alternatives: items in the PoB that no stage wears (the guide's options and upgrades). */
-export type PobBuild = { class: string; ascendancy: string; level: number; stages: PobStage[]; active: number; alternatives?: PobGear[] };
+export type PobBuild = { class: string; ascendancy: string; level: number; stages: PobStage[]; active: number; alternatives?: PobGear[]; wickerman?: WickerPart[] };
+/** A Wickerman body part (3.30) the guide's notes ask for, matched to the game's part; `name` is empty when none fits. */
+export type WickerPart = { slot: string; when: string; name: string; base: string; tier: string; mods: string[]; drops: string[]; icon: string; query: unknown | null; note: string };
 export type CheckNote = { kind: "bad" | "warn" | "ok"; text: string };
 export type StageCheck = { title: string; level: number; level_guessed: boolean; str: number; dex: number; int: number; points: number; points_have: number;
   mana: { total: number; reserved: number; free: number; skill: string; cost: number | null } | null;
@@ -107,6 +109,59 @@ function BuyButton({ it, stage }: { it: PobGear; stage?: string }) {
           "10% under PoB's numbers, crafted mods left out) and open it in your browser"}
         onClick={go}>{state === "busy" ? "Searching…" : "Buy"}</button>
     </>
+  );
+}
+
+/** The Wickerman tab (28 Nov, he asked: "we dont have wickerman parts on our PoB for the luminary"): the guide's parts
+ *  under its own headings (Head, Arm, Torso, Leg), each with its picture, the version to look for, its mod, who drops
+ *  it and Buy. The guide's own lines are under each, since it sometimes says more ("When you go melding"). */
+function WickerList({ parts, have, onHave }: { parts: WickerPart[]; have: Set<string>; onHave: (k: string) => void }) {
+  const heads: string[] = [];
+  for (const p of parts) if (!heads.includes(p.slot)) heads.push(p.slot);
+  const nice = (h: string) => h.charAt(0).toUpperCase() + h.slice(1).toLowerCase();
+  return (
+    <div className="bv-wicker">
+      <div className="bv-ownerhead"><span className="muted small">
+        Body parts the guide's notes ask for. Bosses drop them; take one to the Wickerman in town or your hideout to attach it.
+        Lesser and Greater are the weaker and stronger versions of a part.</span></div>
+      {heads.map((h) => (
+        <div key={h} className="bv-wgroup">
+          <div className="bv-subhead">{nice(h)}</div>
+          {parts.filter((p) => p.slot === h).map((p, i) => {
+            const k = "wick|" + (p.name || p.note);
+            return (
+              <div key={i} className={`bv-wpart ${have.has(k) ? "got" : ""}`}>
+                <input type="checkbox" className="bv-have" checked={have.has(k)} title="I have this" onChange={() => onHave(k)} />
+                <div className="bv-wpic">{p.icon && <img src={p.icon} alt="" width={40} height={40} loading="lazy" />}</div>
+                <div className="bv-wbody">
+                  <div className="bv-wname">
+                    {p.name ? <b>{p.name}</b> : <b className="muted">No part matched</b>}
+                    {p.when && <span className="bv-wwhen">{p.when}</span>}
+                  </div>
+                  {p.mods.map((m) => <div key={m} className="bv-wmod">{m}</div>)}
+                  {p.drops.length > 0 && <div className="muted small">Drops from: {p.drops.join(" · ")}</div>}
+                  <div className="bv-wnote small" title="Word for word from the guide's notes in Path of Building">{p.note.split("\n").map((l, j) => <div key={j}>{l}</div>)}</div>
+                </div>
+                {p.query != null && <WickerBuy query={p.query} />}
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function WickerBuy({ query }: { query: unknown }) {
+  const [state, setState] = useState<"idle" | "busy" | number | string>("idle");
+  const go = () => { setState("busy"); invoke<number>("buy_wicker_part", { query }).then(setState).catch((e) => setState(String(e))); };
+  return (
+    <div className="bv-wbuy">
+      <button className="bv-price bv-buy" disabled={state === "busy"} title="Search the trade site for this part and version, instant buyout, cheapest first, and open it in your browser"
+        onClick={go}>{state === "busy" ? "Searching…" : "Buy"}</button>
+      {typeof state === "number" && <span className="muted small">{state} for sale</span>}
+      {typeof state === "string" && state !== "idle" && state !== "busy" && <span className="bad small">{state}</span>}
+    </div>
   );
 }
 
@@ -343,7 +398,7 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
   });
   const [openItem, setOpenItem] = useState<string | null>(null);
   // Who wears the gear shown: you, your Mercenary, the Animate Guardian, or the spectres (28 Nov, he asked for a section each).
-  const [owner, setOwner] = useState<"you" | "merc" | "guardian" | "spectres">("you");
+  const [owner, setOwner] = useState<"you" | "merc" | "guardian" | "spectres" | "wicker">("you");
   const [mercPick, setMercPick] = useState<number | null>(null);
   const [spareOpen, setSpareOpen] = useState(false);
   // In the overlay (F6) the page never scrolls: the tree fills the space under the tabs and
@@ -479,6 +534,7 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
           { k: "merc" as const, label: "Mercenary", show: !isMerc && mercs.length > 0 },
           { k: "guardian" as const, label: "Animate Guardian", show: !!m?.guardian_gem },
           { k: "spectres" as const, label: `Spectres${m?.spectre_limit ? ` ×${m.spectre_limit}` : ""}`, show: !!m?.spectre_gem },
+          { k: "wicker" as const, label: "Wickerman", show: !isMerc && (build.wickerman?.length ?? 0) > 0 },
         ].filter((x) => x.show);
         const who = tabs.some((x) => x.k === owner) ? owner : "you";
         const spares = spareGroups((build.alternatives ?? []).filter(shown), s.gear);
@@ -489,7 +545,9 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
             {tabs.length > 1 && (
               <div className="bv-owners">
                 {tabs.map((x) => <button key={x.k} className={who === x.k ? "on" : ""} onClick={() => setOwner(x.k)}>{x.label}</button>)}
-                <span className="muted small bv-havecount">Have {sorted.filter((it) => have.has(haveKey(it))).length} of {sorted.length}</span>
+                <span className="muted small bv-havecount">{who === "wicker"
+                  ? <>Have {(build.wickerman ?? []).filter((p) => have.has("wick|" + (p.name || p.note))).length} of {(build.wickerman ?? []).length}</>
+                  : <>Have {sorted.filter((it) => have.has(haveKey(it))).length} of {sorted.length}</>}</span>
               </div>
             )}
             {who === "you" && <>
@@ -541,6 +599,7 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
                 {m.spectres.filter((x) => !x.main).map((x) => <div key={x.id} className="bv-spectre"><span>{x.name}</span></div>)}
               </div>
             )}
+            {who === "wicker" && <WickerList parts={build.wickerman ?? []} have={have} onHave={toggleHave} />}
             {who === "you" && spareN > 0 && (
               <div className="bv-spares">
                 <button className="bv-sparehead" onClick={() => setSpareOpen(!spareOpen)}>

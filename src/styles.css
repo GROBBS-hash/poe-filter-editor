@@ -2638,6 +2638,21 @@ button.qm-rule:hover, .qm-rule.can-open:hover { border-color: var(--gold); backg
 .bv-spectres { display: flex; flex-direction: column; gap: 4px; }
 .bv-spectre { display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-bottom: 1px solid var(--line); }
 .bv-spectre.main b { color: var(--gold); }
+/* My build > Wickerman (28 Nov). */
+.bv-wicker { display: flex; flex-direction: column; gap: 6px; }
+.bv-wgroup { display: flex; flex-direction: column; }
+.bv-wpart { display: flex; align-items: flex-start; gap: 10px; padding: 8px 4px; border-bottom: 1px solid var(--line); }
+.bv-wpart.got { opacity: .55; }
+.bv-wpart .bv-have { margin-top: 12px; }
+.bv-wpic { width: 44px; height: 44px; flex: none; display: flex; align-items: center; justify-content: center; background: var(--raised); border: 1px solid var(--line); border-radius: 8px; }
+.bv-wpic img { max-width: 40px; max-height: 40px; width: auto; height: auto; }
+.bv-wbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.bv-wname { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.bv-wname b { color: var(--gold); }
+.bv-wwhen { font-size: 11px; color: var(--text-2); border: 1px solid var(--line); border-radius: 6px; padding: 0 6px; }
+.bv-wmod { color: #8fb4ff; font-size: 13px; }
+.bv-wnote { color: var(--text-2); font-style: italic; border-left: 2px solid rgba(212,175,55,.45); padding-left: 8px; margin-top: 3px; }
+.bv-wbuy { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex: none; }
 .bv-spares { border-top: 1px solid var(--line); padding-top: 6px; }
 .bv-sparehead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%; text-align: left; background: none; border: none; padding: 6px 2px; color: var(--text); font-weight: 650; cursor: pointer; }
 .bv-sparehead .cnt { background: var(--gold-bg); color: var(--gold); border-radius: 6px; padding: 0 6px; font-size: 12px; }
