@@ -1,0 +1,308 @@
+{
+ "poe1:exchange": {
+  "core_keys": [
+   "items",
+   "rates",
+   "primary",
+   "secondary"
+  ],
+  "core_primary": "chaos",
+  "core_secondary": "divine",
+  "core_rates": {
+   "divine": 0.007544
+  },
+  "core_items_sample": [
+   {
+    "id": "chaos",
+    "name": "Chaos Orb",
+    "image": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lSZXJvbGxSYXJlIiwic2NhbGUiOjF9XQ/46a2347805/CurrencyRerollRare.png",
+    "category": "Currency",
+    "detailsId": "chaos-orb"
+   },
+   {
+    "id": "divine",
+    "name": "Divine Orb",
+    "image": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lNb2RWYWx1ZXMiLCJzY2FsZSI6MX1d/ec48896769/CurrencyModValues.png",
+    "category": "Currency",
+    "detailsId": "divine-orb"
+   }
+  ],
+  "line_sample": [
+   {
+    "id": "accelerating-catalyst",
+    "primaryValue": 0.2979,
+    "volumePrimaryValue": 366.7,
+    "maxVolumeCurrency": "chaos",
+    "maxVolumeRate": 3.36,
+    "sparkline": {
+     "totalChange": -17.62,
+     "data": [
+      -9.39,
+      2.8,
+      68.58,
+      23.81,
+      31.04,
+      86.4,
+      -17.62
+     ]
+    }
+   },
+   {
+    "id": "chaos",
+    "primaryValue": 1,
+    "volumePrimaryValue": 10064809,
+    "maxVolumeCurrency": "divine",
+    "maxVolumeRate": 132.6,
+    "sparkline": {
+     "totalChange": 58.63,
+     "data": [
+      -0.34,
+      5.61,
+      12.51,
+      18.57,
+      24.51,
+      42.07,
+      58.63
+     ]
+    }
+   },
+   {
+    "id": "divine",
+    "primaryValue": 132.6,
+    "volumePrimaryValue": 10064809,
+    "maxVolumeCurrency": "chaos",
+    "maxVolumeRate": 0.007544,
+    "sparkline": {
+     "totalChange": -36.96,
+     "data": [
+      0.36,
+      -5.17,
+      -10.95,
+      -15.65,
+      -19.64,
+      -29.53,
+      -36.96
+     ]
+    }
+   }
+  ],
+  "top_keys": [
+   "core",
+   "lines",
+   "items"
+  ]
+ },
+ "poe1:stash": {
+  "line_sample": [
+   {
+    "id": 130147,
+    "name": "Foulborn Reefbane",
+    "icon": "https://web.poecdn.com/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvV2VhcG9ucy9Ud29IYW5kV2VhcG9ucy9GaXNoaW5nUm9kcy9SZWVmYmFuZSIsInciOjEsImgiOjQsInNjYWxlIjoxLCJtdXRhdGVkIjp0cnVlfV0/7ca32d21f4/Reefbane.png",
+    "baseType": "Fishing Rod",
+    "variant": "Otherworldly Lure",
+    "itemClass": 3,
+    "mutatedModifiers": [
+     {
+      "text": "Otherworldly Lure",
+      "optional": false
+     }
+    ],
+    "itemType": "Fishing Rod",
+    "chaosValue": 105515,
+    "exaltedValue": 120685,
+    "divineValue": 795.7,
+    "count": 4,
+    "detailsId": "foulborn-reefbane-otherworldly-lure-fishing-rod",
+    "listingCount": 4
+   },
+   {
+    "id": 140099,
+    "name": "Foulborn The Bane of Hope",
+    "icon": "https://web.poecdn.com/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvV2VhcG9ucy9Ud29IYW5kV2VhcG9ucy9Cb3dzL0FuaW1vc2l0eSIsInciOjIsImgiOjQsInNjYWxlIjoxLCJtdXRhdGVkIjp0cnVlfV0/8223369116/Animosity.png",
+    "levelRequired": 71,
+    "baseType": "Maraketh Bow",
+    "variant": "Impale Last",
+    "links": 6,
+    "itemClass": 3,
+    "mutatedModifiers": [
+     {
+      "text": "13% chance on Hitting an Enemy for all Impales on that Enemy to last for an additional Hit",
+      "optional": false
+     }
+    ],
+    "statIds": [
+     "attacks_impale_on_hit_%_chance",
+     "local_physical_damage_+%"
+    ],
+    "itemType": "Bow",
+    "chaosValue": 15912,
+    "exaltedValue": 18200,
+    "divineValue": 120.0,
+    "count": 1,
+    "detailsId": "foulborn-the-bane-of-hope-impale-last-maraketh-bow-6l",
+    "listingCount": 1
+   }
+  ]
+ },
+ "poe2:exchange": {
+  "core_keys": [
+   "items",
+   "rates",
+   "primary",
+   "secondary"
+  ],
+  "core_primary": "divine",
+  "core_secondary": "chaos",
+  "core_rates": {
+   "exalted": 394.1,
+   "chaos": 12.44
+  },
+  "core_items_sample": [
+   {
+    "id": "divine",
+    "name": "Divine Orb",
+    "image": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lNb2RWYWx1ZXMiLCJzY2FsZSI6MSwicmVhbG0iOiJwb2UyIn1d/2986e220b3/CurrencyModValues.png",
+    "category": "Currency",
+    "detailsId": "divine-orb"
+   },
+   {
+    "id": "exalted",
+    "name": "Exalted Orb",
+    "image": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lBZGRNb2RUb1JhcmUiLCJzY2FsZSI6MSwicmVhbG0iOiJwb2UyIn1d/ad7c366789/CurrencyAddModToRare.png",
+    "category": "Currency",
+    "detailsId": "exalted-orb"
+   },
+   {
+    "id": "chaos",
+    "name": "Chaos Orb",
+    "image": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lSZXJvbGxSYXJlIiwic2NhbGUiOjEsInJlYWxtIjoicG9lMiJ9XQ/c0ca392a78/CurrencyRerollRare.png",
+    "category": "Currency",
+    "detailsId": "chaos-orb"
+   }
+  ],
+  "line_sample": [
+   {
+    "id": "alch",
+    "primaryValue": 0.008213,
+    "volumePrimaryValue": 48.83,
+    "maxVolumeCurrency": "divine",
+    "maxVolumeRate": 121.8,
+    "sparkline": {
+     "totalChange": -11.86,
+     "data": [
+      31.14,
+      15.95,
+      27.97,
+      57.46,
+      11.4,
+      2.79,
+      -11.86
+     ]
+    }
+   },
+   {
+    "id": "exalted",
+    "primaryValue": 0.002537,
+    "volumePrimaryValue": 240.2,
+    "maxVolumeCurrency": "divine",
+    "maxVolumeRate": 394.1,
+    "sparkline": {
+     "totalChange": 23.87,
+     "data": [
+      7.67,
+      8.99,
+      5.68,
+      13.78,
+      12.8,
+      12.47,
+      23.87
+     ]
+    }
+   },
+   {
+    "id": "ancient-infuser",
+    "primaryValue": 0.5508,
+    "volumePrimaryValue": 10.83,
+    "maxVolumeCurrency": "divine",
+    "maxVolumeRate": 1.82,
+    "sparkline": {
+     "totalChange": -34.13,
+     "data": [
+      -12.56,
+      -14.81,
+      -34.59,
+      -39.03,
+      -23.85,
+      -26.22,
+      -34.13
+     ]
+    }
+   }
+  ],
+  "top_keys": [
+   "core",
+   "lines",
+   "items"
+  ]
+ },
+ "poe2:stash": {
+  "line_sample": [
+   {
+    "id": 753,
+    "itemId": "Winter's Bite Glass Shank",
+    "detailsId": "winters-bite-glass-shank",
+    "name": "Winter's Bite",
+    "baseType": "Glass Shank",
+    "icon": "https://web.poecdn.com/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvV2VhcG9ucy9PbmVIYW5kV2VhcG9ucy9EYWdnZXJzL1VuaXF1ZXMvTmV2ZXJtZWx0IiwidyI6MSwiaCI6Mywic2NhbGUiOjEsInJlYWxtIjoicG9lMiJ9XQ/a5a4d70a8e/Nevermelt.png",
+    "levelRequired": 0,
+    "category": "[Dagger]",
+    "primaryValue": 43652000,
+    "listingCount": 1,
+    "corrupted": false,
+    "propertyModifiers": [
+     {
+      "text": "[Cold|Cold] Damage: (8-10)-(15-18)",
+      "optional": false
+     },
+     {
+      "text": "[Critical|Critical Hit] Chance: 15%",
+      "optional": false
+     },
+     {
+      "text": "Attacks per Second: 1.55",
+      "optional": false
+     }
+    ]
+   },
+   {
+    "id": 730,
+    "itemId": "Runeseeker's Call Runic Fork",
+    "detailsId": "runeseekers-call-runic-fork",
+    "name": "Runeseeker's Call",
+    "baseType": "Runic Fork",
+    "icon": "https://web.poecdn.com/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvV2VhcG9ucy9PbmVIYW5kV2VhcG9ucy9XYW5kcy9VbmlxdWVzL1J1bmljRGl2aW5lciIsInciOjIsImgiOjMsInNjYWxlIjoxLCJyZWFsbSI6InBvZTIifV0/df89e6455f/RunicDiviner.png",
+    "levelRequired": 90,
+    "category": "[Wand]",
+    "primaryValue": 6236,
+    "listingCount": 77,
+    "corrupted": false,
+    "requirementModifiers": [
+     {
+      "text": "Level: 65",
+      "optional": false
+     },
+     {
+      "text": "[Intelligence|Int]: 114",
+      "optional": false
+     }
+    ],
+    "grantedSkillModifiers": [
+     {
+      "text": "Level (17-20) The Stars Answer",
+      "optional": false
+     }
+    ]
+   }
+  ]
+ }
+}
