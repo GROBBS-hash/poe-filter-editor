@@ -55,6 +55,8 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 ## Done (recent sessions)
 
+- **Dust tiers start at 100k / 50k / 25k (28 Nov, not released; he asked after changing his own).** The first defaults (50k / 20k / 10k at item level 84) lit up 6 in 10 of the 1,349 uniques (typical unique about 16k); now about the top 1 in 9, 1 in 6 and 1 in 3. Only filters that never saved dust settings get the new numbers.
+
 - **Hourly prices fixed after an auto-update (28 Nov, released in 0.2.109).** His prices were 4.5 h old: `ask_github.txt` said "couldn't ask: … gh auth login" though `gh` is signed in (keyring). `gh` run without APPDATA says exactly that, and the editor restarted by the updater seems to run without it. `price_tick::ask` now sets APPDATA for `gh` (the data folder's parent, from `dirs::data_dir`) when it's missing. I started the price job by hand the same day so his prices caught up.
 
 - **Ctrl+D and F2 show a unique's dust (28 Nov, released in 0.2.109; `dust::of_unique` existed but nothing showed it).** Command `unique_dust` (dust_app.rs, PoE 1 uniques by name, Foulborn stripped): dust at the copy's item level, quality and influence count; `UniqueDust` in Dust.tsx under the base-worth line in both windows: "Disenchants for about 26k Thaumaturgic Dust (a level 84+ one gives 53k)". Corrupted implicits aren't counted (the tooltip says they add more).

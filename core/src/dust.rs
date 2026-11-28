@@ -151,7 +151,9 @@ pub fn of_unique(name: &str, ilvl: Option<u32>, quality: u32, extras: u32) -> Op
     Some(UniqueDust { dust: dust(v, ilvl.unwrap_or(84), quality, extras), at84: dust(v, 84, 0, 0) })
 }
 
-/// Starting tiers: NeverSink's own dust look (orange on dark blue, purple beam), quieter further down.
+/// Starting tiers: NeverSink's own dust look (orange on dark blue, purple beam), quieter further down. 100k / 50k / 25k
+/// at item level 84 = about the top 1 in 9, 1 in 6 and 1 in 3 of 1,349 uniques (28 Nov 2026; the first 50k / 20k / 10k
+/// lit up 6 in 10, he changed his and asked for these as the default).
 pub fn default_settings() -> DustSettings {
     let look = |size: u32, beam: Option<bool>, icon: u8, shape: &str, sound: Sound| CustomStyle {
         font_size: size, text: [175, 96, 37, 255], border: Some([175, 96, 37, 255]), background: [10, 30, 45, 255],
@@ -159,9 +161,9 @@ pub fn default_settings() -> DustSettings {
         minimap: Some(Minimap { size: icon, colour: "Purple".into(), shape: shape.into() }), sound, label_hidden: false,
     };
     DustSettings { enabled: false, tiers: vec![
-        Tier { min: 50_000.0, style: look(45, Some(false), 1, "Star", Sound::Builtin { id: "3".into(), volume: 300 }) },
-        Tier { min: 20_000.0, style: look(42, Some(true), 2, "Star", Sound::Default) },
-        Tier { min: 10_000.0, style: look(38, None, 2, "Circle", Sound::Default) },
+        Tier { min: 100_000.0, style: look(45, Some(false), 1, "Star", Sound::Builtin { id: "3".into(), volume: 300 }) },
+        Tier { min: 50_000.0, style: look(42, Some(true), 2, "Star", Sound::Default) },
+        Tier { min: 25_000.0, style: look(38, None, 2, "Circle", Sound::Default) },
     ] }
 }
 
@@ -204,7 +206,7 @@ mod tests {
     #[test]
     fn rules_by_dust() {
         // Pick a real base whose cheapest unique gives at least 50k at 84, and one well under 10k.
-        let rich = data().bases.keys().find(|b| base_value(b).is_some_and(|v| dust(v, 84, 0, 0) >= 60_000)).unwrap().clone();
+        let rich = data().bases.keys().find(|b| base_value(b).is_some_and(|v| dust(v, 84, 0, 0) >= 120_000)).unwrap().clone();
         let poor = data().bases.keys().find(|b| base_value(b).is_some_and(|v| dust(v, 84, 0, 0) < 5_000)).unwrap().clone();
         let mut s = default_settings();
         assert_eq!(blocks(&s, &[], "\n"), "", "off by default");
@@ -219,14 +221,14 @@ mod tests {
         assert_eq!(size(&poor, 84, "").as_deref(), Some("20"), "{poor}");
         // At a low item level the rich base drops a tier or more.
         let v = base_value(&rich).unwrap();
-        let low = (65..84).find(|l| dust(v, *l, 0, 0) < 50_000 && dust(v, *l, 0, 0) >= 20_000);
+        let low = (65..84).find(|l| dust(v, *l, 0, 0) < 100_000 && dust(v, *l, 0, 0) >= 50_000);
         if let Some(l) = low { assert_eq!(size(&rich, l, "").as_deref(), Some("42"), "{rich} at {l}"); }
-        assert_eq!(size(&rich, 1, "").as_deref(), if dust(v, 1, 0, 0) >= 10_000 { Some("38") } else { Some("20") });
+        assert_eq!(size(&rich, 1, "").as_deref(), if dust(v, 1, 0, 0) >= 25_000 { Some("38") } else { Some("20") });
     }
 
     #[test]
     fn neversinks_loud_uniques_stay_his() {
-        let rich = data().bases.keys().find(|b| base_value(b).is_some_and(|v| dust(v, 84, 0, 0) >= 60_000)).unwrap().clone();
+        let rich = data().bases.keys().find(|b| base_value(b).is_some_and(|v| dust(v, 84, 0, 0) >= 120_000)).unwrap().clone();
         let filter = format!("Show # $type->uniques $tier->t1\n    Rarity Unique\n    BaseType == \"{rich}\"\n    SetFontSize 45\n");
         let segs = parse_filter(&filter);
         let mut s = default_settings();
