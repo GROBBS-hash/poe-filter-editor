@@ -173,3 +173,7 @@
 .trk-strat select { flex: 1; min-width: 0; font-size: 11.5px; padding: 1px 4px; background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: 6px; }
 .trk-strat select option { background: var(--bg, #1b1d22); }
 
+/* Track box (28 Nov 2026): off = maps count for no strategy, drops still show */
+.trk-track { display: inline-flex; align-items: center; gap: 4px; color: var(--text); cursor: pointer; white-space: nowrap; }
+.trk-track input { margin: 0; accent-color: var(--gold, #e0b252); }
+.trk-off { color: var(--muted); font-style: italic; }

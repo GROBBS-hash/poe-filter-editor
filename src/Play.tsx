@@ -39,7 +39,7 @@ type TrackerView = {
   current: MapRun | null; inside: boolean; current_inside: number; paused: boolean; recent: MapRun[]; today: MapStats; all: MapStats;
   char_name: string | null; char_level: number | null; watch_ms: number; watch_running: boolean; laps: number[]; now: number;
   session: SessionSummary | null; pause: PauseInfo; loot_prefs: LootPrefs; loot_note: string; loot_reading?: boolean; left?: Left | null; over_panels?: boolean; divine: number | null; has_account?: boolean;
-  strategies?: [number, string][]; strategy?: number | null;
+  strategies?: [number, string][]; strategy?: number | null; tracking?: boolean;
 };
 type SessionSummary = { start: number; played: number; maps: number; map_time: number; per_hour: number; deaths: number; levels: number;
   made: number | null; best: MapRun | null; loot: LootLine[]; loot_value: number; loot_maps: number; loot_secs: number };
@@ -251,12 +251,16 @@ export function TrackerWindow() {
           {(c.deaths > 0 || c.portals > 0) && <div className="pw-small">{c.deaths > 0 ? `${c.deaths} death${c.deaths > 1 ? "s" : ""}` : ""}{c.deaths > 0 && c.portals > 0 ? " · " : ""}{c.portals > 0 ? `${c.portals} portal${c.portals > 1 ? "s" : ""} back in` : ""}</div>}
           {c.mods.length > 0 && <div className="trk-mods" title={c.mods.join("\n")}>{c.mods.join(" · ")}</div>}
         </> : <div className="pw-small">Open a map: the timer starts by itself.</div>}
-        {(v.strategies ?? []).length > 0 && <div className="trk-strat" title="Switched atlas tree in game? Pick it here: this map and the next ones count for it">
-          <span>Strategy</span>
+        {(v.strategies ?? []).length > 0 && <div className={`trk-strat ${v.tracking === false ? "off" : ""}`} title={v.tracking === false
+          ? "Not tracking: maps are still timed and their drops shown, but they don't count for any atlas strategy. Tick Track to count them again."
+          : "Switched atlas tree in game? Pick it here: this map and the next ones count for it. Untick Track while levelling or just playing."}>
+          <label className="trk-track"><input type="checkbox" checked={v.tracking !== false}
+            onChange={(e) => invoke<PlayView>("tracker_set_tracking", { on: e.target.checked }).then((p) => setV(p.tracker))} />Track</label>
+          {v.tracking === false ? <span className="trk-off">No strategy · drops still show</span> : <>
           <select value={c?.atlas ?? v.strategy ?? ""} onChange={(e) => invoke<PlayView>("tracker_use_atlas", { id: +e.target.value }).then((p) => setV(p.tracker))}>
             {(c?.atlas ?? v.strategy) == null && <option value="">None picked</option>}
             {v.strategies!.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-          </select>
+          </select></>}
         </div>}
         {v.today.runs > 0 && <div className="trk-grid">
           <span>Today <b>{v.today.runs}</b> maps</span><span><b>{v.today.per_hour.toFixed(1)}</b> per hour</span>

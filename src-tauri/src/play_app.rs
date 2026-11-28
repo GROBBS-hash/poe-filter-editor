@@ -47,6 +47,9 @@ struct PlayStore {
     loot: LootPrefs,
     /// Don't mark Eldritch altars by themselves in maps (Alt+R still works).
     altar_off: bool,
+    /// The tracker's Track box is off (28 Nov 2026, he's levelling a new character through maps, not running a
+    /// strategy): maps are still timed and their loot shown, but they count for no atlas strategy.
+    untracked: bool,
 }
 
 /// "Tell me when Mageblood is under 150 divines".
@@ -144,7 +147,7 @@ fn catch_up(app: &AppHandle, log: &str) {
             let fresh = unix() - t < 90;
             match c {
                 MapChange::Started => {
-                    let atlas = atlas_app::active_id(app);
+                    let atlas = if with_store(app, |s| s.untracked) { None } else { atlas_app::active_id(app) };
                     with_store(app, |s| if let Some(cur) = s.maps.current.as_mut() { cur.atlas = atlas; });
                     if fresh { queue_loot(app, LootJob::Enter(key, t)); } else { loot_missed(app, &key); }
                 }
@@ -348,7 +351,7 @@ pub fn on_line(app: &AppHandle, line: &str) {
                     if ok { l.map_check.take() } else { None }
                 });
                 let value = session_value(app);
-                let atlas = atlas_app::active_id(app);
+                let atlas = if with_store(app, |s| s.untracked) { None } else { atlas_app::active_id(app) };
                 with_store(app, |s| if let Some(cur) = s.maps.current.as_mut() {
                     if let Some((_, _, mods)) = &check { cur.mods = mods.clone(); }
                     cur.value_at_start = value;
@@ -659,6 +662,8 @@ pub struct TrackerView {
     /// Your atlas strategies (id, name) and the one in use: the tracker's strategy switch.
     pub strategies: Vec<(u64, String)>,
     pub strategy: Option<u64>,
+    /// The Track box: maps count for the strategy (off: timed and loot shown, counted for none).
+    pub tracking: bool,
 }
 
 /// Monsters left: the number, "more than" it, and whether the game said so just now.
@@ -721,6 +726,7 @@ fn tracker_view(app: &AppHandle) -> TrackerView {
     let divine = currency_rates(app).get("divine").copied();
     let has_account = account(app).is_some();
     let (strategies, strategy) = (atlas_app::names(app), atlas_app::active_id(app));
+    let tracking = !with_store(app, |s| s.untracked);
     with_live(|l| {
         let watch_ms = l.watch_acc + l.watch_since.map(|t| unix_ms() - t).unwrap_or(0);
         let session = (l.sess_start > 0).then(|| {
@@ -757,7 +763,7 @@ fn tracker_view(app: &AppHandle) -> TrackerView {
             char_name: l.site_char.as_ref().map(|c| c.0.clone()), char_level: l.site_char.as_ref().map(|c| c.1),
             watch_ms, watch_running: l.watch_since.is_some(), laps: l.laps.clone(), now, session,
             pause, loot_prefs: prefs, loot_note: l.loot_note.clone(), loot_reading: l.loot_reading > 0, left: if inside { left_view(l) } else { None }, over_panels, divine, has_account,
-            strategies, strategy,
+            strategies, strategy, tracking,
         }
     })
 }
@@ -767,7 +773,19 @@ fn tracker_view(app: &AppHandle) -> TrackerView {
 #[tauri::command]
 pub fn tracker_use_atlas(app: AppHandle, id: u64) -> PlayView {
     atlas_app::use_strategy(&app, id);
-    with_store(&app, |s| if let Some(c) = s.maps.current.as_mut() { c.atlas = Some(id); });
+    // Picking a strategy means these maps are for it again.
+    with_store(&app, |s| { s.untracked = false; if let Some(c) = s.maps.current.as_mut() { c.atlas = Some(id); } });
+    save_store(&app);
+    emit_all(&app);
+    play_view(app)
+}
+
+/// The Track box: off, this map and the next ones count for no strategy (still timed, loot still shown); on, they
+/// count for the strategy in use again.
+#[tauri::command]
+pub fn tracker_set_tracking(app: AppHandle, on: bool) -> PlayView {
+    let atlas = if on { atlas_app::active_id(&app) } else { None };
+    with_store(&app, |s| { s.untracked = !on; if let Some(c) = s.maps.current.as_mut() { c.atlas = atlas; } });
     save_store(&app);
     emit_all(&app);
     play_view(app)

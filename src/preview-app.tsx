@@ -222,7 +222,7 @@ mockIPC((cmd, args) => {
   if (cmd === "saved_list") return savedSearches;
   if (cmd === "saved_live") { const a = args as { id: number; on: boolean }; savedSearches = savedSearches.map((s) => s.id === a.id ? { ...s, live: a.on } : s); return savedSearches; }
   if (cmd === "saved_delete") { const a = args as { id: number }; savedSearches = savedSearches.filter((s) => s.id !== a.id); return savedSearches; }
-  { const p = playMock(cmd); if (p !== undefined) return p; }
+  { const p = playMock(cmd, args); if (p !== undefined) return p; }
   if (cmd === "price_names") return Object.fromEntries((args as { names: string[] }).names.map((n, i) => [n, n === "Divine Orb" ? 260 : [1, 1, 1, 1, 2, 2, 3, 4, 6, 9, 14, 30, 90, 600][i % 14]]));
   if (cmd === "atlas_list") return atlas;
   if (cmd === "atlas_use") { const a = args as { id: number; variant: number }; atlas = { ...atlas, active: a.id, variant: a.variant }; return atlas; }
