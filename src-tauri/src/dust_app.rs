@@ -22,3 +22,22 @@ pub fn dust_picks(app: AppHandle, id: String, tiers: Vec<Tier>) -> Result<DustPi
     list.truncate(80);
     Ok(DustPicks { total, list, updated: dust::updated().to_string() })
 }
+
+/// What a unique gives when disenchanted, for Ctrl+D and F2 (28 Nov 2026: the dust list was on the Prices page only).
+#[derive(Serialize)]
+pub struct DustOf {
+    /// At this copy's item level, quality and influences (corrupted implicits not counted: they only add).
+    dust: u64,
+    /// At item level 84 with no quality: the most a fresh one gives.
+    at84: u64,
+    ilvl: Option<u32>,
+}
+
+#[tauri::command]
+pub fn unique_dust(app: AppHandle, item: filter_core::item::Item) -> Option<DustOf> {
+    if active_game(&app.state::<AppState>()) != Game::Poe1 || !item.rarity.eq_ignore_ascii_case("unique") { return None; }
+    let name = item.name.as_deref()?;
+    let name = name.strip_prefix("Foulborn ").unwrap_or(name);
+    let d = dust::of_unique(name, item.item_level, item.quality.unwrap_or(0), item.influences.len() as u32)?;
+    Some(DustOf { dust: d.dust, at84: d.at84, ilvl: item.item_level })
+}

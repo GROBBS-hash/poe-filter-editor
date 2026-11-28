@@ -8,6 +8,7 @@ import { ItemIcon } from "./icons";
 import { mapItemIcon } from "./mapIcons";
 import BaseUniques from "./BaseUniques";
 import { BaseWorth } from "./Bases";
+import { UniqueDust } from "./Dust";
 
 export type Picked = { item: Item; from_screen: boolean; screen_text?: string | null; confidence: number; rarity_unsure?: boolean };
 
@@ -458,6 +459,7 @@ export default function ItemPanel({ start, inGame, replacing: replacingProp, onC
         </div>
       </div>
       <BaseWorth item={item} offer onDone={(m) => afterChange(m)} />
+      <UniqueDust item={item} />
       {item.rarity === "Unique" && !item.name && item.base_type && <BaseUniques base={item.base_type} />}
 
       {picked.from_screen && picked.rarity_unsure && isGear && (

@@ -9,6 +9,7 @@ import { mapItemIcon } from "./mapIcons";
 import BaseUniques from "./BaseUniques";
 import RelatedItems from "./RelatedItems";
 import { BaseWorth } from "./Bases";
+import { UniqueDust } from "./Dust";
 import { useDeathMods } from "./Deaths";
 import WornCompare, { Resists, type Comparison } from "./WornCompare";
 import { Item, RARITY_COLOUR, itemTitle } from "./types";
@@ -886,6 +887,7 @@ export default function TradeWindow() {
             setUntick(null); setSetup(s); run(s); }} />
       )}
       <BaseWorth item={it} />
+      <UniqueDust item={it} />
       {it.rarity === "Unique" && !it.name && it.base_type && <BaseUniques base={it.base_type} divine={divine} />}
 
       {check.map && <MapCheck map={check.map} rarity={it.rarity} corrupted={/\nCorrupted/.test(setup?.raw ?? "")} />}

@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { ItemIcon } from "./icons";
 import { friendly } from "./errors";
 import { CustomStyle, LookButton, Preview } from "./StyleEditor";
+import type { Item } from "./types";
 import "./bases.css";
 
 export type DustTier = { min: number; style: CustomStyle };
@@ -75,6 +76,28 @@ export default function DustCard({ profileId, dust, onChange, onLook }: {
       </div>
       {mine.length > 16 && <button className="link small" onClick={() => setAll(!all)}>{all ? "Show fewer" : `Show ${mine.length - 16} more`}</button>}
       {err && <div className="qm-warn small">{err}</div>}
+    </div>
+  );
+}
+
+/** Ctrl+D and F2 on a unique: the Thaumaturgic Dust it gives at Faustus (PoE 1). */
+export function UniqueDust({ item }: { item: Item }) {
+  const [d, setD] = useState<{ dust: number; at84: number; ilvl: number | null } | null>(null);
+  useEffect(() => {
+    let on = true;
+    setD(null);
+    if (item.rarity !== "Unique" || !item.name) return;
+    invoke<{ dust: number; at84: number; ilvl: number | null } | null>("unique_dust", { item }).then((x) => on && setD(x ?? null)).catch(() => on && setD(null));
+    return () => { on = false; };
+  }, [item]);
+  if (!d) return null;
+  const known = d.ilvl != null;
+  return (
+    <div className="dust-of small" title="Faustus in Kingsmarch disenchants uniques for Thaumaturgic Dust. Item level matters most (84+ gives 20 times what 65 gives); quality and influences add more, and so do corrupted implicits (not counted here).">
+      <span className="dust-dot" aria-hidden />
+      Disenchants for about <b>{dustText(d.dust)}</b> Thaumaturgic Dust
+      {known ? (d.at84 > d.dust ? <span className="muted"> (a level 84+ one gives {dustText(d.at84)})</span> : null)
+        : <span className="muted"> at item level 84 (lower on a lower-level copy)</span>}
     </div>
   );
 }

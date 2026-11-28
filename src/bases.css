@@ -12,3 +12,8 @@
 .bs-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bs-unique { color: #c8793a; }
 .bs-unit { display: inline-flex; align-items: center; gap: 4px; }
+
+/* Ctrl+D / F2: dust a unique gives (28 Nov 2026) */
+.dust-of { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 6px 0; color: var(--text-2); }
+.dust-of b { color: #c8793a; }
+.dust-dot { width: 8px; height: 8px; border-radius: 50%; background: #c8793a; box-shadow: 0 0 6px rgba(200,121,58,.6); }
