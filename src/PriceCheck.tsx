@@ -4,6 +4,15 @@ import { friendly } from "./errors";
 import { ErrNote } from "./LoginNeeded";
 import { Tip } from "./Help";
 import { keyOf } from "./hotkeys";
+import SideList, { type Part, useSidePart } from "./SideList";
+import { ExchangeCheck, OilsCard } from "./Play";
+
+/** Price check in parts (28 Nov 2026: the exchange check and blight oils moved here from Game windows). */
+const PC_PARTS: Part[] = [
+  { key: "check", name: "Price check", icon: "M12 3v18M16.5 7.5c0-1.7-2-3-4.5-3s-4.5 1.3-4.5 3 2 2.6 4.5 3 4.5 1.3 4.5 3-2 3-4.5 3-4.5-1.3-4.5-3" },
+  { key: "exchange", name: "Currency exchange", icon: "M4 8h13l-3-3M20 16H7l3 3" },
+  { key: "oils", name: "Blight oils", icon: "M12 3c3 4 6 7.5 6 11a6 6 0 0 1-12 0c0-3.5 3-7 6-11z" },
+];
 
 type Saved = { id: number; name: string; live: boolean; setup: { filters: { enabled: boolean; label: string }[] } };
 
@@ -24,8 +33,13 @@ export default function PriceCheck({ keys }: { keys: Record<string, string> }) {
   const call = (cmd: string, args: Record<string, unknown>) =>
     invoke<Saved[] | null>(cmd, args).then((l) => { setSaved(l ?? []); setErr(""); }).catch((e) => setErr(friendly(e)));
 
+  const [part, pick] = useSidePart("pricecheck", PC_PARTS);
+
   return (
-    <>
+    <SideList page="pricecheck" label="Price check parts" parts={PC_PARTS} part={part} onPick={pick}>
+      {part === "exchange" && <ExchangeCheck />}
+      {part === "oils" && <OilsCard />}
+      {part === "check" && <>
       <div className="card">
         <h2>Price check an item</h2>
         <ol className="pc-steps">
@@ -70,6 +84,7 @@ export default function PriceCheck({ keys }: { keys: Record<string, string> }) {
           <button onClick={() => goTab("maps")}>Map mods you can't run</button>
         </div>
       </div>
-    </>
+      </>}
+    </SideList>
   );
 }

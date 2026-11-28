@@ -33,7 +33,7 @@ import { HOTKEYS, keyOf, pressed } from "./hotkeys";
 /** Where the main window's look is kept (Settings writes it too). */
 export const APP_LOOK_KEY = "app.look";
 
-type Tab = "home" | "help" | "find" | "presets" | "tiers" | "gear" | "build" | "maps" | "atlas" | "wealth" | "bulk" | "pricecheck" | "craft" | "play" | "edits" | "prices" | "themes" | "batch" | "profiles" | "settings";
+type Tab = "home" | "help" | "find" | "presets" | "tiers" | "gear" | "build" | "maps" | "atlas" | "wealth" | "bulk" | "pricecheck" | "craft" | "play" | "runs" | "edits" | "prices" | "themes" | "batch" | "profiles" | "settings";
 
 /** Small line icons for the side menu. */
 /** Each page's colour: a tinted tile behind its menu icon (and page title) so the menu is easy to scan. */
@@ -41,12 +41,13 @@ const COLOURS: Record<Tab, string> = {
   find: "#6aa8ff", tiers: "#ff8a65", presets: "#b48cff", themes: "#ff7eb6", prices: "#5fd38a",
   edits: "#4fd1c5", batch: "#ffa95a",
   build: "#7ad0ff", gear: "#f0b45a",
-  maps: "#8bd67a", atlas: "#a78bfa", wealth: "#f5c542", bulk: "#f5c542", pricecheck: "#f5c542", craft: "#ff9f6b", play: "#6fd0a6",
+  maps: "#8bd67a", atlas: "#a78bfa", wealth: "#f5c542", bulk: "#f5c542", pricecheck: "#f5c542", craft: "#ff9f6b", play: "#6fd0a6", runs: "#8bd67a",
   profiles: "#9fb0c8", settings: "#9fb0c8", help: "#6aa8ff", home: "#e2b96f",
 };
 
 const ICONS: Record<Tab, string> = {
   home: "M4 11l8-7 8 7M6 9.5V20h4.5v-5.5h3V20H18V9.5",
+  runs: "M12 7v5l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z",
   find: "M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zm10 17-5.2-5.2",
   tiers: "M4 6h16M4 12h16M4 18h16M7 4v4M12 10v4M17 16v4",
   presets: "M5 4v16M12 4v16M19 4v16M3 8h4M10 15h4M17 10h4",
@@ -86,7 +87,6 @@ const MENU: { group: string; sub?: string; colour?: string; items: MenuItem[] }[
     { id: "profiles", name: "Filters", hint: "Which filter you're editing, how strict it is, and its NeverSink version" },
     { id: "presets", name: "Presets", hint: "Ready-made changes: levelling, your build's weapons and armour, league mechanics" },
     { id: "themes", name: "Themes", hint: "Recolour the whole filter in one go" },
-    { id: "find", name: "Change an item", hint: "The item you picked in Search (Ctrl+F): change how it drops, or describe a change in your own words" },
     { id: "tiers", name: "Tiers", hint: "NeverSink's ranked item lists: move items up or down, hide them, change their look" },
     { id: "prices", name: "Price tiers", hint: "Make valuable items stand out using poe.ninja prices (off until you turn it on)" },
     { id: "edits", name: "My edits", hint: "Everything you've changed: undo it, see the history, preview drops" },
@@ -100,7 +100,8 @@ const MENU: { group: string; sub?: string; colour?: string; items: MenuItem[] }[
   { group: "Endgame", sub: "Your atlas tree, maps you can run, and windows over the game", colour: G_CHANGES, items: [
     { id: "atlas", name: "Atlas tree", hint: "Atlas tree plans from maxroll or pathofexile.com, over the game with F7" },
     { id: "maps", name: "Map mods", hint: "Map mods your build can't run, a stash search for good maps, and maps to buy" },
-    { id: "play", name: "Game windows", hint: "Windows over the game: levelling route (F8), map tracker (F9), searches (F10), cheat sheets (F11), notes" },
+    { id: "runs", name: "My maps", hint: "Your map runs and what each dropped, death notes, and this session (from the map tracker, F9)" },
+    { id: "play", name: "Game windows", hint: "Set up the windows over the game: levelling route (F8), map tracker (F9), searches (F10), cheat sheets (F11), notes" },
   ] },
   { group: "Money", sub: "What items sell for, what your stash is worth, what you earn", colour: G_MONEY, items: [
     { id: "pricecheck", name: "Price check", hint: "What an item sells for: hover it in game and press Ctrl+D. Plus your saved and live searches" },
@@ -114,7 +115,11 @@ const BOTTOM: MenuItem[] = [
   { id: "settings", name: "Settings", hint: "Hotkeys, league, price check, trading, maps, looks and AI" },
   { id: "help", name: "Help", hint: "Quick answers, and what each hotkey does" },
 ];
-const ALL: MenuItem[] = [...MENU.flatMap((g) => g.items), ...BOTTOM];
+/** Pages with no menu entry (28 Nov 2026): Change an item opens from search (Ctrl+F) or F2's Modify this rule. */
+const HIDDEN: MenuItem[] = [
+    { id: "find", name: "Change an item", hint: "The item you picked in Search (Ctrl+F): change how it drops, or describe a change in your own words" },
+];
+const ALL: MenuItem[] = [...MENU.flatMap((g) => g.items), ...HIDDEN, ...BOTTOM];
 
 function Icon({ d }: { d: string }) {
   return <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>;
@@ -418,6 +423,7 @@ export default function App() {
       {tab === "bulk" && <Bulk />}
       {tab === "pricecheck" && <PriceCheck keys={keys} />}
       {tab === "play" && <PlayTools />}
+      {tab === "runs" && <PlayTools view="maps" />}
       {tab === "craft" && <Craft />}
       {tab === "tiers" && <Tiers profile={active} onChange={refresh} focus={focus?.kind === "neversink" || (focus?.kind === "price" && focus.section) ? focus : null} />}
       {tab === "presets" && <Find key="presets" view="presets" onChange={refresh} />}

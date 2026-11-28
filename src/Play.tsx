@@ -805,7 +805,9 @@ export function TrackerSettings() {
 }
 
 /** Play tools page: what each play window does, levelling choices, your searches, cheat sheet pictures, map runs. */
-export default function PlayTools() {
+/** Game windows (`view` "tools", with its side list) or My maps (`view` "maps": map runs, deaths, this session; its own
+ *  page under Endgame since 28 Nov 2026, he OK'd the page moves after the second whole-app check). */
+export default function PlayTools({ view = "tools" }: { view?: "tools" | "maps" }) {
   const keys = useKeys();
   const [lv, setLv] = useState<LevelView | null>(null);
   const [searches, setSearches] = useState<SearchString[] | null>(null);
@@ -846,11 +848,12 @@ export default function PlayTools() {
   const recent = useMemo(() => runs.slice().reverse().slice(0, 30), [runs]);
   const k = (name: string, def: string) => keys[name] ?? def;
   const [part, pick] = useSidePart("play", PLAY_PARTS);
-  const parts = PLAY_PARTS.map((x) => x.key === "maps" ? { ...x, badge: runs.length || undefined } : x);
+  const p = view === "maps" ? "maps" : part;
+  const wrap = (body: ReactNode) => view === "maps" ? <div className="runs-page">{body}</div>
+    : <SideList page="play" label="Game windows parts" parts={PLAY_PARTS} part={part} onPick={pick}>{body}</SideList>;
 
-  return (
-    <SideList page="play" label="Game windows parts" parts={parts} part={part} onPick={pick}>
-      {part === "windows" && <><div className="card plain">
+  return wrap(<>
+      {p === "windows" && <><div className="card plain">
         <h2>What each window does</h2>
         <p className="muted small">Small windows over the game. They read the game's log file and copied item text only (nothing that reads the
           game's memory). Change the keys under Settings → Hotkeys.</p>
@@ -877,13 +880,13 @@ export default function PlayTools() {
       </div>
       <ChatCommands /></>}
 
-      {part === "maps" && session && <div className="card">
+      {p === "maps" && session && <div className="card">
         <h2>This session</h2>
         <p className="muted small">Started {new Date(session.start * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}. A new session starts after 30 minutes without playing.</p>
         <SessionCard s={session} divine={divine} />
       </div>}
 
-      {part === "level" && lv && <div className="card">
+      {p === "level" && lv && <div className="card">
         <h2>Levelling route</h2>
         <p className="muted small">{lv.credit} Your place is kept per character.</p>
         <label className="check"><input type="checkbox" checked={lv.options.league_start} onChange={(e) => setOpts({ league_start: e.target.checked })} />
@@ -903,16 +906,10 @@ export default function PlayTools() {
         </div>
       </div>}
 
-      {part === "level" && <SplitsCard />}
+      {p === "level" && <SplitsCard />}
 
-      {part === "lookup" && <><ExchangeCheck />
-      <div className="card">
-        <h2>Blight oils</h2>
-        <p className="muted small">Which three oils make a notable, and what they cost. Also in the cheat sheets window (F11).</p>
-        <AnointLookup />
-      </div></>}
 
-      {part === "sheets" && <><div className="card">
+      {p === "sheets" && <><div className="card">
         <h2>Searches</h2>
         <p className="muted small">Up to 250 characters, as the game allows. Quotes and | work like in the game ("nt sp|life").</p>
         {(searches ?? []).map((s, i) => (
@@ -934,7 +931,7 @@ export default function PlayTools() {
         <button onClick={addSheets}>Add pictures…</button>
       </div></>}
 
-      {part === "maps" && <><Deaths />
+      {p === "maps" && <><Deaths />
 
       <div className="card">
         <div className="pw-row between"><h2>Map runs</h2>
@@ -980,24 +977,22 @@ export default function PlayTools() {
           <span className="muted">· Click a map to see everything it dropped.</span></div>}
         {msg && <div className="error small">{msg}</div>}
       </div></>}
-    </SideList>
-  );
+    </>);
 }
 
-/** Game windows in parts (28 Nov 2026: it was ~9 screens, the blight oil table alone over half). */
+/** Game windows in parts (28 Nov 2026: it was ~9 screens). My maps became its own page and the exchange check and
+ *  blight oils moved to Price check the same day. */
 const PLAY_PARTS: SidePart[] = [
   { key: "windows", name: "Windows", icon: "M3 5h18v14H3zM3 9h18M7 7h.01M10 7h.01" },
-  { key: "maps", name: "My maps", icon: "M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14" },
   { key: "level", name: "Levelling", icon: "M4 20h4v-6h4v-5h4V4h4" },
   { key: "sheets", name: "Searches and sheets", icon: "M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM21 21l-5-5" },
-  { key: "lookup", name: "Look-ups", icon: "M5 4h11l3 3v13H5zM9 10h6M9 14h6M9 18h3" },
 ];
 
 const CURRENCIES = ["Chaos Orb", "Divine Orb", "Exalted Orb", "Orb of Alchemy", "Orb of Fusing", "Orb of Alteration", "Chromatic Orb", "Jeweller's Orb",
   "Regal Orb", "Vaal Orb", "Orb of Scouring", "Gemcutter's Prism", "Orb of Annulment", "Blessed Orb", "Orb of Regret", "Mirror of Kalandra"];
 
 /** Is the rate in the game's currency exchange good? "I give 1 Divine Orb, I get 175 Chaos Orb" against poe.ninja. */
-function ExchangeCheck() {
+export function ExchangeCheck() {
   const [give, setGive] = useState({ n: 1, c: "Divine Orb" });
   const [get, setGet] = useState({ n: 170, c: "Chaos Orb" });
   const [p, setP] = useState<Record<string, number>>({});
@@ -1037,6 +1032,17 @@ function ChatCommands() {
       <label className="check"><input type="checkbox" checked={v[0]} onChange={(e) => invoke<boolean>("chat_prefs", { on: e.target.checked }).then((on) => setV([on, v[1]]))} />
         <span>Listen for chat commands</span></label>
       <table className="pt-table"><tbody>{v[1].map(([c, what]) => <tr key={c}><td><code>{c}</code></td><td>{what}</td></tr>)}</tbody></table>
+    </div>
+  );
+}
+
+/** Blight oils card (Price check → Blight oils since 28 Nov 2026; the table is AnointLookup, also in F11). */
+export function OilsCard() {
+  return (
+    <div className="card">
+      <h2>Blight oils</h2>
+      <p className="muted small">Which three oils make a notable, and what they cost. Also in the cheat sheets window (F11).</p>
+      <AnointLookup />
     </div>
   );
 }
