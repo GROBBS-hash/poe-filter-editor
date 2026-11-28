@@ -55,6 +55,8 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 ## Done (recent sessions)
 
+- **Atlas optimiser: Close call (28 Nov, not released; the plan's "solid or guess by re-solving with shaken weights").** After the plan is built, `optimise_with` solves it again 6 times in parallel with every income source the model marks `conf: "guess"` paying 70-130% of its number (`Problem::shake(seed)`, deterministic). `NodeWork.kept` = share of those trees that keep the point; under 2/3 shows a gold **Close call** badge in Build a tree (tooltip: stayed in N of 6, worth testing in your own maps). Adds about 50 ms in release (Profit ~145 ms). Checked: Ritual, Legion + Harvest, Breach, Expedition + Essence keep 23-27 of their main points in every re-solve; one or two per plan are close calls.
+
 - **Built trees remember what they're built for (28 Nov, not released; the plan's "save his Threads / goal with a strategy").** `Strategy.ask` keeps the optimiser's Ask (goals, mechanics, priority, Always / Never, Threads, altar, maps, build) when Build a tree saves; its Threads also go in `device` so the in-game panel's map device notes list them. My trees → a built tree → **Change what it's built for** reopens Build a tree set up exactly as it was built (`rebuild` in Atlas.tsx writes the `atlas-picks-*` / `atlas-opt-*` keys and remounts AtlasPicks). Trees saved before this have no setup to reopen.
 
 - **Farm finder: Copy for Claude (28 Nov, not released; the planned "AI part").** A link under the results (`forClaude` in FarmFinder.tsx) copies everything the finder knows as plain text: data dates and divine price, his filter choices, creator strategies' div/hour and costs, the top 8 mechanics/mixes with score, verdict, Threads, maps, top drops, why / careful notes and his own maps' numbers, his own trees, then a question to ask. Numbers only, no account details.
@@ -1204,6 +1206,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 - [ ] (not released) Game windows → Windows: open the map tracker (F9) and the tile says Open with Hide; press Hide and it says Show. Close one with its own X or hotkey and the page catches up within 2 seconds.
 - [ ] (not released) Atlas → Today: "Copy for Claude" under the results, paste into a Claude chat: it has the top farms, your own trees' numbers and a question.
 - [ ] (not released) Atlas → Build a tree: save a tree, then My trees → it → "Change what it's built for": Build a tree opens with the same picks, maps and Threads. In game (F7) its map device notes list the Threads.
+- [ ] (not released) Atlas → Build a tree: most points show Solid / Maths / Players as before; now and then one also has a gold "Close call" (rest the mouse on it).
 - [ ] (0.2.104) Dust uniques: Prices page, tick "Uniques that give lots of dust", press Save, then F4 in game. A unique on a high-dust base at a high item level shows orange on dark blue with a purple beam (tier 1 also plays a sound); the list on the card shows which bases. Disenchant one at Faustus and check the dust is at least what the card says (at item level 84 without quality).
 - [ ] (0.2.104) Sidebar: "My maps" under Endgame (your map runs, deaths, session); Price check has Currency exchange and Blight oils in its side list; "Change an item" is gone from the menu but opens when you pick an item in Ctrl+F search or press Modify this rule in F2.
 - [ ] (0.2.104) Settings: no Save button any more, changes save a moment later ("Saving…" then "Saved"). Tiers: the list on the left folds by group, each tier shows one row with "+N more". If a page part ever breaks, it shows a short plain note with Copy details instead of code.
@@ -1906,7 +1909,7 @@ when the game window isn't found. Check in game: the window's spot, and that it 
 4. ~~One-click login~~ **Dropped 24 Nov (his call: too much red tape with GGG's app approval).** POESESSID + the "Log in with pathofexile.com" button stay as they are.
 5. **Atlas Strategy Builder (idea 23 Nov; step 1 creator picks + step 3 optimiser done 23 Nov, see Done; tree editing + totals done 23 Nov; wealth-tracker results per tree done 24 Nov; left: Mobalytics/YouTube creator picks).** Pick strategies (e.g. Ritual + Harvest) → creator-pick trees
    (Maxroll, Mobalytics, YouTube) to load and adjust, plus an optimiser for his own trees. Full plan: `ATLAS_STRATEGY_PLAN.md`.
-   Optimiser rebuilt 25 Nov (see Done). Left: check it against his own maps (`tree_results`), "solid or guess" by re-solving with shaken weights, better numbers for the sources marked guess in `atlas_model.json`.
+   Optimiser rebuilt 25 Nov (see Done). Left: check it against his own maps (`tree_results`), better numbers for the sources marked guess in `atlas_model.json`.
 6. Deferred earlier: PoE 2 coverage. Batch mode tidy-up done 21 Nov (see "Batch mode"). (Installer + auto-update done 21 Nov: see "Installer and updates".)
 7. **Ideas from PoeFilterX (he asked 23 Nov; 7a, 7b and 7c done 23 Nov, see Done; 7d left).** github.com/SteffenBlake/PoeFilterX is a
    code-style filter "transpiler" (multi-file, .fss style sheets, JSON/env variables, npm packages). Its syntax doesn't

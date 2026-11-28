@@ -148,6 +148,9 @@ pub struct NodeWork {
     /// "both" (maths and players agree), "maths", "players" or "path".
     #[serde(default)]
     pub sure: String,
+    /// Share of re-solves with the guessed numbers nudged (70-130%) that keep it (1 = always): low = a close call.
+    #[serde(default)]
+    pub kept: f32,
     /// e.g. "more monsters, better drops: Harvest pays 11% more".
     pub why: String,
 }
@@ -279,6 +282,25 @@ fn optimise_with(ask: &Ask, shares: &Shares) -> Plan {
     let t = s.improve(t, budget, 40);
     let nodes = s.order(&t);
 
+    // Solid or a close call: solve again with the model's guessed numbers nudged, and see what stays.
+    const SHAKES: u64 = 6;
+    let kept: HashMap<u32, f32> = {
+        let trees: Vec<Vec<u32>> = std::thread::scope(|sc| {
+            let jobs: Vec<_> = (1..=SHAKES).map(|seed| {
+                let setup = p.setup.clone();
+                sc.spawn(move || {
+                    let mut q = Problem::new(setup, shares);
+                    q.shake(seed);
+                    let tt = Search::new(&q).solve(budget, 10);
+                    q.ids.iter().zip(&tt.has).filter(|(_, h)| **h).map(|(id, _)| *id).collect::<Vec<u32>>()
+                })
+            }).collect();
+            jobs.into_iter().filter_map(|j| j.join().ok()).collect()
+        });
+        let n = trees.len().max(1) as f32;
+        nodes.iter().map(|id| (*id, trees.iter().filter(|t| t.contains(id)).count() as f32 / n)).collect()
+    };
+
     // Why each notable is in: the plan with and without it.
     let names: Vec<String> = p.setup.mechs.iter().map(|x| x.strip_prefix("goal:").and_then(|k| m.goals.get(k)).map(|g| g.label.split(" (").next().unwrap_or("").to_string()).unwrap_or_else(|| atlas_model::cap(x))).collect();
     let with = p.detail(&t.x);
@@ -308,7 +330,7 @@ fn optimise_with(ask: &Ask, shares: &Shares) -> Plan {
         if share >= 0.15 { parts.push(format!("{:.0}% of {}trees take it", share * 100.0, if names.is_empty() { String::new() } else { names.join(" / ") + " " })); }
         let sure = if paying && share >= 0.45 { "both" } else if paying { "maths" } else if share >= 0.35 { "players" } else { "path" };
         let value = gain as f32 + share as f32 * 0.04;
-        NodeWork { node: id, name: g.name(id).to_string(), value, gain: gain as f32, share: share as f32, sure: sure.into(), why: if parts.is_empty() { "on the way to better nodes".into() } else { parts.join(" · ") } }
+        NodeWork { node: id, name: g.name(id).to_string(), value, gain: gain as f32, share: share as f32, sure: sure.into(), kept: kept.get(&id).copied().unwrap_or(1.0), why: if parts.is_empty() { "on the way to better nodes".into() } else { parts.join(" · ") } }
     }).collect();
     works.sort_by(|a, b| b.value.total_cmp(&a.value));
     let (weak, top): (Vec<_>, Vec<_>) = works.into_iter().partition(|w| w.sure == "path" && !ask.lock.contains(&w.node));
@@ -584,7 +606,7 @@ fn show() {
         println!("  income {}", p.parts.iter().map(|x| format!("{} {:.0}%", x.label, x.share * 100.0)).collect::<Vec<_>>().join(", "));
         if let Ok(dir) = std::env::var("ATLAS_OPT_OUT") { let _ = std::fs::write(format!("{dir}/plan_{pr:?}.json"), serde_json::to_string(&p).unwrap()); }
         if pr != Priority::Profit { continue; }
-        for w in &p.top { println!("  + {} ({:.1}%, {}) {}", w.name, w.gain * 100.0, w.sure, w.why); }
+        for w in &p.top { println!("  + {} ({:.1}%, {}, kept {:.0}%) {}", w.name, w.gain * 100.0, w.sure, w.kept * 100.0, w.why); }
         for w in &p.weak { println!("  - {} ({:.1}%) {}", w.name, w.gain * 100.0, w.why); }
         println!("  left out {:?}\n  tips {:?}", p.left_out, p.tips);
     }

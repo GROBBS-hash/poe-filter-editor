@@ -248,7 +248,7 @@ mockIPC((cmd, args) => {
     const pts = [...new Set([...ask.lock, ...mxVariant.history.slice(0, n)])].filter((x: number) => !ask.block.includes(x));
     const nodes = atlasData.nodes as unknown as Record<string, [number, number, number, string]>;
     const notable = pts.filter((x: number) => nodes[x]?.[2] === 1);
-    const work = (x: number, i: number) => ({ node: x, name: nodes[x][3], value: 4 - i * 0.1, why: `${ask.mechanics[0]} node · taken by ${5 - (i % 4)} of 7 trees` });
+    const work = (x: number, i: number) => ({ node: x, name: nodes[x][3], value: 4 - i * 0.1, why: `${ask.mechanics[0]} node · taken by ${5 - (i % 4)} of 7 trees`, sure: i < 3 ? "both" : "maths", kept: i === 4 ? 0.5 : 1 });
     const plan = { nodes: [29045, ...pts], steps: atlasSteps(pts), choices: [], points: pts.length, budget: 150,
       top: notable.slice(0, 10).map(work), weak: notable.slice(10, 12).map((x: number, i: number) => ({ ...work(x, i), why: "on the way to better nodes" })), trees_used: 7,
       notes: ["Eater of Worlds side only: a map has one Eldritch influence"] };

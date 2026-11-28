@@ -360,6 +360,22 @@ impl Problem {
         Problem { ids, alts, setup, k: ch.ix.len(), c, src, juice, danger, steer, avg_price, thr }.with_wanted(wanted)
     }
 
+    /// "Solid or guess" (HANDOFF atlas follow-ups): every income source the model marks as a guess pays a fixed
+    /// amount more or less, between 70% and 130% of its number, picked by `seed` (same seed, same nudge). Solving
+    /// again with a few seeds shows which points stay in whatever the true numbers are.
+    pub fn shake(&mut self, seed: u64) {
+        for (i, s) in self.src.iter_mut().enumerate() {
+            if !s.guess { continue; }
+            // splitmix64 of (seed, source): a number from 0 to 1.
+            let mut z = seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ (i as u64 + 1).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+            z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+            z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+            z ^= z >> 31;
+            let r = (z >> 11) as f64 / (1u64 << 53) as f64;
+            s.unit *= 0.7 + 0.6 * r;
+        }
+    }
+
     /// "Also spend points on": counted with what people take, so it never drowns the maths.
     fn with_wanted(mut self, wanted: usize) -> Problem {
         let g = crate::atlas::graph();

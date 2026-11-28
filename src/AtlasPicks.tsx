@@ -193,7 +193,7 @@ export default function AtlasPicks({ store, onImported, onShow }: {
   );
 }
 
-type NodeWork = { node: number; name: string; value: number; why: string; gain?: number; share?: number; sure?: string };
+type NodeWork = { node: number; name: string; value: number; why: string; gain?: number; share?: number; sure?: string; kept?: number };
 type Plan = { nodes: number[]; steps: AtlasStep[]; choices: [number, number][]; points: number; budget: number;
   top: NodeWork[]; weak: NodeWork[]; trees_used: number; notes?: string[]; left_out?: [string, string][]; tips?: string[];
   threads?: [string, number][]; altar?: string; parts?: { key: string; label: string; share: number }[] };
@@ -298,7 +298,8 @@ function BuildOwn({ sel, goals, onClear, onSaved }: { sel: string[]; goals: stri
     <div key={w.node} id={`ap-row-${w.node}`} className={`ap-work ${weak ? "weak" : ""} ${openNode === w.node ? "open" : ""}`}>
       <button className="ap-work-name" onClick={() => toggleOpen(w.node)} aria-expanded={openNode === w.node} title="What it does (and find it on the tree)">
         <b>{w.name}</b>{(w.gain ?? 0) >= 0.004 && <span className="ap-gain">+{(w.gain! * 100).toFixed(w.gain! < 0.1 ? 1 : 0)}%</span>}
-        {w.sure && SURE[w.sure] && <span className={`ap-sure ${w.sure}`} title={SURE[w.sure][1]}>{SURE[w.sure][0]}</span>}<span className="ap-caret" aria-hidden="true">{openNode === w.node ? "▾" : "▸"}</span>
+        {w.sure && SURE[w.sure] && <span className={`ap-sure ${w.sure}`} title={SURE[w.sure][1]}>{SURE[w.sure][0]}</span>}
+        {w.kept != null && w.kept < 0.67 && <span className="ap-sure close" title={`A close call: with the model's guessed numbers nudged up or down a little, it stayed in ${Math.round(w.kept * 6)} of 6 trees. Worth testing in your own maps.`}>Close call</span>}<span className="ap-caret" aria-hidden="true">{openNode === w.node ? "▾" : "▸"}</span>
       </button>
       <span className="ap-acts">
         <button className={`ap-mini lock ${lock.includes(w.node) ? "on" : ""}`} onClick={() => always(w.node)} title="Always keep this in">Always</button>
