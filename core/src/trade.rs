@@ -1228,17 +1228,17 @@ pub fn buy_query(text: &str, index: &StatIndex) -> Option<(Value, usize)> {
     let local_first = cat.is_some_and(|c| c.starts_with("armour.") || c.starts_with("weapon."));
     let mut stats: Vec<Value> = Vec::new();
     // A rare or magic item (28 Nov 2026, he asked: resistances "and max life etc are PSeudo tags, so we can filter by how
-    // much"): life, fire / cold / lightning resistance and Str / Dex / Int become the trade site's totals with a minimum
-    // a tenth under this item's (its own rolled mods; crafted and implicit ones left out: you craft those, and a
+    // much"): life, fire / cold / lightning resistance, Str / Dex / Int and movement speed become the trade site's totals,
+    // with NO number (he: "IM NOT SAYING TO PUT A MINIMUM IN": he types his own on the site), for the ones this item has (its own rolled mods; crafted and implicit ones left out: you craft those, and a
     // swapped base has other implicits). The mods that make them up aren't asked for one by one. Chaos stays as it is.
-    const TOTALS: [&str; 7] = ["Life", "Fire res", "Cold res", "Lightning res", "Strength", "Dexterity", "Intelligence"];
+    const TOTALS: [&str; 8] = ["Life", "Fire res", "Cold res", "Lightning res", "Strength", "Dexterity", "Intelligence", "Movement speed"];
     let all_mods = mods(text);
     let rolled: Vec<String> = all_mods.iter().filter(|m| m.kind == "explicit" || m.kind == "fractured").map(|m| m.text.clone()).collect();
     let totals = if unique { Default::default() } else { crate::compare::totals(&rolled) };
     let in_totals = |line: &str| !unique && { let t = crate::compare::totals(&[line.to_string()]); TOTALS.iter().any(|k| t.get(k).copied().unwrap_or(0.0) != 0.0) };
     for k in TOTALS {
         let v = totals.get(k).copied().unwrap_or(0.0);
-        if v >= 1.0 { if let Some(id) = crate::upgrade::pseudo(k) { stats.push(json!({ "id": id, "value": { "min": (v * 0.9).floor() } })); } }
+        if v >= 1.0 { if let Some(id) = crate::upgrade::pseudo(k) { stats.push(json!({ "id": id })); } }
     }
     for m in all_mods {
         if (m.kind == "explicit" || m.kind == "fractured") && in_totals(&m.text) { continue; }

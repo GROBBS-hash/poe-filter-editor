@@ -607,13 +607,12 @@ mod buy_tests {
             +68 to Armour\n+18 to Dexterity (crafted)\n";
         let (q, n) = buy_query(gloves, &idx()).unwrap();
         let ids: Vec<&str> = q["query"]["stats"][0]["filters"].as_array().unwrap().iter().map(|v| v["id"].as_str().unwrap()).collect();
-        // Life and resistances as totals with a minimum a tenth under (28 Nov 2026); the rest every mod, no numbers.
+        // Life and resistances as totals (28 Nov 2026), no numbers anywhere: he types his own on the site.
         assert_eq!(ids, ["pseudo.pseudo_total_life", "pseudo.pseudo_total_fire_resistance", "implicit.unnerve", "explicit.ar_local", "crafted.dex"]);
         assert_eq!(n, 4, "the crafted one is shown but not required");
         assert_eq!(q["query"]["stats"][0]["filters"][4]["disabled"], true);
         let f = q["query"]["stats"][0]["filters"].as_array().unwrap();
-        assert_eq!((f[0]["value"]["min"].as_f64(), f[1]["value"]["min"].as_f64()), (Some(72.0), Some(36.0)));
-        assert!(f[2..].iter().all(|v| v.get("value").is_none()), "no numbers on the rest");
+        assert!(f.iter().all(|v| v.get("value").is_none()), "no numbers");
         assert_eq!(q["query"]["type"], "Paladin Gloves");
         assert_eq!(q["query"]["filters"]["type_filters"]["filters"]["rarity"]["option"], "rare");
 
