@@ -123,10 +123,15 @@ export const mercView = {
 export const mercStrip = { ...mercView, stage: "met", items: [], gems: [], skills: [], recruit: null, recruit_listed: null, recruit_how: "", helps: [],
   verdict: { kind: "check", best: null, kill: null, recruit: null, why: "Hover its items and press Ctrl+D" } };
 
+/** Which play windows are up in the preview (Game windows page: Show / Hide). */
+const winState: Record<string, string> = { level: "closed", tracker: "open", searches: "closed", sheet: "map", notes: "closed", splits: "closed" };
+
 /** Answers the play windows' commands; null = not a play command. */
 export function playMock(cmd: string, args?: unknown): unknown {
   switch (cmd) {
     case "level_view": case "level_move": return levelView;
+    case "play_windows_state": return { ...winState };
+    case "play_toggle": { const l = (args as { label: string }).label; winState[l] = winState[l] === "open" ? "closed" : "open"; return null; }
     case "tracker_set_tracking": (playView.tracker as { tracking?: boolean }).tracking = (args as { on: boolean }).on; return { ...playView, tracker: { ...playView.tracker } };
     case "play_view": case "watch_action": case "maps_done": case "pause_prefs": case "loot_prefs_save": return playView;
     case "maps_history": return sampleRuns;

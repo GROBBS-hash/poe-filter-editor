@@ -1680,6 +1680,18 @@ pub fn play_toggle(app: AppHandle, label: String) {
     if ["level", "tracker", "searches", "sheet", "notes", "splits"].contains(&label.as_str()) { toggle(&app, &label); }
 }
 
+/// Which game windows are up, for the Show / Hide buttons on the Game windows page (the whole-app design check
+/// found they didn't say): "open", "map" (put away while you're in a map, back in town) or "closed".
+#[tauri::command]
+pub fn play_windows_state(app: AppHandle) -> HashMap<String, String> {
+    let away = HIDDEN_FOR_MAP.lock().map(|h| h.clone()).unwrap_or_default();
+    ["level", "tracker", "searches", "sheet", "notes", "splits"].iter().map(|l| {
+        let open = app.get_webview_window(l).is_some_and(|w| w.is_visible().unwrap_or(false));
+        let state = if open { "open" } else if away.iter().any(|x| x == l) { "map" } else { "closed" };
+        (l.to_string(), state.to_string())
+    }).collect()
+}
+
 #[tauri::command]
 pub fn play_hide(app: AppHandle, label: String) {
     if label == "tracker" { panel_back(&app); }

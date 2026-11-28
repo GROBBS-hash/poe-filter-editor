@@ -2,7 +2,7 @@ import Deaths from "./Deaths";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import SideList, { type Part as SidePart, useSidePart } from "./SideList";
 import { ResizeGrips, WinBar, useFitHeight } from "./WinFrame";
 import { CurrencyIcon, ItemIcon } from "./icons";
@@ -611,12 +611,21 @@ export function ChoiceWindow() {
 
 // ---------- the main window's page ----------
 
+/** The windows' state for the Show / Hide buttons: "open", "map" (put away in a map) or "closed". */
+const WinStates = createContext<{ s: Record<string, string>; toggle: (label: string) => void }>({ s: {}, toggle: () => {} });
+
 function Tile({ title, k, children, label }: { title: string; k?: string; children: ReactNode; label?: string }) {
+  const { s, toggle } = useContext(WinStates);
+  const st = label ? s[label] : undefined;
   return (
-    <div className="pt-tile">
+    <div className={`pt-tile ${st === "open" ? "is-open" : ""}`}>
       <div className="pw-row between"><h3>{title}</h3>{k ? <kbd>{k}</kbd> : <span className="pw-small">no key</span>}</div>
       <div className="muted small">{children}</div>
-      {label && <div className="row" style={{ margin: 0 }}><button onClick={() => invoke("play_toggle", { label })}>Show / hide</button></div>}
+      {label && <div className="row pt-tile-act" style={{ margin: 0 }}>
+        <button onClick={() => toggle(label)} aria-pressed={st === "open"}>{st === "open" ? "Hide" : "Show"}</button>
+        {st === "open" && <span className="pt-state on"><i aria-hidden />Open</span>}
+        {st === "map" && <span className="pt-state" title="Put away while you're in a map; it comes back in town">Away for the map</span>}
+      </div>}
     </div>
   );
 }
@@ -853,10 +862,21 @@ export default function PlayTools({ view = "tools" }: { view?: "tools" | "maps" 
   const k = (name: string, def: string) => keys[name] ?? def;
   const [part, pick] = useSidePart("play", PLAY_PARTS);
   const p = view === "maps" ? "maps" : part;
+  // Which windows are up, so each Show / Hide button says which it'll do (checked every second and a half while
+  // this part is open: a hotkey or the window's own close button changes it too).
+  const [wins, setWins] = useState<Record<string, string>>({});
+  const loadWins = () => invoke<Record<string, string>>("play_windows_state").then((w) => setWins(w ?? {})).catch(() => {});
+  useEffect(() => {
+    if (p !== "windows") return;
+    loadWins();
+    const t = window.setInterval(loadWins, 1500);
+    return () => window.clearInterval(t);
+  }, [p]); // eslint-disable-line react-hooks/exhaustive-deps
+  const toggleWin = (label: string) => { invoke("play_toggle", { label }).finally(() => window.setTimeout(loadWins, 200)); };
   const wrap = (body: ReactNode) => view === "maps" ? <div className="runs-page">{body}</div>
     : <SideList page="play" label="Game windows parts" parts={PLAY_PARTS} part={part} onPick={pick}>{body}</SideList>;
 
-  return wrap(<>
+  return wrap(<WinStates.Provider value={{ s: wins, toggle: toggleWin }}>
       {p === "windows" && <><div className="card plain">
         <h2>What each window does</h2>
         <p className="muted small">Small windows over the game. They read the game's log file and copied item text only (nothing that reads the
@@ -981,7 +1001,7 @@ export default function PlayTools({ view = "tools" }: { view?: "tools" | "maps" 
           <span className="muted">· Click a map to see everything it dropped.</span></div>}
         {msg && <div className="error small">{msg}</div>}
       </div></>}
-    </>);
+    </WinStates.Provider>);
 }
 
 /** Game windows in parts (28 Nov 2026: it was ~9 screens). My maps became its own page and the exchange check and

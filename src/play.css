@@ -177,3 +177,10 @@
 .trk-track { display: inline-flex; align-items: center; gap: 4px; color: var(--text); cursor: pointer; white-space: nowrap; }
 .trk-track input { margin: 0; accent-color: var(--gold, #e0b252); }
 .trk-off { color: var(--muted); font-style: italic; }
+
+/* Game windows: which are up (28 Nov 2026, design check gap) */
+.pt-tile.is-open { border-color: color-mix(in srgb, var(--green) 45%, var(--line)); }
+.pt-tile-act { align-items: center; gap: 10px; }
+.pt-state { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
+.pt-state.on { color: var(--green); }
+.pt-state i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
