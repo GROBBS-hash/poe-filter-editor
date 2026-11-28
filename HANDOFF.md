@@ -1188,7 +1188,6 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 
 ## Still to check in game (keep this list current)
 - [ ] (0.2.107) Mercenary skills off the screen: beat a Mercenary and open its window (Take Item / Rematch / Hire). Within a couple of seconds the strip lists its skills, each with its supports by name and tier (II, III), and "Recruit: one like it" gets a price. Brick skills/supports (Leap Slam, Brutality …) show red. A support shown as "?": hover it in game and press Ctrl+D; it gets its name, and next time it's known straight away. Tell me if a row is missing or a support is named wrong.
-- [ ] (0.2.106) Change look, scroll down a long page first: after Save look or Cancel you're back where you were, not at the top.
 - [ ] (0.2.105) Prices page: Bases says "chaos or more" with the divine amount; dust tiers sit in neat rows; the dust list names the uniques.
 - [ ] (0.2.104) Dust uniques: Prices page, tick "Uniques that give lots of dust", press Save, then F4 in game. A unique on a high-dust base at a high item level shows orange on dark blue with a purple beam (tier 1 also plays a sound); the list on the card shows which bases. Disenchant one at Faustus and check the dust is at least what the card says (at item level 84 without quality).
 - [ ] (0.2.104) Sidebar: "My maps" under Endgame (your map runs, deaths, session); Price check has Currency exchange and Blight oils in its side list; "Change an item" is gone from the menu but opens when you pick an item in Ctrl+F search or press Modify this rule in F2.
@@ -1313,7 +1312,7 @@ in-game overlays. Built on NeverSink's filters (tags `$type->… $tier->…`), u
 - [ ] (0.2.55) When the pathofexile.com login runs out: the red message has a "Log in again" button on that page; after logging in, it carries on (Sell in bulk reads the stash again).
 Everything below was built since GROBBS last tested and has only been checked with sample data. Tick items off
 (move them to "Confirmed in game") as he reports back, and add new features here as they land.
-Confirmed in game so far: 28 Nov (0.2.105): copy / paste looks; 23 Nov (0.2.53): F5 works outside the game, F2 works in game; basic Ctrl+D price check (trade search returned listings); 20 Nov: weapon + armour
+Confirmed in game so far: 28 Nov (0.2.105-0.2.106): copy / paste looks, look editor keeps your place; 23 Nov (0.2.53): F5 works outside the game, F2 works in game; basic Ctrl+D price check (trade search returned listings); 20 Nov: weapon + armour
 windows work (totals, DPS/defences, build box in the right slot). He found them cluttered, so they were re-laid out.
 
 **Sell in bulk (23 Nov, released in 0.2.52):**
