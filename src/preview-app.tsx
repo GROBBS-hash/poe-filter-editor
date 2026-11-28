@@ -85,7 +85,9 @@ const pob = async () => {
     jewels: [{ node: 7960, notables: ["Doryani's Lesson", "Inspired Oppression", "Overshock"], item: { slot: "Jewel socket 7960", rarity: "rare", name: "8 Passive Only! Not 9!", base: "Large Cluster Jewel", lines: ["Adds 8 Passive Skills", "1 Added Passive Skill is Overshock"], copy: "x" } },
       { node: 26196, notables: [], item: { slot: "Jewel socket 26196", rarity: "unique", name: "Brutal Restraint", base: "Timeless Jewel", lines: ["Denoted service of 7000 dekhara in the akhara of Balbala"], copy: "x" } },
       { node: null, notables: [], item: { slot: "Belt Abyssal Socket 1", rarity: "rare", name: "Bleed + CB Avoidance Jewel", base: "Hypnotic Eye Jewel", lines: ["+12% chance to Avoid Bleeding"] } }] });
-  return { build: { class: "Witch", ascendancy: "Elementalist", level: 50, active: 1, stages: [stage("Start of Maps", 90), stage("End of Early Maps", 120)] }, stage: 1, link: "", follow: false };
+  return { build: { class: "Witch", ascendancy: "Elementalist", level: 50, active: 1, stages: [stage("Start of Maps", 90), stage("End of Early Maps", 120)] }, stage: 1, link: "", follow: false,
+    checks: [0, 1].map((i) => ({ title: "", level: i ? 68 : 60, level_guessed: false, str: 100, dex: 100, int: 150, points: 90, points_have: 90, short: [0, 0, 0], mana: null, speed: null, notes: [],
+      later: i ? [{ slot: "Helmet", level: 69, instead: "Lunaris Circlet" }] : [] })) };
 };
 // Atlas strategies: maxroll's "Leaguestart Shrine/Magic Atlas" (variant 2 is a full tree) with sample notes.
 // Add ?atlas-window to the address to see the F7 window instead of the main window.
@@ -251,7 +253,7 @@ mockIPC((cmd, args) => {
       top: notable.slice(0, 10).map(work), weak: notable.slice(10, 12).map((x: number, i: number) => ({ ...work(x, i), why: "on the way to better nodes" })), trees_used: 7,
       notes: ["Eater of Worlds side only: a map has one Eldritch influence"] };
     if (cmd === "atlas_optimise") return fetch(`/_plan_${ask.priority}.json`).then((r) => (r.ok && r.headers.get("content-type")?.includes("json") ? r.json() : plan)).catch(() => plan);
-    atlas = { ...atlas, active: 99, list: [...atlas.list, { ...atlas.list[0], id: 99, name: `${ask.mechanics.join(" + ")} (optimiser)`, site: "optimiser", link: "", ask }] };
+    atlas = { ...atlas, active: 99, list: [...atlas.list, { ...atlas.list[0], id: 99, name: `${ask.mechanics.join(" + ")} (optimiser)`, site: "optimiser", link: "", ...({ ask } as object) }] };
     return atlas;
   }
   if (cmd === "pob_get") return pob();

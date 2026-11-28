@@ -2588,3 +2588,6 @@ button.qm-rule:hover, .qm-rule.can-open:hover { border-color: var(--gold); backg
 /* Copy / paste a look (28 Nov 2026) */
 .se-copy { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
 .se-copied { transform: scale(.7); transform-origin: left center; display: inline-flex; margin-right: -24px; }
+
+/* Gear needing a higher level than the stage starts at (28 Nov 2026) */
+.bv-later { display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 6px; font-size: 12px; color: var(--gold); background: var(--gold-bg); white-space: nowrap; }

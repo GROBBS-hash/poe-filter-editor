@@ -18,7 +18,9 @@ export type PobBuild = { class: string; ascendancy: string; level: number; stage
 export type CheckNote = { kind: "bad" | "warn" | "ok"; text: string };
 export type StageCheck = { title: string; level: number; level_guessed: boolean; str: number; dex: number; int: number; points: number; points_have: number;
   mana: { total: number; reserved: number; free: number; skill: string; cost: number | null } | null;
-  speed: { skill: string; fires_after: number; attack_every: number; spare_pct: number } | null; notes: CheckNote[] };
+  speed: { skill: string; fires_after: number; attack_every: number; spare_pct: number } | null; notes: CheckNote[];
+  /** Gear needing a higher level than the stage starts at (and a base to wear until then). */
+  later?: { slot: string; level: number; instead: string | null }[] };
 export type PobState = { build: PobBuild; stage: number; link: string; follow?: boolean; checks?: StageCheck[] };
 
 /** Red count for things that won't work, yellow for later or weak, a tick when clean. */
@@ -304,6 +306,12 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
           <span className="bv-iname">
             <span style={{ color: RARITY[it.rarity] ?? "#ccc" }}>{it.name}</span>
             {it.base !== it.name && <span className="muted small"> {it.base}</span>}
+            {(() => {
+              // Needs a higher level than this stage starts at (his level 68 swap's Torturer's Mask needs 84).
+              const l = chk?.later?.find((x) => x.slot === it.slot);
+              return l && <span className="bv-later" title={l.instead ? `Buy searches ${l.instead} with the same mods, wearable at level ${chk!.level}` : `Wait until level ${l.level}, or use what you have`}>
+                needs level {l.level}{l.instead ? ` · wear ${l.instead} until then` : ""}</span>;
+            })()}
           </span>
           <SocketStrip it={it} />
           <CraftButton it={it} />

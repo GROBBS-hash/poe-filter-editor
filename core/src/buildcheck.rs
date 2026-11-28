@@ -80,6 +80,17 @@ pub struct StageCheck {
     pub mana: Option<Mana>,
     pub speed: Option<Speed>,
     pub notes: Vec<Note>,
+    /// Gear you can't wear at this stage's level yet, per slot, for the gear list (28 Nov 2026).
+    pub later: Vec<Later>,
+}
+
+/// One item the stage lists that needs a higher level than the stage starts at.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct Later {
+    pub slot: String,
+    pub level: u32,
+    /// A rare's base of the same kind you can wear now (what Buy searches).
+    pub instead: Option<String>,
 }
 
 fn class_attrs(class: &str) -> (i64, i64, i64) {
@@ -252,7 +263,7 @@ fn check_stage(b: &Build, st: &Stage, next_level: Option<u32>) -> StageCheck {
     // A gear set with no tree, or a Mercenary's stage: it isn't worn by you, so your level and attributes don't apply.
     if st.tree.is_none() && (st.groups.is_empty() || st.title.to_lowercase().contains("mercenar")) {
         let note = Note { kind: "ok".into(), text: "Gear for your Mercenary or a minion, not you: nothing to check against your level.".into() };
-        return StageCheck { title: st.title.clone(), level: b.level.max(1), level_guessed: true, str: 0, dex: 0, int: 0, short: [0; 3],
+        return StageCheck { title: st.title.clone(), level: b.level.max(1), level_guessed: true, str: 0, dex: 0, int: 0, short: [0; 3], later: vec![],
             points: 0, points_have: 0, mana: None, speed: None, notes: vec![note] };
     }
     let nodes = &data().1;
@@ -305,12 +316,17 @@ fn check_stage(b: &Build, st: &Stage, next_level: Option<u32>) -> StageCheck {
 
     // ---- gear
     let mut later: Vec<(u32, String)> = vec![];
+    let mut laters: Vec<Later> = vec![];
     // How much Str / Dex / Int you're short of at worst (the upgrade finder asks for it on gear).
     let mut short_by = [0i64; 3];
     for g in &st.gear {
         let Some((_, base)) = base_of(g) else { continue };
         let lvl = (base[0] as u32).max(if g.rarity == "unique" { unique_level(&g.name) } else { 0 });
         let short_name = g.name.split(" of ").next().unwrap_or(&g.name).trim_start_matches("Constant ").to_string();
+        if lvl > level {
+            let instead = (g.rarity != "unique").then(|| wearable_base(&g.base, level)).flatten();
+            laters.push(Later { slot: g.slot.clone(), level: lvl, instead });
+        }
         if lvl > level && !later.iter().any(|(_, n)| n.starts_with(&short_name)) {
             // A rare's base that fits now (Buy searches it too): "Torturer's Mask at 84 (wear Deicide Mask until then)".
             let instead = (g.rarity != "unique").then(|| wearable_base(&g.base, level)).flatten();
@@ -428,7 +444,7 @@ fn check_stage(b: &Build, st: &Stage, next_level: Option<u32>) -> StageCheck {
     let mut seen = std::collections::HashSet::new();
     notes.retain(|n| seen.insert(n.text.clone()));
     if notes.is_empty() { notes.push(Note { kind: "ok".into(), text: "Everything in this stage can be worn and used at this level.".into() }); }
-    StageCheck { title: st.title.clone(), level, level_guessed, str: ts, dex: td, int: ti, short: short_by, points, points_have, mana: mana_out, speed, notes }
+    StageCheck { title: st.title.clone(), level, level_guessed, str: ts, dex: td, int: ti, short: short_by, points, points_have, mana: mana_out, speed, notes, later: laters }
 }
 
 #[cfg(test)]
