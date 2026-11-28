@@ -820,6 +820,41 @@ fn buy_build_item(app: AppHandle, text: String) -> Result<BuyResult, String> {
 }
 
 #[derive(Serialize)]
+struct MercBuyResult { total: u64, need: usize, skill: String, supports: Vec<String> }
+
+/// "Buy" on a Mercenary stage of your build: Mercenary Warrants with its main attack and all its supports (any tier),
+/// cheapest first; with none for sale, one support fewer at a time.
+#[tauri::command(async)]
+fn buy_build_merc(app: AppHandle, groups: Vec<filter_core::pob::Group>) -> Result<MercBuyResult, String> {
+    let (poe2, league) = trade_league(&app);
+    let dir = app.state::<AppState>().data_dir.clone();
+    let index = trade_api::stats(&dir, poe2).unwrap_or_default();
+    let all = filter_core::merc::from_build(&groups, &index, usize::MAX).ok_or("No Mercenary skill in this stage")?;
+    let mut need = all.supports.len();
+    loop {
+        let w = filter_core::merc::from_build(&groups, &index, need).ok_or("No Mercenary skill in this stage")?;
+        let (id, _, total) = trade_api::search(poe2, &league, &w.query)?;
+        if total > 0 || need <= 1 {
+            open_url(trade_api::site_url(poe2, &league, &id))?;
+            return Ok(MercBuyResult { total, need, skill: w.skill, supports: w.supports });
+        }
+        need -= 1;
+    }
+}
+
+/// "Price" on a Mercenary stage: the price window's warrant search, where the supports can be ticked.
+#[tauri::command]
+fn price_build_merc(app: AppHandle, groups: Vec<filter_core::pob::Group>) {
+    thread::spawn(move || {
+        let (poe2, _) = trade_league(&app);
+        let index = trade_api::stats(&app.state::<AppState>().data_dir, poe2).unwrap_or_default();
+        let Some(w) = filter_core::merc::from_build(&groups, &index, usize::MAX) else { return };
+        let payload = text_payload(&app, &w.text);
+        show_price(&app, payload, &w.text, false);
+    });
+}
+
+#[derive(Serialize)]
 struct BaseResult { total: u64, ilvl: u32, notables: Vec<(String, u32)> }
 
 /// "Buy base" on a cluster jewel in your build: the base to craft it on (same passives and enchant, the item level
@@ -3500,7 +3535,7 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            price_build_item, buy_build_item, buy_base_item, trade_untick_one, trade_hidden, overview,
+            price_build_item, buy_build_item, buy_base_item, buy_build_merc, price_build_merc, trade_untick_one, trade_hidden, overview,
             craft_bases, craft_start, craft_pool, craft_ways, craft_plan, craft_routes, craft_now, craft_buy, craft_search, craft_buy_plan, jewel_mods,
             create_profile,
             list_filters,

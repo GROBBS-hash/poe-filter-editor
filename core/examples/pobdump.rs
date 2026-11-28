@@ -20,6 +20,10 @@ fn main() {
         // POB_BUY=<trade_stats_poe1.json> [POB_STAGE=<part of a stage name>]: the "Buy" search for each item, one JSON per line.
         if let (Ok(stats), true) = (std::env::var("POB_BUY"), s.title.contains(&std::env::var("POB_STAGE").unwrap_or_default())) {
             let index = filter_core::trade::StatIndex::from_json(&serde_json::from_str(&std::fs::read_to_string(stats).unwrap()).unwrap());
+            // A Mercenary stage: the "A Mercenary like this" warrant search.
+            if s.title.to_lowercase().contains("mercenar") {
+                if let Some(w) = filter_core::merc::from_build(&s.groups, &index, usize::MAX) { println!("MERC\t{}\t{:?}\t{}", w.skill, w.supports, w.query); }
+            }
             for g in s.gear.iter().chain(s.jewels.iter().map(|j| &j.item)) {
                 if std::env::var("POB_BASE").is_ok() {
                     if let Some((q, lvl, _)) = filter_core::trade::cluster_base_query(&g.copy, &index) { println!("BASE	{}	{}	{}", g.name, lvl, q); }

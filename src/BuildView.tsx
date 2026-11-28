@@ -103,6 +103,37 @@ function BuyButton({ it }: { it: PobGear }) {
   );
 }
 
+type MercBuy = { total: number; need: number; skill: string; supports: string[] };
+/** A Mercenary stage's first row: Mercenary Warrants with the same main attack and supports (28 Nov). */
+function MercRow({ groups }: { groups: PobGroup[] }) {
+  const [state, setState] = useState<"idle" | "busy" | MercBuy | string>("idle");
+  const buy = () => {
+    setState("busy");
+    invoke<MercBuy>("buy_build_merc", { groups }).then(setState).catch((err) => setState(String(err)));
+  };
+  const note = typeof state === "object"
+    ? `${state.total} for sale${state.need < state.supports.length ? ` · with ${state.need} of its ${state.supports.length} supports` : ""}`
+    : state !== "idle" && state !== "busy" ? state : "";
+  const main = groups.find((g) => g.enabled && g.gems.some((x) => !x.support))?.gems.find((x) => !x.support);
+  return (
+    <li>
+      <div className="bv-item">
+        <span className="bv-slot muted small">Mercenary</span>
+        <ItemIcon name={null} base="Mercenary Warrant" size={26} />
+        <span className="bv-iname">
+          <span>A Mercenary like this</span>
+          <span className="muted small"> {typeof state === "object" ? `${state.skill} with ${state.supports.join(", ")}` : `its main attack${main ? ` (${main.name})` : ""} and supports`}</span>
+        </span>
+        {note && <span className={`bv-buynote small ${typeof state === "string" ? "bad" : ""}`} title={note}>{note}</span>}
+        <button className="bv-price bv-buy" disabled={state === "busy"}
+          title={"Search the trade site for Mercenary Warrants with this main attack and its supports (any tier),\ncheapest first, and open it in your browser"}
+          onClick={buy}>{state === "busy" ? "Searching…" : "Buy"}</button>
+        <PriceButton onClick={() => invoke("price_build_merc", { groups }).catch(() => null)} />
+      </div>
+    </li>
+  );
+}
+
 /** The gem's picture from the game (its colour dot when there's none). */
 function GemPic({ g }: { g: PobGem }) {
   const icons = useIcons();
@@ -311,6 +342,7 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
       {view === "gear" && (
         <ul className="bv-gear">
           {newGems.length > 0 && <li className="bv-newgems"><b>New gems this stage:</b> {newGems.join(" · ")}</li>}
+          {/mercenar/i.test(s.title) && s.groups.length > 0 && <MercRow groups={s.groups} />}
           {gear.length === 0 && <div className="empty">No gear set for this stage.</div>}
           <HaveBar n={sorted.filter((it) => have.has(haveKey(it))).length} of={sorted.length} hide={hideHave} setHide={setHideHave} />
           {gear.filter(shown).map((it) => itemRow(it, it.slot, SLOT_NAME[it.slot] ?? it.slot))}

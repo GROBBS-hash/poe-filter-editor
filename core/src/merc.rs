@@ -129,6 +129,53 @@ pub fn warrant_text(name: &str, gems: &[MercGem]) -> String {
     out
 }
 
+/// "A Mercenary like this" for a build's Mercenary stage (28 Nov: My build had no way to search for the Mercenary itself).
+/// `text` is a warrant copy for the price window; `query` asks the trade site for a warrant with the main attack and
+/// at least `need` of its supports, in any tier.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BuildWarrant { pub text: String, pub query: serde_json::Value, pub skill: String, pub supports: Vec<String> }
+
+/// From a Mercenary stage's gem groups (Path of Building names: "Hypothermia", or "Hypothermia Support"). The main
+/// attack is the group with the most supports whose skill is a Mercenary skill on the trade site; other Mercenary
+/// skills go in the warrant text too. A support counts in any tier: "Hypothermia (Tier 2)" or "Greater Hypothermia (Tier 3)".
+pub fn from_build(groups: &[crate::pob::Group], index: &crate::trade::StatIndex, need: usize) -> Option<BuildWarrant> {
+    let merc = |n: &str| index.ids("mercenary", n);
+    let plain = |n: &str| n.trim_end_matches(" Support").to_string();
+    // Every tier of a support, best first: (label, ids).
+    let tiers = |n: &str| -> Vec<(String, Vec<String>)> {
+        [format!("Greater {n} (Tier 3)"), format!("{n} (Tier 3)"), format!("{n} (Tier 2)"), format!("{n} (Tier 1)")].into_iter()
+            .map(|l| { let ids = merc(&l); (l, ids) }).filter(|(_, ids)| !ids.is_empty()).collect()
+    };
+    let skills: Vec<(&crate::pob::Gem, Vec<&crate::pob::Gem>)> = groups.iter().filter(|g| g.enabled).filter_map(|g| {
+        let on: Vec<&crate::pob::Gem> = g.gems.iter().filter(|x| x.enabled).collect();
+        let skill = on.iter().copied().find(|x| !x.support && !merc(&x.name).is_empty())?;
+        Some((skill, on.into_iter().filter(|x| x.support && !tiers(&plain(&x.name)).is_empty()).collect()))
+    }).collect();
+    let (main, sups) = skills.iter().max_by_key(|(_, s)| s.len())?;
+    let mut gems = vec![];
+    for (sk, ss) in &skills {
+        gems.push(MercGem { name: sk.name.clone(), support: false, tier: None });
+        for s in ss {
+            let (label, _) = tiers(&plain(&s.name)).into_iter().next()?;
+            let (name, tier) = label.rsplit_once(" (Tier ").map(|(n, t)| (n.to_string(), t.trim_end_matches(')').parse().ok()))?;
+            gems.push(MercGem { name, support: true, tier });
+        }
+    }
+    let skill_ids = merc(&main.name);
+    let mut stats = vec![if skill_ids.len() == 1 { serde_json::json!({ "type": "and", "filters": [{ "id": skill_ids[0] }] }) }
+        else { serde_json::json!({ "type": "count", "value": { "min": 1 }, "filters": skill_ids.iter().map(|i| serde_json::json!({ "id": i })).collect::<Vec<_>>() }) }];
+    let sup_ids: Vec<serde_json::Value> = sups.iter().flat_map(|s| tiers(&plain(&s.name)).into_iter().flat_map(|(_, ids)| ids))
+        .map(|i| serde_json::json!({ "id": i })).collect();
+    let need = need.min(sups.len());
+    if need > 0 { stats.push(serde_json::json!({ "type": "count", "value": { "min": need }, "filters": sup_ids })); }
+    Some(BuildWarrant {
+        text: warrant_text("A Mercenary like this", &gems),
+        query: serde_json::json!({ "query": { "status": { "option": "available" }, "type": "Mercenary Warrant", "stats": stats }, "sort": { "price": "asc" } }),
+        skill: main.name.clone(),
+        supports: sups.iter().map(|s| plain(&s.name)).collect(),
+    })
+}
+
 /// The readout at the top of the window.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Verdict {
@@ -217,6 +264,32 @@ mod tests {
         assert_eq!(h, ["Wrath: helps you"]);
         assert_eq!(verdict(&[Some(5.0)], None, &h).kind, "recruit");
         assert_eq!(verdict(&[Some(500.0)], None, &h).kind, "kill");
+    }
+
+    #[test]
+    fn a_build_mercenary_becomes_a_warrant_search() {
+        use crate::pob::{Gem, Group};
+        let g = |n: &str, s: bool| Gem { name: n.into(), level: 20, quality: 0, enabled: true, support: s, colour: "w".into() };
+        let groups = vec![
+            Group { label: "".into(), slot: "".into(), enabled: true, gems: vec![g("Destructive Link", false)] },
+            Group { label: "".into(), slot: "".into(), enabled: true, gems: vec![g("Frost Blades", false), g("Hypothermia Support", true), g("Elemental Damage with Attacks", true), g("Brutality", true)] },
+            Group { label: "".into(), slot: "".into(), enabled: true, gems: vec![g("Static Strike", false), g("More Duration", true)] }];
+        let idx = crate::trade::StatIndex::from_json(&serde_json::json!({ "result": [ { "label": "Mercenary", "entries": [
+            { "id": "mercenary.skill_fb", "text": "Frost Blades", "type": "mercenary" },
+            { "id": "mercenary.skill_ss", "text": "Static Strike", "type": "mercenary" },
+            { "id": "mercenary.support_h2", "text": "Hypothermia (Tier 2)", "type": "mercenary" },
+            { "id": "mercenary.support_h3", "text": "Greater Hypothermia (Tier 3)", "type": "mercenary" },
+            { "id": "mercenary.support_e3", "text": "Greater Elemental Damage with Attacks (Tier 3)", "type": "mercenary" },
+            { "id": "mercenary.support_d2", "text": "More Duration (Tier 2)", "type": "mercenary" } ] } ] }));
+        let w = from_build(&groups, &idx, 9).unwrap();
+        assert_eq!((w.skill.as_str(), w.supports.clone()), ("Frost Blades", vec!["Hypothermia".to_string(), "Elemental Damage with Attacks".to_string()]));
+        let stats = &w.query["query"]["stats"];
+        assert_eq!(stats[0]["filters"][0]["id"], "mercenary.skill_fb");
+        assert_eq!(stats[1]["value"]["min"], 2);
+        let ids: Vec<&str> = stats[1]["filters"].as_array().unwrap().iter().map(|f| f["id"].as_str().unwrap()).collect();
+        assert_eq!(ids, ["mercenary.support_h3", "mercenary.support_h2", "mercenary.support_e3"]);
+        assert!(w.text.contains("Frost Blades\nGreater Hypothermia (Tier: 3)\n") && w.text.contains("Static Strike\nMore Duration (Tier: 2)\n"), "{}", w.text);
+        assert_eq!(from_build(&groups[..1], &idx, 2), None, "no Mercenary skill");
     }
 
     #[test]
