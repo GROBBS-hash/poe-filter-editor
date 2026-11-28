@@ -27,11 +27,15 @@ fn due(updated: Option<i64>, last: i64, now: i64) -> bool {
     updated.is_some_and(|u| now - u >= DUE) && now - last >= DUE
 }
 
-/// Asks GitHub to run the price job. Quiet: no window.
-fn ask() -> Result<(), String> {
+/// Asks GitHub to run the price job. Quiet: no window. `roaming` is the user's AppDataRoaming folder.
+fn ask(roaming: Option<&std::path::Path>) -> Result<(), String> {
     let installed = std::path::Path::new(r"C:\Program Files\GitHub CLI\gh.exe");
     let mut c = std::process::Command::new(if installed.exists() { installed } else { std::path::Path::new("gh") });
     c.args(["workflow", "run", "prices.yml", "-R", "GROBBS-hash/poe-filter-editor"]);
+    // gh finds its sign-in through APPDATA. After "Restart to update" the editor can run without it (28 Nov 2026:
+    // every ask said "run gh auth login" though gh was signed in; gh with APPDATA unset says exactly that), so
+    // the prices went 4+ hours old. Give it the folder.
+    if std::env::var_os("APPDATA").is_none() { if let Some(r) = roaming { c.env("APPDATA", r); } }
     #[cfg(windows)]
     std::os::windows::process::CommandExt::creation_flags(&mut c, 0x0800_0000); // CREATE_NO_WINDOW
     let o = c.output().map_err(|e| e.to_string())?;
@@ -48,7 +52,7 @@ pub fn start(app: AppHandle) {
                 let last = text.split_whitespace().next().and_then(|w| w.parse().ok()).unwrap_or(0);
                 let updated = state.prices.lock().unwrap().get(&Game::Poe1).and_then(|p| unix(&p.updated));
                 if due(updated, last, now()) {
-                    let r = ask();
+                    let r = ask(state.data_dir.parent());
                     let how = match &r { Ok(()) => "asked".to_string(), Err(e) => format!("couldn't ask: {e}") };
                     let _ = std::fs::write(&mark, format!("{} {how}\n", now()));
                     if r.is_ok() {
