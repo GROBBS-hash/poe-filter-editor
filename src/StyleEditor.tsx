@@ -128,6 +128,27 @@ export default function StyleEditor({ start, label, onSave, onCancel }: {
   const [s, setS] = useState<CustomStyle>(start);
   const [files, setFiles] = useState<string[]>([]);
   const [copied, setCopied] = useState<CustomStyle | null>(copiedLook);
+  // Most pages swap their list for this editor, which lost his place: after Save or Cancel the page was back at the
+  // top (28 Nov 2026: "everytime i click save look, our previous window jumps back to the top"). Remember where the
+  // page was when the editor opened and go back there when it closes.
+  const [from] = useState(() => document.scrollingElement?.scrollTop ?? 0);
+  const box = useRef<HTMLDivElement | null>(null);
+  // Opening: if the page was scrolled down, the editor (and its heading) can start above the window; bring it in.
+  useEffect(() => {
+    const top = box.current?.getBoundingClientRect().top ?? 0;
+    if (top < 0) document.scrollingElement?.scrollBy({ top: top - 110 });
+  }, []);
+  useEffect(() => () => {
+    // The page's lists can load a moment later (shorter page first), so keep trying for a second until it's there.
+    const end = performance.now() + 1200;
+    const back = () => {
+      const el = document.scrollingElement;
+      if (!el) return;
+      el.scrollTo({ top: from });
+      if (Math.abs(el.scrollTop - from) > 2 && performance.now() < end) requestAnimationFrame(back);
+    };
+    requestAnimationFrame(back);
+  }, [from]);
   const [note, setNote] = useState("");
   const copy = () => {
     try { localStorage.setItem(COPIED, JSON.stringify(s)); setCopied(s); setNote("Copied. Open any other look and press Paste."); } catch { /* not kept */ }
@@ -158,7 +179,7 @@ export default function StyleEditor({ start, label, onSave, onCancel }: {
   };
 
   return (
-    <div className="se">
+    <div className="se" ref={box}>
       <div className="se-top"><Preview s={s} text={label} /></div>
 
       <div className="se-row se-mode">
