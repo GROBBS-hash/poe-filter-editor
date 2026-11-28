@@ -4,6 +4,8 @@ fn main() {
     let code = std::fs::read_to_string(std::env::args().nth(1).expect("path to a PoB code or XML")).unwrap();
     let xml = if code.trim_start().starts_with('<') { code } else { filter_core::pob::decode(&code).unwrap() };
     let b = filter_core::pob::parse(&xml).unwrap();
+    // POB_JSON=<file>: the build as the app gets it (for preview-app.html?build=real, which reads public/_pob_sample.json).
+    if let Ok(out) = std::env::var("POB_JSON") { std::fs::write(out, serde_json::to_string(&b).unwrap()).unwrap(); }
     // Items no stage wears (shown as "Alternatives in this build"), with their Buy search when POB_BUY is set.
     for g in &b.alternatives {
         println!("alternative: {} / {}", g.name, g.base);

@@ -73,6 +73,12 @@ let pobList = [
 ];
 const gem = (name: string, colour: string, support = false) => ({ name, level: 20, quality: 20, enabled: true, support, colour });
 const pob = async () => {
+  // ?build=real: a real build from public/_pob_sample.json (POB_JSON=public/_pob_sample.json cargo run -p filter-core --example pobdump -- code.txt).
+  if (location.search.includes("build=real")) {
+    const build = await fetch("/_pob_sample.json").then((r) => r.json());
+    const st = Number(new URLSearchParams(location.search).get("stage") ?? build.active);
+    return { build, stage: st, link: "", follow: false, checks: [] };
+  }
   const t = await fetch("/tree_poe1.json").then((r) => r.json());
   const ids = Object.keys(t.nodes).map(Number);
   const stage = (title: string, n: number) => ({ title, tree: { version: "3.30", nodes: ids.slice(200, 200 + n), url: "" },
@@ -264,6 +270,7 @@ mockIPC((cmd, args) => {
     { name: "Tornado Wand", base: "Imbued Wand", price: "1 alch", score: 169, better_by: 28, lines: ["Adds 12 to 22 Physical Damage", "25% increased Attack Speed"], icon: "", pob: { CombinedDPS: 412, Life: 0, Mana: -12, Dex: 18 } },
     { name: "Coiled Wand", base: "Imbued Wand", price: "2 alch", score: 148, better_by: 7, lines: ["Adds 8 to 16 Physical Damage"], icon: "" }] };
   if (cmd === "pob_list") return pobList;
+  if (cmd === "pob_code") return "eNrtWVtv2zYU_isEnrfGdp30oUCBtmuHAt0WtFv3UBQGJdE2V4kSSMqOV-S_7xxeJMqWnMs2YA97cciPh-d-I-PvEyeZspJXkz-NQT64kL4" + "x".repeat(400);
   if (cmd === "pob_switch") { const id = (args as { id: string }).id; pobList = pobList.map((b) => ({ ...b, active: b.id === id })); return null; }
   if (cmd === "pob_rename") { const a = args as { id: string; name: string }; pobList = pobList.map((b) => b.id === a.id ? { ...b, name: a.name } : b); return null; }
   if (cmd === "pob_remove") { const id = (args as { id: string }).id; pobList = pobList.filter((b) => b.id !== id); return null; }

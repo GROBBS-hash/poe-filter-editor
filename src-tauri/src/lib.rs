@@ -1947,6 +1947,12 @@ fn pob_list(state: State<AppState>) -> Vec<PobListItem> {
         level: e.level, active: Some(&e.id) == b.active.as_ref() }).collect()
 }
 
+/// A saved build's Path of Building code, to copy or edit (28 Nov, he asked to "copy the Pobb code, and/or edit the code here").
+#[tauri::command]
+fn pob_code(state: State<AppState>, id: String) -> Result<String, String> {
+    pob_builds_load(&state).list.into_iter().find(|e| e.id == id).map(|e| e.code).ok_or_else(|| "That build isn't saved any more".to_string())
+}
+
 /// Swaps to another saved build; the one you leave keeps its stage.
 #[tauri::command]
 fn pob_switch(app: AppHandle, state: State<AppState>, id: String) -> Result<(), String> {
@@ -3626,6 +3632,7 @@ pub fn run() {
             gear_setup,
             pob_import,
             pob_list,
+            pob_code,
             pob_switch,
             pob_rename,
             pob_remove,

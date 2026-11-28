@@ -35,6 +35,14 @@ export function useIcons(): Record<string, string> {
 /** NeverSink matches some items by part of the name ("Small" = every Small … Flask, "Essence of" = every essence):
  *  the picture of the first item that name fits, flasks first. Remembered per picture list. */
 const partial = new WeakMap<Record<string, string>, Map<string, string | null>>();
+/** A magic item's whole name ("Masochist's Diamond Flask of Rupturing", PoB gives no base for those): the base's
+ *  picture, found by dropping the suffix ("of …") and prefix words until a known base is left ("Diamond Flask"). */
+function magicBase(icons: Record<string, string>, name: string): string | null {
+  const words = name.split(" of ")[0].split(" ");
+  for (let i = 1; i < words.length; i++) { const b = words.slice(i).join(" "); if (icons[b]) return icons[b]; }
+  return null;
+}
+
 function partialIcon(icons: Record<string, string>, stub: string): string | null {
   let seen = partial.get(icons);
   if (!seen) { seen = new Map(); partial.set(icons, seen); }
@@ -59,7 +67,7 @@ const JEWEL_ART: Record<string, string> = {
 export function ItemIcon({ name, base, size = 32 }: { name?: string | null; base?: string | null; size?: number }) {
   const icons = useIcons();
   const url = (name && icons[name]) || (base && icons[base]) || (base && JEWEL_ART[base] && JEWEL_CDN + JEWEL_ART[base] + ".png")
-    || (base && partialIcon(icons, base)) || null;
+    || (base && magicBase(icons, base)) || (base && partialIcon(icons, base)) || null;
   const [broken, setBroken] = useState(false);
   if (!url || broken) return null;
   return <img className="item-icon" src={url} alt="" width={size} height={size} loading="lazy" onError={() => setBroken(true)} />;

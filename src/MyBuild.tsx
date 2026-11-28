@@ -17,6 +17,15 @@ export default function MyBuild() {
   const [msg, setMsg] = useState("");
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const [key, setKey] = useState(0);
+  // Editing a build's code in place (28 Nov, he asked to copy or edit the PoB code here).
+  const [editing, setEditing] = useState<{ id: string; code: string } | null>(null);
+  const copyCode = async (b: Saved) => {
+    try { await navigator.clipboard.writeText(await invoke<string>("pob_code", { id: b.id })); setMsg(`Copied the code of ${b.name}. In Path of Building: Import/Export Build, paste it in.`); }
+    catch (e) { setMsg(String(e)); }
+  };
+  const editCode = async (b: Saved) => {
+    try { setEditing({ id: b.id, code: await invoke<string>("pob_code", { id: b.id }) }); } catch (e) { setMsg(String(e)); }
+  };
 
   const load = () => invoke<Saved[]>("pob_list").then(setList).catch(() => setList([]));
   useEffect(() => {
@@ -37,7 +46,8 @@ export default function MyBuild() {
       const what = `${s.build.ascendancy || s.build.class} with ${n} stage${n > 1 ? "s" : ""}`;
       setMsg(replace || after.length === before ? `Updated ${what}. It's the one showing now.` : `Saved ${what} and switched to it. Press F6 in game to see it.`);
       if (!replace) setLink("");
-    } catch (e) { setMsg(String(e)); } finally { setBusy(""); }
+      return true;
+    } catch (e) { setMsg(String(e)); return false; } finally { setBusy(""); }
   };
   const show = async (id: string) => {
     setBusy(id); setMsg("");
@@ -80,9 +90,21 @@ export default function MyBuild() {
                 <span className="row">
                   {!b.active && <button className="primary" disabled={!!busy} onClick={() => show(b.id)}>{busy === b.id ? "Switching…" : "Show this one"}</button>}
                   {isLink(b.link) && <button disabled={!!busy} onClick={() => add(b.link, b.id)}>{busy === b.id ? "Updating…" : "Update"}</button>}
+                  <button className="link" title="Copy its Path of Building code, to paste into PoB (Import/Export Build) or share" onClick={() => copyCode(b)}>Copy code</button>
+                  <button className="link" title="Paste in a newer code from Path of Building (after you changed the build there)" onClick={() => editing?.id === b.id ? setEditing(null) : editCode(b)}>Edit code</button>
                   <button className="link" onClick={() => setRenaming({ id: b.id, name: b.name })}>Rename</button>
                   <button className="link" onClick={() => remove(b)}>Remove</button>
                 </span>
+                {editing?.id === b.id && (
+                  <div className="mb-code">
+                    <div className="muted small">The build's Path of Building code. Changed the build in PoB? Export it there (Import/Export Build, Copy), paste it here over this one and press Save. The stages, gear and tree here update; your ticks stay.</div>
+                    <textarea className="text" rows={4} spellCheck={false} value={editing.code} onChange={(e) => setEditing({ id: b.id, code: e.target.value })} />
+                    <span className="row">
+                      <button className="primary" disabled={!!busy || !editing.code.trim()} onClick={async () => { if (await add(editing.code, b.id)) setEditing(null); }}>{busy === b.id ? "Saving…" : "Save"}</button>
+                      <button className="link" onClick={() => setEditing(null)}>Cancel</button>
+                    </span>
+                  </div>
+                )}
               </li>
             ))}
           </ul>

@@ -1,7 +1,7 @@
 import { friendly } from "./errors";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import UpgradeFinder from "./UpgradeFinder";
 import { ItemIcon, useIcons } from "./icons";
 import TreeView from "./TreeView";
@@ -12,7 +12,10 @@ export type PobGroup = { label: string; slot: string; enabled: boolean; gems: Po
 export type PobGear = { slot: string; rarity: string; name: string; base: string; lines: string[]; copy?: string };
 /** A jewel in a tree socket (node) or in an item's abyssal socket (node null, slot "Belt Abyssal Socket 1"). */
 export type PobJewel = { node: number | null; item: PobGear; notables: string[] };
-export type PobStage = { title: string; tree: { version: string; nodes: number[]; url: string } | null; groups: PobGroup[]; gear: PobGear[]; jewels?: PobJewel[] };
+/** Spectres and the Animate Guardian's gear (28 Nov). `main`: picked on a Raise Spectre gem; the rest are the build's spectre list. */
+export type PobMinions = { spectres: { id: string; name: string; main: boolean }[]; spectre_gem: PobGem | null; spectre_limit: number | null;
+  guardian_gem: PobGem | null; guardian_set: string; guardian: PobGear[] };
+export type PobStage = { title: string; tree: { version: string; nodes: number[]; url: string } | null; groups: PobGroup[]; gear: PobGear[]; jewels?: PobJewel[]; minions?: PobMinions };
 /** alternatives: items in the PoB that no stage wears (the guide's options and upgrades). */
 export type PobBuild = { class: string; ascendancy: string; level: number; stages: PobStage[]; active: number; alternatives?: PobGear[] };
 export type CheckNote = { kind: "bad" | "warn" | "ok"; text: string };
@@ -214,6 +217,114 @@ function HaveBar({ n, of, hide, setHide }: { n: number; of: number; hide: boolea
   );
 }
 
+/** Where each slot sits on the game's character screen (grid column / row, spans). 28 Nov: he picked this look ("F")
+ *  so the gear shows as item pictures and it's clear which gems go in which item. */
+const DOLL: Record<string, [number, number, number, number]> = {
+  "Weapon 1": [1, 1, 1, 3], "Helmet": [3, 1, 1, 1], "Amulet": [4, 1, 1, 1], "Weapon 2": [5, 1, 1, 3],
+  "Ring 1": [2, 2, 1, 1], "Body Armour": [3, 2, 1, 2], "Ring 2": [4, 2, 1, 1],
+  "Gloves": [2, 3, 1, 1], "Boots": [4, 3, 1, 1], "Belt": [3, 4, 1, 1],
+};
+const FLASKS = ["Flask 1", "Flask 2", "Flask 3", "Flask 4", "Flask 5"];
+const slotName = (slot: string) => SLOT_NAME[slot] ?? slot;
+const itemClass = (it: PobGear) => (it.copy ?? "").match(/^Item Class: (.+)$/m)?.[1]?.trim() ?? "";
+
+/** The gear as the game's character screen: item pictures in their places, flasks under them. Click one to see it on the
+ *  right: its sockets, the gems that go in it (each linked group on its own line), and Buy / Price / Craft. */
+function GearDoll({ gear, groups, stage, have, onHave, later, newGems, empty }: {
+  gear: PobGear[]; groups: PobGroup[]; stage: string; have: Set<string>; onHave: (it: PobGear) => void;
+  later?: StageCheck["later"]; newGems: string[]; empty: string;
+}) {
+  const bySlot = new Map(gear.map((g) => [g.slot, g]));
+  const others = gear.filter((g) => !DOLL[g.slot] && !FLASKS.includes(g.slot));
+  const first = gear.find((g) => groups.some((x) => x.slot === g.slot)) ?? gear[0];
+  const [pick, setPick] = useState<string | null>(null);
+  const [mods, setMods] = useState(false);
+  const sel = bySlot.get(pick ?? "") ?? first;
+  if (gear.length === 0) return <div className="empty">{empty}</div>;
+  const gemsIn = (slot: string) => groups.filter((g) => g.slot === slot);
+  const cell = (slot: string, style?: CSSProperties) => {
+    const it = bySlot.get(slot);
+    const n = gemsIn(slot).reduce((a, g) => a + g.gems.length, 0);
+    return (
+      <button key={slot} style={style} className={`doll-cell ${it ? "" : "none"} ${it && sel?.slot === slot ? "on" : ""} ${it && have.has(haveKey(it)) ? "got" : ""}`}
+        title={it ? `${slotName(slot)}: ${it.name}${it.base !== it.name ? ` (${it.base})` : ""}${n ? `\n${n} gems in it` : ""}` : `${slotName(slot)}: nothing in this stage`}
+        onClick={() => it && (setPick(slot), setMods(false))}>
+        {it ? <><ItemIcon name={it.rarity === "unique" ? it.name : null} base={it.base} size={slot.startsWith("Flask") ? 34 : 44} />
+          {n > 0 && <span className="doll-n">{n}</span>}
+          {have.has(haveKey(it)) && <span className="doll-got">✓</span>}</>
+          : <span className="doll-slot">{slotName(slot)}</span>}
+      </button>
+    );
+  };
+  const l = sel && later?.find((x) => x.slot === sel.slot);
+  const selGroups = sel ? gemsIn(sel.slot) : [];
+  return (
+    <div className="doll-wrap">
+      <div className="doll-left">
+        <div className="doll">
+          {Object.entries(DOLL).map(([slot, [c, r, w, h]]) => cell(slot, { gridColumn: `${c} / span ${w}`, gridRow: `${r} / span ${h}` }))}
+        </div>
+        {FLASKS.some((f) => bySlot.has(f)) && <div className="doll-flasks">{FLASKS.map((f) => cell(f))}</div>}
+        {others.length > 0 && <div className="doll-flasks">{others.map((g) => cell(g.slot))}</div>}
+      </div>
+      {sel && (
+        <div className="doll-detail">
+          <div className="doll-head">
+            <ItemIcon name={sel.rarity === "unique" ? sel.name : null} base={sel.base} size={52} />
+            <div className="doll-title">
+              <span className="muted small">{slotName(sel.slot)}</span>
+              <b style={{ color: RARITY[sel.rarity] ?? "#ccc" }}>{sel.name}</b>
+              {sel.base !== sel.name && <span className="muted small">{sel.base}</span>}
+              {l && <span className="bv-later">needs level {l.level}{l.instead ? ` · wear ${l.instead} until then` : ""}</span>}
+            </div>
+            <label className="doll-have" title="Tick it when you have it"><input type="checkbox" className="bv-have" checked={have.has(haveKey(sel))} onChange={() => onHave(sel)} /> have it</label>
+          </div>
+          <div className="bv-item doll-buttons">
+            <SocketStrip it={sel} />
+            <CraftButton it={sel} />
+            {sel.copy && <BuyButton it={sel} stage={stage} />}
+            {sel.copy && <PriceButton onClick={() => priceItem(sel)} />}
+          </div>
+          {selGroups.length > 0 ? (
+            <div className="doll-gems">
+              <div className="muted small">Gems in this {slotName(sel.slot).toLowerCase()}{selGroups.length > 1 ? " (each line is linked together)" : ""}</div>
+              {selGroups.map((g, i) => (
+                <div key={i} className={`bv-group ${g.enabled ? "" : "off"}`}>
+                  {g.label && <div className="bv-glabel">{g.label}</div>}
+                  <div className="bv-gems">{g.gems.map((x, j) => <GemPill key={j} g={x} main={!x.support && j === 0} fresh={newGems.includes(x.name)} />)}</div>
+                </div>
+              ))}
+            </div>
+          ) : !sel.slot.startsWith("Flask") && <div className="muted small doll-gems">No gems in this one.</div>}
+          <button className="link small" onClick={() => setMods(!mods)}>{mods ? "Hide its mods" : "Show its mods"}</button>
+          {mods && <ul className="bv-lines">{sel.lines.map((x, k) => <li key={k}>{x}</li>)}</ul>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The guide's spare items (in its PoB, worn in no stage), grouped by kind, doubles counted once, and ones this stage
+ *  already wears left out. 28 Nov: "the alternatives make no sense sometimes, or have no explanation". */
+function spareGroups(alts: PobGear[], worn: PobGear[]) {
+  const wornNames = new Set(worn.map((g) => g.name));
+  const out = new Map<string, { it: PobGear; n: number }[]>();
+  for (const it of alts) {
+    if (wornNames.has(it.name) && it.rarity === "unique") continue;
+    const cls = itemClass(it) || "Other";
+    const list = out.get(cls) ?? [];
+    const same = list.find((x) => x.it.name === it.name && x.it.base === it.base);
+    if (same) same.n++; else list.push({ it, n: 1 });
+    out.set(cls, list);
+  }
+  return [...out.entries()].map(([cls, items]) => {
+    // What it would replace: the worn item of the same kind.
+    const names = [...new Set(worn.filter((g) => itemClass(g) === cls).map((g) => g.name))];
+    const instead = names.length === 1 ? `instead of your ${names[0]}` : names.length > 1 ? `instead of one of your ${cls.toLowerCase()}` : "";
+    return { cls, items, instead };
+  });
+}
+
 export default function BuildView({ compact = false }: { compact?: boolean }) {
   const [have, toggleHave] = useHave();
   const [hideHave, setHideHave] = useState(() => { try { return localStorage.getItem("build.hideHave") === "1"; } catch { return false; } });
@@ -229,6 +340,10 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
     } catch { return "gear"; }
   });
   const [openItem, setOpenItem] = useState<string | null>(null);
+  // Who wears the gear shown: you, your Mercenary, the Animate Guardian, or the spectres (28 Nov, he asked for a section each).
+  const [owner, setOwner] = useState<"you" | "merc" | "guardian" | "spectres">("you");
+  const [mercPick, setMercPick] = useState<number | null>(null);
+  const [spareOpen, setSpareOpen] = useState(false);
   // In the overlay (F6) the page never scrolls: the tree fills the space under the tabs and
   // lists scroll inside their own panel. This is that panel's height.
   const panel = useRef<HTMLDivElement | null>(null);
@@ -347,21 +462,96 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
       </div>
 
       <div className="bv-panel" ref={panel}>
-      {view === "gear" && (
-        <ul className="bv-gear">
-          {newGems.length > 0 && <li className="bv-newgems"><b>New gems this stage:</b> {newGems.join(" · ")}</li>}
-          {/mercenar/i.test(s.title) && s.groups.length > 0 && <MercRow groups={s.groups} />}
-          {gear.length === 0 && <div className="empty">No gear set for this stage.</div>}
-          <HaveBar n={sorted.filter((it) => have.has(haveKey(it))).length} of={sorted.length} hide={hideHave} setHide={setHideHave} />
-          {gear.filter(shown).map((it) => itemRow(it, it.slot, SLOT_NAME[it.slot] ?? it.slot))}
-          {flasks.filter(shown).length > 0 && <li className="bv-subhead">Flasks</li>}
-          {flasks.filter(shown).map((it) => itemRow(it, it.slot, it.slot))}
-          {otherGroups.length > 0 && <li className="bv-subhead">Other gems</li>}
-          {otherGroups.length > 0 && <li className="bv-othergems">{otherGroups.map((g, i) => groupView(g, i, true))}</li>}
-          {(build.alternatives ?? []).filter(shown).length > 0 && <li className="bv-subhead" title="Items in the Path of Building that no stage wears: the guide's options and upgrades">Alternatives in this build</li>}
-          {(build.alternatives ?? []).filter(shown).map((it, i) => itemRow(it, "alt" + i, "Alternative"))}
-        </ul>
-      )}
+      {view === "gear" && (() => {
+        // Mercenary stages ("Mercenary: at the swap"): the one named most like this stage, unless one was picked.
+        const mercs = build.stages.map((x, i) => ({ x, i })).filter(({ x }) => /mercenar/i.test(x.title));
+        const isMerc = /mercenar/i.test(s.title);
+        const words = (x: string) => new Set(x.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2 && w !== "mercenary" && w !== "level"));
+        const mine = words(s.title);
+        const guess = isMerc ? stage : [...mercs].sort((a, b) => [...words(b.x.title)].filter((w) => mine.has(w)).length - [...words(a.x.title)].filter((w) => mine.has(w)).length)[0]?.i;
+        const mi = mercPick != null && mercs.some((m) => m.i === mercPick) ? mercPick : guess;
+        const merc = mi != null ? build.stages[mi] : null;
+        const m = s.minions;
+        const tabs = [
+          { k: "you" as const, label: isMerc ? "This stage" : "You", show: true },
+          { k: "merc" as const, label: "Mercenary", show: !isMerc && mercs.length > 0 },
+          { k: "guardian" as const, label: "Animate Guardian", show: !!m?.guardian_gem },
+          { k: "spectres" as const, label: `Spectres${m?.spectre_limit ? ` ×${m.spectre_limit}` : ""}`, show: !!m?.spectre_gem },
+        ].filter((x) => x.show);
+        const who = tabs.some((x) => x.k === owner) ? owner : "you";
+        const spares = spareGroups((build.alternatives ?? []).filter(shown), s.gear);
+        const spareN = spares.reduce((a, g) => a + g.items.length, 0);
+        return (
+          <div className="bv-gearv">
+            {newGems.length > 0 && who === "you" && <div className="bv-newgems"><b>New gems this stage:</b> {newGems.join(" · ")}</div>}
+            {tabs.length > 1 && (
+              <div className="bv-owners">
+                {tabs.map((x) => <button key={x.k} className={who === x.k ? "on" : ""} onClick={() => setOwner(x.k)}>{x.label}</button>)}
+                <span className="muted small bv-havecount">Have {sorted.filter((it) => have.has(haveKey(it))).length} of {sorted.length}</span>
+              </div>
+            )}
+            {who === "you" && <>
+              {isMerc && s.groups.length > 0 && <ul className="bv-gear"><MercRow groups={s.groups} /></ul>}
+              <GearDoll key={"you" + stage} gear={s.gear} groups={s.groups} stage={s.title} have={have} onHave={(it) => toggleHave(haveKey(it))}
+                later={chk?.later} newGems={newGems} empty="No gear set for this stage." />
+              {otherGroups.length > 0 && <><div className="bv-subhead">Gems not in an item</div><div className="bv-othergems">{otherGroups.map((g, i) => groupView(g, i, true))}</div></>}
+            </>}
+            {who === "merc" && merc && <>
+              <div className="bv-ownerhead">
+                {mercs.length > 1 ? <select value={mi ?? undefined} onChange={(e) => setMercPick(+e.target.value)}>
+                  {mercs.map(({ x, i }) => <option key={i} value={i}>{x.title}</option>)}</select> : <b>{merc.title}</b>}
+                <span className="muted small">Your Mercenary's gear and skills from the guide</span>
+              </div>
+              {merc.groups.length > 0 && <ul className="bv-gear"><MercRow groups={merc.groups} /></ul>}
+              <GearDoll key={"merc" + mi} gear={merc.gear} groups={merc.groups} stage={merc.title} have={have} onHave={(it) => toggleHave(haveKey(it))}
+                newGems={[]} empty="The guide gives no gear for the Mercenary here." />
+              {merc.groups.some((g) => !merc.gear.some((it) => it.slot === g.slot)) && <>
+                <div className="bv-subhead">Its skills</div>
+                <div className="bv-othergems">{merc.groups.filter((g) => !merc.gear.some((it) => it.slot === g.slot)).map((g, i) => groupView(g, i, false))}</div>
+              </>}
+            </>}
+            {who === "guardian" && m && <>
+              <div className="bv-ownerhead">
+                {m.guardian_gem && <GemPill g={m.guardian_gem} main={true} />}
+                <span className="muted small">{m.guardian.length ? <>The Animate Guardian wears the guide's “{m.guardian_set}” set. Drop these on the ground, then use the gem on them.</> : "The guide doesn't give the Animate Guardian any gear."}</span>
+              </div>
+              <GearDoll key={"ag" + stage} gear={m.guardian} groups={[]} stage={s.title} have={have} onHave={(it) => toggleHave(haveKey(it))}
+                newGems={[]} empty="No gear for it in this guide." />
+            </>}
+            {who === "spectres" && m?.spectre_gem && (
+              <div className="bv-spectres">
+                <div className="bv-ownerhead">
+                  <GemPill g={m.spectre_gem} main={true} />
+                  <span>raises <b>{m.spectre_limit ?? "?"}</b> spectre{m.spectre_limit === 1 ? "" : "s"}</span>
+                  <span className="muted small" title="From the gem's level, gem levels on your gear, and +spectres from your tree and gear. Support gems aren't counted.">(about: from the gem level, gear and tree)</span>
+                </div>
+                {m.spectres.length === 0 && <div className="empty">The guide doesn't say which spectres to raise.</div>}
+                {m.spectres.some((x) => x.main) && <div className="bv-subhead">Raise these</div>}
+                {m.spectres.filter((x) => x.main).map((x) => (
+                  <div key={x.id} className="bv-spectre main"><GemPic g={m.spectre_gem!} /><b>{x.name}</b>
+                    <span className="muted small">the guide's pick on this stage's Raise Spectre gem</span></div>
+                ))}
+                {m.spectres.some((x) => !x.main) && <div className="bv-subhead" title="Path of Building's spectre list for this build: every spectre the guide set up, for all its stages">Also in the guide's spectre list</div>}
+                {m.spectres.filter((x) => !x.main).map((x) => <div key={x.id} className="bv-spectre"><span>{x.name}</span></div>)}
+              </div>
+            )}
+            {who === "you" && spareN > 0 && (
+              <div className="bv-spares">
+                <button className="bv-sparehead" onClick={() => setSpareOpen(!spareOpen)}>
+                  {spareOpen ? "▾" : "▸"} Spare items in the guide <span className="cnt">{spareN}</span>
+                  <span className="muted small">items the guide put in its Path of Building but no stage wears: options, upgrades, levelling pieces</span>
+                </button>
+                {spareOpen && <ul className="bv-gear">
+                  {spares.map((g) => <li key={g.cls} className="bv-sparegroup">
+                    <div className="bv-subhead">{g.cls}{g.instead && <span className="muted"> · {g.instead}</span>}</div>
+                    <ul className="bv-gear">{g.items.map(({ it, n }, i) => itemRow(it, g.cls + i, n > 1 ? `×${n}` : ""))}</ul>
+                  </li>)}
+                </ul>}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {view === "jewels" && (
         <ul className="bv-gear bv-jewels">
