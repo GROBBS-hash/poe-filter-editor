@@ -363,11 +363,11 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
       {view === "check" && (
         <div className="bv-check">
           {!chk ? <div className="empty">Nothing to check in this stage.</div> : <>
-            <div className="bv-check-sum small">
+            {(chk.str || chk.dex || chk.int || chk.points > 0) ? <div className="bv-check-sum small">
               Level <b>{chk.level}</b>{chk.level_guessed && <span className="muted"> (guessed from the tree)</span>}
               {" · "}{chk.str} Str · {chk.dex} Dex · {chk.int} Int
               {chk.points > 0 && <> · {chk.points} passive points</>}
-            </div>
+            </div> : null}
             {chk.speed && (
               <div className={`bv-check-line ${chk.speed.spare_pct < 0 ? "bad" : "ok"}`}>
                 <b>{chk.speed.skill}</b> fires after <b>{chk.speed.fires_after.toFixed(2)} s</b>, you attack every <b>{chk.speed.attack_every.toFixed(2)} s</b>.{" "}

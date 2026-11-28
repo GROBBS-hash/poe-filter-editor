@@ -219,6 +219,12 @@ pub fn check(b: &Build) -> Vec<StageCheck> {
 }
 
 fn check_stage(b: &Build, st: &Stage, next_level: Option<u32>) -> StageCheck {
+    // A gear set with no tree, or a Mercenary's stage: it isn't worn by you, so your level and attributes don't apply.
+    if st.tree.is_none() && (st.groups.is_empty() || st.title.to_lowercase().contains("mercenar")) {
+        let note = Note { kind: "ok".into(), text: "Gear for your Mercenary or a minion, not you: nothing to check against your level.".into() };
+        return StageCheck { title: st.title.clone(), level: b.level.max(1), level_guessed: true, str: 0, dex: 0, int: 0, short: [0; 3],
+            points: 0, points_have: 0, mana: None, speed: None, notes: vec![note] };
+    }
     let nodes = &data().1;
     let mut notes: Vec<Note> = vec![];
     let mut note = |kind: &str, text: String| notes.push(Note { kind: kind.into(), text });
@@ -395,6 +401,17 @@ fn check_stage(b: &Build, st: &Stage, next_level: Option<u32>) -> StageCheck {
 mod tests {
     use super::*;
     fn build(code: &str) -> Build { crate::pob::parse(&crate::pob::decode(code).unwrap()).unwrap() }
+
+    #[test]
+    fn mercenary_gear_is_not_checked_against_you() {
+        let b = crate::pob::parse(r#"<PathOfBuilding><Build className="Scion" ascendClassName="Luminary" level="40"/>
+<Items><Item id="1">Rarity: UNIQUE
+Paradoxica
+Vaal Rapier</Item><ItemSet id="1" title="Mercenary: budget"><Slot name="Weapon 1" itemId="1"/></ItemSet></Items></PathOfBuilding>"#).unwrap();
+        let c = check(&b);
+        assert_eq!(c.len(), 1);
+        assert!(c[0].notes.iter().all(|n| n.kind == "ok") && c[0].short == [0; 3], "{:?}", c[0].notes);
+    }
 
     #[test]
     fn old_kf_guide_catches_the_int_and_mana_problems() {
