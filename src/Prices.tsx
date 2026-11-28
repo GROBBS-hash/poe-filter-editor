@@ -4,13 +4,14 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { ProfileInfo } from "./types";
 import BasesCard from "./Bases";
+import DustCard, { DustSettings } from "./Dust";
 import StyleEditor, { CustomStyle, LookButton, Preview } from "./StyleEditor";
 
 type Group = "Uniques" | "DivinationCards" | "Currency" | "Other";
 type Tier = { min: number; style: CustomStyle };
 type GroupSettings = { group: Group; enabled: boolean; tiers: Tier[]; hide_below?: number | null };
-type Settings = { enabled: boolean; groups: GroupSettings[]; bases_min?: number | null; bases_influenced?: boolean };
-type Page = { settings: Settings; info?: { league: string; updated: string; unit: string; count: number } | null };
+type Settings = { enabled: boolean; groups: GroupSettings[]; bases_min?: number | null; bases_influenced?: boolean; dust?: DustSettings };
+type Page = { settings: Settings; game?: string; info?: { league: string; updated: string; unit: string; count: number } | null };
 
 const TITLES: Record<Group, string> = {
   Uniques: "Uniques",
@@ -76,6 +77,19 @@ export default function Prices({ profile }: { profile: ProfileInfo }) {
   };
   const when = page.info ? new Date(page.info.updated).toLocaleString() : "";
 
+  if (styling && styling.g < 0 && s.dust) {
+    const tier = s.dust.tiers[styling.t];
+    return (
+      <div className="card prices-style">
+        <h2>Dust uniques: look for tiers giving {tier.min.toLocaleString()}+ dust</h2>
+        <div className="qm">
+          <StyleEditor start={tier.style} label="Example item"
+            onCancel={() => setStyling(null)}
+            onSave={(style) => { change((x) => { x.dust!.tiers[styling.t].style = style; }); setStyling(null); }} />
+        </div>
+      </div>
+    );
+  }
   if (styling) {
     const tier = s.groups[styling.g].tiers[styling.t];
     return (
@@ -157,6 +171,11 @@ export default function Prices({ profile }: { profile: ProfileInfo }) {
       ))}
 
       <BasesCard profileId={profile.id} onSaved={keepBases} />
+
+      {page.game === "Poe1" && s.dust && (
+        <DustCard profileId={profile.id} dust={s.dust} onLook={(t) => setStyling({ g: -1, t })}
+          onChange={(d) => change((x) => { x.dust = d; })} />
+      )}
 
       <div className="save-bar">
         {msg && <span className="note">{msg}</span>}

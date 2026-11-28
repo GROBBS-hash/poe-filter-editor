@@ -159,6 +159,9 @@ pub struct PriceSettings {
     pub bases_influenced: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bases_style: Option<CustomStyle>,
+    /// Uniques by how much Thaumaturgic Dust they give (PoE 1, works with price tiers off).
+    #[serde(default = "crate::dust::default_settings")]
+    pub dust: crate::dust::DustSettings,
 }
 
 /// The Threads page's key in section_hide / section_stack. NeverSink has no Threads section (they sit in Fragments
@@ -209,6 +212,7 @@ pub fn default_settings(unit: &str) -> PriceSettings {
         bases_min: None,
         bases_influenced: false,
         bases_style: None,
+        dust: crate::dust::default_settings(),
     }
 }
 

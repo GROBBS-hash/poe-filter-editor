@@ -302,6 +302,11 @@ pub fn render_profile(store: &Store, id: &str, filter_dir: &Path, prices: Option
         }
         _ => String::new(),
     };
+    // Dust tiers need no prices. After the price tiers, so a unique worth a lot keeps its price look.
+    let extra = match &p.prices {
+        Some(settings) if p.game == Game::Poe1 => extra + &crate::dust::blocks(&settings.dust, &segs, nl),
+        _ => extra,
+    };
     let warnings = apply_with_extra(&mut segs, &rules, &extra, nl);
     Ok((render_filter(&segs), warnings))
 }
