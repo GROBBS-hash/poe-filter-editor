@@ -1292,6 +1292,14 @@ fn unique_rolls(name: &str) -> Vec<(String, f64, f64)> {
     }).collect()
 }
 
+/// Only items you can wear at `level` (28 Nov 2026: his "Swap at Merciless Lab (level 68-90)" stage's Buy
+/// links found rares needing level 84).
+pub fn max_level(q: &mut Value, level: u32) {
+    let query = &mut q["query"];
+    if !query["filters"].is_object() { query["filters"] = json!({}); }
+    query["filters"]["req_filters"] = json!({ "filters": { "lvl": { "max": level } } });
+}
+
 /// The item level a cluster jewel notable needs to roll (core/data/cluster_notables.json, from the game's mod data
 /// via tools/build_cluster_levels.mjs; checked against poedb).
 pub fn notable_ilvl(name: &str) -> Option<u32> {

@@ -54,7 +54,7 @@ function CraftButton({ it }: { it: PobGear }) {
   );
 }
 
-type BuyResult = { total: number; of: number; need: number };
+type BuyResult = { total: number; of: number; need: number; level?: number | null; any_level?: boolean; base_level?: number | null };
 
 /** "Buy": opens the trade site in your browser, searching for an item with the mods PoB lists. */
 type BaseResult = { total: number; ilvl: number; notables: [string, number][] };
@@ -82,15 +82,15 @@ function BuyBaseButton({ it }: { it: PobGear }) {
   );
 }
 
-function BuyButton({ it }: { it: PobGear }) {
+function BuyButton({ it, stage }: { it: PobGear; stage?: string }) {
   const [state, setState] = useState<"idle" | "busy" | BuyResult | string>("idle");
   const go = (e: { stopPropagation(): void }) => {
     e.stopPropagation();
     setState("busy");
-    invoke<BuyResult | null>("buy_build_item", { text: it.copy }).then((r) => setState(r ?? "No answer from the trade site")).catch((err) => setState(String(err)));
+    invoke<BuyResult | null>("buy_build_item", { text: it.copy, stage: stage ?? null }).then((r) => setState(r ?? "No answer from the trade site")).catch((err) => setState(String(err)));
   };
   const note = typeof state === "object" && state
-    ? `${state.total} for sale${state.need < state.of ? ` · any ${state.need} of ${state.of} mods` : ""}`
+    ? `${state.total} for sale${state.need < state.of ? ` · any ${state.need} of ${state.of} mods` : ""}${state.base_level ? ` · this base needs level ${state.base_level}` : state.any_level ? ` · none you can wear at level ${state.level}, showing all` : state.level ? ` · wearable at level ${state.level}` : ""}`
     : state !== "idle" && state !== "busy" ? state : "";
   return (
     <>
@@ -307,7 +307,7 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
           </span>
           <SocketStrip it={it} />
           <CraftButton it={it} />
-          {it.copy && <BuyButton it={it} />}
+          {it.copy && <BuyButton it={it} stage={s.title} />}
           {it.copy && <PriceButton onClick={() => priceItem(it)} />}
         </div>
         {groups.length > 0 && <div className="bv-ingems" onClick={(e) => e.stopPropagation()}>{groups.map((g, i) => groupView(g, i, false))}</div>}
@@ -380,7 +380,7 @@ export default function BuildView({ compact = false }: { compact?: boolean }) {
                   )}
                   {j.item.copy && j.item.base.endsWith("Cluster Jewel") && <BuyBaseButton it={j.item} />}
                   <CraftButton it={j.item} />
-                  {j.item.copy && <BuyButton it={j.item} />}
+                  {j.item.copy && <BuyButton it={j.item} stage={s.title} />}
                   {j.item.copy && <PriceButton onClick={() => priceItem(j.item)} />}
                 </div>
                 {openItem === key && <ul className="bv-lines">{j.item.lines.map((l, k) => <li key={k}>{l}</li>)}</ul>}

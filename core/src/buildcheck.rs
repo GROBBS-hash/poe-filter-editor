@@ -96,7 +96,7 @@ fn quest_points(level: u32) -> u32 {
 }
 
 /// The character level in a stage title: "Level 25", "Lvl 12-25", "lv35", "Act 3 (lvl 30)".
-fn title_level(t: &str) -> Option<u32> {
+pub fn title_level(t: &str) -> Option<u32> {
     let l = t.to_lowercase();
     for key in ["level", "lvl", "lv"] {
         if let Some(i) = l.find(key) {
@@ -149,6 +149,13 @@ fn base_of<'a>(g: &'a Gear) -> Option<(&'a str, [f64; 6])> {
     if let Some(b) = bases.get(g.base.as_str()) { return Some((g.base.as_str(), *b)); }
     // Magic items: "Constant Quicksilver Flask of the Hare" holds the base.
     bases.iter().filter(|(k, _)| g.base.contains(k.as_str())).max_by_key(|(k, _)| k.len()).map(|(_, v)| (g.base.as_str(), *v))
+}
+
+/// The character level an item needs to wear (its base, or a unique's own); 0 when unknown.
+pub fn wear_level(base: &str, rarity: &str, name: &str) -> u32 {
+    let bases = &data().0.bases;
+    let b = bases.get(base).or_else(|| bases.iter().filter(|(k, _)| base.contains(k.as_str())).max_by_key(|(k, _)| k.len()).map(|x| x.1));
+    (b.map(|b| b[0] as u32).unwrap_or(0)).max(if rarity.eq_ignore_ascii_case("unique") { unique_level(name) } else { 0 })
 }
 
 fn unique_level(name: &str) -> u32 {
@@ -401,6 +408,16 @@ fn check_stage(b: &Build, st: &Stage, next_level: Option<u32>) -> StageCheck {
 mod tests {
     use super::*;
     fn build(code: &str) -> Build { crate::pob::parse(&crate::pob::decode(code).unwrap()).unwrap() }
+
+    #[test]
+    fn wear_levels_for_buy() {
+        // His level 68 stage's helmet (the trade site found none wearable at 80, all of them at 90).
+        let l = wear_level("Torturer's Mask", "Rare", "");
+        assert!((81..=90).contains(&l), "{l}");
+        assert!(wear_level("Vaal Gauntlets", "Rare", "") > 0);
+        assert_eq!(wear_level("Not A Base", "Rare", ""), 0);
+        assert_eq!(title_level("Swap at Merciless Lab (level 68-90)"), Some(68));
+    }
 
     #[test]
     fn mercenary_gear_is_not_checked_against_you() {
