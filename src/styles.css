@@ -2507,3 +2507,14 @@ button.qm-rule:hover, .qm-rule.can-open:hover { border-color: var(--gold); backg
 .acmp-note { background: none; border: 1px solid currentColor; border-radius: 99px; padding: 2px 10px; font-size: 12.5px; }
 .acmp-note:hover:not(:disabled) { background: color-mix(in srgb, currentColor 14%, transparent); }
 .mb-list li.mb-on { border-color: var(--gold); background: var(--gold-bg); }
+
+/* Sidebar tidy (28 Nov 2026, "A · four groups"): tighter rows so the whole menu fits without scrolling on a maximised
+   window. Settings and Help share one row at the bottom. Kept last so it wins over the older layers above. */
+.menu, .menu-group { gap: 1px; }
+.side .menu-item { min-height: 31px; padding: 3px 10px; }
+.side .menu-ico { width: 25px; height: 25px; border-radius: 7px; }
+.side .menu-ico svg { width: 16px; height: 16px; }
+.menu-group.has-g .menu-gname { margin-top: 10px !important; margin-bottom: 3px !important; }
+.menu-bottom { flex-direction: row; flex-wrap: wrap; padding-top: 6px; }
+.menu-bottom > .menu-item { flex: 1 1 0; min-width: 0; width: auto; }
+.menu-bottom .side-foot { flex-basis: 100%; padding: 4px 10px 0; }

@@ -72,7 +72,9 @@ type MenuItem = { id: Tab; name: string; hint: string };
 /** The groups' colours (22 Nov, GROBBS picked "more, smaller groups" with a colour per kind of group):
  *  blue = the filter, amber = your changes, green = playing, purple = money. */
 const G_FILTER = "#7fb2ea", G_CHANGES = "#e9b46a", G_PLAY = "#6fd0a6", G_MONEY = "#c9a3ea";
-/** Small groups, each with a line saying what's in it; Settings and Help sit at the bottom. Wording and grouping from
+/** Four groups (28 Nov 2026, he picked sidebar "A · four groups" after the whole-app check: the two filter groups and
+ *  "Your changes" merged, "While you play" became Endgame, the grey line under each group became its hover tip so the
+ *  menu fits without scrolling). Before that: small groups, each with a line saying what's in it; Settings and Help sit at the bottom. Wording and grouping from
  *  mock-up "B · Sorted by what you're doing" (22 Nov 2026): his build sits with the gear for it, the things used while
  *  playing are together, and the price check has its own page under Money. Each hint is also the page's subtitle and
  *  what Ctrl+K search matches, so it says plainly what's on the page. */
@@ -80,17 +82,13 @@ const MENU: { group: string; sub?: string; colour?: string; items: MenuItem[] }[
   { group: "", items: [
     { id: "home", name: "Home", hint: "Your filter at a glance, recent changes and your in-game keys" },
   ] },
-  { group: "Your loot filter", sub: "Which filter you use, how strict, and its colours", colour: G_FILTER, items: [
+  { group: "Loot filter", sub: "Your filter, how items look, and everything you've changed (F2 and F3 in game)", colour: G_FILTER, items: [
     { id: "profiles", name: "Filters", hint: "Which filter you're editing, how strict it is, and its NeverSink version" },
     { id: "presets", name: "Presets", hint: "Ready-made changes: levelling, your build's weapons and armour, league mechanics" },
     { id: "themes", name: "Themes", hint: "Recolour the whole filter in one go" },
-  ] },
-  { group: "How items look", sub: "Change any item, NeverSink's tiers, or colour by price", colour: G_FILTER, items: [
     { id: "find", name: "Change an item", hint: "The item you picked in Search (Ctrl+F): change how it drops, or describe a change in your own words" },
     { id: "tiers", name: "Tiers", hint: "NeverSink's ranked item lists: move items up or down, hide them, change their look" },
     { id: "prices", name: "Price tiers", hint: "Make valuable items stand out using poe.ninja prices (off until you turn it on)" },
-  ] },
-  { group: "Your changes", sub: "Everything you've changed. F2 and F3 change items in game", colour: G_CHANGES, items: [
     { id: "edits", name: "My edits", hint: "Everything you've changed: undo it, see the history, preview drops" },
     { id: "batch", name: "Batch mode", hint: "Collect items in game (F3, then Ctrl+C on each) and change them all at once" },
   ] },
@@ -99,10 +97,10 @@ const MENU: { group: string; sub?: string; colour?: string; items: MenuItem[] }[
     { id: "gear", name: "Unique finder", hint: "Uniques you can wear at your level that suit your skill, cheapest first, with trade links" },
     { id: "craft", name: "Crafting", hint: "What can roll on an item, and the cheapest way to get the mods you want" },
   ] },
-  { group: "While you play", sub: "Windows over the game, maps you can run, your atlas tree", colour: G_PLAY, items: [
-    { id: "play", name: "Game windows", hint: "Windows over the game: levelling route (F8), map tracker (F9), searches (F10), cheat sheets (F11), notes" },
-    { id: "maps", name: "Map mods", hint: "Map mods your build can't run, a stash search for good maps, and maps to buy" },
+  { group: "Endgame", sub: "Your atlas tree, maps you can run, and windows over the game", colour: G_CHANGES, items: [
     { id: "atlas", name: "Atlas tree", hint: "Atlas tree plans from maxroll or pathofexile.com, over the game with F7" },
+    { id: "maps", name: "Map mods", hint: "Map mods your build can't run, a stash search for good maps, and maps to buy" },
+    { id: "play", name: "Game windows", hint: "Windows over the game: levelling route (F8), map tracker (F9), searches (F10), cheat sheets (F11), notes" },
   ] },
   { group: "Money", sub: "What items sell for, what your stash is worth, what you earn", colour: G_MONEY, items: [
     { id: "pricecheck", name: "Price check", hint: "What an item sells for: hover it in game and press Ctrl+D. Plus your saved and live searches" },
@@ -383,8 +381,7 @@ export default function App() {
         <nav className="menu">
           {MENU.map((g) => (
             <div key={g.group || "top"} className={`menu-group ${g.colour ? "has-g" : ""}`} style={g.colour ? { "--g": g.colour } as CSSProperties : undefined}>
-              {g.group && <div className="menu-gname">{g.group}</div>}
-              {g.sub && <div className="menu-gsub">{g.sub}</div>}
+              {g.group && <div className="menu-gname" title={g.sub}>{g.group}</div>}
               {g.items.map(item)}
             </div>
           ))}
